@@ -11,6 +11,10 @@
 *.gch
 *.pch
 
+# Images
+*.svg
+*.png
+
 # Linker files
 *.ilk
 
@@ -39,3 +43,6 @@
 
 # debug information files
 *.dwo
+
+
+build/
