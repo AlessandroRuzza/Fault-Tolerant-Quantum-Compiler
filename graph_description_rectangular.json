@@ -1,0 +1,9 @@
+{
+    "type": "rectangular",
+    "rows": 5,
+    "cols": 5,
+    "diagonal_connectivity": false,
+    "magic_states_coords": [
+        [10, 1], [5, 5]
+    ]
+}
