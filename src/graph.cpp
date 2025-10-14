@@ -142,29 +142,58 @@ Graph Graph::from_json(const std::string& filename) {
     
     json j = json::parse(f);
     Graph g;
-    
-    // Load nodes if present
-    if (j.contains("nodes") && j["nodes"].is_array()) {
-        for (const auto& node : j["nodes"]) {
-            if (node.contains("id")) {
-                int id = node["id"];
-                int x = node.value("x", 0);
-                int y = node.value("y", 0);
-                g.add_node(id, x, y);
-            }
+
+    // // STAMPA IL JSON RAW PER DEBUG
+    // std::cout << "=== JSON RAW CONTENT ===\n";
+    // std::cout << j.dump(2) << std::endl; // indent=2 per pretty print
+    // std::cout << "========================\n";
+
+    // Stampa anche i tipi e le chiavi principali
+    std::cout << "JSON type: " << j.type_name() << std::endl;
+    std::cout << "Keys in JSON object:\n";
+    if (j.is_object()) {
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::cout << "  - \"" << it.key() << "\" : " << it.value().type_name() << std::endl;
         }
     }
-    
-    // Load edges
-    if (j.contains("edges") && j["edges"].is_array()) {
-        for (const auto& edge : j["edges"]) {
-            if (edge.is_array() && edge.size() == 2) {
-                int u = edge[0];
-                int v = edge[1];
-                g.add_edge(u, v);
+    std::cout << "------------------------\n";
+
+    std::cout << "Parsing graph from JSON file: " << filename << "\n";
+
+    if(j.contains("type") && j["type"] == "rectangular") {
+        std::cout << "Creating rectangular grid graph...\n";
+        int rows = j.value("rows", 0);
+        int cols = j.value("cols", 0);
+        bool diagonal = j.value("diagonal_connectivity", false);
+        if (rows > 0 && cols > 0) {
+            // Create grid nodes
+            for (int r = 0; r < rows; ++r) {
+                for (int c = 0; c < cols; ++c) {
+                    int node_id = r * cols + c;
+                    g.add_node(node_id, c, r); // x = col, y = row
+                }
+            }
+            // Create edges
+            for (int r = 0; r < rows; ++r) {
+                for (int c = 0; c < cols; ++c) {
+                    int node_id = r * cols + c;
+                    // Right neighbor
+                    if (c + 1 < cols) g.add_edge(node_id, node_id + 1);
+                    // Bottom neighbor
+                    if (r + 1 < rows) g.add_edge(node_id, node_id + cols);
+                    if (diagonal) {
+                        // Bottom-right neighbor
+                        if (c + 1 < cols && r + 1 < rows) g.add_edge(node_id, node_id + cols + 1);
+                        // Bottom-left neighbor
+                        if (c - 1 >= 0 && r + 1 < rows) g.add_edge(node_id, node_id + cols - 1);
+                    }
+                }
             }
         }
+        std::cout << g.get_node_count() << " nodes created in rectangular grid.\n";
+        return g;
     }
+    
     
     return g;
 }
