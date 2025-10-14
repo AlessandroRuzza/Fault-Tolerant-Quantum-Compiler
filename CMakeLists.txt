@@ -5,6 +5,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include_directories(include)
+
+
+file(GLOB ALL_SRC_FILES src/*.cpp)
+
+add_executable(FaultTolerantQuantumCompiler ${ALL_SRC_FILES})
+
+
 # ------JSON and Main-------------
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
@@ -13,7 +21,11 @@ set(JSON_MultipleHeaders OFF CACHE INTERNAL "")
 # Aggiungi il submodule nlohmann/json
 add_subdirectory(external/nlohmann_json)
 
-add_executable(FaultTolerantQuantumCompiler graph.cpp)
+# Include directories
+target_include_directories(FaultTolerantQuantumCompiler PRIVATE include)
+
+# Crea l'eseguibile con tutti i file sorgente necessari
+
 
 # Linka nlohmann/json
 target_link_libraries(FaultTolerantQuantumCompiler

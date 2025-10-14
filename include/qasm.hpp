@@ -1,8 +1,15 @@
-#pragma once
+#ifndef QASM_HPP
+#define QASM_HPP
 
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <regex>
+#include <cctype>
+#include <stdexcept>
 
 namespace qasm {
 
@@ -16,3 +23,5 @@ struct Gate {
 std::vector<Gate> parse_qasm_file(const std::string &path);
 
 } // namespace qasm
+
+#endif // QASM_HPP

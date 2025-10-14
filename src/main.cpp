@@ -1,9 +1,10 @@
 #include "qasm.hpp"
+#include "graph.hpp"
 
 #include <iostream>
 
 int main(int argc, char **argv) {
-    const char *path = "example.qasm";
+    const char *path = "../example.qasm";
     if (argc > 1) path = argv[1];
     try {
         auto gates = qasm::parse_qasm_file(path);
@@ -20,5 +21,11 @@ int main(int argc, char **argv) {
         std::cerr << "error: " << e.what() << std::endl;
         return 2;
     }
+
+
+    // Graph g = Graph::from_json("graph_description_generic.json");
+    // g.print();
+
+
     return 0;
 }

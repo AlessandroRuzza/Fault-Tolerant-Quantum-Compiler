@@ -1,12 +1,5 @@
 #include "qasm.hpp"
 
-#include <fstream>
-#include <sstream>
-#include <iostream>
-#include <regex>
-#include <cctype>
-#include <stdexcept>
-
 namespace qasm {
 
 static std::string trim(const std::string &s) {
