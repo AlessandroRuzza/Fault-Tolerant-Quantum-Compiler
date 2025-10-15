@@ -12,7 +12,6 @@ file(GLOB ALL_SRC_FILES src/*.cpp)
 
 add_executable(FaultTolerantQuantumCompiler ${ALL_SRC_FILES})
 
-
 # ------JSON and Main-------------
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
@@ -34,6 +33,9 @@ target_link_libraries(FaultTolerantQuantumCompiler
 
 
 # ------Eigen-------------
+
+# Suppress deprecated enum-enum conversion warning
+target_compile_options(FaultTolerantQuantumCompiler PRIVATE -Wno-deprecated-enum-enum-conversion)
 
 if(DEFINED ENV{mkEigenInc} OR DEFINED mkEigenInc)
     # Usa la variabile mkEigenInc (da env o CMake option)
