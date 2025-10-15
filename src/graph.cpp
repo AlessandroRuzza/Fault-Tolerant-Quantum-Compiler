@@ -54,6 +54,10 @@ void Graph::add_edge(int u, int v) {
     if (std::find(u_node.neighbors.begin(), u_node.neighbors.end(), v) == u_node.neighbors.end()) {
         u_node.neighbors.push_back(v);
     }
+    auto& v_node = get_node(v);
+    if (std::find(v_node.neighbors.begin(), v_node.neighbors.end(), v) == v_node.neighbors.end()) {
+        v_node.neighbors.push_back(u);
+    }
     
     nodes.insert(u);
     nodes.insert(v);
@@ -72,8 +76,10 @@ std::vector<int> Graph::neighbors(int u) const {
 // Get neighbors as Node objects
 std::vector<Node> Graph::neighbor_nodes(int u) const {
     std::vector<Node> result;
-    for (int neighbor_id : neighbors(u)) {
-        result.push_back(get_node(neighbor_id));
+    std::vector<int> neighbors_u = neighbors(u);
+    result.reserve(neighbors_u.size());
+    for (int neighbor_id : neighbors_u) {
+        result.emplace_back(get_node(neighbor_id));
     }
     return result;
 }
@@ -112,11 +118,13 @@ void Graph::resize(int new_size) {
     SpMat new_adj(new_size, new_size);
     new_adj.reserve(adj.nonZeros());
     
+    std::vector<Eigen::Triplet<int>> triplets;
     for (int k = 0; k < adj.outerSize(); ++k) {
         for (SpMat::InnerIterator it(adj, k); it; ++it) {
-            new_adj.coeffRef(it.row(), it.col()) = it.value();
+            triplets.emplace_back(it.row(), it.col(), it.value());
         }
     }
+    new_adj.setFromTriplets(triplets.begin(), triplets.end());
     adj = std::move(new_adj);
 }
 
@@ -160,7 +168,54 @@ Graph Graph::from_json(const std::string& filename) {
 
     std::cout << "Parsing graph from JSON file: " << filename << "\n";
 
-    if(j.contains("type") && j["type"] == "rectangular") {
+    if(!j.contains("type")){
+        std::cerr << "type not specified!\n";
+        return Graph{};
+    }
+
+    // Handle generic graph type with fields at the root
+    if (j["type"] == "generic") {
+        int num_nodes = j.value("num_nodes", 0);
+        // Add nodes with default coordinates
+        for (int i = 0; i < num_nodes; ++i) {
+            g.add_node(i);
+        }
+        // Set coordinates if present
+        if (j.contains("coordinates")) {
+            for (auto it = j["coordinates"].begin(); it != j["coordinates"].end(); ++it) {
+                int node_id = std::stoi(it.key());
+                const auto& coords = it.value();
+                if (coords.is_array() && coords.size() >= 2) {
+                    int x = static_cast<int>(coords[0]);
+                    int y = static_cast<int>(coords[1]);
+                    Node& n = g.get_node(node_id);
+                    n.coordX = x;
+                    n.coordY = y;
+                }
+            }
+        }
+        else{
+            std::cerr << "node coordinates not specified!\n";
+            return Graph{};
+        }
+
+        // Add edges from connectivity
+        if (j.contains("connectivity")) {
+            for (const auto& edge : j["connectivity"]) {
+                if (edge.is_array() && edge.size() == 2) {
+                    int u = edge[0];
+                    int v = edge[1];
+                    g.add_edge(u, v);
+                }
+            }
+        } 
+        else{
+            std::cerr << "node connectivity not specified!\n";
+            return Graph{};
+        }
+    }
+    else
+    if(j["type"] == "rectangular") {
         std::cout << "Creating rectangular grid graph...\n";
         int rows = j.value("rows", 0);
         int cols = j.value("cols", 0);
@@ -190,10 +245,27 @@ Graph Graph::from_json(const std::string& filename) {
                 }
             }
         }
+        else{
+            std::cerr << "rows or cols not specified!\n";
+            return Graph{};
+        }
         std::cout << g.get_node_count() << " nodes created in rectangular grid.\n";
         return g;
     }
-    
-    
+
+
+    if(j.contains("magic states")){
+        if(j["magic states"].is_array()){
+            g.magic_states.insert(j["magic states"].begin(), j["magic states"].end());
+        }
+        else{
+            std::cerr << "magic states not specified as array of ints!\n";
+            return Graph{};
+        }
+    }
+    else{
+        std::cerr << "magic states not specified!\n";
+        return Graph{};
+    }
     return g;
 }
