@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
 
 
     Graph g = Graph::from_json("../graph_description_rectangular.json");
-    g.Graph::print();
+    g.print();
 
 
     return 0;

@@ -42,6 +42,7 @@ public:
 private:
     SpMat adj;
     std::unordered_set<int> nodes;
+    std::unordered_set<int> magic_states;
     int node_count;
     std::vector<Node> node_storage;  // Global array of nodes
     std::unordered_map<int, size_t> node_map;  // Map from node ID to index in storage
@@ -79,6 +80,8 @@ public:
 
     // Get all node IDs
     std::unordered_set<int> get_nodes() const { return nodes; }
+    // Get all magic state node IDs
+    std::unordered_set<int> get_magic_states() const { return magic_states; }
     
     // Get node count
     int get_node_count() const { return node_count; }
