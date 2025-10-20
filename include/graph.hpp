@@ -26,11 +26,18 @@ struct Node {
 
 class IGraph {
 public:
+    //return
     virtual ~IGraph() = default;
     virtual void add_edge(int u, int v) = 0;
     virtual const std::vector<int>& neighbors(int u) const = 0;
+    virtual std::vector<Node> neighbor_nodes(int u) const = 0;
     virtual std::vector<int> bfs(int start) const = 0;
     virtual void print() const = 0;
+
+    // //return nodes
+    // virtual void add_edge(Node& n1, Node& n2) = 0;
+    // virtual const std::vector<Node>& neighbors(Node& n1) const = 0;
+    // virtual std::vector<Node> bfs(Node& start) const = 0;
 };
 
 // Graph represented as a sparse adjacency matrix (row-major)

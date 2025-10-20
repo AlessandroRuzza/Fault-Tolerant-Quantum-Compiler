@@ -1,6 +1,6 @@
 #include "layering.hpp"
 
-namespace qasm {
+namespace circuit {
 
 void LayeredCircuit::build_layers() {
     std::unordered_map<int, int> qubit_last_layer;

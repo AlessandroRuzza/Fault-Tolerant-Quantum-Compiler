@@ -1,11 +1,11 @@
-#include "qasm.hpp"
+#include "circuit.hpp"
 
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
 #include <algorithm>
 
-namespace qasm {
+namespace circuit {
 
 class LayeredCircuit : public Circuit {
 protected:

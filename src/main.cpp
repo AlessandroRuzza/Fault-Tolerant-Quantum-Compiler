@@ -1,4 +1,4 @@
-#include "qasm.hpp"
+#include "circuit.hpp"
 #include "graph.hpp"
 #include "layering.hpp"
 
@@ -7,7 +7,7 @@
 int main(int argc, char **argv) {
     const char *path = "../example.qasm";
     if (argc > 1) path = argv[1];
-    qasm::Circuit circuit = qasm::Circuit();
+    circuit::Circuit circuit = circuit::Circuit();
     try {
         circuit.parse_qasm_file(path);
         auto gates = circuit.getGates();
@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     }
 
     std::cout << "------- LAYERING ---------" << std::endl;
-    qasm::LayeredCircuit layeredCircuit = qasm::LayeredCircuit(circuit);
+    circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
     layeredCircuit.print_layered();
 
     Graph g = Graph::from_json("../graph_description_rectangular.json");
