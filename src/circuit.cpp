@@ -1,6 +1,6 @@
-#include "qasm.hpp"
+#include "circuit.hpp"
 
-namespace qasm {
+namespace circuit {
 
 static std::string trim(const std::string &s) {
     size_t a = s.find_first_not_of(" \t\r\n");
@@ -117,4 +117,4 @@ void Circuit::parse_qasm_file(const std::string &path) {
     }
 }
 
-} // namespace qasm
+} // namespace circuit

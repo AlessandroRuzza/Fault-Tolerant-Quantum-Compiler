@@ -1,5 +1,5 @@
-#ifndef QASM_HPP
-#define QASM_HPP
+#ifndef CIRCUIT_HPP
+#define CIRCUIT_HPP
 
 #include <string>
 #include <vector>
@@ -11,7 +11,7 @@
 #include <cctype>
 #include <stdexcept>
 
-namespace qasm {
+namespace circuit {
 
 struct Gate {
     int id;
@@ -54,8 +54,8 @@ public:
 
 namespace std {
 template<>
-struct hash<qasm::Gate> {
-    std::size_t operator()(const qasm::Gate& g) const {
+struct hash<circuit::Gate> {
+    std::size_t operator()(const circuit::Gate& g) const {
         hash<int> hi = hash<int>();
         hash<std::string> hs = hash<std::string>();
         // Combine hashes of all relevant members
@@ -64,4 +64,4 @@ struct hash<qasm::Gate> {
 };
 }
 
-#endif // QASM_HPP
+#endif // CIRCUIT_HPP
