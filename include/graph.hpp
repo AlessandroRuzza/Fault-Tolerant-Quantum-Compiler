@@ -28,7 +28,7 @@ class IGraph {
 public:
     virtual ~IGraph() = default;
     virtual void add_edge(int u, int v) = 0;
-    virtual std::vector<int> neighbors(int u) const = 0;
+    virtual const std::vector<int>& neighbors(int u) const = 0;
     virtual std::vector<int> bfs(int start) const = 0;
     virtual void print() const = 0;
 };
@@ -64,7 +64,7 @@ public:
     void add_edge(int u, int v) override;
 
     // Get neighbors of node u (outgoing edges) - returns neighbor IDs
-    std::vector<int> neighbors(int u) const override;
+    const std::vector<int>& neighbors(int u) const override;
 
     // Get neighbors as Node objects
     std::vector<Node> neighbor_nodes(int u) const;
