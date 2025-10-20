@@ -20,12 +20,12 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    std::cout << "------- LAYERING ---------" << std::endl;
     qasm::LayeredCircuit layeredCircuit = qasm::LayeredCircuit(circuit);
     layeredCircuit.print_layered();
 
     Graph g = Graph::from_json("../graph_description_rectangular.json");
     //g.print();
-
 
     return 0;
 }
