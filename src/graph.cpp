@@ -1,5 +1,7 @@
 #include "graph.hpp"
 
+const std::vector<int> emptyVec;
+
 // Node constructor implementation
 Node::Node(int node_id, int x, int y) : id(node_id), coordX(x), coordY(y) {}
 
@@ -65,18 +67,18 @@ void Graph::add_edge(int u, int v) {
 }
 
 // Get neighbors of node u (outgoing edges) - returns neighbor IDs
-std::vector<int> Graph::neighbors(int u) const {
+const std::vector<int>& Graph::neighbors(int u) const {
     auto it = node_map.find(u);
     if (it != node_map.end()) {
         return node_storage[it->second].neighbors;
     }
-    return std::vector<int>();  // Return empty vector if node not found
+    return emptyVec;  // Return empty vector if node not found
 }
 
 // Get neighbors as Node objects
 std::vector<Node> Graph::neighbor_nodes(int u) const {
     std::vector<Node> result;
-    std::vector<int> neighbors_u = neighbors(u);
+    const std::vector<int>& neighbors_u = neighbors(u);
     result.reserve(neighbors_u.size());
     for (int neighbor_id : neighbors_u) {
         result.emplace_back(get_node(neighbor_id));
