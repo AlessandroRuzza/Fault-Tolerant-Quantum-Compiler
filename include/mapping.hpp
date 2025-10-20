@@ -40,7 +40,7 @@ public:
     }
 
     // Dichiarazione solo: implementazione in src/mapping.cpp
-    void mapping();
+    void magic_aware_mapping();
 
 };
 

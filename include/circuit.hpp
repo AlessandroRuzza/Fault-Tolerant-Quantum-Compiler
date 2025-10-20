@@ -34,6 +34,11 @@ struct Gate {
     }
 };
 
+struct gate_count {
+    std::string name;
+    int count;
+};
+
 class Circuit {
 protected:
     std::vector<Gate> gates; 
@@ -42,8 +47,46 @@ public:
     Circuit() {}
     Circuit(const Circuit& c) : gates(c.gates) {}
 
-    const std::vector<Gate>& getGates() const { return gates; }
-    
+    inline const std::vector<Gate>& getGates() const { return gates; }
+
+    inline const int getNumQubits() const {
+        int max_qubit = -1;
+        for (const Gate& gate : gates) {
+            for (const int q : gate.qubits) {
+                if (q > max_qubit) {
+                    max_qubit = q;
+                }
+            }
+        }
+        return max_qubit + 1; // qubits are zero-indexed
+    }
+
+    inline const int getNumGates() const {
+        return static_cast<int>(gates.size());
+    }
+
+    inline const std::unordered_map<std::string, int> getAllGatesCount() const {
+        std::unordered_map<std::string, int> result;
+        for (const Gate& gate : gates) {
+            result[gate.name]++;
+        }
+        return result;
+    }
+
+
+    const std::vector<std::vector<gate_count>> getGatesCountPerQubit() const;
+
+    const void printCountPerQubit() const {
+        auto counts = getGatesCountPerQubit();
+        for (size_t i = 0; i < counts.size(); ++i) {
+            std::cout << "Qubit " << i << ":\n";
+            for (const auto& gc : counts[i]) {
+                std::cout << "  " << gc.name << ": " << gc.count << "\n";
+            }
+        }
+    }
+
+
     // Parse a QASM file and return a vector of gates.
     // Throws std::runtime_error on I/O errors.
     void parse_qasm_file(const std::string &path);
