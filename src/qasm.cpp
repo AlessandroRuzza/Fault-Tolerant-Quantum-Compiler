@@ -9,11 +9,10 @@ static std::string trim(const std::string &s) {
     return s.substr(a, b - a + 1);
 }
 
-std::vector<Gate> parse_qasm_file(const std::string &path) {
+void Circuit::parse_qasm_file(const std::string &path) {
     std::ifstream ifs(path);
     if (!ifs) throw std::runtime_error("failed to open file: " + path);
 
-    std::vector<Gate> gates;
     std::string line;
 
     // regex to match gate lines like: name q[0];  or cx q[0],q[1];
@@ -21,6 +20,7 @@ std::vector<Gate> parse_qasm_file(const std::string &path) {
     std::regex gate_re(R"(^\s*([a-zA-Z]+)\s+([^;]+);)" );
     std::regex qubit_re(R"((?:([a-zA-Z_]\w*)\s*\[\s*(\d+)\s*\]))");
 
+    int globalID = 0;
     while (std::getline(ifs, line)) {
         auto s = trim(line);
         if (s.empty()) continue;
@@ -34,6 +34,7 @@ std::vector<Gate> parse_qasm_file(const std::string &path) {
         std::smatch m;
         if (std::regex_search(s, m, gate_re)) {
             Gate g;
+            g.id = globalID++;
             g.name = m[1].str();
             std::string operands = m[2].str();
 
@@ -97,8 +98,6 @@ std::vector<Gate> parse_qasm_file(const std::string &path) {
         }
         // otherwise ignore unknown lines
     }
-
-    return gates;
 }
 
 } // namespace qasm

@@ -11,18 +11,25 @@
 #include <cctype>
 #include <stdexcept>
 
-
-
 namespace qasm {
 
 struct Gate {
+    int id;
     std::string name; // gate name, e.g. "cx", "h", "t"
     std::vector<uint32_t> qubits; // targets/controls in textual order
 };
 
-// Parse a QASM file and return a vector of gates.
-// Throws std::runtime_error on I/O errors.
-std::vector<Gate> parse_qasm_file(const std::string &path);
+class Circuit {
+protected:
+    std::vector<Gate> gates; 
+
+public:
+    const std::vector<Gate>& getGates(){ return gates; }
+    // Parse a QASM file and return a vector of gates.
+    // Throws std::runtime_error on I/O errors.
+    void parse_qasm_file(const std::string &path);
+};
+
 
 } // namespace qasm
 
