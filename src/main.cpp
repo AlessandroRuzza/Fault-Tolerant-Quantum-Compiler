@@ -24,7 +24,11 @@ int main(int argc, char **argv) {
     circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
     layeredCircuit.print_layered();
 
-    Graph g = Graph::from_json("../graph_description_rectangular.json");
+    std::cout << "------- MAPPING ---------" << std::endl;
+    std::vector<std::vector<circuit::gate_count>> gatesCount = circuit.getGatesCountPerQubit();
+    circuit.printCountPerQubit();
+
+    //Graph g = Graph::from_json("../graph_description_rectangular.json");
     //g.print();
 
     return 0;

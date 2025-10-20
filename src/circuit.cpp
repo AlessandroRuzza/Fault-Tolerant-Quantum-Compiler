@@ -117,4 +117,39 @@ void Circuit::parse_qasm_file(const std::string &path) {
     }
 }
 
+
+
+
+
+const std::vector<std::vector<gate_count>> Circuit::getGatesCountPerQubit() const {
+    std::vector <std::vector<gate_count>> result;
+    //da pensare se sia melgio chiamare sempre il metodo getNumQubits, magari inline, o salvare il dato
+
+    for (const Gate& gate : gates) {
+        for (const int q : gate.qubits) {
+            if (q < 0) {
+                throw std::runtime_error("Negative qubit index found in gate");
+            }
+            if (q >= static_cast<int>(result.size())) {
+                std::vector<gate_count> vec = {{gate.name, 1}};
+                result.push_back(vec);
+            } else {
+                bool found = false;
+                for (gate_count& gc : result[q]) {
+                    if (gc.name == gate.name) {
+                        gc.count++;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    result[q].push_back({gate.name, 1});
+                }
+            }
+        }
+    }
+    return result;
+}
+
+
 } // namespace circuit
