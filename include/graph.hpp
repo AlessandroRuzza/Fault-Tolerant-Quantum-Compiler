@@ -85,6 +85,9 @@ public:
     // Static method to construct a Graph from JSON file
     static Graph from_json(const std::string& filename);
 
+    // Static method to create a rectangular grid with magic states
+    static Graph create_rectangular_with_magic_states(int width, int height);
+
     // Get all node IDs
     std::unordered_set<int> get_nodes() const { return nodes; }
     // Get all magic state node IDs
