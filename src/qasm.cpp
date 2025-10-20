@@ -68,28 +68,45 @@ void Circuit::parse_qasm_file(const std::string &path) {
                 if (lname == "tdg") {
                     for (int i = 0; i < 7; ++i) {
                         Gate tg;
+                        tg.id = globalID++;
                         tg.name = "t";
                         tg.qubits = g.qubits;
                         gates.push_back(std::move(tg));
                     }
                 } else if (lname == "x") {
-                    Gate h1; h1.name = "h"; h1.qubits = g.qubits; gates.push_back(h1);
+                    Gate h1; 
+                    h1.id = globalID++;
+                    h1.name = "h"; h1.qubits = g.qubits; gates.push_back(h1);
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        Gate tg; 
+                        tg.id = globalID++;
+                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
                     }
-                    Gate h2; h2.name = "h"; h2.qubits = g.qubits; gates.push_back(h2);
+                    Gate h2; 
+                    h2.id = globalID++;
+                    h2.name = "h"; h2.qubits = g.qubits; gates.push_back(h2);
                 } else if (lname == "z") {
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        Gate tg; 
+                        tg.id = globalID++;
+                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
                     }
                 } else if (lname == "y") {
-                    Gate h1; h1.name = "h"; h1.qubits = g.qubits; gates.push_back(h1);
+                    Gate h1; 
+                    h1.id = globalID++;
+                    h1.name = "h"; h1.qubits = g.qubits; gates.push_back(h1);
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        Gate tg; 
+                        tg.id = globalID++;
+                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
                     }
-                    Gate h2; h2.name = "h"; h2.qubits = g.qubits; gates.push_back(h2);
+                    Gate h2; 
+                    h2.id = globalID++;
+                    h2.name = "h"; h2.qubits = g.qubits; gates.push_back(h2);
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        Gate tg; 
+                        tg.id = globalID++;
+                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
                     }
                 } else {
                     gates.push_back(std::move(g));
