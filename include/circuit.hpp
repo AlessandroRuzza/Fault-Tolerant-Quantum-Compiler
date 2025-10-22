@@ -90,10 +90,11 @@ public:
     // Parse a QASM file and return a vector of gates.
     // Throws std::runtime_error on I/O errors.
     void parse_qasm_file(const std::string &path);
+
+    // Scrive il circuito su file in formato OPENQASM 2.0 (semplice)
+    void write_qasm_file(const std::string& path) const;
 };
-
-
-} // namespace qasm
+} // namespace circuit
 
 namespace std {
 template<>
