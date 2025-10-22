@@ -27,6 +27,7 @@ int main(int argc, char **argv) {
     std::cout << "------- MAPPING ---------" << std::endl;
     std::vector<std::vector<circuit::gate_count>> gatesCount = circuit.getGatesCountPerQubit();
     circuit.printCountPerQubit();
+    circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
 
     //Graph g = Graph::from_json("../graph_description_rectangular.json");
     //g.print();

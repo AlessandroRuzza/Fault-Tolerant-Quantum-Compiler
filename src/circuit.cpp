@@ -1,4 +1,5 @@
 #include "circuit.hpp"
+#include <sstream>
 
 namespace circuit {
 
@@ -117,9 +118,40 @@ void Circuit::parse_qasm_file(const std::string &path) {
     }
 }
 
+void Circuit::write_qasm_file(const std::string& path) const {
+    std::ofstream ofs("../"+path);
+    if (!ofs) throw std::runtime_error("failed to open file for writing: " + path);
 
+    // header minimal
+    ofs << "OPENQASM 2.0;\n";
+    ofs << "include \"qelib1.inc\";\n";
 
+    // determina numero di qubit (max index + 1)
+    int maxq = -1;
+    for (const Gate& g : gates) {
+        for (int q : g.qubits) {
+            if (q > maxq) maxq = q;
+        }
+    }
+    int nq = (maxq >= 0) ? (maxq + 1) : 0;
+    if (nq > 0) ofs << "qreg q[" << nq << "];\n\n";
 
+    // scrivi le istruzioni in ordine
+    for (const Gate& g : gates) {
+        // nome gate
+        ofs << g.name;
+        // operandi
+        if (!g.qubits.empty()) {
+            ofs << " ";
+            for (size_t i = 0; i < g.qubits.size(); ++i) {
+                if (i) ofs << ",";
+                ofs << "q[" << g.qubits[i] << "]";
+            }
+        }
+        ofs << ";\n";
+    }
+    ofs.close();
+}
 
 const std::vector<std::vector<gate_count>> Circuit::getGatesCountPerQubit() const {
     std::vector <std::vector<gate_count>> result;
