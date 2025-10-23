@@ -66,3 +66,34 @@ else()
     endif()
 endif()
 
+# Add graph_viewer target and a run/open target to build, run --test, copy the html to Windows (WSL)
+# and open it (or fall back to xdg-open on Linux).
+add_executable(graph_viewer
+    src/graph.cpp
+    visualization/graph_viewer.cpp
+)
+
+target_include_directories(graph_viewer PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+
+# Link nlohmann/json (added earlier via add_subdirectory)
+target_link_libraries(graph_viewer PRIVATE
+    nlohmann_json::nlohmann_json
+)
+
+# If Eigen is available, use it; otherwise add system include
+if (TARGET Eigen3::Eigen)
+    target_link_libraries(graph_viewer PRIVATE Eigen3::Eigen)
+else()
+    target_include_directories(graph_viewer PRIVATE /usr/include/eigen3)
+endif()
+
+# Target that runs the binary (--test)
+add_custom_target(run-graph-viewer
+    DEPENDS graph_viewer
+    COMMAND $<TARGET_FILE:graph_viewer> --test
+    COMMENT "Running graph_viewer --test (generates /tmp/graph_view.html)"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
