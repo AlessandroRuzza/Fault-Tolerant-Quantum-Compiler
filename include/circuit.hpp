@@ -74,6 +74,7 @@ public:
     }
 
 
+    // vector of qubits composed of gate_counts
     const std::vector<std::vector<gate_count>> getGatesCountPerQubit() const;
 
     const void printCountPerQubit() const {

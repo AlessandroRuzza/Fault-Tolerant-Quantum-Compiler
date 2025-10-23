@@ -6,8 +6,8 @@
 #include <string>
 #include <sstream>
 #include <cstdlib>
-#include "../external/nlohmann_json/json.hpp"
-#include "../include/graph.hpp"
+#include <nlohmann/json.hpp>
+#include "graph.hpp"
 
 using json = nlohmann::json;
 
@@ -146,7 +146,7 @@ void show_graph_with_cytoscape(const std::string &json_path) {
 </html>)HTML";
 
     // 4) Scrivi file HTML temporaneo
-    std::string out = "/tmp/graph_view.html"; // WSL-friendly path
+    std::string out = "graph_view.html";
     std::ofstream ofs(out);
     if (!ofs) {
         std::cerr << "Impossibile scrivere HTML su: " << out << "\n";
@@ -309,7 +309,7 @@ void show_graph_with_cytoscape(const Graph &g) {
 int main(int argc, char **argv) {
     if (argc > 1 && std::string(argv[1]) == "--test") {
         // Test con JSON generico
-        const char *path = "graph_description_generic.json";
+        const char *path = "../graphs/graph_description_generic.json";
         std::cout << "Visualizzazione grafo JSON: " << path << "\n";
         show_graph_with_cytoscape(path);
     }
