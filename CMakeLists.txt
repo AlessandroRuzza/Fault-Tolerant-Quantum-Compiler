@@ -37,32 +37,19 @@ target_link_libraries(FaultTolerantQuantumCompiler
 # Suppress deprecated enum-enum conversion warning
 target_compile_options(FaultTolerantQuantumCompiler PRIVATE -Wno-deprecated-enum-enum-conversion)
 
-if(DEFINED ENV{mkEigenInc} OR DEFINED mkEigenInc)
-    # Usa la variabile mkEigenInc (da env o CMake option)
-    if(DEFINED ENV{mkEigenInc})
-        set(EIGEN_INCLUDE_DIR $ENV{mkEigenInc})
-    else()
-        set(EIGEN_INCLUDE_DIR ${mkEigenInc})
-    endif()
-    
-    message(STATUS "Using Eigen from mkEigenInc: ${EIGEN_INCLUDE_DIR}")
-    target_include_directories(FaultTolerantQuantumCompiler PRIVATE ${EIGEN_INCLUDE_DIR})
-    
+find_package(Eigen3 3.3 QUIET)
+if(Eigen3_FOUND)
+    target_link_libraries(FaultTolerantQuantumCompiler PRIVATE Eigen3::Eigen)
+    message(STATUS "Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
 else()
-    # Fallback a find_package
-    find_package(Eigen3 3.3 QUIET)
-    if(Eigen3_FOUND)
+    # Prova path specifico del cluster
+    if(EXISTS "/u/sw/toolchains/gcc-glibc/11.2.0/pkgs/eigen/3.3.9/share/eigen3/cmake/")
+        list(APPEND CMAKE_PREFIX_PATH "/u/sw/toolchains/gcc-glibc/11.2.0/pkgs/eigen/3.3.9/share/eigen3/cmake/")
+        find_package(Eigen3 3.3 REQUIRED)
         target_link_libraries(FaultTolerantQuantumCompiler PRIVATE Eigen3::Eigen)
-        message(STATUS "Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
+        message(STATUS "Found Eigen3 manually: ${EIGEN3_INCLUDE_DIR}")
     else()
-        # Prova path specifico del cluster
-        if(EXISTS "/u/sw/toolchains/gcc-glibc/11.2.0/pkgs/eigen/3.3.9/share/eigen3/cmake/")
-            list(APPEND CMAKE_PREFIX_PATH "/u/sw/toolchains/gcc-glibc/11.2.0/pkgs/eigen/3.3.9/share/eigen3/cmake/")
-            find_package(Eigen3 3.3 REQUIRED)
-            target_link_libraries(FaultTolerantQuantumCompiler PRIVATE Eigen3::Eigen)
-        else()
-            message(FATAL_ERROR "Eigen3 not found. Please install Eigen3, set mkEigenInc environment variable, or set CMAKE_PREFIX_PATH.")
-        endif()
+        message(FATAL_ERROR "Eigen3 not found. Please install Eigen3, set mkEigenInc environment variable, or set CMAKE_PREFIX_PATH.")
     endif()
 endif()
 
