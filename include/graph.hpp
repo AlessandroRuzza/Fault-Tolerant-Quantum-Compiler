@@ -22,6 +22,11 @@ struct Node {
     std::vector<int> neighbors;  // Store neighbor IDs, not Node objects
     
     Node(int node_id, int x = 0, int y = 0);
+    float distance(Node b) const {
+        float distX = abs(coordX - b.coordX);
+        float distY = abs(coordY - b.coordY);
+        return sqrtf(distX*distX + distY*distY);
+    }
 };
 
 class IGraph {
