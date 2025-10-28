@@ -47,7 +47,7 @@ namespace circuit {
         return {}; // no path found
     }
 
-    Routing QubitRouter::route_layer(const std::vector<Gate>& layer_gates) const {
+    Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         Routing routing;
         std::unordered_map<int, int> node_to_qubit; // inverse mapping
         std::unordered_set<int> used_nodes;
@@ -62,6 +62,8 @@ namespace circuit {
                 throw new std::runtime_error("Qubit was not mapped.");
             }
         }
+
+        //TODO: Order gates to be routed by some policy
         
         for (const Gate& gate : layer_gates) {
             Path path;
@@ -90,5 +92,34 @@ namespace circuit {
         return routing;
     }
 
+    void QubitRouter::route_circuit() {
+        std::cout << "Starting qubit routing...\n";
 
+        std::vector<Routing> routing_steps(circuit.getNumLayers());
+
+        while(circuit.getNumLayers() > 0){
+            const Layer& topLayer = circuit.getLayer(0);
+            /*
+            *   Optimization for LayeredCircuit (?)
+            *       Since this only needs the first layer,
+            *       no need to construct all layers at each routing step.
+            *       Only the first can be made and rebuilt from scratch after routing.
+            * 
+            *   OR (better): change LayeredCircuit::update_layers to not rebuild from scratch, 
+            *                instead scan the 2nd layer and move gates to first layer.
+            */
+            Routing route = route_layer(topLayer);
+            routing_steps.emplace_back(route);
+
+            // Extract all keys of route (== gates that have been routed)
+            std::vector<Gate> used_gates(route.size());
+            for (const auto& item : route) {
+                used_gates.push_back(item.first);
+            }
+            // Update layering given used gates
+            circuit.update_layers(used_gates);
+        }
+        
+        std::cout << "Qubit routing completed.\n";
+    }
 }
