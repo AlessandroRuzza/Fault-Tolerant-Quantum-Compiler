@@ -1,3 +1,6 @@
+#ifndef LAYERING_HPP
+#define LAYERING_HPP
+
 #include "circuit.hpp"
 
 #include <unordered_map>
@@ -7,10 +10,13 @@
 
 namespace circuit {
 
+using Layer = std::unordered_set<Gate>;
+
 class LayeredCircuit : public Circuit {
+    static const Layer emptyLayer;
 protected:
     // Each layer is a vector of gate pointers
-    std::vector<std::unordered_set<Gate>> layers;
+    std::vector<Layer> layers;
     std::unordered_set<Gate> ignored_gates;
     
 private:
@@ -21,11 +27,18 @@ public:
         build_layers();
     }
 
-    void update_layers(const std::vector<Gate>& routed_gates){
-        ignored_gates.insert(routed_gates.begin(), routed_gates.end());
-        build_layers();
-    }
+    void update_layers(const std::vector<Gate>& routed_gates);
     void print_layered() const;
+
+    const Layer& getLayer(int i) const {
+        if(i >= layers.size()) return emptyLayer;
+        else return layers[i];
+    }
+    int getNumLayers() const {
+        return layers.size();
+    }
 };
 
 }
+
+#endif // LAYERING_HPP
