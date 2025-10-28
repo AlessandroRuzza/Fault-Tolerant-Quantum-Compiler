@@ -12,7 +12,10 @@
 #include <algorithm>
 #include <limits>
 
-namespace circuit {
+using circuit::LayeredCircuit;
+using circuit::Layer;
+using circuit::Gate;
+
 using Path = std::vector<int>;
 using Routing = std::unordered_map<Gate, Path>;
 
@@ -26,7 +29,7 @@ public:
 };
 
 class NaiveShortestPath : public IPathStrategy {
-    std::vector<int> find_shortest_path(int start_node, int end_node, const std::unordered_set<int>& used_nodes) const;
+    Path find_shortest_path(int start_node, int end_node, const std::unordered_set<int>& used_nodes) const;
 };
 
 class QubitRouter {
@@ -42,7 +45,5 @@ public:
     Routing route_layer(const Layer& layer_gates) const;
     void route_circuit();
 };
-
-} // namespace circuit
 
 #endif // ROUTING_HPP
