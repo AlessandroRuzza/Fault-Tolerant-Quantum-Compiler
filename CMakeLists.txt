@@ -32,6 +32,14 @@ target_link_libraries(FaultTolerantQuantumCompiler
 )
 
 
+# Esegui l'eseguibile principale ad ogni 'make'
+add_custom_target(run-main ALL
+    DEPENDS FaultTolerantQuantumCompiler
+    COMMAND $<TARGET_FILE:FaultTolerantQuantumCompiler>
+    COMMENT "Running FaultTolerantQuantumCompiler after build"
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 # ------Eigen-------------
 
 # Suppress deprecated enum-enum conversion warning
