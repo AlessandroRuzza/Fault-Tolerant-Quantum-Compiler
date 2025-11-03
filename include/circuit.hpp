@@ -12,12 +12,14 @@
 #include <stdexcept>
 #include <unordered_map>
 #include "maxHeap.hpp"
+#include "qubit.hpp"
 
 namespace circuit {
 
 struct Gate {
     int id;
     std::string name; // gate name, e.g. "cx", "h", "t"
+    //vector of qubit indices the gate acts on
     std::vector<uint32_t> qubits; // targets/controls in textual order
 
     std::string to_string() const {
@@ -36,42 +38,27 @@ struct Gate {
     }
 };
 
-struct Qubit {
-    int qubit_id;
-    int T_count;
-
-    //to replace with heap
-    std::vector<int> CNOT_count;
-
-    Qubit(int id, int c, const std::vector<int>& q) : qubit_id(id), T_count(c), CNOT_count(q) {}
-
-    //to replace with heap
-    int max_cnot_count() const {
-        int max_count = 0;
-        for (int count : CNOT_count) {
-            if (count > max_count) {
-                max_count = count;
-            }
-        }
-        return max_count;
-    }
-};
 
 
 class Circuit {
 protected:
     std::vector<Gate> gates; 
-    MaxHeap<Qubit> qubits;
+    MaxHeap<Qubit*> qubitsHeap;
     //maps qubit index to index in the heap
-    std::vector<int> qubit_heap_indices;
+    std::vector<Qubit*> qubitsVector;
 
 public:
 
     Circuit () = default;
 
     Circuit(int num_qubits) {
-        qubits = MaxHeap<Qubit>(num_qubits);
-        initializeQubitHeapIndices(num_qubits);
+        setupCircuit(num_qubits);
+    }
+
+    inline void setupCircuit(int num_qubits) {
+        std::cout << "Setting up circuit with " << num_qubits << " qubits." << std::endl;
+        qubitsHeap = MaxHeap<Qubit*>(num_qubits);
+        qubitsVector = std::vector<Qubit*>(num_qubits, nullptr);
     }
 
     //------------getters--------------
@@ -91,6 +78,10 @@ public:
         return max_qubit + 1; // qubits are zero-indexed
     }
 
+    inline const int getQubitsVectorSize() {
+        return qubitsVector.size();
+    }
+
     inline const int getNumGates() const {
         return static_cast<int>(gates.size());
     }
@@ -105,46 +96,63 @@ public:
     }
 
 
-    inline int getTCount(int qubit_index) const {
-        return qubits.getElementAt(getQubitHeapIndex(qubit_index)).T_count;
+    inline const int getTCount(int qubit_index) const {
+        if (qubit_index < 0 || static_cast<size_t>(qubit_index) >= qubitsVector.size()) throw std::runtime_error("Invalid qubit index in getTCount");
+        return qubitsVector[qubit_index]->getTCount();
     }
 
-    inline int getCNOTCount(int qubit1, int qubit2) const {
-        return qubits.getElementAt(getQubitHeapIndex(qubit1)).CNOT_count[getQubitHeapIndex(qubit2)];
+    inline const int getCNOTCount(int qubit_index1, int qubit_index2) const {
+        if (qubit_index1 < 0 || static_cast<size_t>(qubit_index1) >= qubitsVector.size()) throw std::runtime_error("Invalid qubit1 index in getCNOTCount");
+        if (qubit_index2 < 0 || static_cast<size_t>(qubit_index2) >= qubitsVector.size()) throw std::runtime_error("Invalid qubit2 index in getCNOTCount");
+        return qubitsVector[qubit_index1]->getCNOTCount(getQubitHeapIndex(qubit_index2));
+    }
+
+    
+    inline const int getQubitHeapIndex(int qubit_index) const {
+        if (qubit_index < 0 || static_cast<size_t>(qubit_index) >= qubitsVector.size()) throw std::runtime_error("Invalid qubit index in getQubitHeapIndex");
+        return qubitsVector[qubit_index]->getQubitID();
     }
 
 
-    inline int getQubitHeapIndex(int qubit_index) const {
-        return qubit_heap_indices[qubit_index];
+    inline const Qubit* getQubit(int qubit_index) const {
+        if (qubit_index < 0 || static_cast<size_t>(qubit_index) >= qubitsVector.size()) throw std::runtime_error("Invalid qubit index in getQubit");
+        return qubitsVector[qubit_index];
     }
-
-
 
     //------------initializers/setters--------------
 
 
-    inline void initializeQubitHeapIndices(int num_qubits) {
-        qubit_heap_indices.clear();
-        qubit_heap_indices.resize(num_qubits, -1);
+    // inline void initializeQubitHeapIndices(int num_qubits) {
+    //     qubitsVector.clear();
+    //     qubitsVector.resize(num_qubits, nullptr);
+    // }
+
+
+    inline void setQubitHeapIndex(int qubit_index, Qubit* qubit) {
+        qubitsVector[qubit_index] = qubit;
+
     }
-
-
-    inline void setQubitHeapIndex(int qubit_index, int heap_index) {
-        qubit_heap_indices[qubit_index] = heap_index;
-    }
-
 
 
     //----------incrementers----------
 
     inline void incrementTCount(int qubit_index) {
+        const int index = getQubitHeapIndex(qubit_index);
+        if (index < 0 || static_cast<size_t>(qubit_index) >= qubitsVector.size()) throw std::runtime_error("Invalid qubit index in incrementTCount");
+        qubitsVector[qubit_index]->incrementTCount();
+        qubitsHeap.heapify(index);
 
-        qubits.getElementAt(getQubitHeapIndex(qubit_index)).T_count++;
     }
 
     inline void incrementCNOTCount(int control_qubit, int target_qubit) {
-        qubits.getElementAt(getQubitHeapIndex(control_qubit)).CNOT_count[getQubitHeapIndex(target_qubit)]++;
-        qubits.getElementAt(getQubitHeapIndex(target_qubit)).CNOT_count[getQubitHeapIndex(control_qubit)]++;
+        const int control_index = getQubitHeapIndex(control_qubit);
+        const int target_index = getQubitHeapIndex(target_qubit);
+        if (control_index < 0 || target_index < 0) throw std::runtime_error("Invalid qubit index in incrementCNOTCount");
+        if (control_index > static_cast<int>(qubitsVector.size()) || target_index > static_cast<int>(qubitsVector.size())) throw std::runtime_error("Invalid qubit index in incrementCNOTCount");
+        qubitsVector[control_qubit]->incrementCNOTCount(target_index);
+        qubitsVector[target_qubit]->incrementCNOTCount(control_index);
+        qubitsHeap.heapify(control_index);
+        qubitsHeap.heapify(target_index);
     }
 
 
@@ -157,8 +165,11 @@ public:
     // Scrive il circuito su file in formato OPENQASM 2.0 (semplice)
     void write_qasm_file(const std::string& path) const;
 
+    void addGate(const Gate& gate, std::string gate_name, int globalID);
 
-};
+
+
+};\
 } // namespace circuit
 
 namespace std {

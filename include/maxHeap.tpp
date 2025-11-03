@@ -2,23 +2,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-template<typename T>
-void MaxHeap<T>::heapify(int i) {
-    int largest = i;
-    int left = 2 * i + 1;
-    int right = 2 * i + 2;
 
-    if (left < size && heapify_metric(left) > heapify_metric(largest))
-        largest = left;
-
-    if (right < size && heapify_metric(right) > heapify_metric(largest))
-        largest = right;
-
-    if (largest != i) {
-        std::swap(array[i], array[largest]);
-        heapify(largest);
-    }
-}
 
 template<typename T>
 void MaxHeap<T>::buildHeap(const std::vector<T>& arr) {
@@ -32,22 +16,6 @@ void MaxHeap<T>::buildHeap(const std::vector<T>& arr) {
     }
 }
 
-template<typename T>
-void MaxHeap<T>::insert(T value) {
-    if (size == capacity) {
-        capacity = (capacity == 0) ? 1 : capacity * 2;
-        array.resize(capacity);
-    }
-
-    size++;
-    int i = size - 1;
-    array[i] = value;
-
-    while (i != 0 && heapify_metric((i - 1) / 2) < heapify_metric(i)) {
-        std::swap(array[i], array[(i - 1) / 2]);
-        i = (i - 1) / 2;
-    }
-}
 
 template<typename T>
 T MaxHeap<T>::pop() {
@@ -88,10 +56,51 @@ void MaxHeap<T>::deleteKey(T key) {
     heapify(index);
 }
 
+
+// template<typename T>
+// void MaxHeap<T>::print() const {
+//     std::cout << "Max Heap: ";
+//     for (int i = 0; i < size; ++i)
+//         std::cout << array[i] << " ";
+//     std::cout << std::endl;
+// }
+
 template<typename T>
-void MaxHeap<T>::print() const {
-    std::cout << "Max Heap: ";
-    for (int i = 0; i < size; ++i)
-        std::cout << array[i] << " ";
-    std::cout << std::endl;
+void MaxHeap<T>::heapify(int i)
+{
+    int largest = i;
+    int left = 2 * i + 1;
+    int right = 2 * i + 2;
+
+    if (left < size && heapify_metric(left) > heapify_metric(largest))
+        largest = left;
+
+    if (right < size && heapify_metric(right) > heapify_metric(largest))
+        largest = right;
+
+    if (largest != i)
+    {
+        std::swap(array[i], array[largest]);
+        heapify(largest);
+    }
+}
+
+template<typename T>
+void MaxHeap<T>::insert(T value)
+{
+    if (size == capacity)
+    {
+        capacity = (capacity == 0) ? 1 : capacity * 2;
+        array.reserve(capacity);
+    }
+
+    size++;
+    int i = size - 1;
+    array[i] = value;
+
+    while (i != 0 && heapify_metric((i - 1) / 2) < heapify_metric(i))
+    {
+        std::swap(array[i], array[(i - 1) / 2]);
+        i = (i - 1) / 2;
+    }
 }

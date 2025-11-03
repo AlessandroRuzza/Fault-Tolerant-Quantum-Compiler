@@ -1,16 +1,16 @@
 #include "maxHeap.hpp"
 #include "circuit.hpp"
 
-// template class MaxHeap<int>;
-// template class MaxHeap<circuit::Qubit>;
+// Esplicite istanziazioni: le implementazioni sono in include/maxHeap.tpp
 
 template <>
-int MaxHeap<int>::heapify_metric(int index) const {
-    return array[index];
+int MaxHeap<int*>::heapify_metric(int index) const
+{
+    return *array[index];
 }
 
 template <>
-int MaxHeap<circuit::Qubit>::heapify_metric(int index) const {
-    return array[index].T_count + array[index].max_cnot_count();
+int MaxHeap<Qubit*>::heapify_metric(int index) const
+{
+    return array[index]->getTCount() + array[index]->max_cnot_count();
 }
-
