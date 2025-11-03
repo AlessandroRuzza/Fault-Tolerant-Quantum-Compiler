@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <stdexcept>
 
+
 using namespace std;
 
 // Template for MaxHeap
@@ -42,11 +43,11 @@ public:
     MaxHeap& operator=(MaxHeap&&) = default;
 
     // top overloads
-    inline const T& top() const {
+    inline const T top() const {
         if (size <= 0) throw std::runtime_error("Heap is empty");
         return array[0];
     }
-    inline T& top() {
+    inline T top() {
         if (size <= 0) throw std::runtime_error("Heap is empty");
         return array[0];
     }
@@ -55,12 +56,12 @@ public:
     inline bool isEmpty() const { return size == 0; }
 
     // getElementAt: const and non-const overloads (ritorna riferimento per poter modificare)
-    inline const T& getElementAt(int index) const {
+    inline const T getElementAt(int index) const {
         if (index < 0 || index >= size) throw std::out_of_range("Index out of range");
         return array[index];
     }
-    
-    inline T& getElementAt(int index) {
+
+    inline T getElementAt(int index) {
         if (index < 0 || index >= size) throw std::out_of_range("Index out of range");
         return array[index];
     }
@@ -79,9 +80,9 @@ public:
 
     // Function to delete a specific key from the heap
     void deleteKey(T key);
-    
+
     // Function to print the heap
-    void print() const;
+    // void print() const;
 
     virtual int heapify_metric(int index) const;
 

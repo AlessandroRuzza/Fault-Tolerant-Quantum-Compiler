@@ -10,6 +10,44 @@ static std::string trim(const std::string &s) {
     return s.substr(a, b - a + 1);
 }
 
+
+void Circuit::addGate(const Gate& gate, std::string gate_name, int globalID) {
+
+    for (int j = 0; j < static_cast<int>(gate.qubits.size()); ++j) {
+        int index = static_cast<int>(gate.qubits[j]);
+        if (qubitsVector[index] == nullptr) {
+            // Initialize qubit if not already done
+            std::vector<int> cnot_counts(getQubitsVectorSize(), 0);
+            Qubit* new_qubit = new Qubit(index, 0, cnot_counts); 
+            setQubitHeapIndex(index, new_qubit);
+            qubitsHeap.insert(new_qubit);
+        }
+    }
+    if (gate_name == "t") {
+        for (int j = 0; j < gate.qubits.size(); ++j) {
+            incrementTCount(gate.qubits[j]);
+        }
+    } else if (gate_name == "cnot" || gate_name == "cx") {
+        if (gate.qubits.size() < 2) return; // Invalid CNOT gate
+        int control = gate.qubits[0];
+        int target = gate.qubits[1];
+        incrementCNOTCount(control, target);
+    }
+
+    Gate newgate;
+    newgate.id = globalID;
+    newgate.name = std::move(gate_name);
+    newgate.qubits = gate.qubits;
+
+    gates.push_back(std::move(newgate));
+
+    
+
+}
+
+
+
+
 void Circuit::parse_qasm_file(const std::string &path) {
     std::ifstream ifs(path);
     if (!ifs) throw std::runtime_error("failed to open file: " + path);
@@ -24,19 +62,29 @@ void Circuit::parse_qasm_file(const std::string &path) {
     int globalID = 0;
     while (std::getline(ifs, line)) {
         auto s = trim(line);
+        
         if (s.empty()) continue;
         // skip OpenQASM header and include lines and comments
         if (s.rfind("//", 0) == 0) continue;
         if (s.rfind("OPENQASM", 0) == 0) continue;
         if (s.rfind("include", 0) == 0) continue;
-        if (s.rfind("qreg", 0) == 0) continue;
+        if (s.rfind("qreg", 0) == 0) {
+            // Extract the number of qubits declared
+            std::regex qreg_re(R"(^\s*qreg\s+[a-zA-Z_]\w*\s*\[\s*(\d+)\s*\];)");
+            std::smatch m;
+            if (std::regex_search(s, m, qreg_re)) {
+                int num_qubits = static_cast<int>(std::stoul(m[1].str()));
+                setupCircuit(num_qubits);
+            }
+            continue;
+        }
         if (s.rfind("creg", 0) == 0) continue;
 
         std::smatch m;
         if (std::regex_search(s, m, gate_re)) {
-            Gate g;
-            g.id = globalID++;
-            g.name = m[1].str();
+            Gate gate;
+            gate.id = globalID++;
+            gate.name = m[1].str();
             std::string operands = m[2].str();
 
             // find all qubit occurrences in operands
@@ -46,16 +94,16 @@ void Circuit::parse_qasm_file(const std::string &path) {
                 std::smatch qm = *it;
                 // qm[1] is register name (ignored for now), qm[2] is index
                 unsigned idx = static_cast<unsigned>(std::stoul(qm[2].str()));
-                g.qubits.push_back(idx);
+                gate.qubits.push_back(idx);
             }
 
             // If no explicit q[...] matches (e.g., operations on single implicit qubit), try to parse comma-separated ints
-            if (g.qubits.empty()) {
+            if (gate.qubits.empty()) {
                 // attempt to parse numbers in operands
                 std::regex num_re(R"((\d+))");
                 auto nb = std::sregex_iterator(operands.begin(), operands.end(), num_re);
                 for (auto it = nb; it != end; ++it) {
-                    g.qubits.push_back(static_cast<unsigned>(std::stoul((*it)[1].str())));
+                    gate.qubits.push_back(static_cast<unsigned>(std::stoul((*it)[1].str())));
                 }
             }
 
@@ -63,54 +111,34 @@ void Circuit::parse_qasm_file(const std::string &path) {
             // - "tdg" is translated into seven consecutive "t" gates on the same qubit(s).
             // - "x" is translated into the sequence: h t t t t h applied to the same qubit(s).
             {
-                std::string lname = g.name;
+                std::string lname = gate.name;
                 for (char &c : lname) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
                 if (lname == "tdg") {
                     for (int i = 0; i < 7; ++i) {
-                        Gate tg;
-                        tg.id = globalID++;
-                        tg.name = "t";
-                        tg.qubits = g.qubits;
-                        gates.push_back(std::move(tg));
+                        addGate(gate, "t", globalID++);
                     }
                 } else if (lname == "x") {
-                    Gate h1; 
-                    h1.id = globalID++;
-                    h1.name = "h"; h1.qubits = g.qubits; gates.push_back(h1);
+                    addGate(gate, "h", globalID++);
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; 
-                        tg.id = globalID++;
-                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        addGate(gate, "t", globalID++);
                     }
-                    Gate h2; 
-                    h2.id = globalID++;
-                    h2.name = "h"; h2.qubits = g.qubits; gates.push_back(h2);
+                    addGate(gate, "h", globalID++);
                 } else if (lname == "z") {
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; 
-                        tg.id = globalID++;
-                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        addGate(gate, "t", globalID++);
                     }
                 } else if (lname == "y") {
-                    Gate h1; 
-                    h1.id = globalID++;
-                    h1.name = "h"; h1.qubits = g.qubits; gates.push_back(h1);
+                    addGate(gate, "h", globalID++);
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; 
-                        tg.id = globalID++;
-                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        addGate(gate, "t", globalID++);
                     }
-                    Gate h2; 
-                    h2.id = globalID++;
-                    h2.name = "h"; h2.qubits = g.qubits; gates.push_back(h2);
+                    addGate(gate, "h", globalID++);
                     for (int i = 0; i < 4; ++i) {
-                        Gate tg; 
-                        tg.id = globalID++;
-                        tg.name = "t"; tg.qubits = g.qubits; gates.push_back(tg);
+                        addGate(gate, "t", globalID++);
                     }
                 } else {
-                    gates.push_back(std::move(g));
+                   addGate(gate, gate.name, globalID++);
                 }
             }
         }
@@ -128,8 +156,8 @@ void Circuit::write_qasm_file(const std::string& path) const {
 
     // determina numero di qubit (max index + 1)
     int maxq = -1;
-    for (const Gate& g : gates) {
-        for (int q : g.qubits) {
+    for (const Gate& gate : gates) {
+        for (int q : gate.qubits) {
             if (q > maxq) maxq = q;
         }
     }
@@ -137,15 +165,15 @@ void Circuit::write_qasm_file(const std::string& path) const {
     if (nq > 0) ofs << "qreg q[" << nq << "];\n\n";
 
     // scrivi le istruzioni in ordine
-    for (const Gate& g : gates) {
+    for (const Gate& gate : gates) {
         // nome gate
-        ofs << g.name;
+        ofs << gate.name;
         // operandi
-        if (!g.qubits.empty()) {
+        if (!gate.qubits.empty()) {
             ofs << " ";
-            for (size_t i = 0; i < g.qubits.size(); ++i) {
+            for (size_t i = 0; i < gate.qubits.size(); ++i) {
                 if (i) ofs << ",";
-                ofs << "q[" << g.qubits[i] << "]";
+                ofs << "q[" << gate.qubits[i] << "]";
             }
         }
         ofs << ";\n";
