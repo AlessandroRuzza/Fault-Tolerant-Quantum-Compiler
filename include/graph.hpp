@@ -20,6 +20,7 @@ struct Node {
     int id;
     int coordX, coordY;
     std::vector<int> neighbors;  // Store neighbor IDs, not Node objects
+    bool occupied = false;
     
     Node(int node_id, int x = 0, int y = 0);
     float distance(Node b) const {
@@ -72,6 +73,20 @@ public:
     Node& get_node(int id);
     const Node& get_node(int id) const;
 
+    const Node& get_node_by_coordinates(int x, int y) const;
+
+    const int get_coordX(int id) const {
+        return get_node(id).coordX;
+    }
+
+    const int get_coordY(int id) const {
+        return get_node(id).coordY;
+    }
+
+    bool is_occupied(int id) const;
+
+    void occupy_node(int id);
+
     // Add a directed edge from u to v
     void add_edge(int u, int v) override;
 
@@ -86,6 +101,8 @@ public:
 
     // Print the adjacency list with node coordinates
     void print() const override;
+
+    void print_rectangular() const;
 
     // Static method to construct a Graph from JSON file
     static Graph from_json(const std::string& filename);
