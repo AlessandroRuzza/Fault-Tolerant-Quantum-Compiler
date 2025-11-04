@@ -29,6 +29,8 @@ public:
 };
 
 class NaiveShortestPath : public IPathStrategy {
+public:
+    NaiveShortestPath(const Graph& g) : IPathStrategy(g) {}
     Path find_shortest_path(int start_node, int end_node, const std::unordered_set<int>& used_nodes) const;
 };
 
@@ -38,12 +40,22 @@ private:
     LayeredCircuit& circuit;
     const Graph& graph;
     const IPathStrategy& pathStrategy;
+
+    Routing route_layer(const Layer& layer_gates) const;
+
 public:
     QubitRouter(const Mapping& m, LayeredCircuit& c, const Graph& g, const IPathStrategy& p) 
         : mapping(m), circuit(c), graph(g), pathStrategy(p) {}
-    
-    Routing route_layer(const Layer& layer_gates) const;
-    void route_circuit();
+    /**
+     * Routes the whole circuit, returning a vector of mappings (gate-Path).
+     * 
+     * NOTE: this will modify the layering in the internal LayeredCircuit.
+     * @return A vector of Routing maps.
+     */
+    std::vector<Routing> route_circuit();
+    void reset(){
+        circuit.reset();
+    }
 };
 
 #endif // ROUTING_HPP

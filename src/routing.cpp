@@ -91,7 +91,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     return routing;
 }
 
-void QubitRouter::route_circuit() {
+std::vector<Routing> QubitRouter::route_circuit() {
     std::cout << "Starting qubit routing...\n";
 
     std::vector<Routing> routing_steps(circuit.getNumLayers());
@@ -120,4 +120,5 @@ void QubitRouter::route_circuit() {
     }
     
     std::cout << "Qubit routing completed.\n";
+    return routing_steps;
 }
