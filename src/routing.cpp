@@ -5,13 +5,13 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
     if (start_node == end_node) return {start_node};
     
     std::unordered_map<int, int> parent;
-    // auto cmp = [&](int a, int b){ 
-    //     Node aNode = this->graph.get_node(a);
-    //     Node bNode = this->graph.get_node(b);
-    //     return aNode.distance(bNode); 
-    // };
-    // std::priority_queue<int, std::vector<int>, decltype(cmp)> q(cmp);
-    std::queue<int> q; // Simple BFS
+    auto cmp = [&](int a, int b){ 
+        Node aNode = this->graph.get_node(a);
+        Node bNode = this->graph.get_node(b);
+        Node target = this->graph.get_node(end_node);
+        return aNode.distance(target) > bNode.distance(target); 
+    };
+    std::priority_queue<int, std::vector<int>, decltype(cmp)> q(cmp);
 
     q.push(start_node);
     parent[start_node] = -1;
@@ -19,8 +19,7 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
     //TODO: constrain direction of arrival (i.e. only from top/side)
     
     while (!q.empty()) {
-        int current = q.front();
-        // int current = q.top(); // for priority_queue
+        int current = q.top();
         q.pop();
         
         if (current == end_node) {
@@ -37,7 +36,7 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
         
         for (int neighbor : graph.neighbors(current)) {
             if(neighbor == end_node ||                          // if target
-               (used_nodes.count(neighbor) == 0                 // or unused, unexplored node
+               (used_nodes.count(neighbor) == 0                 // or unused & unexplored node
                 && parent.find(neighbor) == parent.end())
             ){
                 parent[neighbor] = current;
