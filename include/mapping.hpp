@@ -6,19 +6,22 @@
 #include <stdexcept>
 #include "graph.hpp"
 
-// Forward declaration per evitare dipendenza completa dal typedef Circuit qui
-class Circuit;
+// Forward declaration per evitare dipendenza completa dalla definizione di Circuit
+namespace circuit {
+    class Circuit;
+}
 
 class Mapping {
-    const Circuit& circuit;
-    const Graph& graph;
+    const circuit::Circuit& circuit;
+    Graph& graph;
     std::unordered_map<int, int> graph_to_circuit;
 
 public:
-    Mapping(const Circuit& c, const Graph& g) : circuit(c), graph(g) {}
+    Mapping(const circuit::Circuit& c, Graph& g) : circuit(c), graph(g) {}
 
     void map_qubit_to_node(int qubit, int node) {
         graph_to_circuit[qubit] = node;
+        graph.occupy_node(node);
     }
 
     int get_mapped_node(int qubit) const {
@@ -41,6 +44,8 @@ public:
 
     // Dichiarazione solo: implementazione in src/mapping.cpp
     void magic_aware_mapping();
+
+    void homogenous_mapping_rowmajor(int maxX, int maxY);
 
 };
 

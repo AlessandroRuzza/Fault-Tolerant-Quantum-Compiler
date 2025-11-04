@@ -38,6 +38,32 @@ const Node& Graph::get_node(int id) const {
     return node_storage[it->second];
 }
 
+// Get node by coordinates
+const Node& Graph::get_node_by_coordinates(int x, int y) const {
+    for (auto& node : node_storage) {
+        if (node.coordX == x && node.coordY == y) {
+            return node;
+        }
+    }
+    throw std::runtime_error("Node not found at coordinates: (" + std::to_string(x) + ", " + std::to_string(y) + ")");
+}
+
+bool Graph::is_occupied(int id) const {
+    auto it = node_map.find(id);
+    if (it == node_map.end()) {
+        throw std::runtime_error("Node not found: " + std::to_string(id));
+    }
+    return node_storage[it->second].occupied;
+}
+
+void Graph::occupy_node(int id) {
+    auto it = node_map.find(id);
+    if (it == node_map.end()) {
+        throw std::runtime_error("Node not found: " + std::to_string(id));
+    }
+    node_storage[it->second].occupied = true;
+}
+
 // Add a directed edge from u to v
 void Graph::add_edge(int u, int v) {
     if (u < 0 || v < 0) return;
@@ -141,6 +167,36 @@ void Graph::print() const {
         std::cout << std::endl;
     }
 }
+
+void Graph::print_rectangular() const {
+    // Determine grid dimensions
+    int maxX = 0, maxY = 0;
+    for (const auto& node : node_storage) {
+        if (node.coordX > maxX) maxX = node.coordX;
+        if (node.coordY > maxY) maxY = node.coordY;
+    }
+
+    // Print the grid with fixed-width columns
+    for (int y = 0; y <= maxY; ++y) {
+        for (int x = 0; x <= maxX; ++x) {
+            const int node_id = get_node_by_coordinates(x, y).id;
+            if (is_occupied(node_id)) {
+                // Print occupied nodes in red
+                std::cout << "\033[1;31m"; // ANSI escape code for red
+                std::cout << node_id;
+                std::cout << "\033[0m"; // Reset color
+            } else {
+                std::cout << node_id;
+            }
+            if (magic_states.find(node_id) != magic_states.end()) {
+                std::cout << "(M)";
+            }
+            std::cout << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
 
 // Static method to construct a Graph from JSON file
 Graph Graph::from_json(const std::string& filename) {
@@ -273,7 +329,7 @@ Graph Graph::from_json(const std::string& filename) {
 }
 
 // Create a rectangular grid graph with magic states
-Graph Graph::create_rectangular_with_magic_states(int width, int height) {
+Graph Graph::create_rectangular_with_magic_states(int height, int width) {
     Graph g;
     int total_nodes = width * height + height;  // grid nodes + magic states
     g.resize(total_nodes);

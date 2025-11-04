@@ -32,8 +32,8 @@ target_link_libraries(FaultTolerantQuantumCompiler
 )
 
 
-# Esegui l'eseguibile principale ad ogni 'make'
-add_custom_target(run-main ALL
+# Target to run the main executable (not built/executed by default)
+add_custom_target(run-main
     DEPENDS FaultTolerantQuantumCompiler
     COMMAND $<TARGET_FILE:FaultTolerantQuantumCompiler>
     COMMENT "Running FaultTolerantQuantumCompiler after build"
