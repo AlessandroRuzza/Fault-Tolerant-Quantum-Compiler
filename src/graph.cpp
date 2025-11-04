@@ -183,10 +183,10 @@ void Graph::print_rectangular() const {
             if (is_occupied(node_id)) {
                 // Print occupied nodes in red
                 std::cout << "\033[1;31m"; // ANSI escape code for red
-                std::cout << node_id;
+                printf("%3d", node_id);
                 std::cout << "\033[0m"; // Reset color
             } else {
-                std::cout << node_id;
+                printf("%3d", node_id);
             }
             if (magic_states.find(node_id) != magic_states.end()) {
                 std::cout << "(M)";
