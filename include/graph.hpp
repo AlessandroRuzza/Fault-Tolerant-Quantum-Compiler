@@ -26,7 +26,7 @@ struct Node {
     float distance(Node b) const {
         float distX = abs(coordX - b.coordX);
         float distY = abs(coordY - b.coordY);
-        return sqrtf(distX*distX + distY*distY);
+        return distX + distY; // Manhattan distance
     }
 };
 
