@@ -17,27 +17,14 @@ int main(int argc, char **argv) {
         auto gates = circuit.getGates();
         for (size_t i = 0; i < gates.size(); ++i) {
             const auto &g = gates[i];
-            //std::cout << g.id << ": " << g.to_string() << "\n";
+            std::cout << g.id << ": " << g.to_string() << "\n";
         }
     } catch (const std::exception &e) {
         std::cerr << "error: " << e.what() << std::endl;
         return 2;
     }
 
-    //circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
 
-    int x = 10, y = 11;
-
-    Graph graph = Graph::create_rectangular_with_magic_states(x, y);
-
-    graph.print_rectangular();
-
-    Mapping mapping(circuit, graph);
-
-    mapping.homogenous_mapping_rowmajor(x, y);
-
-    graph.print_rectangular();
-    
 
     // //maxHeap testing
     // MaxHeap<int> maxHeap(6);
@@ -69,14 +56,34 @@ int main(int argc, char **argv) {
 
     // //----maxheap testing end----
 
+
+    //circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
+
+    std::cout << "------- MAPPING ---------" << std::endl;
+
+    int x = 10, y = 11;
+
+    Graph graph = Graph::create_rectangular_with_magic_states(x, y);
+
+    graph.print_rectangular();
+
+    Mapping mapping(circuit, graph);
+
+    mapping.homogenous_mapping_rowmajor(x, y);
+
+    graph.print_rectangular();
+
+
+    std::cout << "------- HEAP TEST ---------" << std::endl;
+
     
 
     //Graph g = Graph::from_json("../graph_description_rectangular.json");
     //g.print();
 
-    //std::cout << "------- LAYERING ---------" << std::endl;
-    //circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
-    //layeredCircuit.print_layered();
+    std::cout << "------- LAYERING ---------" << std::endl;
+    circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
+    layeredCircuit.print_layered();
 
 
     return 0;
