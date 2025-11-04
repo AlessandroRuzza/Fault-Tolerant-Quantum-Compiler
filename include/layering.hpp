@@ -28,6 +28,8 @@ public:
     }
 
     void update_layers(const std::vector<Gate>& routed_gates);
+    void reset();
+    void reset(const std::vector<Gate>& routed_gates);
     void print_layered() const;
 
     const Layer& getLayer(int i) const {

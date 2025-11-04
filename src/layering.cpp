@@ -31,6 +31,14 @@ void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
     ignored_gates.insert(routed_gates.begin(), routed_gates.end());
     build_layers();
 }
+void LayeredCircuit::reset(){
+    ignored_gates.clear();
+    build_layers();
+}
+void LayeredCircuit::reset(const std::vector<Gate>& routed_gates){
+    ignored_gates.clear();
+    update_layers(routed_gates);
+}
 
 void LayeredCircuit::print_layered() const {
     for (size_t i = 0; i < layers.size(); ++i) {
