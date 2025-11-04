@@ -3,6 +3,7 @@
 #include "layering.hpp"
 #include "maxHeap.hpp"
 #include "mapping.hpp"
+#include "routing.hpp"
 
 #include <iostream>
 
@@ -26,36 +27,38 @@ int main(int argc, char **argv) {
 
 
 
-    // //maxHeap testing
-    // MaxHeap<int> maxHeap(6);
-    // vector<int> arr = {2, 3, 4, 5, 10, 15};
+    /* maxHeap testing
+    std::cout << "------- HEAP TEST ---------" << std::endl;
 
-    // // Build the heap from the array
-    // maxHeap.buildHeap(arr);
+    MaxHeap<int> maxHeap(6);
+    vector<int> arr = {2, 3, 4, 5, 10, 15};
 
-    // // Print the max heap
-    // maxHeap.print();
+    // Build the heap from the array
+    maxHeap.buildHeap(arr);
 
-    // // Insert a node into the heap
-    // maxHeap.insert(9);
-    // cout << "After inserting 9: " << endl;
-    // maxHeap.print();
+    // Print the max heap
+    maxHeap.print();
 
-    // // Get the maximum value from the max heap
-    // cout << "Top value: " << maxHeap.top() << endl;
+    // Insert a node into the heap
+    maxHeap.insert(9);
+    cout << "After inserting 9: " << endl;
+    maxHeap.print();
 
-    // // Delete the root node of the max heap
-    // cout << "Popped value: " << maxHeap.pop() << endl;
-    // cout << "After popping: ";
-    // maxHeap.print();
+    // Get the maximum value from the max heap
+    cout << "Top value: " << maxHeap.top() << endl;
 
-    // // Delete a specific value from the max heap
-    // maxHeap.deleteKey(5);
-    // cout << "After deleting the node 5: ";
-    // maxHeap.print();
+    // Delete the root node of the max heap
+    cout << "Popped value: " << maxHeap.pop() << endl;
+    cout << "After popping: ";
+    maxHeap.print();
 
-    // //----maxheap testing end----
+    // Delete a specific value from the max heap
+    maxHeap.deleteKey(5);
+    cout << "After deleting the node 5: ";
+    maxHeap.print();
 
+    // ----maxheap testing end----
+    // */
 
     //circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
 
@@ -74,17 +77,18 @@ int main(int argc, char **argv) {
     graph.print_rectangular();
 
 
-    std::cout << "------- HEAP TEST ---------" << std::endl;
-
-    
-
-    //Graph g = Graph::from_json("../graph_description_rectangular.json");
-    //g.print();
-
     std::cout << "------- LAYERING ---------" << std::endl;
     circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
     layeredCircuit.print_layered();
 
+    std::cout << "------- ROUTING ---------" << std::endl;
+    NaiveShortestPath pathStrat(graph);
+    QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
+    router.route_circuit();
+    
+    std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
+    router.print_routing_steps();
+    graph.print_rectangular();
 
     return 0;
 }

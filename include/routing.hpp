@@ -39,12 +39,13 @@ private:
     const Mapping& mapping;
     LayeredCircuit& circuit;
     const Graph& graph;
-    const IPathStrategy& pathStrategy;
+    const IPathStrategy* pathStrategy;
+    std::vector<Routing> routing_steps;
 
     Routing route_layer(const Layer& layer_gates) const;
 
 public:
-    QubitRouter(const Mapping& m, LayeredCircuit& c, const Graph& g, const IPathStrategy& p) 
+    QubitRouter(const Mapping& m, LayeredCircuit& c, const Graph& g, const IPathStrategy* p) 
         : mapping(m), circuit(c), graph(g), pathStrategy(p) {}
     /**
      * Routes the whole circuit, returning a vector of mappings (gate-Path).
@@ -52,10 +53,23 @@ public:
      * NOTE: this will modify the layering in the internal LayeredCircuit.
      * @return A vector of Routing maps.
      */
-    std::vector<Routing> route_circuit();
-    void reset(){
-        circuit.reset();
+    void route_circuit();
+    inline const std::vector<Routing>& get_routing() const {
+        return routing_steps;
     }
+    inline const Routing& get_route_step(int i) const {
+        return routing_steps[i];
+    }
+    inline int get_routing_length() const {
+        return routing_steps.size();
+    }
+    inline void reset(){
+        circuit.reset();
+        routing_steps.clear();
+    }
+    void print_routing_steps() const;
+    void print_routing(int i) const;
+
 };
 
 #endif // ROUTING_HPP

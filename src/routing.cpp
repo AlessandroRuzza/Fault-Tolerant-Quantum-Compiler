@@ -5,12 +5,13 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
     if (start_node == end_node) return {start_node};
     
     std::unordered_map<int, int> parent;
-    auto cmp = [&](int a, int b){ 
-        Node aNode = this->graph.get_node(a);
-        Node bNode = this->graph.get_node(b);
-        return aNode.distance(bNode); 
-    };
-    std::priority_queue<int, std::vector<int>, decltype(cmp)> q(cmp);
+    // auto cmp = [&](int a, int b){ 
+    //     Node aNode = this->graph.get_node(a);
+    //     Node bNode = this->graph.get_node(b);
+    //     return aNode.distance(bNode); 
+    // };
+    // std::priority_queue<int, std::vector<int>, decltype(cmp)> q(cmp);
+    std::queue<int> q; // Simple BFS
 
     q.push(start_node);
     parent[start_node] = -1;
@@ -18,7 +19,8 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
     //TODO: constrain direction of arrival (i.e. only from top/side)
     
     while (!q.empty()) {
-        int current = q.top();
+        int current = q.front();
+        // int current = q.top(); // for priority_queue
         q.pop();
         
         if (current == end_node) {
@@ -34,11 +36,12 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
         }
         
         for (int neighbor : graph.neighbors(current)) {
-            if (used_nodes.count(neighbor) == 0
-                && parent.find(neighbor) == parent.end() 
+            if(neighbor == end_node ||                          // if target
+               (used_nodes.count(neighbor) == 0                 // or unused, unexplored node
+                && parent.find(neighbor) == parent.end())
             ){
                 parent[neighbor] = current;
-                q.push(neighbor);
+                q.push(neighbor);                           // Add to queue with current as parent
             }
         }
     }
@@ -63,15 +66,16 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     }
 
     //TODO: Order gates to be routed by some policy
+    // TODO: Handle T-gates correctly.
     
     for (const Gate& gate : layer_gates) {
         Path path;
-        if (gate.qubits.size() == 1) {
-            // Single-qubit gate: always executable
+        if (gate.qubits.size() == 1 && gate.name != "t") {
+            // Single-qubit gate (non-t): always executable
             int node = mapping.get_mapped_node(gate.qubits[0]);
             path = {node};
         } else if (gate.qubits.size() == 2) {
-            // Two-qubit gate: check if qubits are adjacent
+            // Two-qubit gate: find path between the 2 qubits
             int qubit1 = gate.qubits[0];
             int qubit2 = gate.qubits[1];
             
@@ -79,9 +83,20 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             int node2 = mapping.get_mapped_node(qubit2);
 
             // TODO: route better (improve heuristic)
-            path = pathStrategy.find_shortest_path(node1, node2, used_nodes);
+            path = pathStrategy->find_shortest_path(node1, node2, used_nodes);
         }
-        
+        else if(gate.name == "t"){ // path to closest magic state 
+            int closestDist = INT32_MAX;
+            Path closestPath;
+            for(int magicState : graph.get_magic_states()){
+                path = pathStrategy->find_shortest_path(gate.qubits[0], magicState, used_nodes);
+                if(path.size() < closestDist){
+                    closestDist = path.size();
+                    closestPath = path;
+                }
+            }
+            path = closestPath;
+        }
         if(path.size() > 0){
             routing.emplace(gate, path);
             used_nodes.insert(path.begin(), path.end());
@@ -91,10 +106,11 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     return routing;
 }
 
-std::vector<Routing> QubitRouter::route_circuit() {
+void QubitRouter::route_circuit() {
     std::cout << "Starting qubit routing...\n";
 
-    std::vector<Routing> routing_steps(circuit.getNumLayers());
+    routing_steps.clear();
+    routing_steps.reserve(circuit.getNumLayers());
 
     while(circuit.getNumLayers() > 0){
         const Layer& topLayer = circuit.getLayer(0);
@@ -108,6 +124,11 @@ std::vector<Routing> QubitRouter::route_circuit() {
         *                instead scan the 2nd layer and move gates to first layer.
         */
         Routing route = route_layer(topLayer);
+        if(route.size() == 0){
+            std::cout << "Layer " << routing_steps.size()+1 << " empty! Returning incomplete." << std::endl;
+            return;
+        }
+
         routing_steps.emplace_back(route);
 
         // Extract all keys of route (== gates that have been routed)
@@ -120,5 +141,25 @@ std::vector<Routing> QubitRouter::route_circuit() {
     }
     
     std::cout << "Qubit routing completed.\n";
-    return routing_steps;
+}
+
+void QubitRouter::print_routing_steps() const {
+    for(int i=0; i < routing_steps.size(); i++){
+        std::cout << "# Step " << i << " #############" << std::endl;
+        print_routing(i);
+        std::cout << std::endl;
+    }
+}
+
+void QubitRouter::print_routing(int i) const {
+    for(auto pair : routing_steps[i]){
+        std::cout << pair.first.to_string() << ": ";
+        Path& p = pair.second;
+        for(int step : p)
+            if(step == p[0])
+                std::cout << step;
+            else 
+                std::cout << "-" << step;
+        std::cout << std::endl;
+    }
 }
