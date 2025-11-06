@@ -10,13 +10,14 @@ struct Node {
     bool occupied = false;
     
     Node(int node_id, int x = 0, int y = 0);
-    /**
-     * Manhattan distance
-     */
     float distance(Node b) const {
         float distX = abs(coordX - b.coordX);
         float distY = abs(coordY - b.coordY);
-        return distX + distY;
+        return distX + distY; // Manhattan distance
+    }
+
+    std::tuple <int, int> get_coordinates() const {
+        return std::make_tuple(coordX, coordY);
     }
 };
 
@@ -25,6 +26,7 @@ class IGraph {
 protected:
     std::unordered_set<int> nodes;
     std::unordered_set<int> magic_states;
+    std::unordered_map<int, int> mapped_magic_states;
     int node_count;
 
 public:
@@ -51,6 +53,24 @@ public:
 
     int get_node_count() const { 
         return node_count; 
+    }
+
+
+    const int getBestMagicStateId() {
+        int best_magic_state_id = -1;
+        int min_mapped_qubits = INT_MAX;
+        for (int magic_state_id : this->get_magic_states()) {
+            int count = mapped_magic_states[magic_state_id];
+            if (count < min_mapped_qubits) {
+                min_mapped_qubits = count;
+                best_magic_state_id = magic_state_id;
+            }
+        }
+        return best_magic_state_id;
+    }
+
+    void increment_mapped_magic_state(int magic_state_id) {
+        mapped_magic_states[magic_state_id]++;
     }
 
 };

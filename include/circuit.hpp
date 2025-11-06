@@ -64,9 +64,8 @@ public:
     //------------getters--------------
 
 
-    inline const std::vector<Gate>& getGates() const { return gates; }
 
-    inline const int getNumQubits() const {
+    const int getNumQubits() const {
         int max_qubit = -1;
         for (const Gate& gate : gates) {
             for (const int q : gate.qubits) {
@@ -78,6 +77,20 @@ public:
         return max_qubit + 1; // qubits are zero-indexed
     }
 
+
+    const std::unordered_map<std::string, int> getAllGatesCount() const {
+        std::unordered_map<std::string, int> result;
+        for (const Gate& gate : gates) {
+            result[gate.name]++;
+        }
+        return result;
+    }
+
+    inline const int getHeapSize(){
+        return qubitsHeap.getSize();
+    }
+
+
     inline const int getQubitsVectorSize() {
         return qubitsVector.size();
     }
@@ -86,14 +99,7 @@ public:
         return static_cast<int>(gates.size());
     }
 
-
-    inline const std::unordered_map<std::string, int> getAllGatesCount() const {
-        std::unordered_map<std::string, int> result;
-        for (const Gate& gate : gates) {
-            result[gate.name]++;
-        }
-        return result;
-    }
+    inline const std::vector<Gate>& getGates() const { return gates; }
 
 
     inline const int getTCount(int qubit_index) const {
@@ -119,13 +125,11 @@ public:
         return qubitsVector[qubit_index];
     }
 
+    inline Qubit* popFromHeap() {
+        return qubitsHeap.pop();
+    }
+
     //------------initializers/setters--------------
-
-
-    // inline void initializeQubitHeapIndices(int num_qubits) {
-    //     qubitsVector.clear();
-    //     qubitsVector.resize(num_qubits, nullptr);
-    // }
 
 
     inline void setQubitHeapIndex(int qubit_index, Qubit* qubit) {
@@ -171,7 +175,7 @@ public:
         qubitsHeap.print();
     };
 
-};\
+};
 } // namespace circuit
 
 namespace std {
