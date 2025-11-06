@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <ostream>
 
 
 class Qubit {
@@ -53,5 +54,12 @@ public:
         CNOT_count[other_qubit_index]++;
     }
 };
+
+// Stream output for Qubit - prints a compact summary without exposing internals.
+inline std::ostream& operator<<(std::ostream& os, const Qubit& q) {
+    return os << "Qubit{id=" << q.getQubitID()
+              << ", T=" << q.getTCount()
+              << ", CNOTmax=" << q.max_cnot_count() << "}";
+}
 
 #endif // QUBIT_HPP

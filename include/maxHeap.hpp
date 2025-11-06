@@ -82,7 +82,7 @@ public:
     void deleteKey(T key);
 
     // Function to print the heap
-    // void print() const;
+    void print() const;
 
     virtual int heapify_metric(int index) const;
 
