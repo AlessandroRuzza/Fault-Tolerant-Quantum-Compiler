@@ -2,6 +2,9 @@
 #include <stdexcept>
 #include <algorithm>
 
+// Qubit definition used for specialized printing when T == Qubit*
+#include "qubit.hpp"
+
 
 
 template<typename T>
@@ -56,14 +59,15 @@ void MaxHeap<T>::deleteKey(T key) {
     heapify(index);
 }
 
-
-// template<typename T>
-// void MaxHeap<T>::print() const {
-//     std::cout << "Max Heap: ";
-//     for (int i = 0; i < size; ++i)
-//         std::cout << array[i] << " ";
-//     std::cout << std::endl;
-// }
+ 
+template<typename T>
+void MaxHeap<T>::print() const {
+    std::cout << "Max Heap: ";
+    for (int i = 0; i < size; ++i) {
+        std::cout << *array[i] << std::endl;
+    }
+    std::cout << std::endl;
+}
 
 template<typename T>
 void MaxHeap<T>::heapify(int i)

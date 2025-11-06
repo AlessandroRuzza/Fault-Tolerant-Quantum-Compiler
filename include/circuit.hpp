@@ -167,7 +167,9 @@ public:
 
     void addGate(const Gate& gate, std::string gate_name, int globalID);
 
-
+    void print_qubit_heap() const{
+        qubitsHeap.print();
+    };
 
 };\
 } // namespace circuit

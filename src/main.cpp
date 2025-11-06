@@ -27,38 +27,42 @@ int main(int argc, char **argv) {
 
 
 
-    /* maxHeap testing
+    //maxHeap testing
     std::cout << "------- HEAP TEST ---------" << std::endl;
 
-    MaxHeap<int> maxHeap(6);
-    vector<int> arr = {2, 3, 4, 5, 10, 15};
+    circuit.print_qubit_heap();
 
+    /* /* MaxHeap<int*> maxHeap(6);
+
+    int value = 10;
+    maxHeap.insert(&value);
+    maxHeap.print();
+    value = 10;
+    maxHeap.insert(&value);
+    maxHeap.print();
+    value = 15;
+    maxHeap.insert(&value);
+    value = 20;
+    maxHeap.insert(&value);
+    value = 5;
+    maxHeap.insert(&value);
     // Build the heap from the array
-    maxHeap.buildHeap(arr);
+    //maxHeap.buildHeap();
 
     // Print the max heap
-    maxHeap.print();
-
-    // Insert a node into the heap
-    maxHeap.insert(9);
-    cout << "After inserting 9: " << endl;
-    maxHeap.print();
+    maxHeap.print(); */
 
     // Get the maximum value from the max heap
-    cout << "Top value: " << maxHeap.top() << endl;
+    // cout << "Top value: " << maxHeap.top() << endl;
 
     // Delete the root node of the max heap
-    cout << "Popped value: " << maxHeap.pop() << endl;
-    cout << "After popping: ";
-    maxHeap.print();
+    // cout << "Popped value: " << maxHeap.pop() << endl;
+    // cout << "After popping: ";
+    // maxHeap.print();
 
-    // Delete a specific value from the max heap
-    maxHeap.deleteKey(5);
-    cout << "After deleting the node 5: ";
-    maxHeap.print();
 
     // ----maxheap testing end----
-    // */
+    // 
 
     //circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
 

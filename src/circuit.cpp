@@ -181,6 +181,4 @@ void Circuit::write_qasm_file(const std::string& path) const {
     ofs.close();
 }
 
-
-
 } // namespace circuit
