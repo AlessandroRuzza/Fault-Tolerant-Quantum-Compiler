@@ -29,12 +29,57 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    circuit.print_qubit_heap();
+
+    circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
+
+    std::cout << "------- MAPPING ---------" << std::endl;
+
+    int x = 10, y = 11;
+
+    Graph graph = Graph::create_rectangular_with_magic_states(x, y);
+
+    graph.print_rectangular();
+
+    FarthestFromMagicSelector farthest_from_magic_selector(graph);
+
+    Mapping mapping(circuit, graph);
+
+    int T_lower_bound = 2;
+    int T_upper_bound = 5;
+    int maximum_iterations = 100;
+    mapping.magic_aware_mapping(T_lower_bound, T_upper_bound, maximum_iterations, farthest_from_magic_selector);
+
+    //mapping.homogenous_mapping_rowmajor(x, y);
+
+    graph.print_rectangular();
+
+
+    std::cout << "------- LAYERING ---------" << std::endl;
+    circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
+    layeredCircuit.print_layered();
+
+    std::cout << "------- ROUTING ---------" << std::endl;
+    NaiveShortestPath pathStrat(graph);
+    QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
+    router.route_circuit();
+    
+    std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
+    router.print_routing_steps();
+    graph.print_rectangular();
+
+    return 0;
+}
+
+
+
+
+
 
 
     //maxHeap testing
-    std::cout << "------- HEAP TEST ---------" << std::endl;
+    //std::cout << "------- HEAP TEST ---------" << std::endl;
 
-    circuit.print_qubit_heap();
 
     /* /* MaxHeap<int*> maxHeap(6);
 
@@ -67,38 +112,3 @@ int main(int argc, char **argv) {
 
     // ----maxheap testing end----
     // 
-
-    //circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
-
-    std::cout << "------- MAPPING ---------" << std::endl;
-
-    int x = 10, y = 11;
-
-    Graph graph = Graph::create_rectangular_with_magic_states(x, y);
-
-    graph.print_rectangular();
-
-    Mapping mapping(circuit, graph);
-
-    mapping.homogenous_mapping_rowmajor(x, y);
-
-    graph.print_rectangular();
-
-
-    std::cout << "------- LAYERING ---------" << std::endl;
-    circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
-    layeredCircuit.print_layered();
-
-    std::cout << "------- ROUTING ---------" << std::endl;
-    NaiveShortestPath pathStrat(graph);
-    QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
-    router.route_circuit();
-    
-    std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
-    router.print_routing_steps();
-    graph.print_rectangular();
-
-    return 0;
-}
-
-

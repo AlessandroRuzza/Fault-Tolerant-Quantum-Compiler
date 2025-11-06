@@ -384,3 +384,31 @@ Graph Graph::create_rectangular_with_magic_states(int height, int width) {
     
     return g;
 }
+
+
+const int Graph::getNearestMagicStateId(int node_id) const {
+    if (magic_states.empty()) {
+        throw std::runtime_error("No magic states available in the graph.");
+    }
+
+    const Node& start_node = get_node(node_id);
+    int nearest_magic_state = -1;
+    double min_distance = std::numeric_limits<double>::max();
+
+    for (int magic_id : magic_states) {
+        const Node& magic_node = get_node(magic_id);
+        double distance = std::sqrt(std::pow(start_node.coordX - magic_node.coordX, 2) +
+                                    std::pow(start_node.coordY - magic_node.coordY, 2));
+        if (distance < min_distance) {
+            min_distance = distance;
+            nearest_magic_state = magic_id;
+        }
+    }
+
+    return nearest_magic_state;
+}
+
+const Node& Graph::getNearestMagicState(const Node& node) const {
+    int nearest_id = getNearestMagicStateId(node.id);
+    return get_node(nearest_id);
+}

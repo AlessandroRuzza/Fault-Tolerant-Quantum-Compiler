@@ -12,5 +12,5 @@ int MaxHeap<int*>::heapify_metric(int index) const
 template <>
 int MaxHeap<Qubit*>::heapify_metric(int index) const
 {
-    return array[index]->getTCount() + array[index]->max_cnot_count();
+    return array[index]->getTCount() + array[index]->getMaxCNOTCount();
 }

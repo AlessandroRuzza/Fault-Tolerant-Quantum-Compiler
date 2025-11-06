@@ -65,6 +65,10 @@ public:
 
     const Node& get_node_by_coordinates(int x, int y) const;
 
+    const int get_node_id_by_coordinates(int x, int y) const {
+        return get_node_by_coordinates(x, y).id;
+    }
+
     const int get_coordX(int id) const {
         return get_node(id).coordX;
     }
@@ -87,6 +91,17 @@ public:
 
 
 
+    // Get all node IDs
+    std::unordered_set<int> get_nodes() const { return nodes; }
+    // Get all magic state node IDs
+    std::unordered_set<int> get_magic_states() const { return magic_states; }
+    
+    // Get node count
+    int get_node_count() const { return node_count; }
+
+    const int getNearestMagicStateId(int node_id) const;
+
+    const Node& getNearestMagicState(const Node& node) const;
 };
 
 #endif // GRAPH_HPP
