@@ -43,14 +43,14 @@ private:
     std::vector<Routing> routing_steps;
 
     Routing route_layer(const Layer& layer_gates) const;
+    float minGateRouteLength(Gate g) const;
 
 public:
     QubitRouter(const Mapping& m, LayeredCircuit& c, const Graph& g, const IPathStrategy* p) 
         : mapping(m), circuit(c), graph(g), pathStrategy(p) {}
     /**
      * Routes the whole circuit, returning a vector of mappings (gate-Path).
-     * 
-     * NOTE: this will modify the layering in the internal LayeredCircuit.
+     * @attention this will modify the layering in the internal LayeredCircuit.
      * @return A vector of Routing maps.
      */
     void route_circuit();

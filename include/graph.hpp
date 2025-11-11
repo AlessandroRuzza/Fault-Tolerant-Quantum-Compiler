@@ -23,10 +23,13 @@ struct Node {
     bool occupied = false;
     
     Node(int node_id, int x = 0, int y = 0);
+    /**
+     * Manhattan distance
+     */
     float distance(Node b) const {
         float distX = abs(coordX - b.coordX);
         float distY = abs(coordY - b.coordY);
-        return distX + distY; // Manhattan distance
+        return distX + distY;
     }
 };
 
