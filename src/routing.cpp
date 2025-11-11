@@ -48,6 +48,27 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
     return {}; // no path found
 }
 
+float QubitRouter::minGateRouteLength(Gate g) const {
+    if(g.name == "h") return 0;
+    const Node& node1 = graph.get_node(mapping.get_mapped_node(g.qubits[0]));
+    int target;
+    if(g.qubits.size() == 2){
+        target = mapping.get_mapped_node(g.qubits[1]);
+    }
+    else { // target = closest magic state
+        float minDist = INT32_MAX;
+        for(int m : graph.get_magic_states()){
+            float dist = node1.distance(graph.get_node(m));
+            if(dist < minDist){
+                minDist = dist;
+                target = m; 
+            }
+        }
+    }
+    const Node& node2 = graph.get_node(target); 
+    return node1.distance(node2);
+}
+
 Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     Routing routing;
     std::unordered_map<int, int> node_to_qubit; // inverse mapping
@@ -64,10 +85,16 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         }
     }
 
-    //TODO: Order gates to be routed by some policy
-    // TODO: Handle T-gates correctly.
-    
-    for (const Gate& gate : layer_gates) {
+    /*** Order Layer Gates by node distance length ******/
+    std::vector<Gate> ordered_gates;
+    ordered_gates.reserve(layer_gates.size());
+    ordered_gates.insert(ordered_gates.end(), layer_gates.begin(), layer_gates.end());
+    auto ordering = [&](Gate a, Gate b) {
+        return minGateRouteLength(a) < minGateRouteLength(b);
+    };
+    std::sort(ordered_gates.begin(), ordered_gates.end(), ordering);
+
+    for (const Gate& gate : ordered_gates) {
         Path path;
         if (gate.qubits.size() == 1 && gate.name != "t") {
             // Single-qubit gate (non-t): always executable
@@ -81,7 +108,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             int node1 = mapping.get_mapped_node(qubit1);
             int node2 = mapping.get_mapped_node(qubit2);
 
-            // TODO: route better (improve heuristic)
+            // TODO: route better (improve heuristic) (congestion-avoidance?)
             path = pathStrategy->find_shortest_path(node1, node2, used_nodes);
         }
         else if(gate.name == "t"){ // path to closest magic state 
