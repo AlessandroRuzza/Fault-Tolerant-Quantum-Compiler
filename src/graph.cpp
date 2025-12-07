@@ -6,8 +6,8 @@ const std::vector<int> emptyVec;
 Node::Node(int node_id, int x, int y) : id(node_id), coordX(x), coordY(y) {}
 
 // Graph constructor implementation
-Graph::Graph(int max_nodes) : adj(max_nodes, max_nodes), node_count(0) {
-    node_storage.reserve(max_nodes);
+Graph::Graph(int max_nodes) : IGraph(), adj(max_nodes, max_nodes) {
+    node_storage.reserve(static_cast<size_t>(max_nodes));
 }
 
 // Add a node with coordinates

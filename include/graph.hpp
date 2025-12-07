@@ -2,7 +2,6 @@
 #define GRAPH_HPP
 
 #include <iostream>
-#include <vector>
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
@@ -13,41 +12,7 @@
 #include <nlohmann/json.hpp>
 #include <Eigen/Sparse>
 
-
-using json = nlohmann::json;
-
-struct Node {
-    int id;
-    int coordX, coordY;
-    std::vector<int> neighbors;  // Store neighbor IDs, not Node objects
-    bool occupied = false;
-    
-    Node(int node_id, int x = 0, int y = 0);
-    /**
-     * Manhattan distance
-     */
-    float distance(Node b) const {
-        float distX = abs(coordX - b.coordX);
-        float distY = abs(coordY - b.coordY);
-        return distX + distY;
-    }
-};
-
-class IGraph {
-public:
-    //return
-    virtual ~IGraph() = default;
-    virtual void add_edge(int u, int v) = 0;
-    virtual const std::vector<int>& neighbors(int u) const = 0;
-    virtual std::vector<Node> neighbor_nodes(int u) const = 0;
-    virtual std::vector<int> bfs(int start) const = 0;
-    virtual void print() const = 0;
-
-    // //return nodes
-    // virtual void add_edge(Node& n1, Node& n2) = 0;
-    // virtual const std::vector<Node>& neighbors(Node& n1) const = 0;
-    // virtual std::vector<Node> bfs(Node& start) const = 0;
-};
+#include "igraph.hpp"
 
 // Graph represented as a sparse adjacency matrix (row-major)
 class Graph : public IGraph {
@@ -57,9 +22,6 @@ public:
 
 private:
     SpMat adj;
-    std::unordered_set<int> nodes;
-    std::unordered_set<int> magic_states;
-    int node_count;
     std::vector<Node> node_storage;  // Global array of nodes
     std::unordered_map<int, size_t> node_map;  // Map from node ID to index in storage
 
@@ -69,12 +31,37 @@ public:
     // Constructor: specify maximum number of nodes
     explicit Graph(int max_nodes = 100);
 
+
+    //----------overrides------------------
+
+    // Add a directed edge from u to v
+    void add_edge(int u, int v) override;
+
+    // Get neighbors of node u (outgoing edges) - returns neighbor IDs
+    const std::vector<int>& neighbors(int u) const override;
+
+    // BFS traversal
+    std::vector<int> bfs(int start) const override;
+
+    bool is_occupied(int id) const override; 
+
+    // Print the adjacency list with node coordinates
+    void print() const override;
+
+    Node& get_node(int id) override;
+    
+    const Node& get_node(int id) const override;
+
+    void occupy_node(int id) override;
+
+    std::vector<Node> neighbor_nodes(int u) const override;
+
+
+    //-------coordinates---------
+
     // Add a node with coordinates
     void add_node(int id, int x = 0, int y = 0);
 
-    // Get node by ID
-    Node& get_node(int id);
-    const Node& get_node(int id) const;
 
     const Node& get_node_by_coordinates(int x, int y) const;
 
@@ -86,24 +73,9 @@ public:
         return get_node(id).coordY;
     }
 
-    bool is_occupied(int id) const;
-
-    void occupy_node(int id);
-
-    // Add a directed edge from u to v
-    void add_edge(int u, int v) override;
-
-    // Get neighbors of node u (outgoing edges) - returns neighbor IDs
-    const std::vector<int>& neighbors(int u) const override;
 
     // Get neighbors as Node objects
-    std::vector<Node> neighbor_nodes(int u) const;
 
-    // BFS traversal
-    std::vector<int> bfs(int start) const override;
-
-    // Print the adjacency list with node coordinates
-    void print() const override;
 
     void print_rectangular() const;
 
@@ -113,13 +85,8 @@ public:
     // Static method to create a rectangular grid with magic states
     static Graph create_rectangular_with_magic_states(int width, int height);
 
-    // Get all node IDs
-    std::unordered_set<int> get_nodes() const { return nodes; }
-    // Get all magic state node IDs
-    std::unordered_set<int> get_magic_states() const { return magic_states; }
-    
-    // Get node count
-    int get_node_count() const { return node_count; }
+
+
 };
 
 #endif // GRAPH_HPP
