@@ -6,12 +6,16 @@
 #include "routing.hpp"
 
 #include <iostream>
+#include <filesystem>
 
 using namespace std;
 
 int main(int argc, char **argv) {
-    const char *path = "../qasms/example.qasm";
-    if (argc > 1) path = argv[1];
+    std::string path = "../qasms/example.qasm";
+    if (argc > 1) {
+        std::filesystem::path root(PROJECT_ROOT);        
+        path = (root / "qasms" / (std::string(argv[1]) + ".qasm")).string();
+    }
     circuit::Circuit circuit = circuit::Circuit();
     try {
         circuit.parse_qasm_file(path);

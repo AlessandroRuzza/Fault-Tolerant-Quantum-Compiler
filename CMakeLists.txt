@@ -11,6 +11,7 @@ include_directories(include)
 file(GLOB ALL_SRC_FILES src/*.cpp)
 
 add_executable(FaultTolerantQuantumCompiler ${ALL_SRC_FILES})
+add_definitions(-DPROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 
 # ------JSON and Main-------------
 
