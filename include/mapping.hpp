@@ -1,12 +1,24 @@
 #ifndef MAPPING_HPP
 #define MAPPING_HPP
 
-#include <unordered_map>
 #include <iostream>
 #include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include "graph.hpp"
 #include "farthest_from_magic.hpp"
 #include "qubit.hpp"
+
+// Custom exceptions for mapping errors
+class MapNearMagicError : public std::runtime_error {
+public:
+    MapNearMagicError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class MapNearQubitError : public std::runtime_error {
+public:
+    MapNearQubitError(const std::string& msg) : std::runtime_error(msg) {}
+};
 
 // Forward declaration per evitare dipendenza completa dalla definizione di Circuit
 namespace circuit {
@@ -33,17 +45,32 @@ private:
         if (!mapped) {
             std::cerr << "No unoccupied neighbor available for mapping qubit " << qubit->getQubitID() << ".\n";
         }
+
         return mapped;
+
     }
 
 
 
 public:
+    enum class MappingStrategy {
+        DISTANCE_FIRST,
+        CENTER_SPACED,
+        RANDOM
+    };
+
+    static MappingStrategy mapping_strategy;
+    static bool set_mapping_strategy(const std::string& strategy_name);
+    static std::string current_mapping_strategy_name();
+    static std::string available_mapping_strategies();
+
     Mapping(circuit::Circuit& c, Graph& g) : circuit(c), graph(g) {}
 
     inline void map_qubit_to_node(int qubit, int node) {
         graph_to_circuit[qubit] = node;
         graph.occupy_node(node);
+        std::cout << "Mapped qubit " << qubit << " to node " << node << "\n";
+        graph.print_rectangular();
     }
 
     //-----getters---------
@@ -70,10 +97,24 @@ public:
 
     // ----------mapping algorithms----------
 
-    // Dichiarazione solo: implementazione in src/mapping.cpp
+    // Dichiarazione solo: implementazione in src/mapping/*.cpp
     void magic_aware_mapping(int T_lower_bound, int T_upper_bound, int maximum_iterations, FarthestFromMagicSelector& farthest_from_magic_selector);
 
     void homogenous_mapping_rowmajor(int maxX, int maxY);
+
+private:
+    static std::string normalize_strategy_name(const std::string& strategy_name);
+    static std::string strategy_to_string(MappingStrategy strategy);
+
+    void one_iteration_magic_aware_mapping(Qubit* qubit, int T_lower_bound, int T_upper_bound, FarthestFromMagicSelector& farthest_from_magic_selector, int* c);
+    
+    void pseudo_random_mapping(Qubit* qubit, int second_qubit);
+
+    void random_mapping(Qubit* qubit, int second_qubit);
+
+    void center_spaced_mapping(Qubit* qubit, int second_qubit);
+
+    void distance_first_mapping(Qubit* qubit, int second_qubit);
 
 };
 

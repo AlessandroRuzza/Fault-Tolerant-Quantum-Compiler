@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include_directories(include)
 
 
-file(GLOB ALL_SRC_FILES src/*.cpp)
+file(GLOB_RECURSE ALL_SRC_FILES CONFIGURE_DEPENDS src/*.cpp)
 
 add_executable(FaultTolerantQuantumCompiler ${ALL_SRC_FILES})
 add_definitions(-DPROJECT_ROOT="${CMAKE_SOURCE_DIR}")
@@ -92,4 +92,3 @@ add_custom_target(run-graph-viewer
     COMMENT "Running graph_viewer --test (generates /tmp/graph_view.html)"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-

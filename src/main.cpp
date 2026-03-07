@@ -11,10 +11,72 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-    std::string path = "../qasms/example.qasm";
+    std::string path = "../qasms/qft_20.qasm";
+    const auto print_usage = [&](const char* executable) {
+        std::cout << "Usage: " << executable
+                  << " --circuit [circuit_name|circuit_name.qasm|full_path_to_qasm] "
+                  << "[--strategy [" << Mapping::available_mapping_strategies() << "]]\n"
+                  << "   or: " << executable << " --help\n";
+    };
+
+    const auto resolve_circuit_path = [&](const std::string& circuit_arg) {
+        std::filesystem::path candidate(circuit_arg);
+
+        if (!candidate.has_extension()) {
+            candidate += ".qasm";
+        }
+
+        if (!candidate.has_parent_path() && !candidate.is_absolute()) {
+            std::filesystem::path root(PROJECT_ROOT);
+            candidate = root / "qasms" / candidate;
+        }
+
+        return candidate.string();
+    };
+
     if (argc > 1) {
-        std::filesystem::path root(PROJECT_ROOT);        
-        path = (root / "qasms" / (std::string(argv[1]) + ".qasm")).string();
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--help") {
+                print_usage(argv[0]);
+                return 0;
+            }
+
+            if (arg == "--circuit") {
+                if (i + 1 >= argc) {
+                    std::cerr << "Missing value for --circuit\n";
+                    print_usage(argv[0]);
+                    return 1;
+                }
+                path = resolve_circuit_path(argv[++i]);
+                continue;
+            }
+
+            if (arg == "--strategy") {
+                if (i + 1 >= argc) {
+                    std::cerr << "Missing value for --strategy\n";
+                    print_usage(argv[0]);
+                    return 1;
+                }
+
+                const std::string strategy_name = argv[++i];
+                if (!Mapping::set_mapping_strategy(strategy_name)) {
+                    std::cerr << "Invalid mapping strategy '" << strategy_name
+                              << "'. Use one of ["
+                              << Mapping::available_mapping_strategies() << "]\n";
+                    return 1;
+                }
+
+                std::cout << "Using "
+                          << Mapping::current_mapping_strategy_name()
+                          << " mapping strategy\n";
+                continue;
+            }
+
+            std::cerr << "Unknown option '" << arg << "'\n";
+            print_usage(argv[0]);
+            return 1;
+        }
     }
     circuit::Circuit circuit = circuit::Circuit();
     try {
@@ -31,7 +93,9 @@ int main(int argc, char **argv) {
 
     circuit.print_qubit_heap();
 
-    circuit.write_qasm_file("universal_set_qasms/semplified.qasm");
+    std::filesystem::path original_name = std::filesystem::path(path).stem();
+    std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
+    circuit.write_qasm_file(output_path);
 
     std::cout << "------- MAPPING ---------" << std::endl;
 
