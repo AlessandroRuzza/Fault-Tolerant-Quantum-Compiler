@@ -1,42 +1,41 @@
 #include "mapping.hpp"
 #include "circuit.hpp"
 
-void Mapping::magic_aware_mapping(int T_lower_bound,
-                                  int T_upper_bound,
-                                  int maximum_iterations,
-                                  FarthestFromMagicSelector& farthest_from_magic_selector) {
+void Mapping::magic_aware_mapping(int T_lower_bound, int T_upper_bound,
+                                  int maximum_iterations, FarthestFromMagicSelector& farthest_from_magic_selector) {
     int total_qubits = circuit.getNumQubits();
     int iterations = 0;
 
-    std::cout << "total_qubits:" << total_qubits << "\n";
+    if (PRINT_MAPPING) std::cout << "\n\n";
+
     while (circuit.getHeapSize() > 0 && iterations < maximum_iterations) {
-        circuit.print_qubit_heap();
+        if (MAPPING_VERBOSE) circuit.print_qubit_heap();
         Qubit* qubit = circuit.popFromHeap();
         try {
             one_iteration_magic_aware_mapping(
                 qubit, T_lower_bound, T_upper_bound, farthest_from_magic_selector, &iterations);
         } catch (const MapNearMagicError&) {
             pseudo_random_mapping(qubit, -1);
+            iterations++; // consider this as an iteration even if it falls back to pseudo-random
         } catch (const MapNearQubitError&) {
             pseudo_random_mapping(qubit, -1);
+            iterations++; // consider this as an iteration even if it falls back to pseudo-random
         } catch (const std::exception& e) {
             std::cerr << "Unexpected error: " << e.what() << "\n";
         }
+        if (PRINT_MAPPING) std::cout << "Mapped qubits: " << iterations << "/" << total_qubits << "\n\n";
     }
 }
 
-void Mapping::one_iteration_magic_aware_mapping(
-    Qubit* qubit,
-    int T_lower_bound,
-    int T_upper_bound,
-    FarthestFromMagicSelector& farthest_from_magic_selector,
-    int* iterations) {
-    std::cout << "Mapping qubit " << qubit->getQubitID() << " with T_count = "
+void Mapping::one_iteration_magic_aware_mapping(Qubit* qubit, int T_lower_bound, int T_upper_bound, 
+                                                FarthestFromMagicSelector& farthest_from_magic_selector, int* iterations) {
+    
+    if (PRINT_MAPPING) std::cout << "Mapping qubit " << qubit->getQubitID() << " with T_count = "
               << qubit->getTCount() << " and max CNOT count = "
               << qubit->getMaxCNOTCount() << "\n";
 
     if (qubit->getTCount() > qubit->getMaxCNOTCount()) {
-        std::cout << "Mapping based on T_count"
+        if (MAPPING_VERBOSE) std::cout << "Mapping based on T_count"
                   << "\n";
         int best_magic_state = graph.getBestMagicStateId();
 
@@ -49,12 +48,12 @@ void Mapping::one_iteration_magic_aware_mapping(
                 ".\n");
         }
     } else {
-        std::cout << "Mapping based on CNOT_count"
+        if (MAPPING_VERBOSE) std::cout << "Mapping based on CNOT_count"
                   << "\n";
         int second_qubit = qubit->getMaxCNOTCountIndex();
         int second_qubit_mapped_node = get_mapped_node(second_qubit);
         if (second_qubit_mapped_node != -1) {
-            std::cout << "mapping near qubit " << second_qubit
+            if (MAPPING_VERBOSE) std::cout << "mapping near qubit " << second_qubit
                       << " which is already mapped to node " << second_qubit_mapped_node
                       << "\n";
             if (!mapToNeighbor(qubit, second_qubit_mapped_node)) {
@@ -65,9 +64,9 @@ void Mapping::one_iteration_magic_aware_mapping(
             }
         } else {
             int best_magic_state_id = graph.getBestMagicStateId();
-            std::cout << "Second qubit " << second_qubit << " is not mapped yet.\n";
+            if (MAPPING_VERBOSE) std::cout << "Second qubit " << second_qubit << " is not mapped yet.\n";
             if (qubit->getTCount() > T_upper_bound) {
-                std::cout
+                if (MAPPING_VERBOSE) std::cout
                     << "mapping near magic state because second qubit is not mapped and "
                        "T_count is high\n";
                 if (mapToNeighbor(qubit, best_magic_state_id)) {
@@ -79,7 +78,7 @@ void Mapping::one_iteration_magic_aware_mapping(
                         std::to_string(best_magic_state_id) + ".\n");
                 }
 
-                std::cout << "mapping second qubit near the first\n";
+                if (MAPPING_VERBOSE) std::cout << "mapping second qubit near the first\n";
                 int qubit_mapped_node = get_mapped_node(qubit->getQubitID());
                 if (mapToNeighbor(circuit.getQubit(second_qubit), qubit_mapped_node)) {
                     graph.increment_mapped_magic_state(best_magic_state_id);
@@ -90,7 +89,7 @@ void Mapping::one_iteration_magic_aware_mapping(
                         std::to_string(qubit->getQubitID()) + ".\n");
                 }
             } else if (qubit->getTCount() < T_lower_bound) {
-                std::cout << "mapping far from magic states because second qubit is not "
+                if (MAPPING_VERBOSE) std::cout << "mapping far from magic states because second qubit is not "
                              "mapped and T_count is low\n";
                 int node_id = farthest_from_magic_selector.pick_next();
                 if (node_id != -1) {
@@ -101,7 +100,7 @@ void Mapping::one_iteration_magic_aware_mapping(
                                              std::to_string(qubit->getQubitID()) + ".\n");
                 }
 
-                std::cout << "mapping second qubit near the first\n";
+                if (MAPPING_VERBOSE) std::cout << "mapping second qubit near the first\n";
                 if (!mapToNeighbor(circuit.getQubit(second_qubit), node_id)) {
                     throw MapNearQubitError(
                         "Failed to map qubit " + std::to_string(qubit->getQubitID()) +

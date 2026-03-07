@@ -5,9 +5,12 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+
 #include "graph.hpp"
 #include "farthest_from_magic.hpp"
 #include "qubit.hpp"
+#include "defines.hpp"
+
 
 // Custom exceptions for mapping errors
 class MapNearMagicError : public std::runtime_error {
@@ -43,7 +46,7 @@ private:
             }
         }
         if (!mapped) {
-            std::cerr << "No unoccupied neighbor available for mapping qubit " << qubit->getQubitID() << ".\n";
+            if (PRINT_MAPPING) std::cout << "No unoccupied neighbor available for mapping qubit " << qubit->getQubitID() << ".\n";
         }
 
         return mapped;
@@ -69,8 +72,8 @@ public:
     inline void map_qubit_to_node(int qubit, int node) {
         graph_to_circuit[qubit] = node;
         graph.occupy_node(node);
-        std::cout << "Mapped qubit " << qubit << " to node " << node << "\n";
-        graph.print_rectangular();
+        if (PRINT_MAPPING) std::cout << "Mapped qubit " << qubit << " to node " << node << "\n";
+        if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
     }
 
     //-----getters---------

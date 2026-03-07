@@ -11,8 +11,11 @@
 #include <cctype>
 #include <stdexcept>
 #include <unordered_map>
+#include <cmath>
 #include "maxHeap.hpp"
 #include "qubit.hpp"
+#include "defines.hpp"
+
 
 namespace circuit {
 
@@ -44,6 +47,7 @@ class Circuit {
 protected:
     std::vector<Gate> gates; 
     MaxHeap<Qubit*> qubitsHeap;
+
     //maps qubit index to index in the heap
     std::vector<Qubit*> qubitsVector;
 
@@ -129,6 +133,39 @@ public:
         return qubitsHeap.pop();
     }
 
+    // Calculate the mean number of T gates per qubit
+    inline double getTMean() const {
+        if (qubitsVector.empty()) return 0.0;
+        
+        int sum = 0;
+        int count = 0;
+        for (const auto* qubit : qubitsVector) {
+            if (qubit != nullptr) {
+                sum += qubit->getTCount();
+                count++;
+            }
+        }
+        return count > 0 ? static_cast<double>(sum) / count : 0.0;
+    }
+
+    // Calculate the standard deviation of T gates per qubit
+    inline double getTStd() const {
+        if (qubitsVector.empty()) return 0.0;
+        
+        double mean = getTMean();
+        double sum_squared_diff = 0.0;
+        int count = 0;
+        
+        for (const auto* qubit : qubitsVector) {
+            if (qubit != nullptr) {
+                double diff = qubit->getTCount() - mean;
+                sum_squared_diff += diff * diff;
+                count++;
+            }
+        }
+        return count > 0 ? std::sqrt(sum_squared_diff / count) : 0.0;
+    }
+
     //------------initializers/setters--------------
 
 
@@ -160,6 +197,10 @@ public:
     }
 
 
+    inline void print_qubit_heap() const{
+        qubitsHeap.print();
+    };
+
 
 
     // Parse a QASM file and return a vector of gates.
@@ -171,9 +212,6 @@ public:
 
     void addGate(const Gate& gate, std::string gate_name, int globalID);
 
-    void print_qubit_heap() const{
-        qubitsHeap.print();
-    };
 
 };
 } // namespace circuit

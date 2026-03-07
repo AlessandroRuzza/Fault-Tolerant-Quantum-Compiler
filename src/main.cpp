@@ -4,13 +4,96 @@
 #include "maxHeap.hpp"
 #include "mapping.hpp"
 #include "routing.hpp"
+#include "defines.hpp"
 
 #include <iostream>
 #include <filesystem>
 
 using namespace std;
 
+
+
+
+std::string argument_parsing(int argc, char **argv); 
+
+
 int main(int argc, char **argv) {
+    std::string path = argument_parsing(argc, argv);
+    if (path == "error") {
+        return 1;
+    }
+    circuit::Circuit circuit = circuit::Circuit();
+    try {
+        circuit.parse_qasm_file(path);
+        auto gates = circuit.getGates();
+        for (size_t i = 0; i < gates.size(); ++i) {
+            const auto &g = gates[i];
+            if (PRINT_PARSING) std::cout << g.id << ": " << g.to_string() << "\n";
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "error: " << e.what() << std::endl;
+        return 2;
+    }
+
+    if (PRINT_CIRCUIT) circuit.print_qubit_heap();
+
+    std::filesystem::path original_name = std::filesystem::path(path).stem();
+    std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
+    circuit.write_qasm_file(output_path);
+
+    std::cout << "------- MAPPING ---------" << std::endl;
+
+    int x = 10, y = 11;
+
+    Graph graph = Graph::create_rectangular_with_magic_states(x, y);
+
+    if (PRINT_MAPPING) graph.print_rectangular();
+
+    FarthestFromMagicSelector farthest_from_magic_selector(graph);
+
+    Mapping mapping(circuit, graph);
+
+
+    int total_qubits = circuit.getNumQubits();
+    std::cout << "\n\ntotal_qubits:" << total_qubits << "\n";
+    std::cout << "T gates per qubit - Mean: " << circuit.getTMean() << ", Std: " << circuit.getTStd() << "\n";
+
+    int T_lower_bound = static_cast<int>(circuit.getTMean() - circuit.getTStd());
+    int T_upper_bound = static_cast<int>(circuit.getTMean() + circuit.getTStd());
+
+    std::cout << "T_count lower bound: " << T_lower_bound << "\n";
+    std::cout << "T_count upper bound: " << T_upper_bound << "\n";
+
+    int maximum_iterations = 100;
+
+
+    mapping.magic_aware_mapping(T_lower_bound, T_upper_bound, maximum_iterations, farthest_from_magic_selector);
+
+    //mapping.homogenous_mapping_rowmajor(x, y);
+
+    graph.print_rectangular();
+
+
+    std::cout << "------- LAYERING ---------" << std::endl;
+    circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
+    if (PRINT_LAYER) layeredCircuit.print_layered();
+
+    std::cout << "------- ROUTING ---------" << std::endl;
+    NaiveShortestPath pathStrat(graph);
+    QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
+    router.route_circuit();
+    
+    std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
+    if (PRINT_ROUTING) router.print_routing_steps();
+    std::cout << "\nTotal routing steps: " << router.get_routing_length() << "\n\n";
+    graph.print_rectangular();
+
+    return 0;
+}
+
+
+
+std::string argument_parsing(int argc, char **argv) {
     std::string path = "../qasms/qft_20.qasm";
     const auto print_usage = [&](const char* executable) {
         std::cout << "Usage: " << executable
@@ -39,14 +122,14 @@ int main(int argc, char **argv) {
             const std::string arg = argv[i];
             if (arg == "--help") {
                 print_usage(argv[0]);
-                return 0;
+                return "error";
             }
 
             if (arg == "--circuit") {
                 if (i + 1 >= argc) {
                     std::cerr << "Missing value for --circuit\n";
                     print_usage(argv[0]);
-                    return 1;
+                    return "error";
                 }
                 path = resolve_circuit_path(argv[++i]);
                 continue;
@@ -56,7 +139,7 @@ int main(int argc, char **argv) {
                 if (i + 1 >= argc) {
                     std::cerr << "Missing value for --strategy\n";
                     print_usage(argv[0]);
-                    return 1;
+                    return "error";
                 }
 
                 const std::string strategy_name = argv[++i];
@@ -64,7 +147,7 @@ int main(int argc, char **argv) {
                     std::cerr << "Invalid mapping strategy '" << strategy_name
                               << "'. Use one of ["
                               << Mapping::available_mapping_strategies() << "]\n";
-                    return 1;
+                    return "error";
                 }
 
                 std::cout << "Using "
@@ -75,66 +158,11 @@ int main(int argc, char **argv) {
 
             std::cerr << "Unknown option '" << arg << "'\n";
             print_usage(argv[0]);
-            return 1;
+            return "error";
         }
     }
-    circuit::Circuit circuit = circuit::Circuit();
-    try {
-        circuit.parse_qasm_file(path);
-        auto gates = circuit.getGates();
-        for (size_t i = 0; i < gates.size(); ++i) {
-            const auto &g = gates[i];
-            std::cout << g.id << ": " << g.to_string() << "\n";
-        }
-    } catch (const std::exception &e) {
-        std::cerr << "error: " << e.what() << std::endl;
-        return 2;
-    }
-
-    circuit.print_qubit_heap();
-
-    std::filesystem::path original_name = std::filesystem::path(path).stem();
-    std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
-    circuit.write_qasm_file(output_path);
-
-    std::cout << "------- MAPPING ---------" << std::endl;
-
-    int x = 10, y = 11;
-
-    Graph graph = Graph::create_rectangular_with_magic_states(x, y);
-
-    graph.print_rectangular();
-
-    FarthestFromMagicSelector farthest_from_magic_selector(graph);
-
-    Mapping mapping(circuit, graph);
-
-    int T_lower_bound = 2;
-    int T_upper_bound = 5;
-    int maximum_iterations = 100;
-    mapping.magic_aware_mapping(T_lower_bound, T_upper_bound, maximum_iterations, farthest_from_magic_selector);
-
-    //mapping.homogenous_mapping_rowmajor(x, y);
-
-    graph.print_rectangular();
-
-
-    std::cout << "------- LAYERING ---------" << std::endl;
-    circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
-    layeredCircuit.print_layered();
-
-    std::cout << "------- ROUTING ---------" << std::endl;
-    NaiveShortestPath pathStrat(graph);
-    QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
-    router.route_circuit();
-    
-    std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
-    router.print_routing_steps();
-    graph.print_rectangular();
-
-    return 0;
+    return path;
 }
-
 
 
 

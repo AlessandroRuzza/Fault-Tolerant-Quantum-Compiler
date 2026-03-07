@@ -14,6 +14,7 @@
 
 #include "igraph.hpp"
 
+
 // Graph represented as a sparse adjacency matrix (row-major)
 class Graph : public IGraph {
 public:
@@ -78,7 +79,8 @@ public:
     }
 
 
-    // Get neighbors as Node objects
+
+
 
 
     void print_rectangular() const;
