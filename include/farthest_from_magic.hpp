@@ -2,6 +2,8 @@
 #define FARTHEST_FROM_MAGIC_HPP
 
 #include "graph.hpp"
+
+
 #include <unordered_map>
 #include <queue>
 #include <limits>

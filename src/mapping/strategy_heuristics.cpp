@@ -7,7 +7,7 @@
 #include <vector>
 
 void Mapping::random_mapping(Qubit* qubit, int second_qubit) {
-    std::cout << "mapping randomly because second qubit is not mapped and T_count is in "
+    if (PRINT_MAPPING) std::cout << "mapping randomly because second qubit is not mapped and T_count is in "
                  "the middle\n";
     std::vector<int> candidates;
     candidates.reserve(graph.get_node_count());
@@ -42,7 +42,7 @@ void Mapping::random_mapping(Qubit* qubit, int second_qubit) {
 }
 
 void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
-    std::cout << "mapping with center-spaced heuristic\n";
+    if (PRINT_MAPPING) std::cout << "mapping with center-spaced heuristic\n";
 
     const std::unordered_set<int> magic_states = graph.get_magic_states();
     std::vector<int> candidates;
@@ -135,7 +135,7 @@ void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
 }
 
 void Mapping::distance_first_mapping(Qubit* qubit, int second_qubit) {
-    std::cout << "mapping with distance-first heuristic\n";
+    if (PRINT_MAPPING) std::cout << "mapping with distance-first heuristic\n";
 
     const std::unordered_set<int> magic_states = graph.get_magic_states();
     std::vector<int> candidates;

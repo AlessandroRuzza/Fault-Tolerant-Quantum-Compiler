@@ -10,6 +10,8 @@ struct Node {
     bool occupied = false;
     
     Node(int node_id, int x = 0, int y = 0);
+
+    
     float distance(Node b) const {
         float distX = abs(coordX - b.coordX);
         float distY = abs(coordY - b.coordY);
@@ -69,8 +71,16 @@ public:
         return best_magic_state_id;
     }
 
+    // const void update_magic_states_score(int magic_state_id) {
+    //     // In this simple implementation, the score is just the count of mapped qubits.
+    //     // More complex heuristics could be implemented here if needed.
+
+        
+    // }
+
     void increment_mapped_magic_state(int magic_state_id) {
         mapped_magic_states[magic_state_id]++;
+        //update_magic_states_score(magic_state_id);
     }
 
 };
