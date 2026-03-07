@@ -62,7 +62,7 @@ void MaxHeap<T>::deleteKey(T key) {
  
 template<typename T>
 void MaxHeap<T>::print() const {
-    std::cout << "Max Heap: ";
+    std::cout << "\nMax Heap: \n";
     for (int i = 0; i < size; ++i) {
         std::cout << *array[i] << std::endl;
     }
