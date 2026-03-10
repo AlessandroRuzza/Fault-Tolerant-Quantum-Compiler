@@ -67,9 +67,9 @@ int main(int argc, char **argv) {
     int maximum_iterations = 100;
 
 
-    mapping.magic_aware_mapping(T_lower_bound, T_upper_bound, maximum_iterations, farthest_from_magic_selector);
+    //mapping.magic_aware_mapping(T_lower_bound, T_upper_bound, maximum_iterations, farthest_from_magic_selector);
 
-    //mapping.homogenous_mapping_rowmajor(x, y);
+    mapping.homogenous_mapping_rowmajor(x, y);
 
     graph.print_rectangular();
 
