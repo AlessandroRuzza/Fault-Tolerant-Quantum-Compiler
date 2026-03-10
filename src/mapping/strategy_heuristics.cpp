@@ -20,15 +20,7 @@ void Mapping::random_mapping(Qubit* qubit, int second_qubit) {
     }
 
     if (candidates.empty()) {
-        for (int node_id = 0; node_id < graph.get_node_count(); ++node_id) {
-            if (!graph.is_occupied(node_id)) {
-                candidates.push_back(node_id);
-            }
-        }
-    }
-
-    if (candidates.empty()) {
-        throw std::runtime_error("No available node found for random_mapping.");
+        throw std::runtime_error("No available non-magic node found for random_mapping.");
     }
 
     static thread_local std::mt19937 rng(std::random_device{}());
@@ -75,15 +67,7 @@ void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
     }
 
     if (candidates.empty()) {
-        for (int node_id = 0; node_id < graph.get_node_count(); ++node_id) {
-            if (!graph.is_occupied(node_id)) {
-                candidates.push_back(node_id);
-            }
-        }
-    }
-
-    if (candidates.empty()) {
-        throw std::runtime_error("No available node found for center_spaced_mapping.");
+        throw std::runtime_error("No available non-magic node found for center_spaced_mapping.");
     }
 
     const float center_x = (min_x + max_x) / 2.0f;
@@ -168,15 +152,7 @@ void Mapping::distance_first_mapping(Qubit* qubit, int second_qubit) {
     }
 
     if (candidates.empty()) {
-        for (int node_id = 0; node_id < graph.get_node_count(); ++node_id) {
-            if (!graph.is_occupied(node_id)) {
-                candidates.push_back(node_id);
-            }
-        }
-    }
-
-    if (candidates.empty()) {
-        throw std::runtime_error("No available node found for distance_first_mapping.");
+        throw std::runtime_error("No available non-magic node found for distance_first_mapping.");
     }
 
     const float center_x = (min_x + max_x) / 2.0f;
