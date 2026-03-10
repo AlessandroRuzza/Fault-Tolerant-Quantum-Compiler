@@ -65,6 +65,7 @@ endif()
 # Add graph_viewer target and a run/open target to build, run --test, copy the html to Windows (WSL)
 # and open it (or fall back to xdg-open on Linux).
 add_executable(graph_viewer
+    src/igraph.cpp
     src/graph.cpp
     visualization/graph_viewer.cpp
 )

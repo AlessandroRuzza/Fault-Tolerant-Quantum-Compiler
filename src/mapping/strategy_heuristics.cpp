@@ -12,9 +12,9 @@ void Mapping::random_mapping(Qubit* qubit, int second_qubit) {
     std::vector<int> candidates;
     candidates.reserve(graph.get_node_count());
 
-    const std::unordered_set<int> magic_states = graph.get_magic_states();
+    const std::vector<int> magic_states_ids = graph.get_magic_state_ids();
     for (int node_id = 0; node_id < graph.get_node_count(); ++node_id) {
-        if (!graph.is_occupied(node_id) && !magic_states.contains(node_id)) {
+        if (!graph.is_occupied(node_id) && std::find(magic_states_ids.begin(), magic_states_ids.end(), node_id) == magic_states_ids.end()) {
             candidates.push_back(node_id);
         }
     }
@@ -44,7 +44,7 @@ void Mapping::random_mapping(Qubit* qubit, int second_qubit) {
 void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
     if (PRINT_MAPPING) std::cout << "mapping with center-spaced heuristic\n";
 
-    const std::unordered_set<int> magic_states = graph.get_magic_states();
+    const std::vector<int> magic_states_ids = graph.get_magic_state_ids();
     std::vector<int> candidates;
     std::vector<int> occupied_data_nodes;
     candidates.reserve(graph.get_node_count());
@@ -56,7 +56,7 @@ void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
     int max_y = std::numeric_limits<int>::min();
 
     for (int node_id = 0; node_id < graph.get_node_count(); ++node_id) {
-        if (magic_states.contains(node_id)) {
+        if (std::find(magic_states_ids.begin(), magic_states_ids.end(), node_id) != magic_states_ids.end()) {
             continue;
         }
 
@@ -137,7 +137,7 @@ void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
 void Mapping::distance_first_mapping(Qubit* qubit, int second_qubit) {
     if (PRINT_MAPPING) std::cout << "mapping with distance-first heuristic\n";
 
-    const std::unordered_set<int> magic_states = graph.get_magic_states();
+    const std::vector<int> magic_states_ids = graph.get_magic_state_ids();
     std::vector<int> candidates;
     std::vector<int> occupied_data_nodes;
     candidates.reserve(graph.get_node_count());
@@ -149,7 +149,7 @@ void Mapping::distance_first_mapping(Qubit* qubit, int second_qubit) {
     int max_y = std::numeric_limits<int>::min();
 
     for (int node_id = 0; node_id < graph.get_node_count(); ++node_id) {
-        if (magic_states.contains(node_id)) {
+        if (std::find(magic_states_ids.begin(), magic_states_ids.end(), node_id) != magic_states_ids.end()) {
             continue;
         }
 

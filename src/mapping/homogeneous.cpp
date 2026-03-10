@@ -8,7 +8,7 @@ void Mapping::homogenous_mapping_rowmajor(int maxX, int maxY) {
             std::cerr << "Not enough nodes in the graph to map all qubits homogeneously.\n";
             break;
         }
-        if (!graph.get_magic_states().contains(node_id)) {
+        if (std::find(graph.get_magic_state_ids().begin(), graph.get_magic_state_ids().end(), node_id) == graph.get_magic_state_ids().end()) {
             map_qubit_to_node(qubit_id, node_id);
             count++;
             if (maxY % 2 == 1 && count == (maxY + 1) / 2) {
