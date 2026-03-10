@@ -37,8 +37,12 @@ private:
 
     const bool mapToNeighbor(const Qubit* qubit, int node_id){
         const std::vector<int>& neighbors = graph.neighbors(node_id);
+        const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
         bool mapped = false;
         for (int neighbor_id : neighbors) {
+            if (std::find(magic_state_ids.begin(), magic_state_ids.end(), neighbor_id) != magic_state_ids.end()) {
+                continue; // Never map a data qubit on a magic-state node.
+            }
             if (!graph.is_occupied(neighbor_id)) {
                 map_qubit_to_node(qubit->getQubitID(), neighbor_id);
                 mapped = true;
