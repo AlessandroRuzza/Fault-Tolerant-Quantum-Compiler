@@ -1,7 +1,14 @@
+#ifndef IGRAPH_HPP
+#define IGRAPH_HPP
+
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+#include <string>
+#include <tuple>
 #include <vector>
-
-
-using json = nlohmann::json;
+#include <set>
+#include <unordered_map>
 
 struct Node {
     int id;
@@ -13,8 +20,8 @@ struct Node {
 
     
     float distance(Node b) const {
-        float distX = abs(coordX - b.coordX);
-        float distY = abs(coordY - b.coordY);
+        float distX = std::abs(coordX - b.coordX);
+        float distY = std::abs(coordY - b.coordY);
         return distX + distY; // Manhattan distance
     }
 
@@ -23,64 +30,169 @@ struct Node {
     }
 };
 
+
+
 class IGraph {
 
 protected:
-    std::unordered_set<int> nodes;
-    std::unordered_set<int> magic_states;
+    std::vector<Node> nodes;
+    std::vector<int> magic_states_ids; // Store only IDs of magic states
     std::unordered_map<int, int> mapped_magic_states;
     int node_count;
 
 public:
+
     IGraph() : node_count(0) {}  // costruttore di default
     virtual ~IGraph() = default;
     virtual void add_edge(int u, int v) = 0;
-    virtual const std::vector<int>& neighbors(int u) const = 0;
-    virtual std::vector<Node> neighbor_nodes(int u) const = 0;
-    virtual std::vector<int> bfs(int start) const = 0;
-    virtual void print() const = 0;
-    virtual bool is_occupied(int id) const = 0;
-    virtual Node& get_node(int id) = 0;
-    virtual const Node& get_node(int id) const = 0;
-    virtual void occupy_node(int id) = 0;
-    
-    std::unordered_set<int> get_nodes() const { 
+
+
+
+    // ------get_nodes----------
+
+
+
+    inline Node& get_node(int id) {
+        return nodes[id];
+    }
+
+    inline const Node& get_node(int id) const {
+        return nodes[id];
+    }
+
+
+    inline std::vector<Node> get_nodes() const { 
         return nodes; 
     }
 
-    std::unordered_set<int> get_magic_states() const { 
-        return magic_states; 
+
+    std::vector<int> get_nodes_ids () const {
+        std::vector<int> ids;
+        ids.reserve(nodes.size());
+        for (const Node& node : nodes) {
+            ids.push_back(node.id);
+        }
+        return ids;
+    } 
+
+
+
+        // Get node by coordinates
+    const Node& get_node_by_coordinates(int x, int y) const {
+        for (const Node& node : nodes) {
+            if (node.coordX == x && node.coordY == y) {
+                return node;
+            }
+        }
+        throw std::runtime_error("Node not found at coordinates: (" + std::to_string(x) + "," + std::to_string(y) + ")");
     }
 
 
-    int get_node_count() const { 
+
+    // ------get_magic_states----------
+
+
+    std::vector<Node> get_magic_states() const { 
+        std::vector<Node> result;
+        for (int id : magic_states_ids) {
+            result.push_back(get_node(id));
+        }
+        return result;
+    }
+
+
+    inline std::vector<int> get_magic_state_ids() const {
+        return magic_states_ids;
+    }
+
+
+
+    // ---------get_coord-----------
+
+
+
+
+    inline const int get_coordX(int id) const {
+        return get_node(id).coordX;
+    }
+
+    inline const int get_coordY(int id) const {
+        return get_node(id).coordY;
+    }
+
+
+
+    // --------neighbours--------
+
+    inline const std::vector<int>& neighbors(int u) const {
+        return get_node(u).neighbors;
+    }
+
+
+    
+    const std::vector<Node> neighbor_nodes(int u) const {
+        std::vector<Node> result;
+        const std::vector<int>& neighbors_u = neighbors(u);
+        result.reserve(neighbors_u.size());
+        for (int neighbor_id : neighbors_u) {
+            result.emplace_back(get_node(neighbor_id));
+        }
+        return result;
+    }
+
+
+    //--------occupied-----------
+    
+
+    inline void occupy_node(int id) {
+        get_node(id).occupied = true;
+    }
+
+
+    inline const bool is_occupied(int id) const {
+        return get_node(id).occupied;
+    }
+
+
+    // --------------------------
+
+    inline int get_node_count() const { 
         return node_count; 
     }
 
 
-    const int getBestMagicStateId() {
-        int best_magic_state_id = -1;
-        int min_mapped_qubits = INT_MAX;
-        for (int magic_state_id : this->get_magic_states()) {
-            int count = mapped_magic_states[magic_state_id];
-            if (count < min_mapped_qubits) {
-                min_mapped_qubits = count;
-                best_magic_state_id = magic_state_id;
-            }
-        }
-        return best_magic_state_id;
-    }
 
-    // const void update_magic_states_score(int magic_state_id) {
-    //     // In this simple implementation, the score is just the count of mapped qubits.
-    //     // More complex heuristics could be implemented here if needed.
 
-        
-    // }
 
-    void increment_mapped_magic_state(int magic_state_id) {
-        mapped_magic_states[magic_state_id]++;
-        //update_magic_states_score(magic_state_id);
-    }
+
+    // -------print ---------------
+    void print() const;
+    
+    void print_rectangular() const;
+
+
+    //-------add---------------
+    void add_node(int id, int x, int y);
+    void add_node(int id);
+
+
+
+    // ------magic_states_algorithms_helpers----------
+
+
+
+    const int getNearestMagicStateId(int node_id) const;
+
+    const Node& getNearestMagicState(const Node& node) const;
+
+    const int getBestMagicStateId();
+
+    // const void update_magic_states_score(int magic_state_id);
+
+    void increment_mapped_magic_state(int magic_state_id);
+
 
 };
+
+
+#endif

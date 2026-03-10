@@ -178,15 +178,15 @@ void show_graph_with_cytoscape(const Graph &g) {
     std::ostringstream nodes_js, edges_js;
     nodes_js << "[\n";
     
-    auto magic_states = g.get_magic_states();
+    auto magic_state_ids = g.get_magic_state_ids();
     
     // Iterate through all nodes in storage
-    for (int id : g.get_nodes()) {
-        const Node &node = g.get_node(id);
+    for (const Node &node : g.get_nodes()) {
+        int id = node.id;
         double x = node.coordX * 150;  // Spacing
         double y = node.coordY * 150;
         
-        bool is_magic = (magic_states.find(id) != magic_states.end());
+        bool is_magic = (std::find(magic_state_ids.begin(), magic_state_ids.end(), id) != magic_state_ids.end());
         
         nodes_js << "  { data: { id: \"" << id << "\", label: \"" << id << "\" }, "
                  << "position: { x: " << x << ", y: " << y << " }, "
@@ -201,7 +201,8 @@ void show_graph_with_cytoscape(const Graph &g) {
     nodes_js << "]\n";
 
     edges_js << "[\n";
-    for (int id : g.get_nodes()) {
+    for (const Node &node : g.get_nodes()) {
+        int id = node.id;
         for (int neighbor : g.neighbors(id)) {
             if (id < neighbor) {  // Avoid duplicate edges
                 edges_js << "  { data: { id: \"" << id << "-" << neighbor 

@@ -57,7 +57,7 @@ float QubitRouter::minGateRouteLength(Gate g) const {
     }
     else { // target = closest magic state
         float minDist = INT32_MAX;
-        for(int m : graph.get_magic_states()){
+        for(int m : graph.get_magic_state_ids()){
             float dist = node1.distance(graph.get_node(m));
             if(dist < minDist){
                 minDist = dist;
@@ -114,7 +114,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         else if(gate.name == "t"){ // path to closest magic state 
             int closestDist = INT32_MAX;
             Path closestPath;
-            for(int magicState : graph.get_magic_states()){
+            for(int magicState : graph.get_magic_state_ids()){
                 path = pathStrategy->find_shortest_path(gate.qubits[0], magicState, used_nodes);
                 if(path.size() < closestDist){
                     closestDist = path.size();

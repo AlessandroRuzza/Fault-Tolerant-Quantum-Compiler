@@ -45,7 +45,7 @@ private:
 
     void compute_order() {
         const auto nodes        = graph.get_nodes();        // copy of all node IDs
-        const auto magic_states = graph.get_magic_states(); // copy of magic state IDs
+        const auto magic_states_ids = graph.get_magic_state_ids(); // copy of magic state IDs
 
         // Distance map: node_id -> distance from nearest magic state
         std::unordered_map<int, int> dist;
@@ -55,12 +55,12 @@ private:
         std::queue<int> q;
 
         // Initialize distances to INF
-        for (int u : nodes) {
+        for (int u : graph.get_nodes_ids()) {
             dist[u] = INF;
         }
 
         // Multi-source BFS initialization: all magic states start at distance 0
-        for (int s : magic_states) {
+        for (int s : magic_states_ids) {
             auto it = dist.find(s);
             if (it == dist.end()) continue; // safety, in case s not in nodes
             it->second = 0;
@@ -92,8 +92,8 @@ private:
         order.clear();
         order.reserve(nodes.size());
 
-        for (int u : nodes) {
-            if (magic_states.find(u) == magic_states.end()) {
+        for (int u : graph.get_nodes_ids()) {
+            if (std::find(magic_states_ids.begin(), magic_states_ids.end(), u) == magic_states_ids.end()) {
                 order.push_back(u);
             }
         }
