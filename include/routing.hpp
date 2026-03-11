@@ -43,7 +43,7 @@ private:
     std::vector<Routing> routing_steps;
 
     Routing route_layer(const Layer& layer_gates) const;
-    float minGateRouteLength(Gate g) const;
+    float minGateRouteLength(const Gate& g) const;
 
 public:
     QubitRouter(const Mapping& m, LayeredCircuit& c, const Graph& g, const IPathStrategy* p) 

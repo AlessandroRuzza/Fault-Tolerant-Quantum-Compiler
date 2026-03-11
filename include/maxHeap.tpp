@@ -98,9 +98,13 @@ void MaxHeap<T>::insert(T value)
         array.reserve(capacity);
     }
 
+    int i = size;
+    if (static_cast<int>(array.size()) == size) {
+        array.push_back(value);
+    } else {
+        array[size] = value;
+    }
     size++;
-    int i = size - 1;
-    array[i] = value;
 
     while (i != 0 && heapify_metric((i - 1) / 2) < heapify_metric(i))
     {
