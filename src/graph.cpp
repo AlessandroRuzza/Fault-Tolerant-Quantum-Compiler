@@ -14,8 +14,17 @@ void Graph::add_edge(int u, int v) {
     if (u < 0 || v < 0) return;
     
     // Ensure nodes exist
-    add_node(u);
-    add_node(v);
+    if (u >= nodes.size()) {
+        add_node(u);
+    } else if (nodes[u].id == -1) {
+        add_node(u);
+    }
+    if (v >= nodes.size()) {
+        add_node(v);
+    } else if (nodes[v].id == -1) {
+        add_node(v);
+    }
+
     
     if (u >= adj.rows() || v >= adj.cols()) {
         resize(std::max(u, v) + 1);
@@ -102,9 +111,7 @@ Graph Graph::from_json(const std::string& filename) {
                     if (coords.is_array() && coords.size() >= 2) {
                         int x = static_cast<int>(coords[0]);
                         int y = static_cast<int>(coords[1]);
-                        Node& n = g.get_node(node_id);
-                        n.coordX = x;
-                        n.coordY = y;
+                        g.add_node(node_id, x, y);
                     }
                 }
             }
@@ -194,6 +201,8 @@ Graph Graph::create_rectangular_with_magic_states(int height, int width) {
         int total_nodes = width * height + height;  // grid nodes + magic states
         g.resize(total_nodes);
         
+
+
         // First, create all nodes with their coordinates
         // Grid nodes
         for (int row = 0; row < height; row++) {
@@ -241,6 +250,7 @@ Graph Graph::create_rectangular_with_magic_states(int height, int width) {
             int magic_id = magic_start + row;
             g.add_edge(magic_id, magic_id + 1);
         }
+
         
         return g;
 }

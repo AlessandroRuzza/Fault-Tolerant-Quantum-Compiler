@@ -14,15 +14,23 @@ using namespace std;
 
 
 
-std::string argument_parsing(int argc, char **argv); 
+void argument_parsing(int argc, char **argv, std::string& path, std::string& strategy, std::string& type); 
 
 
 int main(int argc, char **argv) {
-    std::string path = argument_parsing(argc, argv);
-    if (path == "error") {
-        return 1;
-    }
+
+    std::string path = "../qasms/example.qasm";
+    std::string strategy = "distance_first";
+    std::string type = "magic_aware";
+
+    argument_parsing(argc, argv, path, strategy, type);
+
+    std::cout << "path: " << path << std::endl;
+    std::cout << "strategy: " << strategy << std::endl;
+    std::cout << "type: " << type << std::endl;
+
     circuit::Circuit circuit = circuit::Circuit();
+
     try {
         circuit.parse_qasm_file(path);
         auto gates = circuit.getGates();
@@ -43,36 +51,18 @@ int main(int argc, char **argv) {
 
     std::cout << "------- MAPPING ---------" << std::endl;
 
-    int x = 10, y = 11;
+    int x = 4, y = 4;
+    int maximum_iterations = 100;
 
     Graph graph = Graph::create_rectangular_with_magic_states(x, y);
 
     if (PRINT_MAPPING) graph.print_rectangular();
 
-    FarthestFromMagicSelector farthest_from_magic_selector(graph);
+    Mapping mapping(circuit, graph, strategy, type, maximum_iterations);
 
-    Mapping mapping(circuit, graph);
-
-
-    int total_qubits = circuit.getNumQubits();
-    std::cout << "\n\ntotal_qubits:" << total_qubits << "\n";
-    std::cout << "T gates per qubit - Mean: " << circuit.getTMean() << ", Std: " << circuit.getTStd() << "\n";
-
-    int T_lower_bound = static_cast<int>(circuit.getTMean() - circuit.getTStd());
-    int T_upper_bound = static_cast<int>(circuit.getTMean() + circuit.getTStd());
-
-    std::cout << "T_count lower bound: " << T_lower_bound << "\n";
-    std::cout << "T_count upper bound: " << T_upper_bound << "\n";
-
-    int maximum_iterations = 100;
-
-
-    mapping.magic_aware_mapping(T_lower_bound, T_upper_bound, maximum_iterations, farthest_from_magic_selector);
-
-    //mapping.homogenous_mapping_rowmajor(x, y);
+    mapping.map();
 
     graph.print_rectangular();
-
 
     std::cout << "------- LAYERING ---------" << std::endl;
     circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
@@ -86,19 +76,18 @@ int main(int argc, char **argv) {
     std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
     if (PRINT_ROUTING) router.print_routing_steps();
     std::cout << "\nTotal routing steps: " << router.get_routing_length() << "\n\n";
-    graph.print_rectangular();
 
     return 0;
 }
 
 
 
-std::string argument_parsing(int argc, char **argv) {
-    std::string path = "../qasms/qft_20.qasm";
+void argument_parsing(int argc, char **argv, std::string& path, std::string& strategy, std::string& type) {
     const auto print_usage = [&](const char* executable) {
         std::cout << "Usage: " << executable
                   << " --circuit [circuit_name|circuit_name.qasm|full_path_to_qasm] "
                   << "[--strategy [" << Mapping::available_mapping_strategies() << "]]\n"
+                  << "[--type [" << Mapping::available_mapping_types() << "]]\n"
                   << "   or: " << executable << " --help\n";
     };
 
@@ -114,7 +103,7 @@ std::string argument_parsing(int argc, char **argv) {
             candidate = root / "qasms" / candidate;
         }
 
-        return candidate.string();
+        path = candidate.string();
     };
 
     if (argc > 1) {
@@ -122,16 +111,16 @@ std::string argument_parsing(int argc, char **argv) {
             const std::string arg = argv[i];
             if (arg == "--help") {
                 print_usage(argv[0]);
-                return "error";
+                exit(0);
             }
 
             if (arg == "--circuit") {
                 if (i + 1 >= argc) {
                     std::cerr << "Missing value for --circuit\n";
                     print_usage(argv[0]);
-                    return "error";
+                    throw std::runtime_error("Missing value for --circuit");
                 }
-                path = resolve_circuit_path(argv[++i]);
+                resolve_circuit_path(argv[++i]);
                 continue;
             }
 
@@ -139,29 +128,43 @@ std::string argument_parsing(int argc, char **argv) {
                 if (i + 1 >= argc) {
                     std::cerr << "Missing value for --strategy\n";
                     print_usage(argv[0]);
-                    return "error";
+                    throw std::runtime_error("Missing value for --strategy");
                 }
 
-                const std::string strategy_name = argv[++i];
-                if (!Mapping::set_mapping_strategy(strategy_name)) {
-                    std::cerr << "Invalid mapping strategy '" << strategy_name
-                              << "'. Use one of ["
-                              << Mapping::available_mapping_strategies() << "]\n";
-                    return "error";
+                strategy = argv[++i];
+                const std::vector<std::string> valid_strategies = Mapping::get_available_mapping_strategies();
+                if (std::find(valid_strategies.begin(), valid_strategies.end(), strategy) == valid_strategies.end()) {
+                    std::cerr << "Invalid mapping strategy: " << strategy << "\n";
+                    print_usage(argv[0]);
+                    throw std::runtime_error("Invalid mapping strategy: " + strategy);
                 }
-
-                std::cout << "Using "
-                          << Mapping::current_mapping_strategy_name()
-                          << " mapping strategy\n";
                 continue;
+
+
+            }
+
+            if (arg == "--type") {
+                if (i + 1 >= argc) {
+                    std::cerr << "Missing value for --type\n";
+                    print_usage(argv[0]);
+                    throw std::runtime_error("Missing value for --type");
+                }
+                type = argv[++i];
+                const std::vector<std::string> valid_types = Mapping::get_available_mapping_types();
+                if (std::find(valid_types.begin(), valid_types.end(), type) == valid_types.end()) {
+                    std::cerr << "Invalid mapping type: " << type << "\n";
+                    print_usage(argv[0]);
+                    throw std::runtime_error("Invalid mapping type: " + type);
+                }
+                continue;
+
             }
 
             std::cerr << "Unknown option '" << arg << "'\n";
             print_usage(argv[0]);
-            return "error";
+            throw std::runtime_error("Unknown option: " + arg);
         }
     }
-    return path;
 }
 
 

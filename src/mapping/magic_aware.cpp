@@ -1,8 +1,7 @@
 #include "mapping.hpp"
 #include "circuit.hpp"
 
-void Mapping::magic_aware_mapping(int T_lower_bound, int T_upper_bound,
-                                  int maximum_iterations, FarthestFromMagicSelector& farthest_from_magic_selector) {
+void Mapping::magic_aware_mapping() {
     int total_qubits = circuit.getNumQubits();
     int iterations = 0;
 
@@ -11,9 +10,14 @@ void Mapping::magic_aware_mapping(int T_lower_bound, int T_upper_bound,
     while (circuit.getHeapSize() > 0 && iterations < maximum_iterations) {
         if (MAPPING_VERBOSE) circuit.print_qubit_heap();
         Qubit* qubit = circuit.popFromHeap();
+        if (qubit == nullptr) {
+            continue;
+        }
+        if (get_mapped_node(qubit->getQubitID()) != -1) {
+            continue; // already mapped as a side effect of mapping a related qubit
+        }
         try {
-            one_iteration_magic_aware_mapping(
-                qubit, T_lower_bound, T_upper_bound, farthest_from_magic_selector, &iterations);
+            one_iteration_magic_aware_mapping(qubit, &iterations);
         } catch (const MapNearMagicError&) {
             pseudo_random_mapping(qubit, -1);
             iterations++; // consider this as an iteration even if it falls back to pseudo-random
@@ -21,14 +25,15 @@ void Mapping::magic_aware_mapping(int T_lower_bound, int T_upper_bound,
             pseudo_random_mapping(qubit, -1);
             iterations++; // consider this as an iteration even if it falls back to pseudo-random
         } catch (const std::exception& e) {
-            std::cerr << "Unexpected error: " << e.what() << "\n";
+            throw std::runtime_error(
+                "Failed to map qubit " + std::to_string(qubit->getQubitID()) + ": " + e.what()
+            );
         }
         if (PRINT_MAPPING) std::cout << "Mapped qubits: " << iterations << "/" << total_qubits << "\n\n";
     }
 }
 
-void Mapping::one_iteration_magic_aware_mapping(Qubit* qubit, int T_lower_bound, int T_upper_bound, 
-                                                FarthestFromMagicSelector& farthest_from_magic_selector, int* iterations) {
+void Mapping::one_iteration_magic_aware_mapping(Qubit* qubit, int* iterations) {
     
     if (PRINT_MAPPING) std::cout << "Mapping qubit " << qubit->getQubitID() << " with T_count = "
               << qubit->getTCount() << " and max CNOT count = "
@@ -51,6 +56,11 @@ void Mapping::one_iteration_magic_aware_mapping(Qubit* qubit, int T_lower_bound,
         if (MAPPING_VERBOSE) std::cout << "Mapping based on CNOT_count"
                   << "\n";
         int second_qubit = qubit->getMaxCNOTCountIndex();
+        if (second_qubit < 0) {
+            pseudo_random_mapping(qubit, -1);
+            (*iterations)++;
+            return;
+        }
         int second_qubit_mapped_node = get_mapped_node(second_qubit);
         if (second_qubit_mapped_node != -1) {
             if (MAPPING_VERBOSE) std::cout << "mapping near qubit " << second_qubit

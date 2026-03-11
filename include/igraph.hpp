@@ -39,10 +39,12 @@ protected:
     std::vector<int> magic_states_ids; // Store only IDs of magic states
     std::unordered_map<int, int> mapped_magic_states;
     int node_count;
+    int maxX;
+    int maxY;
 
 public:
 
-    IGraph() : node_count(0) {}  // costruttore di default
+    IGraph() : node_count(0), maxX(-1), maxY(-1) {}  // costruttore di default
     virtual ~IGraph() = default;
     virtual void add_edge(int u, int v) = 0;
 
@@ -120,6 +122,14 @@ public:
         return get_node(id).coordY;
     }
 
+    inline const int getMaxX() const {
+        return maxX;
+    }
+
+    inline const int getMaxY() const {
+        return maxY;
+     }
+
 
 
     // --------neighbours--------
@@ -160,6 +170,14 @@ public:
         return node_count; 
     }
 
+    inline int get_maxX() const {
+        return maxX;
+    }
+
+    inline int get_maxY() const {
+        return maxY;
+    }
+
 
 
 
@@ -187,7 +205,7 @@ public:
 
     const int getBestMagicStateId();
 
-    // const void update_magic_states_score(int magic_state_id);
+    const void update_magic_states_score(int magic_state_id);
 
     void increment_mapped_magic_state(int magic_state_id);
 

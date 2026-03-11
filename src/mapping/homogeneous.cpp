@@ -1,7 +1,9 @@
 #include "mapping.hpp"
 #include "circuit.hpp"
 
-void Mapping::homogenous_mapping_rowmajor(int maxX, int maxY) {
+void Mapping::homogenous_mapping_rowmajor() {
+    int maxX = graph.getMaxX();
+    int maxY = graph.getMaxY();
     const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
 
     for (int qubit_id = 0, node_id = 0, count = 0; qubit_id < circuit.getNumQubits();
