@@ -38,7 +38,13 @@ void IGraph::print_rectangular() const {
     // Print the grid with fixed-width columns
     for (int y = 0; y <= this->maxY; ++y) {
         for (int x = 0; x <= this->maxX; ++x) {
-            const int node_id = get_node_by_coordinates(x, y).id;
+            int node_id = -1;
+            try {
+                node_id = get_node_by_coordinates(x, y).id;
+            } catch (const std::exception& e) {
+                std::cout << "   "; // Empty space for missing nodes
+                continue;
+            }
             if (is_occupied(node_id)) {
                 // Print occupied nodes in red
                 std::cout << "\033[1;31m"; // ANSI escape code for red
@@ -69,14 +75,26 @@ void IGraph::add_node(int id, int x, int y) {
     if (nodes[id].id == -1) {
         nodes[id] = Node(id, x, y);
         node_count++;
-    } 
+    } else {
+        nodes[id].coordX = x;
+        nodes[id].coordY = y;
+    }
 
-    maxX = std::max(maxX, x);
-    maxY = std::max(maxY, y);
+    maxX = std::max(maxX, nodes[id].coordX);
+    maxY = std::max(maxY, nodes[id].coordY);
 }
 
 void IGraph::add_node(int id) {
-    add_node(id, 0, 0); // Default coordinates (0,0) if not specified
+    // Add a default node only if missing; do not overwrite existing coordinates.
+    if (id >= nodes.size()) {
+        nodes.resize(id + 1, Node(-1, 0, 0));
+    }
+    if (nodes[id].id == -1) {
+        nodes[id] = Node(id, 0, 0);
+        node_count++;
+        maxX = std::max(maxX, 0);
+        maxY = std::max(maxY, 0);
+    }
 }
 
 
