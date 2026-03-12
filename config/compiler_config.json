@@ -1,0 +1,5 @@
+{
+  "circuit": "example",
+  "strategy": "random",
+  "type": "homogenous_rowmajor"
+}
