@@ -60,7 +60,6 @@ void IGraph::print_rectangular() const {
 
 // Add a node with coordinates
 void IGraph::add_node(int id, int x, int y) {
-    std::cout << "Adding node " << id << " at (" << x << "," << y << ")\n";
     // Resize vector if necessary to accommodate the id
     if (id >= nodes.size()) {
         nodes.resize(id + 1, Node(-1, 0, 0)); // Initialize with sentinel values
