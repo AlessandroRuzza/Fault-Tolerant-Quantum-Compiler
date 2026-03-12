@@ -1,5 +1,7 @@
 {
-  "circuit": "example",
+  "circuit": "qft_20",
   "strategy": "random",
-  "type": "homogenous_rowmajor"
+  "type": "homogenous_rowmajor",
+  "x": 4,
+  "y": 40
 }
