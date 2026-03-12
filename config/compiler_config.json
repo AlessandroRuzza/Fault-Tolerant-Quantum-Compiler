@@ -1,7 +1,7 @@
 {
   "circuit": "qft_20",
   "strategy": "random",
-  "type": "homogenous_rowmajor",
+  "type": "gaussian",
   "x": 4,
   "y": 40
 }

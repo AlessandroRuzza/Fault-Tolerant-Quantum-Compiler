@@ -38,7 +38,8 @@ public:
 
     enum class MappingType {
         MAGIC_AWARE,
-        HOMOGENOUS_ROWMAJOR
+        HOMOGENOUS_ROWMAJOR,
+        GAUSSIAN
     };
 
     static vector<std::string> get_available_mapping_strategies() {
@@ -46,7 +47,7 @@ public:
     }
 
     static vector<std::string> get_available_mapping_types() {
-        return {"magic_aware", "homogenous_rowmajor"};
+        return {"magic_aware", "homogenous_rowmajor", "gaussian"};
     }
 
 
@@ -55,7 +56,7 @@ public:
     } 
 
     static std::string available_mapping_types() {
-        return "magic_aware | homogenous_rowmajor";
+        return "magic_aware | homogenous_rowmajor | gaussian";
     }
 
 
@@ -110,6 +111,9 @@ public:
             case MappingType::HOMOGENOUS_ROWMAJOR:
                 homogenous_mapping_rowmajor();
                 return;
+            case MappingType::GAUSSIAN:
+                gaussian_mapping();
+                return;
             default:
                 throw std::runtime_error("Invalid mapping type");
         }
@@ -162,6 +166,8 @@ public:
     void magic_aware_mapping();
 
     void homogenous_mapping_rowmajor();
+
+    void gaussian_mapping();
 
 private:
 

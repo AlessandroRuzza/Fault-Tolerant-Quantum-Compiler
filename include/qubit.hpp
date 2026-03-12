@@ -16,7 +16,7 @@ class Qubit {
 
 //to replace with heap
 private: 
-    std::tuple<int, int> max_cnot_count() const {
+std::tuple<int, int> max_cnot_count() const {
     int c = 0;
     int max_count = 0;
     int index = -1;
@@ -30,6 +30,17 @@ private:
     return std::make_tuple(max_count, index);
 }
 
+//to replace with heap
+std::vector<int> high_cnot_qubits(int threshold) const {
+    std::vector<int> high_qubits;
+    for (size_t i = 0; i < CNOT_count.size(); ++i) {
+        if (CNOT_count[i] >= threshold) {
+            high_qubits.push_back(i);
+        }
+    }
+    return high_qubits;
+}
+
 
 public:
 
@@ -38,6 +49,10 @@ public:
     //will call the top heap
     int getMaxCNOTCount() const {
         return get<0>(max_cnot_count());
+    }
+
+    std::vector<int> highCnotQubits(int threshold) const {
+        return high_cnot_qubits(threshold);
     }
 
     int getMaxCNOTCountIndex() const {
