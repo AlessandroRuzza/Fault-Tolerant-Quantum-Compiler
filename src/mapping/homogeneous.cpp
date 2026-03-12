@@ -2,28 +2,40 @@
 #include "circuit.hpp"
 
 void Mapping::homogenous_mapping_rowmajor() {
-    int maxX = graph.getMaxX();
-    int maxY = graph.getMaxY();
     const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
+    const int width = graph.getMaxX();
+    const int height = graph.getMaxY() + 1;
+    int qubit_id = 0;
+    int mapped = 0;
 
-    for (int qubit_id = 0, node_id = 0, count = 0; qubit_id < circuit.getNumQubits();
-         node_id += 2) {
-        if (node_id >= graph.get_node_count()) {
-            std::cerr << "Not enough nodes in the graph to map all qubits homogeneously.\n";
-            break;
+    const auto next_active_qubit = [&]() {
+        while (qubit_id < circuit.getQubitsVectorSize() && circuit.getQubit(qubit_id) == nullptr) {
+            ++qubit_id;
         }
-        if (std::find(magic_state_ids.begin(), magic_state_ids.end(), node_id) == magic_state_ids.end()) {
-            map_qubit_to_node(qubit_id, node_id);
-            qubit_id++;
-            count++;
-            if (maxY % 2 == 1 && count == (maxY + 1) / 2) {
-                node_id += maxY - 1;
-                count = 0;
-            }
-            if (maxY % 2 == 0 && count == maxY / 2) {
-                node_id += maxY;
-                count = 0;
+    };
+
+    const auto map_pass = [&](int row_start, int col_start) {
+        for (int y = row_start; y < height && qubit_id < circuit.getQubitsVectorSize(); y += 2) {
+            for (int x = col_start; x < width && qubit_id < circuit.getQubitsVectorSize(); x += 2) {
+                const int node_id = y * width + x;
+                if (std::find(magic_state_ids.begin(), magic_state_ids.end(), node_id) != magic_state_ids.end()) {
+                    continue;
+                }
+                map_qubit_to_node(qubit_id, node_id);
+                ++mapped;
+                ++qubit_id;
+                next_active_qubit();
             }
         }
+    };
+
+    next_active_qubit();
+    map_pass(0, 0); // righe pari, colonne pari
+    map_pass(0, 1); // righe pari, colonne dispari
+    map_pass(1, 0); // righe dispari, colonne pari
+    map_pass(1, 1); // righe dispari, colonne dispari
+
+    if (mapped < circuit.getNumQubits()) {
+        std::cerr << "Not enough nodes in the graph to map all qubits homogeneously.\n";
     }
 }

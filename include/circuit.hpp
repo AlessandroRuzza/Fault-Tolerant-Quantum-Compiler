@@ -68,18 +68,28 @@ public:
     //------------getters--------------
 
 
-
     const int getNumQubits() const {
-        int max_qubit = -1;
-        for (const Gate& gate : gates) {
-            for (const int q : gate.qubits) {
-                if (q > max_qubit) {
-                    max_qubit = q;
-                }
+        int acc = 0;
+        for (const auto& qubit : qubitsVector) {
+            if (qubit != nullptr) {
+                acc++;
             }
         }
-        return max_qubit + 1; // qubits are zero-indexed
+        return acc;
     }
+
+
+    // const int getNumQubits() const {
+    //     int max_qubit = -1;
+    //     for (const Gate& gate : gates) {
+    //         for (const int q : gate.qubits) {
+    //             if (q > max_qubit) {
+    //                 max_qubit = q;
+    //             }
+    //         }
+    //     }
+    //     return max_qubit + 1; // qubits are zero-indexed
+    // }
 
 
     const std::unordered_map<std::string, int> getAllGatesCount() const {
@@ -95,7 +105,7 @@ public:
     }
 
 
-    inline const int getQubitsVectorSize() {
+    inline const int getQubitsVectorSize() const {
         return qubitsVector.size();
     }
 

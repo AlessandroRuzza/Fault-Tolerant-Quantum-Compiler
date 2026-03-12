@@ -90,7 +90,10 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     std::unordered_set<int> used_nodes;
     
     // Reserve mapped qubit nodes so routes do not pass through occupied data nodes.
-    for (int qubit = 0; qubit < circuit.getNumQubits(); ++qubit) {
+    for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
+        if (circuit.getQubit(qubit) == nullptr) {
+            continue;
+        }
         int node = mapping.get_mapped_node(qubit);
         if (node < 0) {
             continue;
