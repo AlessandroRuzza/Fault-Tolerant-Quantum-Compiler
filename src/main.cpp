@@ -18,13 +18,32 @@ int main(int argc, char **argv) {
     std::string strategy = "distance_first";
     std::string type = "magic_aware";
     std::string config_path = "../config/compiler_config.json";
+    std::string graph_path = "";
+    int x = 10;
+    int y = 11;
+    int maximum_iterations = 100;
 
-    apply_config_overrides(argc, argv, path, strategy, type, config_path);
-    argument_parsing(argc, argv, path, strategy, type);
+    apply_config_overrides(argc, argv, path, strategy, type, config_path, x, y, graph_path);
+    argument_parsing(argc, argv, path, strategy, type, x, y, graph_path);
 
-    std::cout << "path: " << path << std::endl;
+    std::cout << "circuit path: " << path << std::endl;
     std::cout << "strategy: " << strategy << std::endl;
     std::cout << "type: " << type << std::endl;
+    if (!graph_path.empty()) {
+        std::cout << "graph path: " << graph_path << std::endl;
+    } else {
+        std::cout << "graph dimensions: " << x << "x" << y << std::endl;
+    }
+
+    Graph graph;
+
+    if (graph_path.empty()) {
+        std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
+        graph = Graph::create_rectangular_with_magic_states(y, x);
+    } else {
+        std::cout << "Loading graph from " << graph_path << "...\n";
+        graph = Graph::from_json(graph_path);
+    }
 
     circuit::Circuit circuit = circuit::Circuit();
 
@@ -48,10 +67,6 @@ int main(int argc, char **argv) {
 
     std::cout << "------- MAPPING ---------" << std::endl;
 
-    int x = 4, y = 4;
-    int maximum_iterations = 100;
-
-    Graph graph = Graph::create_rectangular_with_magic_states(x, y);
 
     if (PRINT_MAPPING) graph.print_rectangular();
 
