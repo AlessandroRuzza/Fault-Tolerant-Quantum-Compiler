@@ -21,7 +21,7 @@ void Mapping::homogenous_mapping_rowmajor() {
                 if (std::find(magic_state_ids.begin(), magic_state_ids.end(), node_id) != magic_state_ids.end()) {
                     continue;
                 }
-                map_qubit_to_node(qubit_id, node_id);
+                map_qubit_to_node(qubit_id, node_id, 0);
                 ++mapped;
                 ++qubit_id;
                 next_active_qubit();

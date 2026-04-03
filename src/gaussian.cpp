@@ -1,5 +1,7 @@
 #include "gaussian.hpp"
 
+#include <iostream>
+
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -58,6 +60,7 @@ Gaussian::Gaussian(int mean_x, int mean_y, double sigma_x, double sigma_y, int s
 
 double Gaussian::gaussian_at(int x, int y) const {
 	if (x < 0 || x >= size_x || y < 0 || y >= size_y) {
+		std::cerr << "Error: Coordinates (" << x << ", " << y << ") are out of bounds for size (" << size_x << ", " << size_y << ")\n";
 		throw std::out_of_range("x, y must be in [0, size)");
 	}
 
