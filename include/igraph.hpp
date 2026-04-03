@@ -164,6 +164,17 @@ public:
     }
 
 
+    const std::vector<Node> get_occupied_nodes() const {
+        std::vector<Node> occupied_nodes;
+        for (const Node& node : nodes) {
+            if (node.occupied) {
+                occupied_nodes.push_back(node);
+            }
+        }
+        return occupied_nodes;
+     }
+
+
     // --------------------------
 
     inline int get_node_count() const { 

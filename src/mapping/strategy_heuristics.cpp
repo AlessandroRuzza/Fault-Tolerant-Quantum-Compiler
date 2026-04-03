@@ -26,10 +26,10 @@ void Mapping::random_mapping(Qubit* qubit, int second_qubit) {
     static thread_local std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<size_t> distribution(0, candidates.size() - 1);
     const int mapped_node = candidates[distribution(rng)];
-    map_qubit_to_node(qubit->getQubitID(), mapped_node);
+    map_qubit_to_node(qubit->getQubitID(), mapped_node, 0);
 
     if (second_qubit >= 0 && get_mapped_node(second_qubit) == -1) {
-        mapToNeighbor(circuit.getQubit(second_qubit), mapped_node);
+        mapToNeighbor(second_qubit, mapped_node, 0);
     }
 }
 
@@ -111,10 +111,10 @@ void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
         }
     }
 
-    map_qubit_to_node(qubit->getQubitID(), best_node);
+    map_qubit_to_node(qubit->getQubitID(), best_node, 0);
 
     if (second_qubit >= 0 && get_mapped_node(second_qubit) == -1) {
-        mapToNeighbor(circuit.getQubit(second_qubit), best_node);
+        mapToNeighbor(second_qubit, best_node, 0);
     }
 }
 
@@ -196,9 +196,9 @@ void Mapping::distance_first_mapping(Qubit* qubit, int second_qubit) {
         }
     }
 
-    map_qubit_to_node(qubit->getQubitID(), best_node);
+    map_qubit_to_node(qubit->getQubitID(), best_node, 0);
 
     if (second_qubit >= 0 && get_mapped_node(second_qubit) == -1) {
-        mapToNeighbor(circuit.getQubit(second_qubit), best_node);
+        mapToNeighbor(second_qubit, best_node, 0);
     }
 }

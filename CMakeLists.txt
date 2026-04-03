@@ -93,3 +93,10 @@ add_custom_target(run-graph-viewer
     COMMENT "Running graph_viewer --test (generates /tmp/graph_view.html)"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
+
+# Target to export PROJECT and generate gaussian video at 2 fps.
+add_custom_target(make-video
+    COMMAND ${CMAKE_COMMAND} -E env PROJECT=${CMAKE_SOURCE_DIR} sh ${CMAKE_SOURCE_DIR}/scripts/make-video.sh
+    COMMENT "Exporting gaussian frames video (2 fps)"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
