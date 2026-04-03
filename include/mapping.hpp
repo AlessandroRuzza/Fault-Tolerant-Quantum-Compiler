@@ -13,6 +13,8 @@
 #include "qubit.hpp"
 #include "defines.hpp"
 
+class Gaussian;
+
 
 // Custom exceptions for mapping errors
 class MapNearMagicError : public std::runtime_error {
@@ -155,10 +157,10 @@ public:
         graph_to_circuit.clear();
     }
 
-    const bool mapToNeighbor(const Qubit* qubit, int node_id);
+    const bool mapToNeighbor(int qubit, int node_id, int iterations);
 
 
-    void map_qubit_to_node(int qubit, int node);
+    void map_qubit_to_node(int qubit, int node, int iterations);
 
 
     // ----------mapping algorithms----------
@@ -172,6 +174,8 @@ public:
 private:
 
     void one_iteration_magic_aware_mapping(Qubit* qubit, int* iterations);
+
+    void one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, Gaussian& baseline_gaussian);
     
     void random_mapping(Qubit* qubit, int second_qubit);
 
@@ -179,6 +183,9 @@ private:
 
     void distance_first_mapping(Qubit* qubit, int second_qubit);
 
+    bool check_safe_passage(const Node& node);
+
+    Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit);
 
 
 
@@ -247,6 +254,9 @@ private:
             return true;
         } else if (normalized_name == "homogenous_rowmajor") {
             mappingType = MappingType::HOMOGENOUS_ROWMAJOR;
+            return true;
+        } else if (normalized_name == "gaussian") {
+            mappingType = MappingType::GAUSSIAN;
             return true;
         }
 
