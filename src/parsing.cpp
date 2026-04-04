@@ -102,6 +102,15 @@ void validate_type(const std::string& value, const char* executable) {
     }
 }
 
+void validate_safe_passage_strategy(const std::string& value, const char* executable) {
+    const std::vector<std::string> valid_strategies = Mapping::get_available_safe_passage_strategies();
+    if (std::find(valid_strategies.begin(), valid_strategies.end(), value) == valid_strategies.end()) {
+        std::cerr << "Invalid safe passage strategy: " << value << "\n";
+        print_usage(executable);
+        throw std::runtime_error("Invalid safe passage strategy: " + value);
+    }
+}
+
 std::filesystem::path extract_config_path(int argc, char **argv, std::string& config_path) {
 
     for (int i = 1; i < argc; ++i) {
@@ -130,6 +139,7 @@ void print_usage(const char* executable) {
               << " --circuit [circuit_name|circuit_name.qasm|full_path_to_qasm] "
               << "[--strategy [" << Mapping::available_mapping_strategies() << "]]\n"
               << "[--type [" << Mapping::available_mapping_types() << "]]\n"
+              << "[--safe-passage [" << Mapping::available_safe_passage_strategies() << "]]\n"
               << "[--x <integer>]\n"
               << "[--y <integer>]\n"
               << "[--graph <graph_path>]\n"
@@ -147,6 +157,7 @@ void apply_config_overrides(
     std::string& path,
     std::string& strategy,
     std::string& type,
+    std::string& safe_passage_strategy,
     std::string& config_path,
     int& x,
     int& y,
@@ -216,6 +227,16 @@ void apply_config_overrides(
         validate_type(type, argv[0]);
     }
 
+    if (config_json.contains("safe_passage_strategy")) {
+        if (!config_json["safe_passage_strategy"].is_string()) {
+            throw std::runtime_error("Config key 'safe_passage_strategy' must be a string");
+        }
+        const std::string configured_safe_passage_strategy =
+            config_json["safe_passage_strategy"].get<std::string>();
+        validate_safe_passage_strategy(configured_safe_passage_strategy, argv[0]);
+        safe_passage_strategy = configured_safe_passage_strategy;
+    }
+
     if (config_json.contains("x")) {
         if (!config_json["x"].is_number_integer()) {
             throw std::runtime_error("Config key 'x' must be an integer");
@@ -250,6 +271,7 @@ void argument_parsing(
     std::string& path,
     std::string& strategy,
     std::string& type,
+    std::string& safe_passage_strategy,
     int& x,
     int& y,
     std::string& graph_path
@@ -301,6 +323,18 @@ void argument_parsing(
             }
             type = argv[++i];
             validate_type(type, argv[0]);
+            continue;
+        }
+
+        if (arg == "--safe-passage") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --safe-passage\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --safe-passage");
+            }
+            const std::string cli_safe_passage_strategy = argv[++i];
+            validate_safe_passage_strategy(cli_safe_passage_strategy, argv[0]);
+            safe_passage_strategy = cli_safe_passage_strategy;
             continue;
         }
 
