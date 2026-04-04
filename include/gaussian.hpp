@@ -10,6 +10,16 @@ public:
     inline void update_weight(double new_weight) { weight = new_weight; }
 
     inline void update_inverse(bool new_inverse) { inverse = new_inverse; }
+
+    inline int get_mean_x() const { return mean_x; }
+    inline int get_mean_y() const { return mean_y; }
+    inline double get_sigma_x() const { return sigmaX; }
+    inline double get_sigma_y() const { return sigmaY; }
+    inline int get_size_x() const { return size_x; }
+    inline int get_size_y() const { return size_y; }
+    inline double get_weight() const { return weight; }
+    inline bool is_inverse() const { return inverse; }
+    inline double get_peak_value() const { return normFactor * weight; }
     
 private:
     const int mean_x;

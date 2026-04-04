@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 
 #define MAPPED_GAUSSIAN_WEIGHT 0.8
@@ -159,11 +160,17 @@ void update_gaussians(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std
     if (qubit->getTCount() > qubit->getMaxCNOTCount()) {
         if (MAPPING_VERBOSE) std::cout << "Mapping based on T_count" << "\n";
         update_weight(magic_gaussians, MAGIC_ABOVE_THRESHOLD);
+        update_inverse(magic_gaussians, false);
 
     } else {
         if (MAPPING_VERBOSE) std::cout << "Mapping based on CNOT_count" << "\n";
 
         std::vector<int> highCnotQubits = qubit->highCnotQubits(cnot_threshold);
+
+        std::cout << "Qubits with CNOT count above threshold (" << cnot_threshold << "): ";
+        for (int i : highCnotQubits) {
+            std::cout << i << " ";
+        }
         
         for (int i : highCnotQubits) {
             int second_qubit_mapped_node = mapping.get_mapped_node(i);
@@ -192,13 +199,18 @@ void update_gaussians(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std
         }
 
 
+
         if (qubit->getTCount() < t_lower_bound) {
             if (MAPPING_VERBOSE) std::cout << "mapping far from magic states because second qubit is not "
                              "mapped and T_count is low\n";
             update_weight(magic_gaussians, MAGIC_BELOW_THRESHOLD);
             update_inverse(magic_gaussians, true);
         } else if (qubit->getTCount() > t_upper_bound) {
-            update_weight(mapped_gaussians, MAGIC_ABOVE_THRESHOLD);
+            update_weight(magic_gaussians, MAGIC_ABOVE_THRESHOLD);
+            update_inverse(magic_gaussians, false);
+
+        } else {
+            update_weight(magic_gaussians, 0);
         }
 
         
@@ -250,6 +262,18 @@ const char* palette_color(const std::array<const char*, N>& palette, std::size_t
     return palette[idx % palette.size()];
 }
 
+std::string gaussian_details(const Gaussian& gaussian) {
+    std::ostringstream details;
+    details << std::fixed << std::setprecision(2);
+    details << "mx=" << gaussian.get_mean_x()
+            << ",my=" << gaussian.get_mean_y()
+            << ",sx=" << gaussian.get_sigma_x()
+            << ",sy=" << gaussian.get_sigma_y()
+            << ",w=" << gaussian.get_weight()
+            << ",inv=" << (gaussian.is_inverse() ? 1 : 0);
+    return details.str();
+}
+
 void write_gaussian_layer(
     const std::filesystem::path& out_path,
     const std::vector<Gaussian>& gaussians,
@@ -275,10 +299,15 @@ std::vector<std::filesystem::path> write_component_layers(
     const std::string& frame_idx,
     const std::vector<Gaussian>& gaussians,
     int width,
-    int height
+    int height,
+    std::vector<std::string>* component_labels
 ) {
     std::vector<std::filesystem::path> component_paths;
     component_paths.reserve(gaussians.size());
+    if (component_labels != nullptr) {
+        component_labels->clear();
+        component_labels->reserve(gaussians.size());
+    }
 
     for (std::size_t i = 0; i < gaussians.size(); ++i) {
         const std::vector<Gaussian> single_layer{gaussians[i]};
@@ -290,6 +319,9 @@ std::vector<std::filesystem::path> write_component_layers(
             out_dir / (prefix + "_" + frame_idx + "_" + std::to_string(i) + ".dat");
         write_gaussian_layer(component_path, single_layer, width, height);
         component_paths.push_back(component_path);
+        if (component_labels != nullptr) {
+            component_labels->push_back(gaussian_details(gaussians[i]));
+        }
     }
 
     return component_paths;
@@ -325,15 +357,9 @@ void save_gaussian_frame(
     const std::filesystem::path script_sum_gp = out_dir / ("plot_sum_" + idx + ".gp");
     const std::filesystem::path output_sum_png = out_dir / ("gaussians_sum_" + idx + ".png");
 
-    std::vector<Gaussian> mapped_plot = mapped_gaussians;
-    std::vector<Gaussian> magic_plot = magic_gaussians;
-    std::vector<Gaussian> cnot_plot = cnot_gaussians;
-
-    // Keep mapped as inverse (as used by gaussian mapping score), while
-    // magic/cnot stay direct peaks for readability.
-    update_inverse(mapped_plot, true);
-    update_inverse(magic_plot, false);
-    update_inverse(cnot_plot, false);
+    const std::vector<Gaussian>& mapped_plot = mapped_gaussians;
+    const std::vector<Gaussian>& magic_plot = magic_gaussians;
+    const std::vector<Gaussian>& cnot_plot = cnot_gaussians;
 
     write_gaussian_layer(mapped_dat, mapped_plot, width, height);
     write_gaussian_layer(magic_dat, magic_plot, width, height);
@@ -357,9 +383,12 @@ void save_gaussian_frame(
     }
     write_gaussian_layer(total_dat, total_plot, width, height);
 
-    const auto mapped_components = write_component_layers(out_dir, "mapped_component", idx, mapped_plot, width, height);
-    const auto magic_components = write_component_layers(out_dir, "magic_component", idx, magic_plot, width, height);
-    const auto cnot_components = write_component_layers(out_dir, "cnot_component", idx, cnot_plot, width, height);
+    std::vector<std::string> mapped_labels;
+    std::vector<std::string> magic_labels;
+    std::vector<std::string> cnot_labels;
+    const auto mapped_components = write_component_layers(out_dir, "mapped_component", idx, mapped_plot, width, height, &mapped_labels);
+    const auto magic_components = write_component_layers(out_dir, "magic_component", idx, magic_plot, width, height, &magic_labels);
+    const auto cnot_components = write_component_layers(out_dir, "cnot_component", idx, cnot_plot, width, height, &cnot_labels);
 
     const double max_mapped = max_gaussian_value(mapped_plot, width, height);
     const double max_magic = max_gaussian_value(magic_plot, width, height);
@@ -397,27 +426,31 @@ void save_gaussian_frame(
     for (std::size_t i = 0; i < mapped_components.size(); ++i) {
         std::ostringstream entry;
         entry << "'" << mapped_components[i].string() << "' using 1:2:3 with lines lc rgb '"
-              << palette_color(kMappedPalette, i) << "' lw 2 dt 1 title 'mapped[" << i << "]'";
+              << palette_color(kMappedPalette, i) << "' lw 2 dt 1 title 'mapped[" << i << "] "
+              << mapped_labels[i] << "'";
         plot_entries.push_back(entry.str());
     }
 
     for (std::size_t i = 0; i < magic_components.size(); ++i) {
         std::ostringstream entry;
         entry << "'" << magic_components[i].string() << "' using 1:2:3 with lines lc rgb '"
-              << palette_color(kMagicPalette, i) << "' lw 2 dt 2 title 'magic[" << i << "]'";
+              << palette_color(kMagicPalette, i) << "' lw 2 dt 2 title 'magic[" << i << "] "
+              << magic_labels[i] << "'";
         plot_entries.push_back(entry.str());
     }
 
     for (std::size_t i = 0; i < cnot_components.size(); ++i) {
         std::ostringstream entry;
         entry << "'" << cnot_components[i].string() << "' using 1:2:3 with lines lc rgb '"
-              << palette_color(kCnotPalette, i) << "' lw 2 dt 3 title 'cnot[" << i << "]'";
+              << palette_color(kCnotPalette, i) << "' lw 2 dt 3 title 'cnot[" << i << "] "
+              << cnot_labels[i] << "'";
         plot_entries.push_back(entry.str());
     }
 
     {
         std::ostringstream entry;
-        entry << "'" << baseline_dat.string() << "' using 1:2:3 with lines lc rgb '#222222' lw 2 dt 1 title 'baseline'";
+        entry << "'" << baseline_dat.string() << "' using 1:2:3 with lines lc rgb '#222222' lw 2 dt 1 title 'baseline "
+              << gaussian_details(baseline_gaussian) << "'";
         plot_entries.push_back(entry.str());
     }
 

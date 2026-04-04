@@ -52,3 +52,5 @@ build/
 env/
 
 visualization/
+universal_set_qasms
+qasms/vqe_n24.qasm

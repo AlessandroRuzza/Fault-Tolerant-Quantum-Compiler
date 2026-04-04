@@ -1,8 +1,8 @@
 {
-  "circuit": "dnn_n16",
-  "strategy": "random",
-  "type": "gaussian",
+  "circuit": "example",
+  "strategy": "center",
+  "type": "magic_aware",
   "safe_passage_strategy": "passage",
-  "x": 10,
-  "y": 10
+  "x": 7,
+  "y": 7
 }
