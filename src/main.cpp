@@ -9,8 +9,37 @@
 
 #include <filesystem>
 #include <iostream>
+#include <unordered_set>
 
 using namespace std;
+
+namespace {
+void clear_visualization_outputs() {
+    namespace fs = std::filesystem;
+
+    const fs::path visualization_dir = fs::path(PROJECT_ROOT) / "visualization";
+    fs::create_directories(visualization_dir);
+
+    const std::unordered_set<std::string> keep_entries = {
+        "README.md",
+        "graph_viewer.cpp"
+    };
+
+    for (const auto& entry : fs::directory_iterator(visualization_dir)) {
+        const std::string name = entry.path().filename().string();
+        if (keep_entries.find(name) != keep_entries.end()) {
+            continue;
+        }
+
+        std::error_code ec;
+        fs::remove_all(entry.path(), ec);
+        if (ec) {
+            std::cerr << "Warning: failed to remove visualization output "
+                      << entry.path() << ": " << ec.message() << "\n";
+        }
+    }
+}
+} // namespace
 
 int main(int argc, char **argv) {
 
@@ -34,6 +63,8 @@ int main(int argc, char **argv) {
     } else {
         std::cout << "graph dimensions: " << x << "x" << y << std::endl;
     }
+
+    clear_visualization_outputs();
 
     Graph graph;
 
