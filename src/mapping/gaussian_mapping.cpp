@@ -4,9 +4,11 @@
 #include "qubit.hpp"
 #include "graph.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #define MAPPED_GAUSSIAN_WEIGHT 0.8
 #define MAGIC_HIGHEST 1.5
@@ -229,6 +231,28 @@ double max_gaussian_value(const std::vector<Gaussian>& gaussians, int width, int
 
 namespace {
 
+constexpr double kPlotLayerEpsilon = 1e-12;
+
+const std::array<const char*, 8> kMappedPalette = {
+    "#B455F5", "#9C6BFF", "#8A82FF", "#6FA0FF",
+    "#58BBFF", "#49CFF5", "#3EDBE2", "#35E5CC"
+};
+
+const std::array<const char*, 8> kMagicPalette = {
+    "#28B8D9", "#30C8E8", "#3AD9F2", "#52E4F7",
+    "#6CECF9", "#87F2FA", "#A0F6FB", "#B8FAFC"
+};
+
+const std::array<const char*, 8> kCnotPalette = {
+    "#F5A623", "#F7B133", "#F9BC45", "#FBC75A",
+    "#FCD170", "#FEDA86", "#FFE39D", "#FFEBB4"
+};
+
+template <std::size_t N>
+const char* palette_color(const std::array<const char*, N>& palette, std::size_t idx) {
+    return palette[idx % palette.size()];
+}
+
 void write_gaussian_layer(
     const std::filesystem::path& out_path,
     const std::vector<Gaussian>& gaussians,
@@ -246,6 +270,32 @@ void write_gaussian_layer(
         }
         out << "\n";
     }
+}
+
+std::vector<std::filesystem::path> write_component_layers(
+    const std::filesystem::path& out_dir,
+    const std::string& prefix,
+    const std::string& frame_idx,
+    const std::vector<Gaussian>& gaussians,
+    int width,
+    int height
+) {
+    std::vector<std::filesystem::path> component_paths;
+    component_paths.reserve(gaussians.size());
+
+    for (std::size_t i = 0; i < gaussians.size(); ++i) {
+        const std::vector<Gaussian> single_layer{gaussians[i]};
+        if (max_gaussian_value(single_layer, width, height) <= kPlotLayerEpsilon) {
+            continue;
+        }
+
+        const std::filesystem::path component_path =
+            out_dir / (prefix + "_" + frame_idx + "_" + std::to_string(i) + ".dat");
+        write_gaussian_layer(component_path, single_layer, width, height);
+        component_paths.push_back(component_path);
+    }
+
+    return component_paths;
 }
 
 void save_gaussian_frame(
@@ -272,15 +322,19 @@ void save_gaussian_frame(
     const std::filesystem::path magic_dat = out_dir / ("magic_" + idx + ".dat");
     const std::filesystem::path cnot_dat = out_dir / ("cnot_" + idx + ".dat");
     const std::filesystem::path baseline_dat = out_dir / ("baseline_" + idx + ".dat");
+    const std::filesystem::path total_dat = out_dir / ("total_" + idx + ".dat");
     const std::filesystem::path script_gp = out_dir / ("plot_" + idx + ".gp");
     const std::filesystem::path output_png = out_dir / ("gaussians_" + idx + ".png");
+    const std::filesystem::path script_sum_gp = out_dir / ("plot_sum_" + idx + ".gp");
+    const std::filesystem::path output_sum_png = out_dir / ("gaussians_sum_" + idx + ".png");
 
     std::vector<Gaussian> mapped_plot = mapped_gaussians;
     std::vector<Gaussian> magic_plot = magic_gaussians;
     std::vector<Gaussian> cnot_plot = cnot_gaussians;
 
-    // Visualization only: show direct Gaussian peaks instead of inverse surfaces.
-    update_inverse(mapped_plot, false);
+    // Keep mapped as inverse (as used by gaussian mapping score), while
+    // magic/cnot stay direct peaks for readability.
+    update_inverse(mapped_plot, true);
     update_inverse(magic_plot, false);
     update_inverse(cnot_plot, false);
 
@@ -290,10 +344,31 @@ void save_gaussian_frame(
     std::vector<Gaussian> baseline_layer{baseline_gaussian};
     write_gaussian_layer(baseline_dat, baseline_layer, width, height);
 
+    std::vector<Gaussian> total_plot;
+    total_plot.reserve(mapped_plot.size() + magic_plot.size() + cnot_plot.size() + baseline_layer.size());
+    for (const Gaussian& g : mapped_plot) {
+        total_plot.push_back(g);
+    }
+    for (const Gaussian& g : magic_plot) {
+        total_plot.push_back(g);
+    }
+    for (const Gaussian& g : cnot_plot) {
+        total_plot.push_back(g);
+    }
+    for (const Gaussian& g : baseline_layer) {
+        total_plot.push_back(g);
+    }
+    write_gaussian_layer(total_dat, total_plot, width, height);
+
+    const auto mapped_components = write_component_layers(out_dir, "mapped_component", idx, mapped_plot, width, height);
+    const auto magic_components = write_component_layers(out_dir, "magic_component", idx, magic_plot, width, height);
+    const auto cnot_components = write_component_layers(out_dir, "cnot_component", idx, cnot_plot, width, height);
+
     const double max_mapped = max_gaussian_value(mapped_plot, width, height);
     const double max_magic = max_gaussian_value(magic_plot, width, height);
     const double max_cnot = max_gaussian_value(cnot_plot, width, height);
     const double max_baseline = max_gaussian_value(baseline_layer, width, height);
+    const double max_total = max_gaussian_value(total_plot, width, height);
 
 
     std::ofstream gp(script_gp);
@@ -303,6 +378,9 @@ void save_gaussian_frame(
      gp << "set label 1 'qubit=" << qubit.getQubitID()
          << "  T=" << qubit.getTCount()
          << "  CNOTMax=" << qubit.getMaxCNOTCount()
+         << "  mappedN=" << mapped_components.size()
+         << "  magicN=" << magic_components.size()
+         << "  cnotN=" << cnot_components.size()
          << "' at screen 0.02,0.95 front tc rgb '#111111'\n";
       gp << "set label 2 'max(mapped)=" << max_mapped
           << "  max(magic)=" << max_magic
@@ -312,21 +390,77 @@ void save_gaussian_frame(
     gp << "set xlabel 'x'\n";
     gp << "set ylabel 'y'\n";
     gp << "set zlabel 'amplitude'\n";
-    gp << "set key outside\n";
-    gp << "set hidden3d\n";
+    gp << "set key outside right top opaque\n";
+    // NOTE: hidden3d can collapse visible mesh colors to a single style, making
+    // legend colors appear inconsistent with plotted layers.
     gp << "set view 62,36\n";
-     gp << "set style line 1 lc rgb '#B455F5' lw 2\n";
-     gp << "set style line 2 lc rgb '#28B8D9' lw 2\n";
-     gp << "set style line 3 lc rgb '#F5A623' lw 2\n";
-     gp << "set style line 4 lc rgb '#222222' lw 2\n";
-     gp << "splot '" << mapped_dat.string() << "' using 1:2:3 with lines ls 1 title 'mapped',\\\n";
-     gp << "      '" << magic_dat.string() << "' using 1:2:3 with lines ls 2 title 'magic',\\\n";
-     gp << "      '" << cnot_dat.string() << "' using 1:2:3 with lines ls 3 title 'cnot',\\\n";
-     gp << "      '" << baseline_dat.string() << "' using 1:2:3 with lines ls 4 title 'baseline'\n";
+    std::vector<std::string> plot_entries;
+    plot_entries.reserve(mapped_components.size() + magic_components.size() + cnot_components.size() + 1);
+
+    for (std::size_t i = 0; i < mapped_components.size(); ++i) {
+        std::ostringstream entry;
+        entry << "'" << mapped_components[i].string() << "' using 1:2:3 with lines lc rgb '"
+              << palette_color(kMappedPalette, i) << "' lw 2 dt 1 title 'mapped[" << i << "]'";
+        plot_entries.push_back(entry.str());
+    }
+
+    for (std::size_t i = 0; i < magic_components.size(); ++i) {
+        std::ostringstream entry;
+        entry << "'" << magic_components[i].string() << "' using 1:2:3 with lines lc rgb '"
+              << palette_color(kMagicPalette, i) << "' lw 2 dt 2 title 'magic[" << i << "]'";
+        plot_entries.push_back(entry.str());
+    }
+
+    for (std::size_t i = 0; i < cnot_components.size(); ++i) {
+        std::ostringstream entry;
+        entry << "'" << cnot_components[i].string() << "' using 1:2:3 with lines lc rgb '"
+              << palette_color(kCnotPalette, i) << "' lw 2 dt 3 title 'cnot[" << i << "]'";
+        plot_entries.push_back(entry.str());
+    }
+
+    {
+        std::ostringstream entry;
+        entry << "'" << baseline_dat.string() << "' using 1:2:3 with lines lc rgb '#222222' lw 2 dt 1 title 'baseline'";
+        plot_entries.push_back(entry.str());
+    }
+
+    gp << "splot ";
+    for (std::size_t i = 0; i < plot_entries.size(); ++i) {
+        gp << plot_entries[i];
+        if (i + 1 < plot_entries.size()) {
+            gp << ",\\\n      ";
+        } else {
+            gp << "\n";
+        }
+    }
     gp.close();
 
-    const std::string cmd = "gnuplot '" + script_gp.string() + "'";
-    std::system(cmd.c_str());
+    std::ofstream gp_sum(script_sum_gp);
+    gp_sum << "set terminal pngcairo size 1400,900\n";
+    gp_sum << "set output '" << output_sum_png.string() << "'\n";
+    gp_sum << "set title 'Gaussian SUM - frame " << idx << "'\n";
+    gp_sum << "set label 1 'qubit=" << qubit.getQubitID()
+           << "  T=" << qubit.getTCount()
+           << "  CNOTMax=" << qubit.getMaxCNOTCount()
+           << "' at screen 0.02,0.95 front tc rgb '#111111'\n";
+    gp_sum << "set label 2 'max(total)=" << max_total
+           << "  max(mapped)=" << max_mapped
+           << "  max(magic)=" << max_magic
+           << "  max(cnot)=" << max_cnot
+           << "  max(base)=" << max_baseline
+           << "' at screen 0.02,0.92 front tc rgb '#111111'\n";
+    gp_sum << "set xlabel 'x'\n";
+    gp_sum << "set ylabel 'y'\n";
+    gp_sum << "set zlabel 'amplitude'\n";
+    gp_sum << "set key outside right top opaque\n";
+    gp_sum << "set view 62,36\n";
+    gp_sum << "splot '" << total_dat.string() << "' using 1:2:3 with lines lc rgb '#1F6FE5' lw 2 title 'all_gaussians_sum'\n";
+    gp_sum.close();
+
+    const std::string cmd_split = "gnuplot '" + script_gp.string() + "'";
+    std::system(cmd_split.c_str());
+    const std::string cmd_sum = "gnuplot '" + script_sum_gp.string() + "'";
+    std::system(cmd_sum.c_str());
 }
 
 } // namespace

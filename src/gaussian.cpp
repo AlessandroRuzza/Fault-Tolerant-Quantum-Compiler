@@ -74,7 +74,9 @@ double Gaussian::gaussian_at(int x, int y) const {
 		return gaussianValue;
 	}
 
-	const double cellCount = static_cast<double>(size_x) * static_cast<double>(size_y);
-	return (1.0 - gaussianValue) / (cellCount - 1.0);
+	// Mirror the gaussian around its peak so inverse=true is a true "valley":
+	// minimum at the mean and higher values away from the center.
+	const double peakValue = normFactor * weight;
+	const double invertedValue = peakValue - gaussianValue;
+	return invertedValue > 0.0 ? invertedValue : 0.0;
 }
-
