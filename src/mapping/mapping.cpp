@@ -34,12 +34,13 @@ void Mapping::map_qubit_to_node(int qubit, int node, int iterations) {
     if (!check_safe_passage(graph.get_node(node))) {
         std::cout << "Warning: Mapping qubit " << qubit << " to node " << node
                   << " which does not have a safe passage. This may lead to an unsatisfiable mapping.\n";
+        std::cout << "iteration " << iterations << "\n";
         if (iterations > circuit.getNumQubits()) {
             throw std::runtime_error(
                 "Failed to find a safe passage for qubit " + std::to_string(qubit) + " after " + std::to_string(iterations) + " iterations. Aborting mapping.\n"
             );
         }
-        mapToNeighbor(qubit, node, iterations++);
+        mapToNeighbor(qubit, node, iterations+1);
         return;
     }
 
