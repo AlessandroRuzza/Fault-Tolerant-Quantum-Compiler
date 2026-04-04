@@ -176,6 +176,43 @@ public:
         return count > 0 ? std::sqrt(sum_squared_diff / count) : 0.0;
     }
 
+
+    double getCNOTMean() {
+        int total_qubits = getNumQubits();
+        if (total_qubits <= 1) return 0.0;
+
+        int total_cnot = 0;
+        int count = 0;
+        for (size_t i = 0; i < qubitsVector.size(); ++i) {
+            for (size_t j = i + 1; j < qubitsVector.size(); ++j) {
+                if (qubitsVector[i] != nullptr && qubitsVector[j] != nullptr) {
+                    total_cnot += getCNOTCount(i, j);
+                    count++;
+                }
+            }
+        }
+        return count > 0 ? static_cast<double>(total_cnot) / count : 0.0;
+    }
+
+    double getCNOTStd() {
+        int total_qubits = getNumQubits();
+        if (total_qubits <= 1) return 0.0;
+
+        double mean = getCNOTMean();
+        double sum_squared_diff = 0.0;
+        int count = 0;
+        for (size_t i = 0; i < qubitsVector.size(); ++i) {
+            for (size_t j = i + 1; j < qubitsVector.size(); ++j) {
+                if (qubitsVector[i] != nullptr && qubitsVector[j] != nullptr) {
+                    double diff = getCNOTCount(i, j) - mean;
+                    sum_squared_diff += diff * diff;
+                    count++;
+                }
+            }
+        }
+        return count > 0 ? std::sqrt(sum_squared_diff / count) : 0.0;
+    }
+
     //------------initializers/setters--------------
 
 

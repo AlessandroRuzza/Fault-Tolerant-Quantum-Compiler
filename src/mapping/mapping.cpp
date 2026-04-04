@@ -68,10 +68,10 @@ void Mapping::map_qubit_to_node(int qubit, int node, int iterations) {
 
 
 
+bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<Node>& occupied_nodes, int width, int height);
 
-namespace {
 
-bool _3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes) {
+bool Mapping::_3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes) {
 
     bool in_3x3_of_occupied = false;
     for (const Node& occupied_node : occupied_nodes) {
@@ -84,6 +84,40 @@ bool _3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes) {
     }
     return !in_3x3_of_occupied;
 }
+
+
+
+
+
+bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int width, int height) {
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+
+    std::vector<Node> occupied_after = occupied_nodes;
+    bool already_present = false;
+    for (const Node& occupied_node : occupied_after) {
+        if (occupied_node.coordX == node.coordX && occupied_node.coordY == node.coordY) {
+            already_present = true;
+            break;
+        }
+    }
+    if (!already_present) {
+        occupied_after.push_back(node);
+    }
+
+    for (const Node& occupied_node : occupied_after) {
+        if (!has_exit_path_from_occupied(occupied_node, occupied_after, width, height)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+
+
 
 
 bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<Node>& occupied_nodes, int width, int height) {
@@ -176,40 +210,4 @@ bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<No
     }
 
     return false;
-}
-
-
-bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int width, int height) {
-    if (width <= 0 || height <= 0) {
-        return false;
-    }
-
-    std::vector<Node> occupied_after = occupied_nodes;
-    bool already_present = false;
-    for (const Node& occupied_node : occupied_after) {
-        if (occupied_node.coordX == node.coordX && occupied_node.coordY == node.coordY) {
-            already_present = true;
-            break;
-        }
-    }
-    if (!already_present) {
-        occupied_after.push_back(node);
-    }
-
-    for (const Node& occupied_node : occupied_after) {
-        if (!has_exit_path_from_occupied(occupied_node, occupied_after, width, height)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
-
-}
-
-bool Mapping::check_safe_passage(const Node& node) {
-    return safe_passage(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
-    //return _3x3_occupied(node, graph.get_occupied_nodes());
 }

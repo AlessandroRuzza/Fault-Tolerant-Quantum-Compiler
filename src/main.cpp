@@ -44,20 +44,22 @@ void clear_visualization_outputs() {
 int main(int argc, char **argv) {
 
     std::string path = "../qasms/example.qasm";
-    std::string strategy = "distance_first";
+    std::string strategy = "distance";
     std::string type = "magic_aware";
+    std::string safe_passage_strategy = "passage";
     std::string config_path = "../config/compiler_config.json";
     std::string graph_path = "";
     int x = 10;
     int y = 11;
     int maximum_iterations = 100;
 
-    apply_config_overrides(argc, argv, path, strategy, type, config_path, x, y, graph_path);
-    argument_parsing(argc, argv, path, strategy, type, x, y, graph_path);
+    apply_config_overrides(argc, argv, path, strategy, type, safe_passage_strategy, config_path, x, y, graph_path);
+    argument_parsing(argc, argv, path, strategy, type, safe_passage_strategy, x, y, graph_path);
 
     std::cout << "circuit path: " << path << std::endl;
     std::cout << "strategy: " << strategy << std::endl;
     std::cout << "type: " << type << std::endl;
+    std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -101,7 +103,7 @@ int main(int argc, char **argv) {
 
     if (PRINT_MAPPING) graph.print_rectangular();
 
-    Mapping mapping(circuit, graph, strategy, type, maximum_iterations);
+    Mapping mapping(circuit, graph, strategy, type, safe_passage_strategy, maximum_iterations);
 
     mapping.map();
 

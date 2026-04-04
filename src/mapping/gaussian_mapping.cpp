@@ -18,13 +18,10 @@
 #define BASE_GAUSSIAN_WEIGHT 1
 
 
-//TODO
-#define CNOT_THRESHOLD 1
-
 double compute_sigma(int radius, double confidence) {return radius / sqrt(-2 * log(1 - confidence));}
 void update_weight(std::vector<Gaussian>& gaussians, double new_weight);
 void update_inverse(std::vector<Gaussian>& gaussians, bool inverse);
-void update_gaussians(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Graph& graph, const Mapping& mapping, int t_lower_bound, int t_upper_bound);
+void update_gaussians(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Graph& graph, const Mapping& mapping, int t_lower_bound, int t_upper_bound, int cnot_threshold);
 Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit);
 
 
@@ -32,7 +29,7 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
     
     std::vector<Gaussian> cnot_gaussians;
 
-    update_gaussians(qubit, mapped_gaussians, magic_gaussians, cnot_gaussians, graph, *this, T_lower_bound, T_upper_bound);
+    update_gaussians(qubit, mapped_gaussians, magic_gaussians, cnot_gaussians, graph, *this, T_lower_bound, T_upper_bound, CNOT_threshold);
 
     Node best_node = computeNextMappingNode(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, *qubit);
     map_qubit_to_node(qubit->getQubitID(), best_node.id, 0);
@@ -153,7 +150,7 @@ void update_inverse(std::vector<Gaussian>& gaussians, bool inverse) {
 
 
 
-void update_gaussians(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Graph& graph, const Mapping& mapping, int t_lower_bound, int t_upper_bound) {
+void update_gaussians(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Graph& graph, const Mapping& mapping, int t_lower_bound, int t_upper_bound, int cnot_threshold) {
 
     if (PRINT_MAPPING) std::cout << "Mapping qubit " << qubit->getQubitID() << " with T_count = "
               << qubit->getTCount() << " and max CNOT count = "
@@ -166,7 +163,7 @@ void update_gaussians(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std
     } else {
         if (MAPPING_VERBOSE) std::cout << "Mapping based on CNOT_count" << "\n";
 
-        std::vector<int> highCnotQubits = qubit->highCnotQubits(CNOT_THRESHOLD);
+        std::vector<int> highCnotQubits = qubit->highCnotQubits(cnot_threshold);
         
         for (int i : highCnotQubits) {
             int second_qubit_mapped_node = mapping.get_mapped_node(i);

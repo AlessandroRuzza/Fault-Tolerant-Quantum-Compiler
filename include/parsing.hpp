@@ -10,6 +10,7 @@ void apply_config_overrides(
     std::string& path,
     std::string& strategy,
     std::string& type,
+    std::string& safe_passage_strategy,
     std::string& config_path,
     int& x,
     int& y,
@@ -21,6 +22,7 @@ void argument_parsing(
     std::string& path,
     std::string& strategy,
     std::string& type,
+    std::string& safe_passage_strategy,
     int& x,
     int& y,
     std::string& graph_path

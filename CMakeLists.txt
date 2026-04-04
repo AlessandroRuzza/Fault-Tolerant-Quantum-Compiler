@@ -94,9 +94,9 @@ add_custom_target(run-graph-viewer
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-# Target to export PROJECT and generate gaussian video at 2 fps.
+# Target to export PROJECT and generate gaussian animation at 2 fps.
 add_custom_target(make-video
     COMMAND ${CMAKE_COMMAND} -E env PROJECT=${CMAKE_SOURCE_DIR} sh ${CMAKE_SOURCE_DIR}/scripts/make-video.sh
-    COMMENT "Exporting gaussian frames video (2 fps)"
+    COMMENT "Exporting gaussian frames GIF (2 fps)"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )

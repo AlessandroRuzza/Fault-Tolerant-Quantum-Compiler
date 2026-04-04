@@ -32,33 +32,46 @@ class Mapping {
 
 public:
     enum class MappingStrategy {
-        DISTANCE_FIRST,
-        CENTER_SPACED,
+        DISTANCE,
+        CENTER,
         RANDOM
     };
 
 
     enum class MappingType {
         MAGIC_AWARE,
-        HOMOGENOUS_ROWMAJOR,
+        HOMOGENEOUS,
         GAUSSIAN
     };
 
+    enum class SafePassageStrategy {
+        PASSAGE,
+        CUBE
+    };
+
     static vector<std::string> get_available_mapping_strategies() {
-        return {"distance_first", "center_spaced", "random"};
+        return {"distance", "center", "random"};
     }
 
     static vector<std::string> get_available_mapping_types() {
-        return {"magic_aware", "homogenous_rowmajor", "gaussian"};
+        return {"magic_aware", "homogeneous", "gaussian"};
+    }
+
+    static vector<std::string> get_available_safe_passage_strategies() {
+        return {"passage", "cube"};
     }
 
 
     static std::string available_mapping_strategies() {
-        return "distance_first | center_spaced | random";
+        return "distance | center | random";
     } 
 
     static std::string available_mapping_types() {
-        return "magic_aware | homogenous_rowmajor | gaussian";
+        return "magic_aware | homogeneous | gaussian";
+    }
+
+    static std::string available_safe_passage_strategies() {
+        return "passage | cube";
     }
 
 
@@ -68,21 +81,26 @@ private:
     std::unordered_map<int, int> graph_to_circuit;
     MappingStrategy mappingStrategy;
     MappingType mappingType;
+    SafePassageStrategy safePassageStrategy;
     int T_lower_bound;
     int T_upper_bound;
+    int CNOT_threshold;
     int maximum_iterations;
     FarthestFromMagicSelector farthest_from_magic_selector;
 
 
 public:
 
-    Mapping(circuit::Circuit& circuit, Graph& graph, const std::string& strategy_name,const std::string& type_name, int maximum_iterations) : 
+    Mapping(circuit::Circuit& circuit, Graph& graph, const std::string& strategy_name,const std::string& type_name, const std::string& safe_passage_strategy, int maximum_iterations) : 
     circuit(circuit), graph(graph), maximum_iterations(maximum_iterations), farthest_from_magic_selector(graph)  {
         if (!set_mapping_strategy(strategy_name)) {
             throw std::invalid_argument("Invalid mapping strategy: " + strategy_name);
         }
         if (!set_mapping_type(type_name)) {
             throw std::invalid_argument("Invalid mapping type: " + type_name);
+        }
+        if (!set_safe_passage_strategy(safe_passage_strategy)) {
+            throw std::invalid_argument("Invalid safe passage strategy: " + safe_passage_strategy);
         }
         set_thresholds();
     }
@@ -91,15 +109,15 @@ public:
 
     inline void pseudo_random_mapping(Qubit* qubit, int second_qubit) {
         switch (mappingStrategy) {
-            case MappingStrategy::CENTER_SPACED:
-                center_spaced_mapping(qubit, second_qubit);
+            case MappingStrategy::CENTER:
+                center_mapping(qubit, second_qubit);
                 return;
             case MappingStrategy::RANDOM:
                 random_mapping(qubit, second_qubit);
                 return;
-            case MappingStrategy::DISTANCE_FIRST:
+            case MappingStrategy::DISTANCE:
             default:
-                distance_first_mapping(qubit, second_qubit);
+                distance_mapping(qubit, second_qubit);
                 return;
         }
     }
@@ -110,8 +128,8 @@ public:
             case MappingType::MAGIC_AWARE:
                 magic_aware_mapping();
                 return;
-            case MappingType::HOMOGENOUS_ROWMAJOR:
-                homogenous_mapping_rowmajor();
+            case MappingType::HOMOGENEOUS:
+                homogeneous_mapping();
                 return;
             case MappingType::GAUSSIAN:
                 gaussian_mapping();
@@ -122,14 +140,26 @@ public:
     }
 
 
+    inline bool check_safe_passage(const Node& node) {
+        switch (safePassageStrategy) {
+            case SafePassageStrategy::PASSAGE:
+                return safe_passage(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
+            case SafePassageStrategy::CUBE:
+                return _3x3_occupied(node, graph.get_occupied_nodes());
+            default:
+                throw std::runtime_error("Invalid safe passage strategy");
+        }
+    }
+
+
 
 
     inline std::string current_mapping_strategy_name() const {
         switch (mappingStrategy) {
-            case MappingStrategy::DISTANCE_FIRST:
-                return "distance_first";
-            case MappingStrategy::CENTER_SPACED:
-                return "center_spaced";
+            case MappingStrategy::DISTANCE:
+                return "distance";
+            case MappingStrategy::CENTER:
+                return "center";
             case MappingStrategy::RANDOM:
                 return "random";
             default:
@@ -167,9 +197,13 @@ public:
 
     void magic_aware_mapping();
 
-    void homogenous_mapping_rowmajor();
+    void homogeneous_mapping();
 
     void gaussian_mapping();
+
+    bool _3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes);
+
+    bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int maxX, int maxY);
 
 private:
 
@@ -179,13 +213,12 @@ private:
     
     void random_mapping(Qubit* qubit, int second_qubit);
 
-    void center_spaced_mapping(Qubit* qubit, int second_qubit);
+    void center_mapping(Qubit* qubit, int second_qubit);
 
-    void distance_first_mapping(Qubit* qubit, int second_qubit);
-
-    bool check_safe_passage(const Node& node);
+    void distance_mapping(Qubit* qubit, int second_qubit);
 
     Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit);
+
 
 
 
@@ -200,8 +233,11 @@ private:
         T_lower_bound = static_cast<int>(circuit.getTMean() - circuit.getTStd());
         T_upper_bound = static_cast<int>(circuit.getTMean() + circuit.getTStd());
 
+        CNOT_threshold = static_cast<int>(circuit.getCNOTMean());
+
         std::cout << "T_count lower bound: " << T_lower_bound << "\n";
         std::cout << "T_count upper bound: " << T_upper_bound << "\n";
+        std::cout << "CNOT_count threshold: " << CNOT_threshold << "\n\n";
     }
 
 
@@ -232,11 +268,11 @@ private:
     inline bool set_mapping_strategy(const std::string& strategy_name) {
         const std::string normalized_name = normalize_strategy_name(strategy_name);
 
-        if (normalized_name == "distance_first") {
-            mappingStrategy = MappingStrategy::DISTANCE_FIRST;
+        if (normalized_name == "distance") {
+            mappingStrategy = MappingStrategy::DISTANCE;
             return true;
-        } else if (normalized_name == "center_spaced") {
-            mappingStrategy = MappingStrategy::CENTER_SPACED;
+        } else if (normalized_name == "center") {
+            mappingStrategy = MappingStrategy::CENTER;
             return true;
         } else if (normalized_name == "random") {
             mappingStrategy = MappingStrategy::RANDOM;
@@ -252,11 +288,25 @@ private:
         if (normalized_name == "magic_aware") {
             mappingType = MappingType::MAGIC_AWARE;
             return true;
-        } else if (normalized_name == "homogenous_rowmajor") {
-            mappingType = MappingType::HOMOGENOUS_ROWMAJOR;
+        } else if (normalized_name == "homogeneous") {
+            mappingType = MappingType::HOMOGENEOUS;
             return true;
         } else if (normalized_name == "gaussian") {
             mappingType = MappingType::GAUSSIAN;
+            return true;
+        }
+
+        return false;
+    }
+
+    inline bool set_safe_passage_strategy(const std::string& strategy_name) {
+        const std::string normalized_name = normalize_strategy_name(strategy_name);
+
+        if (normalized_name == "passage") {
+            safePassageStrategy = SafePassageStrategy::PASSAGE;
+            return true;
+        } else if (normalized_name == "cube") {
+            safePassageStrategy = SafePassageStrategy::CUBE;
             return true;
         }
 
