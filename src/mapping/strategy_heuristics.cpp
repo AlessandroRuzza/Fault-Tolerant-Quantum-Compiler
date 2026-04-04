@@ -33,7 +33,7 @@ void Mapping::random_mapping(Qubit* qubit, int second_qubit) {
     }
 }
 
-void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
+void Mapping::center_mapping(Qubit* qubit, int second_qubit) {
     if (PRINT_MAPPING) std::cout << "mapping with center-spaced heuristic\n";
 
     const std::vector<int> magic_states_ids = graph.get_magic_state_ids();
@@ -67,7 +67,7 @@ void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
     }
 
     if (candidates.empty()) {
-        throw std::runtime_error("No available non-magic node found for center_spaced_mapping.");
+        throw std::runtime_error("No available non-magic node found for center_mapping.");
     }
 
     const float center_x = (min_x + max_x) / 2.0f;
@@ -118,7 +118,7 @@ void Mapping::center_spaced_mapping(Qubit* qubit, int second_qubit) {
     }
 }
 
-void Mapping::distance_first_mapping(Qubit* qubit, int second_qubit) {
+void Mapping::distance_mapping(Qubit* qubit, int second_qubit) {
     if (PRINT_MAPPING) std::cout << "mapping with distance-first heuristic\n";
 
     const std::vector<int> magic_states_ids = graph.get_magic_state_ids();
@@ -152,7 +152,7 @@ void Mapping::distance_first_mapping(Qubit* qubit, int second_qubit) {
     }
 
     if (candidates.empty()) {
-        throw std::runtime_error("No available non-magic node found for distance_first_mapping.");
+        throw std::runtime_error("No available non-magic node found for distance_mapping.");
     }
 
     const float center_x = (min_x + max_x) / 2.0f;

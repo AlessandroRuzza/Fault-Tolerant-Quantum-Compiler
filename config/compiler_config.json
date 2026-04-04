@@ -2,6 +2,7 @@
   "circuit": "dnn_n16",
   "strategy": "random",
   "type": "gaussian",
+  "safe_passage_strategy": "passage",
   "x": 10,
   "y": 10
 }
