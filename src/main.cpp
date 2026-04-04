@@ -125,36 +125,3 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-// maxHeap testing
-//std::cout << "------- HEAP TEST ---------" << std::endl;
-
-/* /* MaxHeap<int*> maxHeap(6);
-
-int value = 10;
-maxHeap.insert(&value);
-maxHeap.print();
-value = 10;
-maxHeap.insert(&value);
-maxHeap.print();
-value = 15;
-maxHeap.insert(&value);
-value = 20;
-maxHeap.insert(&value);
-value = 5;
-maxHeap.insert(&value);
-// Build the heap from the array
-//maxHeap.buildHeap();
-
-// Print the max heap
-maxHeap.print(); */
-
-// Get the maximum value from the max heap
-// cout << "Top value: " << maxHeap.top() << endl;
-
-// Delete the root node of the max heap
-// cout << "Popped value: " << maxHeap.pop() << endl;
-// cout << "After popping: ";
-// maxHeap.print();
-
-// ----maxheap testing end----
-//
