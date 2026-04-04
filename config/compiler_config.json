@@ -1,5 +1,5 @@
 {
-  "circuit": "qft_20",
+  "circuit": "dnn_n16",
   "strategy": "random",
   "type": "gaussian",
   "x": 10,
