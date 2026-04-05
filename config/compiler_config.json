@@ -1,7 +1,7 @@
 {
   "circuit": "example",
   "strategy": "center",
-  "type": "magic_aware",
+  "type": "gaussian",
   "safe_passage_strategy": "passage",
   "x": 7,
   "y": 7
