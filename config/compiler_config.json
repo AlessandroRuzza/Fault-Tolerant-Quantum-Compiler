@@ -3,6 +3,12 @@
   "magic_aware_strategy": "center",
   "type": "gaussian",
   "gaussian_strategy": "coarse",
+  "MAGIC_HIGH": 1.5,
+  "MAGIC_LOW": 0.5,
+  "CNOT_HIGH": 1.5,
+  "CNOT_LOW": 0.5,
+  "MAPPED_GAUSSIAN_WEIGHT": 0.8,
+  "BASE_GAUSSIAN_WEIGHT": 1.0,
   "safe_passage_strategy": "passage",
   "x": 7,
   "y": 7

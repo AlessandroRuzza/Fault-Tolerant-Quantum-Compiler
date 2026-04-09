@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <cctype>
+#include <cmath>
 
 #include "circuit.hpp"
 #include "graph.hpp"
@@ -96,6 +97,12 @@ private:
     MappingType mappingType;
     GaussianStrategy gaussianStrategy;
     SafePassageStrategy safePassageStrategy;
+    double magicHigh;
+    double magicLow;
+    double cnotHigh;
+    double cnotLow;
+    double mappedGaussianWeight;
+    double baseGaussianWeight;
     int T_lower_bound;
     int T_upper_bound;
     int CNOT_threshold;
@@ -112,9 +119,24 @@ public:
         const std::string& type_name,
         const std::string& gaussian_strategy_name,
         const std::string& safe_passage_strategy,
+        double magic_high,
+        double magic_low,
+        double cnot_high,
+        double cnot_low,
+        double mapped_gaussian_weight,
+        double base_gaussian_weight,
         int maximum_iterations
     ) :
-    circuit(circuit), graph(graph), maximum_iterations(maximum_iterations), farthest_from_magic_selector(graph)  {
+    circuit(circuit),
+    graph(graph),
+    magicHigh(magic_high),
+    magicLow(magic_low),
+    cnotHigh(cnot_high),
+    cnotLow(cnot_low),
+    mappedGaussianWeight(mapped_gaussian_weight),
+    baseGaussianWeight(base_gaussian_weight),
+    maximum_iterations(maximum_iterations),
+    farthest_from_magic_selector(graph)  {
         if (!set_mapping_strategy(magic_aware_strategy_name)) {
             throw std::invalid_argument("Invalid magic-aware strategy: " + magic_aware_strategy_name);
         }
@@ -127,6 +149,7 @@ public:
         if (!set_safe_passage_strategy(safe_passage_strategy)) {
             throw std::invalid_argument("Invalid safe passage strategy: " + safe_passage_strategy);
         }
+        validate_gaussian_weights();
         set_thresholds();
     }
 
@@ -202,6 +225,13 @@ public:
                 return "unknown";
         }
     }
+
+    inline double getMagicHigh() const { return magicHigh; }
+    inline double getMagicLow() const { return magicLow; }
+    inline double getCnotHigh() const { return cnotHigh; }
+    inline double getCnotLow() const { return cnotLow; }
+    inline double getMappedGaussianWeight() const { return mappedGaussianWeight; }
+    inline double getBaseGaussianWeight() const { return baseGaussianWeight; }
 
 
     // returns -1 if qubit is not mapped
@@ -361,6 +391,28 @@ private:
         }
 
         return false;
+    }
+
+    inline void validate_non_negative_finite(double value, const char* name) {
+        if (!std::isfinite(value) || value < 0.0) {
+            throw std::invalid_argument(std::string(name) + " must be a finite number >= 0");
+        }
+    }
+
+    inline void validate_gaussian_weights() {
+        validate_non_negative_finite(magicHigh, "MAGIC_HIGH");
+        validate_non_negative_finite(magicLow, "MAGIC_LOW");
+        validate_non_negative_finite(cnotHigh, "CNOT_HIGH");
+        validate_non_negative_finite(cnotLow, "CNOT_LOW");
+        validate_non_negative_finite(mappedGaussianWeight, "MAPPED_GAUSSIAN_WEIGHT");
+        validate_non_negative_finite(baseGaussianWeight, "BASE_GAUSSIAN_WEIGHT");
+
+        if (magicHigh < magicLow) {
+            throw std::invalid_argument("MAGIC_HIGH must be >= MAGIC_LOW");
+        }
+        if (cnotHigh < cnotLow) {
+            throw std::invalid_argument("CNOT_HIGH must be >= CNOT_LOW");
+        }
     }
 
 

@@ -3,6 +3,7 @@
 #include "mapping.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -84,6 +85,21 @@ int parse_positive_integer(const std::string& value, const char* flag_name) {
     return parsed_value;
 }
 
+double parse_non_negative_double(const std::string& value, const char* flag_name) {
+    double parsed_value = 0.0;
+    try {
+        parsed_value = std::stod(value);
+    } catch (const std::exception&) {
+        throw std::runtime_error("Invalid floating-point value for " + std::string(flag_name) + ": " + value);
+    }
+
+    if (!std::isfinite(parsed_value) || parsed_value < 0.0) {
+        throw std::runtime_error(std::string(flag_name) + " must be a finite number >= 0");
+    }
+
+    return parsed_value;
+}
+
 void validate_magic_aware_strategy(const std::string& value, const char* executable) {
     const std::vector<std::string> valid_strategies = Mapping::get_available_mapping_strategies();
     if (std::find(valid_strategies.begin(), valid_strategies.end(), value) == valid_strategies.end()) {
@@ -150,6 +166,12 @@ void print_usage(const char* executable) {
               << "[--type [" << Mapping::available_mapping_types() << "]]\n"
               << "[--gaussian-strategy [" << Mapping::available_gaussian_strategies() << "]]\n"
               << "[--safe-passage [" << Mapping::available_safe_passage_strategies() << "]]\n"
+              << "[--magic-high <float>=0]\n"
+              << "[--magic-low <float>=0]\n"
+              << "[--cnot-high <float>=0]\n"
+              << "[--cnot-low <float>=0]\n"
+              << "[--mapped-gaussian-weight <float>=0]\n"
+              << "[--base-gaussian-weight <float>=0]\n"
               << "[--x <integer>]\n"
               << "[--y <integer>]\n"
               << "[--graph <graph_path>]\n"
@@ -169,6 +191,12 @@ void apply_config_overrides(
     std::string& type,
     std::string& gaussian_strategy,
     std::string& safe_passage_strategy,
+    double& magic_high,
+    double& magic_low,
+    double& cnot_high,
+    double& cnot_low,
+    double& mapped_gaussian_weight,
+    double& base_gaussian_weight,
     std::string& config_path,
     int& x,
     int& y,
@@ -197,6 +225,21 @@ void apply_config_overrides(
     if (!config_json.is_object()) {
         throw std::runtime_error("Config file must contain a JSON object: " + resolved_config_path.string());
     }
+
+    const auto load_non_negative_double_from_config = [&](const char* key, double& target) {
+        if (!config_json.contains(key)) {
+            return false;
+        }
+        if (!config_json[key].is_number()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
+        }
+        const double value = config_json[key].get<double>();
+        if (!std::isfinite(value) || value < 0.0) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a finite number >= 0");
+        }
+        target = value;
+        return true;
+    };
 
     if (config_json.contains("circuit")) {
         if (!config_json["circuit"].is_string()) {
@@ -246,6 +289,25 @@ void apply_config_overrides(
         validate_gaussian_strategy(gaussian_strategy, argv[0]);
     }
 
+    if (!load_non_negative_double_from_config("MAGIC_HIGH", magic_high)) {
+        load_non_negative_double_from_config("magic_high", magic_high);
+    }
+    if (!load_non_negative_double_from_config("MAGIC_LOW", magic_low)) {
+        load_non_negative_double_from_config("magic_low", magic_low);
+    }
+    if (!load_non_negative_double_from_config("CNOT_HIGH", cnot_high)) {
+        load_non_negative_double_from_config("cnot_high", cnot_high);
+    }
+    if (!load_non_negative_double_from_config("CNOT_LOW", cnot_low)) {
+        load_non_negative_double_from_config("cnot_low", cnot_low);
+    }
+    if (!load_non_negative_double_from_config("MAPPED_GAUSSIAN_WEIGHT", mapped_gaussian_weight)) {
+        load_non_negative_double_from_config("mapped_gaussian_weight", mapped_gaussian_weight);
+    }
+    if (!load_non_negative_double_from_config("BASE_GAUSSIAN_WEIGHT", base_gaussian_weight)) {
+        load_non_negative_double_from_config("base_gaussian_weight", base_gaussian_weight);
+    }
+
     if (config_json.contains("safe_passage_strategy")) {
         if (!config_json["safe_passage_strategy"].is_string()) {
             throw std::runtime_error("Config key 'safe_passage_strategy' must be a string");
@@ -292,6 +354,12 @@ void argument_parsing(
     std::string& type,
     std::string& gaussian_strategy,
     std::string& safe_passage_strategy,
+    double& magic_high,
+    double& magic_low,
+    double& cnot_high,
+    double& cnot_low,
+    double& mapped_gaussian_weight,
+    double& base_gaussian_weight,
     int& x,
     int& y,
     std::string& graph_path
@@ -354,6 +422,66 @@ void argument_parsing(
             }
             gaussian_strategy = argv[++i];
             validate_gaussian_strategy(gaussian_strategy, argv[0]);
+            continue;
+        }
+
+        if (arg == "--magic-high" || arg == "--magic_high") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --magic-high\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --magic-high");
+            }
+            magic_high = parse_non_negative_double(argv[++i], "--magic-high");
+            continue;
+        }
+
+        if (arg == "--magic-low" || arg == "--magic_low") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --magic-low\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --magic-low");
+            }
+            magic_low = parse_non_negative_double(argv[++i], "--magic-low");
+            continue;
+        }
+
+        if (arg == "--cnot-high" || arg == "--cnot_high") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --cnot-high\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --cnot-high");
+            }
+            cnot_high = parse_non_negative_double(argv[++i], "--cnot-high");
+            continue;
+        }
+
+        if (arg == "--cnot-low" || arg == "--cnot_low") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --cnot-low\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --cnot-low");
+            }
+            cnot_low = parse_non_negative_double(argv[++i], "--cnot-low");
+            continue;
+        }
+
+        if (arg == "--mapped-gaussian-weight" || arg == "--mapped_gaussian_weight") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --mapped-gaussian-weight\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --mapped-gaussian-weight");
+            }
+            mapped_gaussian_weight = parse_non_negative_double(argv[++i], "--mapped-gaussian-weight");
+            continue;
+        }
+
+        if (arg == "--base-gaussian-weight" || arg == "--base_gaussian_weight") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --base-gaussian-weight\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --base-gaussian-weight");
+            }
+            base_gaussian_weight = parse_non_negative_double(argv[++i], "--base-gaussian-weight");
             continue;
         }
 

@@ -48,6 +48,12 @@ int main(int argc, char **argv) {
     std::string type = "magic_aware";
     std::string gaussian_strategy = "fine";
     std::string safe_passage_strategy = "passage";
+    double magic_high = 1.5;
+    double magic_low = 0.5;
+    double cnot_high = 1.5;
+    double cnot_low = 0.5;
+    double mapped_gaussian_weight = 0.8;
+    double base_gaussian_weight = 1.0;
     std::string config_path = "../config/compiler_config.json";
     std::string graph_path = "";
     int x = 10;
@@ -62,6 +68,12 @@ int main(int argc, char **argv) {
         type,
         gaussian_strategy,
         safe_passage_strategy,
+        magic_high,
+        magic_low,
+        cnot_high,
+        cnot_low,
+        mapped_gaussian_weight,
+        base_gaussian_weight,
         config_path,
         x,
         y,
@@ -75,6 +87,12 @@ int main(int argc, char **argv) {
         type,
         gaussian_strategy,
         safe_passage_strategy,
+        magic_high,
+        magic_low,
+        cnot_high,
+        cnot_low,
+        mapped_gaussian_weight,
+        base_gaussian_weight,
         x,
         y,
         graph_path
@@ -84,6 +102,12 @@ int main(int argc, char **argv) {
     std::cout << "magic aware strategy: " << magic_aware_strategy << std::endl;
     std::cout << "type: " << type << std::endl;
     std::cout << "gaussian strategy: " << gaussian_strategy << std::endl;
+    std::cout << "MAGIC_HIGH: " << magic_high << std::endl;
+    std::cout << "MAGIC_LOW: " << magic_low << std::endl;
+    std::cout << "CNOT_HIGH: " << cnot_high << std::endl;
+    std::cout << "CNOT_LOW: " << cnot_low << std::endl;
+    std::cout << "MAPPED_GAUSSIAN_WEIGHT: " << mapped_gaussian_weight << std::endl;
+    std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
@@ -135,6 +159,12 @@ int main(int argc, char **argv) {
         type,
         gaussian_strategy,
         safe_passage_strategy,
+        magic_high,
+        magic_low,
+        cnot_high,
+        cnot_low,
+        mapped_gaussian_weight,
+        base_gaussian_weight,
         maximum_iterations
     );
 

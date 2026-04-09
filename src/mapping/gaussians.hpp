@@ -1,17 +1,9 @@
-#define MAPPED_GAUSSIAN_WEIGHT 0.8
-#define BASE_GAUSSIAN_WEIGHT 1
-
-
-
-
-
-
 double compute_sigma(int radius, double confidence) {return radius / sqrt(-2 * log(1 - confidence));}
 
 
 namespace Gaussians {
 
-    Gaussian baseline_gaussian(const Graph& graph){
+    Gaussian baseline_gaussian(const Graph& graph, double base_gaussian_weight){
         return Gaussian (
             //mean
             graph.get_maxX() / 2,
@@ -26,7 +18,7 @@ namespace Gaussians {
             graph.get_maxY() + 1,
 
             //weight
-            BASE_GAUSSIAN_WEIGHT,
+            base_gaussian_weight,
 
             //inverse
             false
@@ -34,7 +26,7 @@ namespace Gaussians {
     }
 
 
-    Gaussian mapped_gaussian(const Graph& graph, const Node& node) {
+    Gaussian mapped_gaussian(const Graph& graph, const Node& node, double mapped_gaussian_weight) {
         return Gaussian(
             //mean
             node.coordX,
@@ -49,7 +41,7 @@ namespace Gaussians {
             graph.get_maxY() + 1, 
 
             //weight
-            MAPPED_GAUSSIAN_WEIGHT,
+            mapped_gaussian_weight,
 
             //inverse
             true

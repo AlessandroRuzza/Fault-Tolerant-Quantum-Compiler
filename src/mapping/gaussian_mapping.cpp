@@ -13,18 +13,35 @@
 #include <iomanip>
 #include <sstream>
 
-
-#define MAGIC_HIGH 1.5
-#define MAGIC_LOW 0.5
-
-#define CNOT_HIGH 1.5
-#define CNOT_LOW 0.5
-
-
 void update_weight(std::vector<Gaussian>& gaussians, double new_weight);
 void update_inverse(std::vector<Gaussian>& gaussians, bool inverse);
-void update_gaussians_coarse(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Graph& graph, const Mapping& mapping, int t_lower_bound, int t_upper_bound, int cnot_threshold);
-void update_gaussians_fine(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, const Circuit& circuit, const Graph& graph, const Mapping& mapping, int CNOT_threshold);
+void update_gaussians_coarse(
+    Qubit* qubit,
+    std::vector<Gaussian>& mapped_gaussians,
+    std::vector<Gaussian>& magic_gaussians,
+    std::vector<Gaussian>& cnot_gaussians,
+    Graph& graph,
+    const Mapping& mapping,
+    int t_lower_bound,
+    int t_upper_bound,
+    int cnot_threshold,
+    double magic_high,
+    double cnot_high
+);
+void update_gaussians_fine(
+    Qubit* qubit,
+    std::vector<Gaussian>& mapped_gaussians,
+    std::vector<Gaussian>& magic_gaussians,
+    std::vector<Gaussian>& cnot_gaussians,
+    const Circuit& circuit,
+    const Graph& graph,
+    const Mapping& mapping,
+    int CNOT_threshold,
+    double magic_high,
+    double magic_low,
+    double cnot_high,
+    double cnot_low
+);
 Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit);
 void update_weight(std::vector<Gaussian>& gaussians, double new_weight);
 void update_inverse(std::vector<Gaussian>& gaussians, bool inverse);
@@ -38,10 +55,35 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
 
     switch (gaussianStrategy) {
         case GaussianStrategy::COARSE:
-            update_gaussians_coarse(qubit, mapped_gaussians, magic_gaussians, cnot_gaussians, graph, *this, T_lower_bound, T_upper_bound, CNOT_threshold);
+            update_gaussians_coarse(
+                qubit,
+                mapped_gaussians,
+                magic_gaussians,
+                cnot_gaussians,
+                graph,
+                *this,
+                T_lower_bound,
+                T_upper_bound,
+                CNOT_threshold,
+                magicHigh,
+                cnotHigh
+            );
             break;
         case GaussianStrategy::FINE:
-            update_gaussians_fine(qubit, mapped_gaussians, magic_gaussians, cnot_gaussians, circuit, graph, *this, CNOT_threshold);
+            update_gaussians_fine(
+                qubit,
+                mapped_gaussians,
+                magic_gaussians,
+                cnot_gaussians,
+                circuit,
+                graph,
+                *this,
+                CNOT_threshold,
+                magicHigh,
+                magicLow,
+                cnotHigh,
+                cnotLow
+            );
             break;
     }
 
@@ -49,7 +91,7 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
     
     map_qubit_to_node(qubit->getQubitID(), best_node.id, 0);
 
-    mapped_gaussians.push_back(Gaussians::mapped_gaussian(graph, best_node));
+    mapped_gaussians.push_back(Gaussians::mapped_gaussian(graph, best_node, mappedGaussianWeight));
 
     (*iterations)++;
 
@@ -62,7 +104,7 @@ void Mapping::gaussian_mapping() {
     std::vector<Gaussian> mapped_gaussians;
     std::vector<Gaussian> magic_gaussians;
 
-    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph);
+    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight);
     
     for (int node_id : graph.get_magic_state_ids()) {
         magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id));
@@ -96,7 +138,19 @@ void Mapping::gaussian_mapping() {
 
 
 
-void update_gaussians_coarse(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Graph& graph, const Mapping& mapping, int t_lower_bound, int t_upper_bound, int cnot_threshold) {
+void update_gaussians_coarse(
+    Qubit* qubit,
+    std::vector<Gaussian>& mapped_gaussians,
+    std::vector<Gaussian>& magic_gaussians,
+    std::vector<Gaussian>& cnot_gaussians,
+    Graph& graph,
+    const Mapping& mapping,
+    int t_lower_bound,
+    int t_upper_bound,
+    int cnot_threshold,
+    double magic_high,
+    double cnot_high
+) {
 
     if (PRINT_MAPPING) std::cout << "Mapping qubit " << qubit->getQubitID() << " with T_count = "
               << qubit->getTCount() << " and max CNOT count = "
@@ -104,7 +158,7 @@ void update_gaussians_coarse(Qubit* qubit, std::vector<Gaussian>& mapped_gaussia
 
     if (qubit->getTCount() > qubit->getMaxCNOTCount()) {
         if (MAPPING_VERBOSE) std::cout << "Mapping based on T_count" << "\n";
-        update_weight(magic_gaussians, MAGIC_HIGH);
+        update_weight(magic_gaussians, magic_high);
         update_inverse(magic_gaussians, false);
 
     } else {
@@ -120,7 +174,7 @@ void update_gaussians_coarse(Qubit* qubit, std::vector<Gaussian>& mapped_gaussia
         for (int i : highCnotQubits) {
             int second_qubit_mapped_node = mapping.get_mapped_node(i);
             if (second_qubit_mapped_node != -1){
-                cnot_gaussians.push_back(Gaussians::cnot_gaussian(graph, second_qubit_mapped_node, CNOT_HIGH, false));
+                cnot_gaussians.push_back(Gaussians::cnot_gaussian(graph, second_qubit_mapped_node, cnot_high, false));
             }
         }
 
@@ -129,10 +183,10 @@ void update_gaussians_coarse(Qubit* qubit, std::vector<Gaussian>& mapped_gaussia
         if (qubit->getTCount() < t_lower_bound) {
             if (MAPPING_VERBOSE) std::cout << "mapping far from magic states because second qubit is not "
                              "mapped and T_count is low\n";
-            update_weight(magic_gaussians, MAGIC_HIGH);
+            update_weight(magic_gaussians, magic_high);
             update_inverse(magic_gaussians, true);
         } else if (qubit->getTCount() > t_upper_bound) {
-            update_weight(magic_gaussians, MAGIC_HIGH);
+            update_weight(magic_gaussians, magic_high);
             update_inverse(magic_gaussians, false);
 
         } else {
@@ -144,7 +198,20 @@ void update_gaussians_coarse(Qubit* qubit, std::vector<Gaussian>& mapped_gaussia
 }
 
 
-void update_gaussians_fine(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, const Circuit& circuit, const Graph& graph, const Mapping& mapping, int CNOT_threshold) {
+void update_gaussians_fine(
+    Qubit* qubit,
+    std::vector<Gaussian>& mapped_gaussians,
+    std::vector<Gaussian>& magic_gaussians,
+    std::vector<Gaussian>& cnot_gaussians,
+    const Circuit& circuit,
+    const Graph& graph,
+    const Mapping& mapping,
+    int CNOT_threshold,
+    double magic_high,
+    double magic_low,
+    double cnot_high,
+    double cnot_low
+) {
 
     //2 pesi per T: LOW, HIGH
     //2 pesi per CNOT: LOW, HIGH
@@ -175,17 +242,17 @@ void update_gaussians_fine(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians
     if (qubit->getTCount() == T_mean) {
         update_weight(magic_gaussians, 0);
     } else if (qubit->getTCount() < T_mean - T_std) {
-        update_weight(magic_gaussians, MAGIC_HIGH);
+        update_weight(magic_gaussians, magic_high);
         update_inverse(magic_gaussians, true);
     } else if (qubit->getTCount() > T_mean + T_std) {
-        update_weight(magic_gaussians, MAGIC_HIGH);
+        update_weight(magic_gaussians, magic_high);
         update_inverse(magic_gaussians, false);
     } else if (qubit->getTCount() >= T_mean - T_std && qubit->getTCount() <= T_mean) {
-        double weight = MAGIC_LOW + (MAGIC_HIGH - MAGIC_LOW) * (qubit->getTCount() - (T_mean - T_std)) / (T_std);
+        double weight = magic_low + (magic_high - magic_low) * (qubit->getTCount() - (T_mean - T_std)) / (T_std);
         update_weight(magic_gaussians, weight);
         update_inverse(magic_gaussians, true);
     } else if (qubit->getTCount() > T_mean && qubit->getTCount() <= T_mean + T_std) {
-        double weight = MAGIC_LOW + (MAGIC_HIGH - MAGIC_LOW) * ((qubit->getTCount() - T_mean) / (T_std));
+        double weight = magic_low + (magic_high - magic_low) * ((qubit->getTCount() - T_mean) / (T_std));
         update_weight(magic_gaussians, weight);
         update_inverse(magic_gaussians, false);
     }
@@ -200,22 +267,22 @@ void update_gaussians_fine(Qubit* qubit, std::vector<Gaussian>& mapped_gaussians
             weight = 0.0;
             inverse = false;
         } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) < CNOT_mean - CNOT_std) {
-            weight = CNOT_HIGH;
+            weight = cnot_high;
             inverse = true;
         } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) > CNOT_mean + CNOT_std) {
-            weight = CNOT_HIGH;
+            weight = cnot_high;
             inverse = false;
 
         } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) >= CNOT_mean - CNOT_std && 
                    circuit.getCNOTCount(qubit->getQubitID(), q_id) <= CNOT_mean) {
 
-            weight = CNOT_LOW + (CNOT_HIGH - CNOT_LOW) * (qubit->getMaxCNOTCount() - (CNOT_mean - CNOT_std)) / (CNOT_std);
+            weight = cnot_low + (cnot_high - cnot_low) * (qubit->getMaxCNOTCount() - (CNOT_mean - CNOT_std)) / (CNOT_std);
             inverse = true;
 
         } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) > CNOT_mean && 
                    circuit.getCNOTCount(qubit->getQubitID(), q_id) <= CNOT_mean + CNOT_std) {
 
-            weight = CNOT_LOW + (CNOT_HIGH - CNOT_LOW) * ((qubit->getMaxCNOTCount() - CNOT_mean) / (CNOT_std));
+            weight = cnot_low + (cnot_high - cnot_low) * ((qubit->getMaxCNOTCount() - CNOT_mean) / (CNOT_std));
             inverse = false;
         }
 
