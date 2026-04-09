@@ -121,7 +121,7 @@ void save_gaussian_frame(
 ) {
     static int frame_id = 0;
 
-    const int width = graph.get_maxX();
+    const int width = graph.get_maxX() + 1;
     const int height = graph.get_maxY() + 1;
     if (width <= 0 || height <= 0) {
         return;
@@ -278,4 +278,3 @@ void save_gaussian_frame(
 }
 
 } // namespace
-

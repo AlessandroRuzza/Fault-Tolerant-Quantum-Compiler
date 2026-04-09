@@ -3,7 +3,7 @@
 
 void Mapping::homogeneous_mapping() {
     const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
-    const int width = graph.getMaxX();
+    const int width = graph.getMaxX() + 1;
     const int height = graph.getMaxY() + 1;
     int qubit_id = 0;
     int mapped = 0;
