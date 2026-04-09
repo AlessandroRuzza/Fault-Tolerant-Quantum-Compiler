@@ -44,6 +44,11 @@ public:
         GAUSSIAN
     };
 
+    enum class GaussianStrategy {
+        COARSE,
+        FINE
+    };
+
     enum class SafePassageStrategy {
         PASSAGE,
         CUBE
@@ -55,6 +60,10 @@ public:
 
     static vector<std::string> get_available_mapping_types() {
         return {"magic_aware", "homogeneous", "gaussian"};
+    }
+
+    static vector<std::string> get_available_gaussian_strategies() {
+        return {"coarse", "fine"};
     }
 
     static vector<std::string> get_available_safe_passage_strategies() {
@@ -70,6 +79,10 @@ public:
         return "magic_aware | homogeneous | gaussian";
     }
 
+    static std::string available_gaussian_strategies() {
+        return "coarse | fine";
+    }
+
     static std::string available_safe_passage_strategies() {
         return "passage | cube";
     }
@@ -81,6 +94,7 @@ private:
     std::unordered_map<int, int> graph_to_circuit;
     MappingStrategy mappingStrategy;
     MappingType mappingType;
+    GaussianStrategy gaussianStrategy;
     SafePassageStrategy safePassageStrategy;
     int T_lower_bound;
     int T_upper_bound;
@@ -91,13 +105,24 @@ private:
 
 public:
 
-    Mapping(Circuit& circuit, Graph& graph, const std::string& strategy_name,const std::string& type_name, const std::string& safe_passage_strategy, int maximum_iterations) : 
+    Mapping(
+        Circuit& circuit,
+        Graph& graph,
+        const std::string& magic_aware_strategy_name,
+        const std::string& type_name,
+        const std::string& gaussian_strategy_name,
+        const std::string& safe_passage_strategy,
+        int maximum_iterations
+    ) :
     circuit(circuit), graph(graph), maximum_iterations(maximum_iterations), farthest_from_magic_selector(graph)  {
-        if (!set_mapping_strategy(strategy_name)) {
-            throw std::invalid_argument("Invalid mapping strategy: " + strategy_name);
+        if (!set_mapping_strategy(magic_aware_strategy_name)) {
+            throw std::invalid_argument("Invalid magic-aware strategy: " + magic_aware_strategy_name);
         }
         if (!set_mapping_type(type_name)) {
             throw std::invalid_argument("Invalid mapping type: " + type_name);
+        }
+        if (!set_gaussian_strategy(gaussian_strategy_name)) {
+            throw std::invalid_argument("Invalid gaussian strategy: " + gaussian_strategy_name);
         }
         if (!set_safe_passage_strategy(safe_passage_strategy)) {
             throw std::invalid_argument("Invalid safe passage strategy: " + safe_passage_strategy);
@@ -162,6 +187,17 @@ public:
                 return "center";
             case MappingStrategy::RANDOM:
                 return "random";
+            default:
+                return "unknown";
+        }
+    }
+
+    inline std::string current_gaussian_strategy_name() const {
+        switch (gaussianStrategy) {
+            case GaussianStrategy::COARSE:
+                return "coarse";
+            case GaussianStrategy::FINE:
+                return "fine";
             default:
                 return "unknown";
         }
@@ -293,6 +329,20 @@ private:
             return true;
         } else if (normalized_name == "gaussian") {
             mappingType = MappingType::GAUSSIAN;
+            return true;
+        }
+
+        return false;
+    }
+
+    inline bool set_gaussian_strategy(const std::string& strategy_name) {
+        const std::string normalized_name = normalize_strategy_name(strategy_name);
+
+        if (normalized_name == "coarse") {
+            gaussianStrategy = GaussianStrategy::COARSE;
+            return true;
+        } else if (normalized_name == "fine") {
+            gaussianStrategy = GaussianStrategy::FINE;
             return true;
         }
 

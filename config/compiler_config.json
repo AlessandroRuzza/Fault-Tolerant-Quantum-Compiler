@@ -1,7 +1,8 @@
 {
   "circuit": "qft_20",
-  "strategy": "center",
+  "magic_aware_strategy": "center",
   "type": "gaussian",
+  "gaussian_strategy": "coarse",
   "safe_passage_strategy": "passage",
   "x": 7,
   "y": 7
