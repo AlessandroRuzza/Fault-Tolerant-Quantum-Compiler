@@ -197,61 +197,41 @@ Graph Graph::from_json(const std::string& filename) {
 
 // Create a rectangular grid graph with magic states
 Graph Graph::create_rectangular_with_magic_states(int height, int width) {
-        Graph g;
-        int total_nodes = width * height + height;  // grid nodes + magic states
-        g.resize(total_nodes);
-        
+    Graph g;
+    const int total_nodes = width * height;  // only grid nodes
+    g.resize(total_nodes);
 
+    // Create all grid nodes with their coordinates.
+    for (int row = 0; row < height; row++) {
+        for (int col = 0; col < width; col++) {
+            int id = row * width + col;
+            g.add_node(id, col, row);
+        }
+    }
 
-        // First, create all nodes with their coordinates
-        // Grid nodes
-        for (int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-                int id = row * width + col;
-                g.add_node(id, col, row);
+    // Pick magic states from inside the grid: the rightmost column.
+    for (int row = 0; row < height; row++) {
+        const int magic_id = row * width + (width - 1);
+        g.magic_states_ids.push_back(magic_id);
+    }
+
+    // Add horizontal and vertical edges in the grid.
+    for (int row = 0; row < height; row++) {
+        for (int col = 0; col < width; col++) {
+            int id = row * width + col;
+            
+            // Right neighbor
+            if (col < width - 1) {
+                g.add_edge(id, id + 1);
+            }
+            
+            // Bottom neighbor
+            if (row < height - 1) {
+                g.add_edge(id, id + width);
             }
         }
-        
-        // Magic state nodes (positioned to the right of the grid)
-        int magic_start = width * height;
-        for (int row = 0; row < height; row++) {
-            int magic_id = magic_start + row;
-            g.add_node(magic_id, width, row);
-            g.magic_states_ids.push_back(magic_id);  // Mark as magic state
-        }
-        
-        // Now add edges
-        // Horizontal and vertical edges in the grid
-        for (int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-                int id = row * width + col;
-                
-                // Right neighbor
-                if (col < width - 1) {
-                    g.add_edge(id, id + 1);
-                }
-                
-                // Bottom neighbor
-                if (row < height - 1) {
-                    g.add_edge(id, id + width);
-                }
-            }
-        }
-        
-        // Connect rightmost column to magic states
-        for (int row = 0; row < height; row++) {
-            int rightmost = row * width + (width - 1);
-            int magic_id = magic_start + row;
-            g.add_edge(rightmost, magic_id);
-        }
-        
-        // Connect magic states vertically
-        for (int row = 0; row < height - 1; row++) {
-            int magic_id = magic_start + row;
-            g.add_edge(magic_id, magic_id + 1);
-        }
+    }
 
-        
-        return g;
+    return g;
 }
 
