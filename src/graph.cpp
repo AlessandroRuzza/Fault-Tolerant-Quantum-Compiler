@@ -177,7 +177,28 @@ Graph Graph::from_json(const std::string& filename) {
 
         if(j.contains("magic states")){
             if(j["magic states"].is_array()){
-                g.magic_states_ids.insert(g.magic_states_ids.end(), j["magic states"].begin(), j["magic states"].end());
+                std::unordered_set<int> seen_magic_ids;
+                for (const auto& magic_state_entry : j["magic states"]) {
+                    if (!magic_state_entry.is_number_integer()) {
+                        std::cerr << "magic states must be an array of integer node ids!\n";
+                        return Graph{};
+                    }
+
+                    const int magic_state_id = magic_state_entry.get<int>();
+                    if (magic_state_id < 0 || magic_state_id >= g.get_node_count()) {
+                        std::cerr << "magic state id out of range: " << magic_state_id << "\n";
+                        return Graph{};
+                    }
+                    if (g.get_node(magic_state_id).id == -1) {
+                        std::cerr << "magic state id does not correspond to an existing node: "
+                                  << magic_state_id << "\n";
+                        return Graph{};
+                    }
+
+                    if (seen_magic_ids.insert(magic_state_id).second) {
+                        g.magic_states_ids.push_back(magic_state_id);
+                    }
+                }
         }
             else{
                 std::cerr << "magic states not specified as array of ints!\n";

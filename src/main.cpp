@@ -127,6 +127,15 @@ int main(int argc, char **argv) {
         graph = Graph::from_json(graph_path);
     }
 
+    if (graph.get_node_count() <= 0) {
+        std::cerr << "error: graph is empty or invalid.\n";
+        return 2;
+    }
+    if (graph.get_magic_state_ids().empty()) {
+        std::cerr << "error: graph has no magic states.\n";
+        return 2;
+    }
+
     Circuit circuit = Circuit();
 
     try {
@@ -169,6 +178,17 @@ int main(int argc, char **argv) {
     );
 
     mapping.map();
+
+    for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
+        if (circuit.getQubit(qubit) == nullptr) {
+            continue;
+        }
+        if (mapping.get_mapped_node(qubit) < 0) {
+            throw std::runtime_error(
+                "Incomplete mapping: qubit " + std::to_string(qubit) + " was not mapped."
+            );
+        }
+    }
 
     graph.print_rectangular();
 
