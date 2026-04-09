@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
         graph = Graph::from_json(graph_path);
     }
 
-    circuit::Circuit circuit = circuit::Circuit();
+    Circuit circuit = Circuit();
 
     try {
         circuit.parse_qasm_file(path);
@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
     graph.print_rectangular();
 
     std::cout << "------- LAYERING ---------" << std::endl;
-    circuit::LayeredCircuit layeredCircuit = circuit::LayeredCircuit(circuit);
+    LayeredCircuit layeredCircuit = LayeredCircuit(circuit);
     if (PRINT_LAYER) layeredCircuit.print_layered();
 
     std::cout << "------- ROUTING ---------" << std::endl;
@@ -124,4 +124,3 @@ int main(int argc, char **argv) {
 
     return 0;
 }
-

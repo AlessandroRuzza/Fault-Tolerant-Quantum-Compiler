@@ -1,9 +1,8 @@
 #define MAPPED_GAUSSIAN_WEIGHT 0.8
-#define MAGIC_HIGHEST 1.5
-#define MAGIC_ABOVE_THRESHOLD 1.2
-#define CNOT_ABOVE_THRESHOLD 1.5
-#define MAGIC_BELOW_THRESHOLD 1.2
 #define BASE_GAUSSIAN_WEIGHT 1
+
+
+
 
 
 
@@ -83,7 +82,7 @@ namespace Gaussians {
     }
 
 
-    Gaussian cnot_gaussian(const Graph& graph, int node_id) {
+    Gaussian cnot_gaussian(const Graph& graph, int node_id, double weight, bool inverse) {
         return Gaussian(
             //mean
             graph.get_coordX(node_id),
@@ -99,10 +98,10 @@ namespace Gaussians {
             graph.get_maxY() + 1, 
 
             //weight
-            CNOT_ABOVE_THRESHOLD,
+            weight,
 
             //inverse
-            false
+            inverse
         );
     }
 
