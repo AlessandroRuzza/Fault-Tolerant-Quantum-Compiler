@@ -12,10 +12,6 @@
 #include <algorithm>
 #include <limits>
 
-using circuit::LayeredCircuit;
-using circuit::Layer;
-using circuit::Gate;
-
 using Path = std::vector<int>;
 using Routing = std::unordered_map<Gate, Path>;
 

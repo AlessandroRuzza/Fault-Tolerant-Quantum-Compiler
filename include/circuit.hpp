@@ -16,9 +16,6 @@
 #include "qubit.hpp"
 #include "defines.hpp"
 
-
-namespace circuit {
-
 struct Gate {
     int id;
     std::string name; // gate name, e.g. "cx", "h", "t"
@@ -177,7 +174,7 @@ public:
     }
 
 
-    double getCNOTMean() {
+    const double getCNOTMean() const {
         int total_qubits = getNumQubits();
         if (total_qubits <= 1) return 0.0;
 
@@ -194,7 +191,7 @@ public:
         return count > 0 ? static_cast<double>(total_cnot) / count : 0.0;
     }
 
-    double getCNOTStd() {
+    const double getCNOTStd() const {
         int total_qubits = getNumQubits();
         if (total_qubits <= 1) return 0.0;
 
@@ -259,14 +256,12 @@ public:
 
     void addGate(const Gate& gate, std::string gate_name, int globalID);
 
-
 };
-} // namespace circuit
 
 namespace std {
 template<>
-struct hash<circuit::Gate> {
-    std::size_t operator()(const circuit::Gate& g) const {
+struct hash<Gate> {
+    std::size_t operator()(const Gate& g) const {
         hash<int> hi = hash<int>();
         hash<std::string> hs = hash<std::string>();
         // Combine hashes of all relevant members

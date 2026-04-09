@@ -1,7 +1,5 @@
 #include "layering.hpp"
 
-namespace circuit {
-    
 // Definition of static member
 const Layer LayeredCircuit::emptyLayer = {};
 
@@ -48,6 +46,4 @@ void LayeredCircuit::print_layered() const {
         }
         std::cout << std::endl;
     }
-}
-
 }
