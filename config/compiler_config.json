@@ -1,5 +1,5 @@
 {
-  "circuit": "example",
+  "circuit": "qft_20",
   "strategy": "center",
   "type": "gaussian",
   "safe_passage_strategy": "passage",

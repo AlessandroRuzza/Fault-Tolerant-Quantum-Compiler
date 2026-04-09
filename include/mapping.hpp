@@ -76,7 +76,7 @@ public:
 
 
 private:
-    circuit::Circuit& circuit;
+    Circuit& circuit;
     Graph& graph;
     std::unordered_map<int, int> graph_to_circuit;
     MappingStrategy mappingStrategy;
@@ -91,7 +91,7 @@ private:
 
 public:
 
-    Mapping(circuit::Circuit& circuit, Graph& graph, const std::string& strategy_name,const std::string& type_name, const std::string& safe_passage_strategy, int maximum_iterations) : 
+    Mapping(Circuit& circuit, Graph& graph, const std::string& strategy_name,const std::string& type_name, const std::string& safe_passage_strategy, int maximum_iterations) : 
     circuit(circuit), graph(graph), maximum_iterations(maximum_iterations), farthest_from_magic_selector(graph)  {
         if (!set_mapping_strategy(strategy_name)) {
             throw std::invalid_argument("Invalid mapping strategy: " + strategy_name);

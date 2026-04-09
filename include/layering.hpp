@@ -9,8 +9,6 @@
 #include <queue>
 #include <algorithm>
 
-namespace circuit {
-
 using Layer = std::unordered_set<Gate>;
 
 class LayeredCircuit : public Circuit {
@@ -41,7 +39,5 @@ public:
         return layers.size();
     }
 };
-
-}
 
 #endif // LAYERING_HPP

@@ -1,8 +1,6 @@
 #include "circuit.hpp"
 #include <sstream>
 
-namespace circuit {
-
 static std::string trim(const std::string &s) {
     size_t a = s.find_first_not_of(" \t\r\n");
     if (a == std::string::npos) return "";
@@ -181,4 +179,3 @@ void Circuit::write_qasm_file(const std::string& path) const {
     ofs.close();
 }
 
-} // namespace circuit
