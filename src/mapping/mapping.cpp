@@ -8,18 +8,26 @@ const bool Mapping::mapToNeighbor(int qubit, int node_id, int iterations) {
     const std::vector<int>& neighbors = graph.neighbors(node_id);
     const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
     bool mapped = false;
+    std::string last_error;
     for (int neighbor_id : neighbors) {
         if (std::find(magic_state_ids.begin(), magic_state_ids.end(), neighbor_id) != magic_state_ids.end()) {
             continue; // Never map a data qubit on a magic-state node.
         }
         if (!graph.is_occupied(neighbor_id)) {
-            map_qubit_to_node(qubit, neighbor_id, iterations);
-            mapped = true;
-            break;
+            try {
+                map_qubit_to_node(qubit, neighbor_id, iterations);
+                mapped = true;
+                break;
+            } catch (const std::exception& e) {
+                last_error = e.what();
+            }
         }
     }
     if (!mapped) {
         if (PRINT_MAPPING) std::cout << "No unoccupied neighbor available for mapping qubit " << qubit << ".\n";
+        if (MAPPING_VERBOSE && !last_error.empty()) {
+            std::cout << "Last neighbor-mapping error for qubit " << qubit << ": " << last_error << "\n";
+        }
     }
 
     return mapped;
@@ -29,7 +37,19 @@ const bool Mapping::mapToNeighbor(int qubit, int node_id, int iterations) {
 
 
 
-void Mapping::map_qubit_to_node(int qubit, int node, int iterations) {
+int Mapping::map_qubit_to_node(int qubit, int node, int iterations) {
+    const Qubit* q = circuit.getQubit(qubit);
+    if (q == nullptr) {
+        throw std::runtime_error("Cannot map a null qubit pointer.");
+    }
+
+    const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
+    if (std::find(magic_state_ids.begin(), magic_state_ids.end(), node) != magic_state_ids.end()) {
+        throw std::runtime_error(
+            "Cannot map data qubit " + std::to_string(qubit) +
+            " directly on magic-state node " + std::to_string(node) + "."
+        );
+    }
 
     if (!check_safe_passage(graph.get_node(node))) {
         std::cout << "Warning: Mapping qubit " << qubit << " to node " << node
@@ -40,14 +60,26 @@ void Mapping::map_qubit_to_node(int qubit, int node, int iterations) {
                 "Failed to find a safe passage for qubit " + std::to_string(qubit) + " after " + std::to_string(iterations) + " iterations. Aborting mapping.\n"
             );
         }
-        mapToNeighbor(qubit, node, iterations+1);
-        return;
+        if (!mapToNeighbor(qubit, node, iterations+1)) {
+            throw std::runtime_error(
+                "Failed to map qubit " + std::to_string(qubit) +
+                ": no safe neighbor found from node " + std::to_string(node) + "."
+            );
+        }
+        const int mapped_node = get_mapped_node(qubit);
+        if (mapped_node < 0) {
+            throw std::runtime_error(
+                "Internal error: qubit " + std::to_string(qubit) +
+                " is still unmapped after neighbor fallback."
+            );
+        }
+        return mapped_node;
     }
 
     std::unordered_map<int, int>::iterator already_mapped = graph_to_circuit.find(qubit);
     if (already_mapped != graph_to_circuit.end()) {
         if (already_mapped->second == node) {
-            return;
+            return node;
         }
         throw std::runtime_error(
             "Qubit " + std::to_string(qubit) + " already mapped to node " +
@@ -64,6 +96,7 @@ void Mapping::map_qubit_to_node(int qubit, int node, int iterations) {
     graph.occupy_node(node);
     if (PRINT_MAPPING) std::cout << "Mapped qubit " << qubit << " to node " << node << "\n";
     if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
+    return node;
 }
 
 

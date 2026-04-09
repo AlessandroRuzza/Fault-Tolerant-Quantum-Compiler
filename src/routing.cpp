@@ -155,7 +155,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             path = closestPath;
         }
 
-        if(path.size() > 0){
+        if (path.size() > 0) {
             routing.emplace(gate, path);
             used_nodes.insert(path.begin(), path.end());
         }
@@ -184,8 +184,10 @@ void QubitRouter::route_circuit() {
         */
         Routing route = route_layer(topLayer);
         if(route.size() == 0){
-            std::cout << "Layer " << routing_steps.size()+1 << " empty! Returning incomplete." << std::endl;
-            return;
+            throw std::runtime_error(
+                "Routing made no progress at layer " + std::to_string(routing_steps.size() + 1) +
+                ": no routeable gate found with current constraints."
+            );
         }
 
         routing_steps.emplace_back(route);

@@ -88,10 +88,10 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
     }
 
     Node best_node = computeNextMappingNode(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, *qubit);
-    
-    map_qubit_to_node(qubit->getQubitID(), best_node.id, 0);
 
-    mapped_gaussians.push_back(Gaussians::mapped_gaussian(graph, best_node, mappedGaussianWeight));
+    const int mapped_node_id = map_qubit_to_node(qubit->getQubitID(), best_node.id, 0);
+    const Node& mapped_node = graph.get_node(mapped_node_id);
+    mapped_gaussians.push_back(Gaussians::mapped_gaussian(graph, mapped_node, mappedGaussianWeight));
 
     (*iterations)++;
 
@@ -311,6 +311,7 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
     Node best_node = nodes.front();
     double best_score = -std::numeric_limits<double>::infinity();
     const std::vector<int> magic_ids = graph.get_magic_state_ids();
+    bool found_candidate = false;
 
     for (const Node& node : graph.get_nodes()) {
         
@@ -326,6 +327,7 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
         if (!is_safe) {
             continue;
         }
+        found_candidate = true;
 
 
         double score = 0.0;
@@ -346,6 +348,10 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
             best_score = score;
             best_node = node;
         }
+    }
+
+    if (!found_candidate) {
+        throw std::runtime_error("No valid free non-magic node with safe passage was found.");
     }
 
     return best_node;

@@ -256,7 +256,7 @@ public:
     const bool mapToNeighbor(int qubit, int node_id, int iterations);
 
 
-    void map_qubit_to_node(int qubit, int node, int iterations);
+    int map_qubit_to_node(int qubit, int node, int iterations);
 
 
     // ----------mapping algorithms----------
