@@ -14,7 +14,7 @@ namespace Gaussians {
             compute_sigma(graph.get_maxY() / 2, 0.95),
 
             //size
-            graph.get_maxX(),
+            graph.get_maxX() + 1,
             graph.get_maxY() + 1,
 
             //weight
@@ -37,8 +37,8 @@ namespace Gaussians {
             compute_sigma(graph.get_maxY() / 2, 0.95),
 
             //size
-            graph.get_maxX(), 
-            graph.get_maxY() + 1, 
+            graph.get_maxX() + 1,
+            graph.get_maxY() + 1,
 
             //weight
             mapped_gaussian_weight,
@@ -60,8 +60,8 @@ namespace Gaussians {
             compute_sigma(graph.get_maxY() / 2, 0.95),
 
             //size
-            graph.get_maxX(), 
-            graph.get_maxY() + 1, 
+            graph.get_maxX() + 1,
+            graph.get_maxY() + 1,
 
             //weight
             0,
@@ -86,8 +86,8 @@ namespace Gaussians {
             compute_sigma(graph.get_maxY() / 2 , 0.95),
 
             //size
-            graph.get_maxX(), 
-            graph.get_maxY() + 1, 
+            graph.get_maxX() + 1,
+            graph.get_maxY() + 1,
 
             //weight
             weight,
