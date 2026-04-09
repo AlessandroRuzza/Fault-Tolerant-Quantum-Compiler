@@ -44,8 +44,9 @@ void clear_visualization_outputs() {
 int main(int argc, char **argv) {
 
     std::string path = "../qasms/example.qasm";
-    std::string strategy = "distance";
+    std::string magic_aware_strategy = "distance";
     std::string type = "magic_aware";
+    std::string gaussian_strategy = "fine";
     std::string safe_passage_strategy = "passage";
     std::string config_path = "../config/compiler_config.json";
     std::string graph_path = "";
@@ -53,12 +54,36 @@ int main(int argc, char **argv) {
     int y = 11;
     int maximum_iterations = 100;
 
-    apply_config_overrides(argc, argv, path, strategy, type, safe_passage_strategy, config_path, x, y, graph_path);
-    argument_parsing(argc, argv, path, strategy, type, safe_passage_strategy, x, y, graph_path);
+    apply_config_overrides(
+        argc,
+        argv,
+        path,
+        magic_aware_strategy,
+        type,
+        gaussian_strategy,
+        safe_passage_strategy,
+        config_path,
+        x,
+        y,
+        graph_path
+    );
+    argument_parsing(
+        argc,
+        argv,
+        path,
+        magic_aware_strategy,
+        type,
+        gaussian_strategy,
+        safe_passage_strategy,
+        x,
+        y,
+        graph_path
+    );
 
     std::cout << "circuit path: " << path << std::endl;
-    std::cout << "strategy: " << strategy << std::endl;
+    std::cout << "magic aware strategy: " << magic_aware_strategy << std::endl;
     std::cout << "type: " << type << std::endl;
+    std::cout << "gaussian strategy: " << gaussian_strategy << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
@@ -103,7 +128,15 @@ int main(int argc, char **argv) {
 
     if (PRINT_MAPPING) graph.print_rectangular();
 
-    Mapping mapping(circuit, graph, strategy, type, safe_passage_strategy, maximum_iterations);
+    Mapping mapping(
+        circuit,
+        graph,
+        magic_aware_strategy,
+        type,
+        gaussian_strategy,
+        safe_passage_strategy,
+        maximum_iterations
+    );
 
     mapping.map();
 

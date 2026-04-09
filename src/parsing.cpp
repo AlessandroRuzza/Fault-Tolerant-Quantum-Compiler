@@ -84,12 +84,12 @@ int parse_positive_integer(const std::string& value, const char* flag_name) {
     return parsed_value;
 }
 
-void validate_strategy(const std::string& value, const char* executable) {
+void validate_magic_aware_strategy(const std::string& value, const char* executable) {
     const std::vector<std::string> valid_strategies = Mapping::get_available_mapping_strategies();
     if (std::find(valid_strategies.begin(), valid_strategies.end(), value) == valid_strategies.end()) {
-        std::cerr << "Invalid mapping strategy: " << value << "\n";
+        std::cerr << "Invalid magic-aware strategy: " << value << "\n";
         print_usage(executable);
-        throw std::runtime_error("Invalid mapping strategy: " + value);
+        throw std::runtime_error("Invalid magic-aware strategy: " + value);
     }
 }
 
@@ -99,6 +99,15 @@ void validate_type(const std::string& value, const char* executable) {
         std::cerr << "Invalid mapping type: " << value << "\n";
         print_usage(executable);
         throw std::runtime_error("Invalid mapping type: " + value);
+    }
+}
+
+void validate_gaussian_strategy(const std::string& value, const char* executable) {
+    const std::vector<std::string> valid_strategies = Mapping::get_available_gaussian_strategies();
+    if (std::find(valid_strategies.begin(), valid_strategies.end(), value) == valid_strategies.end()) {
+        std::cerr << "Invalid gaussian strategy: " << value << "\n";
+        print_usage(executable);
+        throw std::runtime_error("Invalid gaussian strategy: " + value);
     }
 }
 
@@ -137,8 +146,9 @@ std::filesystem::path extract_config_path(int argc, char **argv, std::string& co
 void print_usage(const char* executable) {
     std::cout << "Usage: " << executable
               << " --circuit [circuit_name|circuit_name.qasm|full_path_to_qasm] "
-              << "[--strategy [" << Mapping::available_mapping_strategies() << "]]\n"
+              << "[--magic-aware-strategy [" << Mapping::available_mapping_strategies() << "]]\n"
               << "[--type [" << Mapping::available_mapping_types() << "]]\n"
+              << "[--gaussian-strategy [" << Mapping::available_gaussian_strategies() << "]]\n"
               << "[--safe-passage [" << Mapping::available_safe_passage_strategies() << "]]\n"
               << "[--x <integer>]\n"
               << "[--y <integer>]\n"
@@ -155,8 +165,9 @@ void apply_config_overrides(
     int argc,
     char **argv,
     std::string& path,
-    std::string& strategy,
+    std::string& magic_aware_strategy,
     std::string& type,
+    std::string& gaussian_strategy,
     std::string& safe_passage_strategy,
     std::string& config_path,
     int& x,
@@ -211,12 +222,12 @@ void apply_config_overrides(
         path = candidate.lexically_normal().string();
     }
 
-    if (config_json.contains("strategy")) {
-        if (!config_json["strategy"].is_string()) {
-            throw std::runtime_error("Config key 'strategy' must be a string");
+    if (config_json.contains("magic_aware_strategy")) {
+        if (!config_json["magic_aware_strategy"].is_string()) {
+            throw std::runtime_error("Config key 'magic_aware_strategy' must be a string");
         }
-        strategy = config_json["strategy"].get<std::string>();
-        validate_strategy(strategy, argv[0]);
+        magic_aware_strategy = config_json["magic_aware_strategy"].get<std::string>();
+        validate_magic_aware_strategy(magic_aware_strategy, argv[0]);
     }
 
     if (config_json.contains("type")) {
@@ -225,6 +236,14 @@ void apply_config_overrides(
         }
         type = config_json["type"].get<std::string>();
         validate_type(type, argv[0]);
+    }
+
+    if (config_json.contains("gaussian_strategy")) {
+        if (!config_json["gaussian_strategy"].is_string()) {
+            throw std::runtime_error("Config key 'gaussian_strategy' must be a string");
+        }
+        gaussian_strategy = config_json["gaussian_strategy"].get<std::string>();
+        validate_gaussian_strategy(gaussian_strategy, argv[0]);
     }
 
     if (config_json.contains("safe_passage_strategy")) {
@@ -269,8 +288,9 @@ void argument_parsing(
     int argc,
     char **argv,
     std::string& path,
-    std::string& strategy,
+    std::string& magic_aware_strategy,
     std::string& type,
+    std::string& gaussian_strategy,
     std::string& safe_passage_strategy,
     int& x,
     int& y,
@@ -303,15 +323,15 @@ void argument_parsing(
             continue;
         }
 
-        if (arg == "--strategy") {
+        if (arg == "--magic-aware-strategy" || arg == "--magic_aware_strategy") {
             if (i + 1 >= argc) {
-                std::cerr << "Missing value for --strategy\n";
+                std::cerr << "Missing value for --magic-aware-strategy\n";
                 print_usage(argv[0]);
-                throw std::runtime_error("Missing value for --strategy");
+                throw std::runtime_error("Missing value for --magic-aware-strategy");
             }
 
-            strategy = argv[++i];
-            validate_strategy(strategy, argv[0]);
+            magic_aware_strategy = argv[++i];
+            validate_magic_aware_strategy(magic_aware_strategy, argv[0]);
             continue;
         }
 
@@ -323,6 +343,17 @@ void argument_parsing(
             }
             type = argv[++i];
             validate_type(type, argv[0]);
+            continue;
+        }
+
+        if (arg == "--gaussian-strategy" || arg == "--gaussian_strategy") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --gaussian-strategy\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --gaussian-strategy");
+            }
+            gaussian_strategy = argv[++i];
+            validate_gaussian_strategy(gaussian_strategy, argv[0]);
             continue;
         }
 
