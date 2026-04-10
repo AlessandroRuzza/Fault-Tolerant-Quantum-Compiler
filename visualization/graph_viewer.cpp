@@ -322,7 +322,16 @@ int main(int argc, char **argv) {
             height = std::atoi(argv[3]);
         }
         std::cout << "Creazione griglia " << width << "x" << height << " con magic states\n";
-        Graph g = Graph::create_rectangular_with_magic_states(width, height);
+        Graph g(
+            true,
+            width * height,
+            10,
+            10.0,
+            "center_circle",
+            width,
+            height,
+            ""
+        );
         g.print();
         show_graph_with_cytoscape(g);
     }

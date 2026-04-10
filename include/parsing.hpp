@@ -21,7 +21,10 @@ void apply_config_overrides(
     std::string& config_path,
     int& x,
     int& y,
-    std::string& graph_path
+    std::string& graph_path,
+    std::string& magic_state_placement_strategy,
+    int& number_of_magic_states,
+    double& border_distance_percentage
 );
 void argument_parsing(
     int argc,
@@ -39,7 +42,10 @@ void argument_parsing(
     double& base_gaussian_weight,
     int& x,
     int& y,
-    std::string& graph_path
+    std::string& graph_path,
+    std::string& magic_state_placement_strategy,
+    int& number_of_magic_states,
+    double& border_distance_percentage
 );
 
 #endif // PARSING_HPP
