@@ -220,6 +220,15 @@ public:
 
     void increment_mapped_magic_state(int magic_state_id);
 
+    virtual void add_magic_states_rightrow(const std::vector<int>& magic_state_ids, int height, int width) = 0;
+
+    virtual void add_magic_states_center_circle(
+        const std::vector<int>& magic_state_ids,
+        int height,
+        int width,
+        int number_of_magic_states,
+        double border_distance_percentage
+    ) = 0;
 
 };
 

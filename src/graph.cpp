@@ -1,4 +1,5 @@
 #include "graph.hpp"
+#include <cmath>
 
 const std::vector<int> emptyVec;
 
@@ -212,29 +213,128 @@ Graph Graph::from_json(const std::string& filename) {
         return g;
 }
 
-
         
+void Graph::add_magic_states_rightrow(const std::vector<int>& magic_state_ids, int height, int width) {
+    for (int row = 0; row < height; row++) {
+        const int magic_id = row * width + (width - 1);
+        magic_states_ids.push_back(magic_id);
+    }
+}
+
+void Graph::add_magic_states_center_circle(
+    const std::vector<int>&,
+    int height,
+    int width,
+    int number_of_magic_states,
+    double border_distance_percentage
+) {
+    if (height <= 0 || width <= 0 || number_of_magic_states <= 0) {
+        return;
+    }
+
+    const int center_row = height / 2;
+    const int center_col = width / 2;
+    const int center_id = center_row * width + center_col;
+
+    std::unordered_set<int> used_magic_ids(magic_states_ids.begin(), magic_states_ids.end());
+
+    auto try_add_magic_id = [&](int magic_id) {
+        if (magic_states_ids.size() >= static_cast<size_t>(number_of_magic_states)) {
+            return;
+        }
+        if (magic_id < 0 || magic_id >= height * width) {
+            return;
+        }
+        if (used_magic_ids.insert(magic_id).second) {
+            magic_states_ids.push_back(magic_id);
+        }
+    };
+
+    // Keep exactly one magic state at the center first.
+    try_add_magic_id(center_id);
+    if (magic_states_ids.size() >= static_cast<size_t>(number_of_magic_states)) {
+        return;
+    }
+
+    // Place remaining magic states on a rectangular ring inset by a percentage
+    // from the outer border (e.g., 10x10 with 10% -> one-cell non-magic border).
+    const double clamped_percentage = std::clamp(border_distance_percentage, 0.0, 100.0);
+    const int max_inset = std::max(0, (std::min(height, width) - 1) / 2);
+    int inset = static_cast<int>(std::ceil((std::min(height, width) * clamped_percentage) / 100.0));
+    inset = std::clamp(inset, 0, max_inset);
+
+    const int top = inset;
+    const int bottom = height - 1 - inset;
+    const int left = inset;
+    const int right = width - 1 - inset;
+
+    std::vector<int> ring_ids;
+    ring_ids.reserve(2 * ((right - left + 1) + (bottom - top + 1)));
+
+    for (int col = left; col <= right; ++col) {
+        ring_ids.push_back(top * width + col);
+    }
+    for (int row = top + 1; row <= bottom; ++row) {
+        ring_ids.push_back(row * width + right);
+    }
+    if (bottom > top) {
+        for (int col = right - 1; col >= left; --col) {
+            ring_ids.push_back(bottom * width + col);
+        }
+    }
+    if (right > left) {
+        for (int row = bottom - 1; row > top; --row) {
+            ring_ids.push_back(row * width + left);
+        }
+    }
+
+    const int remaining_magic_states = number_of_magic_states - static_cast<int>(magic_states_ids.size());
+    if (remaining_magic_states <= 0 || ring_ids.empty()) {
+        return;
+    }
+
+    const int to_place_on_ring = std::min(remaining_magic_states, static_cast<int>(ring_ids.size()));
+    if (to_place_on_ring == static_cast<int>(ring_ids.size())) {
+        for (const int ring_id : ring_ids) {
+            try_add_magic_id(ring_id);
+        }
+        return;
+    }
+
+    // Distribute requested magic states uniformly around the selected ring.
+    for (int i = 0; i < to_place_on_ring; ++i) {
+        const int index = (i * static_cast<int>(ring_ids.size())) / to_place_on_ring;
+        try_add_magic_id(ring_ids[static_cast<size_t>(index)]);
+    }
+}
 
 
 // Create a rectangular grid graph with magic states
-Graph Graph::create_rectangular_with_magic_states(int height, int width) {
+Graph Graph::create_rectangular_with_magic_states(
+    int height,
+    int width,
+    int number_of_magic_states,
+    double border_distance_percentage
+) {
     Graph g;
     const int total_nodes = width * height;  // only grid nodes
     g.resize(total_nodes);
 
-    // Create all grid nodes with their coordinates.
+    // Create all grid nodes with explicit coordinates.
     for (int row = 0; row < height; row++) {
         for (int col = 0; col < width; col++) {
-            int id = row * width + col;
+            const int id = row * width + col;
             g.add_node(id, col, row);
         }
     }
 
-    // Pick magic states from inside the grid: the rightmost column.
-    for (int row = 0; row < height; row++) {
-        const int magic_id = row * width + (width - 1);
-        g.magic_states_ids.push_back(magic_id);
-    }
+    g.add_magic_states_center_circle(
+        g.magic_states_ids,
+        height,
+        width,
+        number_of_magic_states,
+        border_distance_percentage
+    );
 
     // Add horizontal and vertical edges in the grid.
     for (int row = 0; row < height; row++) {

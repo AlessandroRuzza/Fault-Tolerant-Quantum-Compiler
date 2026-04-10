@@ -45,16 +45,21 @@ void IGraph::print_rectangular() const {
                 std::cout << "   "; // Empty space for missing nodes
                 continue;
             }
-            if (is_occupied(node_id)) {
-                // Print occupied nodes in red
-                std::cout << "\033[1;31m"; // ANSI escape code for red
+            const bool is_magic =
+                std::find(magic_states_ids.begin(), magic_states_ids.end(), node_id) != magic_states_ids.end();
+
+            if (is_magic) {
+                // Print magic-state nodes in green.
+                std::cout << "\033[1;32m";
                 printf("%3d", node_id);
-                std::cout << "\033[0m"; // Reset color
+                std::cout << "\033[0m";
+            } else if (is_occupied(node_id)) {
+                // Print occupied non-magic nodes in red.
+                std::cout << "\033[1;31m";
+                printf("%3d", node_id);
+                std::cout << "\033[0m";
             } else {
                 printf("%3d", node_id);
-            }
-            if (std::find(magic_states_ids.begin(), magic_states_ids.end(), node_id) != magic_states_ids.end()) {
-                std::cout << "(M)";
             }
             std::cout << " ";
         }

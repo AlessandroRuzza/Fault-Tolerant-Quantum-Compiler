@@ -39,8 +39,30 @@ public:
     void add_edge(int u, int v) override;
 
 
+
+    void add_magic_states_rightrow(const std::vector<int>& magic_state_ids, int height, int width) override;
+
+    void add_magic_states_center_circle(
+        const std::vector<int>& magic_state_ids,
+        int height,
+        int width,
+        int number_of_magic_states,
+        double border_distance_percentage
+    ) override;
+
+
+    // -------- new methods ----------------
+
+
     static Graph from_json(const std::string& filename);
-    static Graph create_rectangular_with_magic_states(int height, int width);
+    static Graph create_rectangular_with_magic_states(
+        int height,
+        int width,
+        int number_of_magic_states = 10,
+        double border_distance_percentage = 10.0
+    );
+
+
 
 
 };
