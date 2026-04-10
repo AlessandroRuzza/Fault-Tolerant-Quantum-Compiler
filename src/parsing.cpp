@@ -3,6 +3,7 @@
 #include "mapping.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -100,6 +101,22 @@ double parse_non_negative_double(const std::string& value, const char* flag_name
     return parsed_value;
 }
 
+double parse_percentage_0_100(const std::string& value, const char* flag_name) {
+    const double parsed_value = parse_non_negative_double(value, flag_name);
+    if (parsed_value > 100.0) {
+        throw std::runtime_error(std::string(flag_name) + " must be <= 100");
+    }
+    return parsed_value;
+}
+
+std::string normalize_magic_state_placement_strategy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    std::replace(value.begin(), value.end(), '-', '_');
+    return value;
+}
+
 void validate_magic_aware_strategy(const std::string& value, const char* executable) {
     const std::vector<std::string> valid_strategies = Mapping::get_available_mapping_strategies();
     if (std::find(valid_strategies.begin(), valid_strategies.end(), value) == valid_strategies.end()) {
@@ -136,6 +153,21 @@ void validate_safe_passage_strategy(const std::string& value, const char* execut
     }
 }
 
+void validate_magic_state_placement_strategy(std::string value, const char* executable) {
+    value = normalize_magic_state_placement_strategy(std::move(value));
+    if (value == "rightrow") {
+        value = "right_row";
+    }
+
+    const std::vector<std::string> valid_strategies =
+        Graph::get_available_magic_state_placement_strategies();
+    if (std::find(valid_strategies.begin(), valid_strategies.end(), value) == valid_strategies.end()) {
+        std::cerr << "Invalid MagicStatePlacementStrategy: " << value << "\n";
+        print_usage(executable);
+        throw std::runtime_error("Invalid MagicStatePlacementStrategy: " + value);
+    }
+}
+
 std::filesystem::path extract_config_path(int argc, char **argv, std::string& config_path) {
 
     for (int i = 1; i < argc; ++i) {
@@ -166,6 +198,9 @@ void print_usage(const char* executable) {
               << "[--type [" << Mapping::available_mapping_types() << "]]\n"
               << "[--gaussian-strategy [" << Mapping::available_gaussian_strategies() << "]]\n"
               << "[--safe-passage [" << Mapping::available_safe_passage_strategies() << "]]\n"
+              << "[--magic-state-placement-strategy [" << Graph::available_magic_state_placement_strategies() << "]]\n"
+              << "[--number-of-magic-states <integer> >0]\n"
+              << "[--border-distance-percentage <float> in [0,100]]\n"
               << "[--magic-high <float>=0]\n"
               << "[--magic-low <float>=0]\n"
               << "[--cnot-high <float>=0]\n"
@@ -200,7 +235,10 @@ void apply_config_overrides(
     std::string& config_path,
     int& x,
     int& y,
-    std::string& graph_path
+    std::string& graph_path,
+    std::string& magic_state_placement_strategy,
+    int& number_of_magic_states,
+    double& border_distance_percentage
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -318,6 +356,66 @@ void apply_config_overrides(
         safe_passage_strategy = configured_safe_passage_strategy;
     }
 
+    const auto set_magic_state_placement_strategy_from_config = [&](const char* key) {
+        if (!config_json.contains(key)) {
+            return false;
+        }
+        if (!config_json[key].is_string()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a string");
+        }
+        std::string parsed_strategy = config_json[key].get<std::string>();
+        parsed_strategy = normalize_magic_state_placement_strategy(parsed_strategy);
+        if (parsed_strategy == "rightrow") {
+            parsed_strategy = "right_row";
+        }
+        validate_magic_state_placement_strategy(parsed_strategy, argv[0]);
+        magic_state_placement_strategy = parsed_strategy;
+        return true;
+    };
+
+    if (!set_magic_state_placement_strategy_from_config("MagicStatePlacementStrategy")) {
+        set_magic_state_placement_strategy_from_config("magic_state_placement_strategy");
+    }
+
+    const auto set_number_of_magic_states_from_config = [&](const char* key) {
+        if (!config_json.contains(key)) {
+            return false;
+        }
+        if (!config_json[key].is_number_integer()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be an integer");
+        }
+        number_of_magic_states = config_json[key].get<int>();
+        if (number_of_magic_states <= 0) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be > 0");
+        }
+        return true;
+    };
+
+    if (!set_number_of_magic_states_from_config("number_of_magic_states")) {
+        set_number_of_magic_states_from_config("NumberOfMagicStates");
+    }
+
+    const auto set_border_distance_percentage_from_config = [&](const char* key) {
+        if (!config_json.contains(key)) {
+            return false;
+        }
+        if (!config_json[key].is_number()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
+        }
+        const double parsed_value = config_json[key].get<double>();
+        if (!std::isfinite(parsed_value) || parsed_value < 0.0 || parsed_value > 100.0) {
+            throw std::runtime_error(
+                std::string("Config key '") + key + "' must be a finite number in [0,100]"
+            );
+        }
+        border_distance_percentage = parsed_value;
+        return true;
+    };
+
+    if (!set_border_distance_percentage_from_config("border_distance_percentage")) {
+        set_border_distance_percentage_from_config("BorderDistancePercentage");
+    }
+
     if (config_json.contains("x")) {
         if (!config_json["x"].is_number_integer()) {
             throw std::runtime_error("Config key 'x' must be an integer");
@@ -362,7 +460,10 @@ void argument_parsing(
     double& base_gaussian_weight,
     int& x,
     int& y,
-    std::string& graph_path
+    std::string& graph_path,
+    std::string& magic_state_placement_strategy,
+    int& number_of_magic_states,
+    double& border_distance_percentage
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -494,6 +595,46 @@ void argument_parsing(
             const std::string cli_safe_passage_strategy = argv[++i];
             validate_safe_passage_strategy(cli_safe_passage_strategy, argv[0]);
             safe_passage_strategy = cli_safe_passage_strategy;
+            continue;
+        }
+
+        if (arg == "--magic-state-placement-strategy" ||
+            arg == "--magic_state_placement_strategy" ||
+            arg == "--MagicStatePlacementStrategy") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --magic-state-placement-strategy\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --magic-state-placement-strategy");
+            }
+            magic_state_placement_strategy = normalize_magic_state_placement_strategy(argv[++i]);
+            if (magic_state_placement_strategy == "rightrow") {
+                magic_state_placement_strategy = "right_row";
+            }
+            validate_magic_state_placement_strategy(magic_state_placement_strategy, argv[0]);
+            continue;
+        }
+
+        if (arg == "--number-of-magic-states" ||
+            arg == "--number_of_magic_states" ||
+            arg == "--NumberOfMagicStates") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --number-of-magic-states\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --number-of-magic-states");
+            }
+            number_of_magic_states = parse_positive_integer(argv[++i], "--number-of-magic-states");
+            continue;
+        }
+
+        if (arg == "--border-distance-percentage" ||
+            arg == "--border_distance_percentage" ||
+            arg == "--BorderDistancePercentage") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --border-distance-percentage\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --border-distance-percentage");
+            }
+            border_distance_percentage = parse_percentage_0_100(argv[++i], "--border-distance-percentage");
             continue;
         }
 

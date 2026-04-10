@@ -1,13 +1,41 @@
 #include "graph.hpp"
+#include <cctype>
 #include <cmath>
 
 const std::vector<int> emptyVec;
 
+Graph::MagicStatePlacementStrategy Graph::parse_magic_state_placement_strategy(
+    const std::string& strategy_name
+) {
+    std::string normalized = strategy_name;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    std::replace(normalized.begin(), normalized.end(), '-', '_');
+
+    if (normalized == "rightrow") {
+        normalized = "right_row";
+    }
+
+    if (normalized == "right_row") {
+        return MagicStatePlacementStrategy::RIGHT_ROW;
+    }
+    if (normalized == "center_circle") {
+        return MagicStatePlacementStrategy::CENTER_CIRCLE;
+    }
+
+    throw std::invalid_argument(
+        "Invalid MagicStatePlacementStrategy '" + strategy_name +
+        "'. Allowed values: " + available_magic_state_placement_strategies() + "."
+    );
+}
+
+void Graph::set_magic_state_placement_strategy(const std::string& strategy_name) {
+    magic_state_placement_strategy = parse_magic_state_placement_strategy(strategy_name);
+}
+
 // Node constructor implementation
 Node::Node(int node_id, int x, int y) : id(node_id), coordX(x), coordY(y) {}
-
-// Graph constructor implementation
-Graph::Graph(int max_nodes) : IGraph(), adj(max_nodes, max_nodes) {}
 
 
 // Add a directed edge from u to v
@@ -64,16 +92,15 @@ void Graph::resize(int new_size) {
 
 
 // Static method to construct a Graph from JSON file
-Graph Graph::from_json(const std::string& filename) {
+void Graph::from_json(const std::string& filename) {
         std::ifstream f(filename);
         if (!f) {
             std::cerr << "file non trovato: " << filename << "\n";
-            return Graph{}; // return empty graph on failure
+            return; // return empty graph on failure
             // throw std::runtime_error("Could not open file: " + filename);
         }
         
         json j = json::parse(f);
-        Graph g;
 
         // // STAMPA IL JSON RAW PER DEBUG
         // std::cout << "=== JSON RAW CONTENT ===\n";
@@ -94,7 +121,7 @@ Graph Graph::from_json(const std::string& filename) {
 
         if(!j.contains("type")){
             std::cerr << "type not specified!\n";
-            return Graph{};
+            return;
         }
 
         // Handle generic graph type with fields at the root
@@ -102,7 +129,7 @@ Graph Graph::from_json(const std::string& filename) {
             int num_nodes = j.value("num_nodes", 0);
             // Add nodes with default coordinates
             for (int i = 0; i < num_nodes; ++i) {
-                g.add_node(i);
+                this->add_node(i);
             }
             // Set coordinates if present
             if (j.contains("coordinates")) {
@@ -112,13 +139,13 @@ Graph Graph::from_json(const std::string& filename) {
                     if (coords.is_array() && coords.size() >= 2) {
                         int x = static_cast<int>(coords[0]);
                         int y = static_cast<int>(coords[1]);
-                        g.add_node(node_id, x, y);
+                        this->add_node(node_id, x, y);
                     }
                 }
             }
             else{
                 std::cerr << "node coordinates not specified!\n";
-                return Graph{};
+                return;
             }
 
             // Add edges from connectivity
@@ -127,13 +154,13 @@ Graph Graph::from_json(const std::string& filename) {
                     if (edge.is_array() && edge.size() == 2) {
                         int u = edge[0];
                         int v = edge[1];
-                        g.add_edge(u, v);
+                        this->add_edge(u, v);
                     }
                 }
             } 
             else{
                 std::cerr << "node connectivity not specified!\n";
-                return Graph{};
+                return;
             }
         }
         else
@@ -147,7 +174,7 @@ Graph Graph::from_json(const std::string& filename) {
                 for (int r = 0; r < rows; ++r) {
                     for (int c = 0; c < cols; ++c) {
                         int node_id = r * cols + c;
-                        g.add_node(node_id, c, r); // x = col, y = row
+                        this->add_node(node_id, c, r); // x = col, y = row
                     }
                 }
                 // Create edges
@@ -155,24 +182,23 @@ Graph Graph::from_json(const std::string& filename) {
                     for (int c = 0; c < cols; ++c) {
                         int node_id = r * cols + c;
                         // Right neighbor
-                        if (c + 1 < cols) g.add_edge(node_id, node_id + 1);
+                        if (c + 1 < cols) this->add_edge(node_id, node_id + 1);
                         // Bottom neighbor
-                        if (r + 1 < rows) g.add_edge(node_id, node_id + cols);
+                        if (r + 1 < rows) this->add_edge(node_id, node_id + cols);
                         if (diagonal) {
                             // Bottom-right neighbor
-                            if (c + 1 < cols && r + 1 < rows) g.add_edge(node_id, node_id + cols + 1);
+                            if (c + 1 < cols && r + 1 < rows) this->add_edge(node_id, node_id + cols + 1);
                             // Bottom-left neighbor
-                            if (c - 1 >= 0 && r + 1 < rows) g.add_edge(node_id, node_id + cols - 1);
+                            if (c - 1 >= 0 && r + 1 < rows) this->add_edge(node_id, node_id + cols - 1);
                         }
                     }
                 }
             }
             else{
                 std::cerr << "rows or cols not specified!\n";
-                return Graph{};
+                return;
             }
-            std::cout << g.get_node_count() << " nodes created in rectangular grid.\n";
-            return g;
+            std::cout << this->get_node_count() << " nodes created in rectangular grid.\n";
         }
 
 
@@ -182,42 +208,50 @@ Graph Graph::from_json(const std::string& filename) {
                 for (const auto& magic_state_entry : j["magic states"]) {
                     if (!magic_state_entry.is_number_integer()) {
                         std::cerr << "magic states must be an array of integer node ids!\n";
-                        return Graph{};
+                        return;
                     }
 
                     const int magic_state_id = magic_state_entry.get<int>();
-                    if (magic_state_id < 0 || magic_state_id >= g.get_node_count()) {
+                    if (magic_state_id < 0 || magic_state_id >= this->get_node_count()) {
                         std::cerr << "magic state id out of range: " << magic_state_id << "\n";
-                        return Graph{};
+                        return;
                     }
-                    if (g.get_node(magic_state_id).id == -1) {
+                    if (this->get_node(magic_state_id).id == -1) {
                         std::cerr << "magic state id does not correspond to an existing node: "
                                   << magic_state_id << "\n";
-                        return Graph{};
+                        return;
                     }
 
                     if (seen_magic_ids.insert(magic_state_id).second) {
-                        g.magic_states_ids.push_back(magic_state_id);
+                        this->magic_states_ids.push_back(magic_state_id);
                     }
                 }
         }
             else{
                 std::cerr << "magic states not specified as array of ints!\n";
-                return Graph{};
+                return;
             }
         }
         else{
             std::cerr << "magic states not specified!\n";
-            return Graph{};
+            return;
         }
-        return g;
-}
+    }
 
         
 void Graph::add_magic_states_rightrow(const std::vector<int>& magic_state_ids, int height, int width) {
-    for (int row = 0; row < height; row++) {
+    int placed_magic_states = 0;
+    for (int row = 0; row < height && placed_magic_states < number_of_magic_states; row++) {
         const int magic_id = row * width + (width - 1);
         magic_states_ids.push_back(magic_id);
+        placed_magic_states++;
+    }
+
+    if (placed_magic_states < number_of_magic_states) {
+        std::cerr
+            << "warning: requested " << number_of_magic_states
+            << " magic states with RIGHT_ROW, but only " << placed_magic_states
+            << " positions are available.\n";
     }
 }
 
@@ -257,7 +291,7 @@ void Graph::add_magic_states_center_circle(
     }
 
     // Place remaining magic states on a rectangular ring inset by a percentage
-    // from the outer border (e.g., 10x10 with 10% -> one-cell non-magic border).
+    // from the outer border (e.this->, 10x10 with 10% -> one-cell non-magic border).
     const double clamped_percentage = std::clamp(border_distance_percentage, 0.0, 100.0);
     const int max_inset = std::max(0, (std::min(height, width) - 1) / 2);
     int inset = static_cast<int>(std::ceil((std::min(height, width) * clamped_percentage) / 100.0));
@@ -310,31 +344,32 @@ void Graph::add_magic_states_center_circle(
 
 
 // Create a rectangular grid graph with magic states
-Graph Graph::create_rectangular_with_magic_states(
+void Graph::create_rectangular_with_magic_states(
     int height,
-    int width,
-    int number_of_magic_states,
-    double border_distance_percentage
+    int width
 ) {
-    Graph g;
     const int total_nodes = width * height;  // only grid nodes
-    g.resize(total_nodes);
+    this->resize(total_nodes);
 
     // Create all grid nodes with explicit coordinates.
     for (int row = 0; row < height; row++) {
         for (int col = 0; col < width; col++) {
             const int id = row * width + col;
-            g.add_node(id, col, row);
+            this->add_node(id, col, row);
         }
     }
 
-    g.add_magic_states_center_circle(
-        g.magic_states_ids,
-        height,
-        width,
-        number_of_magic_states,
-        border_distance_percentage
-    );
+    if (magic_state_placement_strategy == MagicStatePlacementStrategy::RIGHT_ROW) {
+        this->add_magic_states_rightrow(this->magic_states_ids, height, width);
+    } else if (magic_state_placement_strategy == MagicStatePlacementStrategy::CENTER_CIRCLE) {
+        this->add_magic_states_center_circle(
+            this->magic_states_ids,
+            height,
+            width,
+            number_of_magic_states,
+            border_distance_percentage
+        );
+    }
 
     // Add horizontal and vertical edges in the grid.
     for (int row = 0; row < height; row++) {
@@ -343,16 +378,14 @@ Graph Graph::create_rectangular_with_magic_states(
             
             // Right neighbor
             if (col < width - 1) {
-                g.add_edge(id, id + 1);
+                this->add_edge(id, id + 1);
             }
             
             // Bottom neighbor
             if (row < height - 1) {
-                g.add_edge(id, id + width);
+                this->add_edge(id, id + width);
             }
         }
     }
-
-    return g;
 }
 

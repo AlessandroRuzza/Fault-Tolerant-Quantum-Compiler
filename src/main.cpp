@@ -56,6 +56,9 @@ int main(int argc, char **argv) {
     double base_gaussian_weight = 1.0;
     std::string config_path = "../config/compiler_config.json";
     std::string graph_path = "";
+    std::string magic_state_placement_strategy = "center_circle";
+    int number_of_magic_states = 10;
+    double border_distance_percentage = 10.0;
     int x = 10;
     int y = 11;
     int maximum_iterations = 100;
@@ -77,7 +80,10 @@ int main(int argc, char **argv) {
         config_path,
         x,
         y,
-        graph_path
+        graph_path,
+        magic_state_placement_strategy,
+        number_of_magic_states,
+        border_distance_percentage
     );
     argument_parsing(
         argc,
@@ -95,7 +101,10 @@ int main(int argc, char **argv) {
         base_gaussian_weight,
         x,
         y,
-        graph_path
+        graph_path,
+        magic_state_placement_strategy,
+        number_of_magic_states,
+        border_distance_percentage
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -109,6 +118,9 @@ int main(int argc, char **argv) {
     std::cout << "MAPPED_GAUSSIAN_WEIGHT: " << mapped_gaussian_weight << std::endl;
     std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
+    std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
+    std::cout << "number_of_magic_states: " << number_of_magic_states << std::endl;
+    std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -117,15 +129,24 @@ int main(int argc, char **argv) {
 
     clear_visualization_outputs();
 
-    Graph graph;
-
-    if (graph_path.empty()) {
+    const bool use_generated_graph = graph_path.empty();
+    
+    if (use_generated_graph) {
         std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
-        graph = Graph::create_rectangular_with_magic_states(y, x, 10, 0.0);
     } else {
         std::cout << "Loading graph from " << graph_path << "...\n";
-        graph = Graph::from_json(graph_path);
     }
+
+    Graph graph(
+        use_generated_graph,
+        100,
+        number_of_magic_states,
+        border_distance_percentage,
+        magic_state_placement_strategy,
+        x,
+        y,
+        graph_path
+    );
 
     if (graph.get_node_count() <= 0) {
         std::cerr << "error: graph is empty or invalid.\n";
