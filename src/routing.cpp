@@ -147,7 +147,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             }
             for(int magicState : graph.get_magic_state_ids()){
                 path = pathStrategy->find_shortest_path(start_node, magicState, used_nodes);
-                if(path.size() < closestDist){
+                if(!path.empty() && static_cast<int>(path.size()) < closestDist){
                     closestDist = path.size();
                     closestPath = path;
                 }

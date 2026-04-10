@@ -102,7 +102,12 @@ int Mapping::map_qubit_to_node(int qubit, int node, int iterations) {
 
 
 
-bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<Node>& occupied_nodes, int width, int height);
+bool has_exit_path_from_occupied(
+    const Node& occupied_node,
+    const std::vector<Node>& blocked_nodes,
+    int width,
+    int height
+);
 
 
 bool Mapping::_3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes) {
@@ -140,8 +145,25 @@ bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_n
         occupied_after.push_back(node);
     }
 
+    // Magic-state nodes are not valid placement cells for data qubits, so they
+    // must be treated as blocked when checking escape passages.
+    std::vector<Node> blocked_nodes = occupied_after;
+    const auto add_blocked_if_missing = [&blocked_nodes](const Node& candidate) {
+        for (const Node& blocked : blocked_nodes) {
+            if (blocked.coordX == candidate.coordX && blocked.coordY == candidate.coordY) {
+                return;
+            }
+        }
+        blocked_nodes.push_back(candidate);
+    };
+
+    for (int magic_state_id : graph.get_magic_state_ids()) {
+        const Node& magic_node = graph.get_node(magic_state_id);
+        add_blocked_if_missing(magic_node);
+    }
+
     for (const Node& occupied_node : occupied_after) {
-        if (!has_exit_path_from_occupied(occupied_node, occupied_after, width, height)) {
+        if (!has_exit_path_from_occupied(occupied_node, blocked_nodes, width, height)) {
             return false;
         }
     }
@@ -154,10 +176,15 @@ bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_n
 
 
 
-bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<Node>& occupied_nodes, int width, int height) {
-    const auto is_occupied = [&occupied_nodes](int x, int y) {
-        for (const Node& occupied : occupied_nodes) {
-            if (occupied.coordX == x && occupied.coordY == y) {
+bool has_exit_path_from_occupied(
+    const Node& occupied_node,
+    const std::vector<Node>& blocked_nodes,
+    int width,
+    int height
+) {
+    const auto is_blocked = [&blocked_nodes](int x, int y) {
+        for (const Node& blocked : blocked_nodes) {
+            if (blocked.coordX == x && blocked.coordY == y) {
                 return true;
             }
         }
@@ -168,16 +195,16 @@ bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<No
         return false;
     }
 
-    if (occupied_node.coordY == 0 && (occupied_node.coordY + 1 >= height || is_occupied(occupied_node.coordX, occupied_node.coordY + 1))) {
+    if (occupied_node.coordY == 0 && (occupied_node.coordY + 1 >= height || is_blocked(occupied_node.coordX, occupied_node.coordY + 1))) {
         return false;
     }
-    if (occupied_node.coordY == height - 1 && (occupied_node.coordY - 1 < 0 || is_occupied(occupied_node.coordX, occupied_node.coordY - 1))) {
+    if (occupied_node.coordY == height - 1 && (occupied_node.coordY - 1 < 0 || is_blocked(occupied_node.coordX, occupied_node.coordY - 1))) {
         return false;
     }
-    if (occupied_node.coordX == 0 && (occupied_node.coordX + 1 >= width || is_occupied(occupied_node.coordX + 1, occupied_node.coordY))) {
+    if (occupied_node.coordX == 0 && (occupied_node.coordX + 1 >= width || is_blocked(occupied_node.coordX + 1, occupied_node.coordY))) {
         return false;
     }
-    if (occupied_node.coordX == width - 1 && (occupied_node.coordX - 1 < 0 || is_occupied(occupied_node.coordX - 1, occupied_node.coordY))) {
+    if (occupied_node.coordX == width - 1 && (occupied_node.coordX - 1 < 0 || is_blocked(occupied_node.coordX - 1, occupied_node.coordY))) {
         return false;
     }
 
@@ -204,7 +231,7 @@ bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<No
         if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
             continue;
         }
-        if (is_occupied(nx, ny)) {
+        if (is_blocked(nx, ny)) {
             continue;
         }
         const int idx = index(nx, ny);
@@ -232,7 +259,7 @@ bool has_exit_path_from_occupied(const Node& occupied_node, const std::vector<No
             if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
                 continue;
             }
-            if (is_occupied(nx, ny)) {
+            if (is_blocked(nx, ny)) {
                 continue;
             }
             const int idx = index(nx, ny);

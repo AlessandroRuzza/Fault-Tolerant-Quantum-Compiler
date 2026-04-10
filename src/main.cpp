@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
 
     if (graph_path.empty()) {
         std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
-        graph = Graph::create_rectangular_with_magic_states(y, x);
+        graph = Graph::create_rectangular_with_magic_states(y, x, 10, 0.0);
     } else {
         std::cout << "Loading graph from " << graph_path << "...\n";
         graph = Graph::from_json(graph_path);
