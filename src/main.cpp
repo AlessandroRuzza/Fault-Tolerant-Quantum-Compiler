@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
 
     std::cout << "------- ROUTING ---------" << std::endl;
     constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
-    constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::DYNAMIC_PER_LAYER;
+    constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
     std::unique_ptr<IPathStrategy> pathStrategyPtr;
     if (routing_strategy == "naive") {
         pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
 
     std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
     if (PRINT_ROUTING) router.print_routing_steps();
-    std::cout << "\nTotal routing steps: " << router.get_routing_length() << "\n\n";
+    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n\n";
 
     return 0;
 }
