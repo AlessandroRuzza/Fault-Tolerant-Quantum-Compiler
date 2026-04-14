@@ -111,6 +111,17 @@ void Circuit::parse_qasm_file(const std::string &path) {
             {
                 std::string lname = gate.name;
                 for (char &c : lname) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                
+                // Reject multi-qubit gates that the router does not support (handled later at routing).
+                // Currently the router supports single-qubit gates, two-qubit gates (like CNOT/SWAP),
+                // and `t` (magic) gates. Gates that operate on more than two qubits (e.g. `cswap`,
+                // `ccx`) must be decomposed into supported primitives prior to routing.
+                if (gate.qubits.size() > 2) {
+                    throw std::runtime_error(
+                        "Unsupported multi-qubit gate '" + gate.name + "' with " +
+                        std::to_string(gate.qubits.size()) +
+                        " qubits. Please decompose it into single- and two-qubit gates before routing.");
+                }
 
                 if (lname == "tdg") {
                     for (int i = 0; i < 7; ++i) {

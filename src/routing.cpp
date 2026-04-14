@@ -110,6 +110,10 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             }
             path = closestPath;
         }
+        else{
+            std::cout << "ERROR. Unhandled Gate " << gate.to_string() << ".\n";
+            throw std::runtime_error("Unhandled Gate.");
+        }
 
         if (path.size() > 0) {
             routing.emplace(gate, path);
@@ -129,6 +133,10 @@ void QubitRouter::route_circuit() {
 
     while(circuit.getNumLayers() > 0){
         const Layer& topLayer = circuit.getLayer(0);
+
+        if (topLayer.empty()) {
+            throw std::runtime_error("Layer is empty: no gates to route.");
+        }
         /*
         *   Optimization for LayeredCircuit (?)
         *       Since this only needs the first layer,
@@ -140,6 +148,10 @@ void QubitRouter::route_circuit() {
         */
         Routing route = route_layer(topLayer);
         if(route.size() == 0){
+            std::cout << "ERROR trying to route layer with " << topLayer.size() << " gates:" << std::endl;
+            for (const auto& gate : topLayer) {
+                std::cout << "  " << gate.to_string() << std::endl;
+            }
             throw std::runtime_error(
                 "Routing made no progress at layer " + std::to_string(routing_steps.size() + 1) +
                 ": no routeable gate found with current constraints."
