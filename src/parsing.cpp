@@ -227,7 +227,7 @@ void print_usage(const char* executable) {
               << "[--cnot-low <float>=0]\n"
               << "[--mapped-gaussian-weight <float>=0]\n"
               << "[--base-gaussian-weight <float>=0]\n"
-              << "[--routing-method [congestion|naive]]\n"
+              << "[--routing-strategy [congestion|naive]]\n"
               << "[--x <integer>]\n"
               << "[--y <integer>]\n"
               << "[--graph <graph_path>]\n"
@@ -465,7 +465,21 @@ void apply_config_overrides(
         graph_path = resolve_config_graph_path(config_json["graph"].get<std::string>(), resolved_config_path);
     }
 
-    if (config_json.contains("routing_method") || config_json.contains("routing-method")) {
+    if (config_json.contains("routing_strategy") || config_json.contains("routing-strategy")) {
+        const std::string rm = config_json.contains("routing_strategy") ?
+            config_json["routing_strategy"].get<std::string>() :
+            config_json["routing-strategy"].get<std::string>();
+        std::string normalized = normalize_routing_method(rm);
+        validate_routing_method(normalized, argv[0]);
+        routing_method = normalized;
+    }
+    else if (config_json.contains("routing")) {
+        const std::string rm = config_json["routing"].get<std::string>();
+        std::string normalized = normalize_routing_method(rm);
+        validate_routing_method(normalized, argv[0]);
+        routing_method = normalized;
+    }
+    else if (config_json.contains("routing_method") || config_json.contains("routing-method")) {
         const std::string rm = config_json.contains("routing_method") ?
             config_json["routing_method"].get<std::string>() :
             config_json["routing-method"].get<std::string>();
@@ -700,11 +714,11 @@ void argument_parsing(
             continue;
         }
 
-        if (arg == "--routing-method" || arg == "--routing_method" || arg == "--routing") {
+        if (arg == "--routing-strategy" || arg == "--routing_strategy" || arg == "--routing-method" || arg == "--routing_method" || arg == "--routing" ) {
             if (i + 1 >= argc) {
-                std::cerr << "Missing value for --routing-method\n";
+                std::cerr << "Missing value for --routing-strategy\n";
                 print_usage(argv[0]);
-                throw std::runtime_error("Missing value for --routing-method");
+                throw std::runtime_error("Missing value for --routing-strategy");
             }
             routing_method = normalize_routing_method(argv[++i]);
             validate_routing_method(routing_method, argv[0]);

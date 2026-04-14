@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     int x = 10;
     int y = 11;
     int maximum_iterations = 100;
-    std::string routing_method = "congestion";
+    std::string routing_strategy = "congestion";
 
     apply_config_overrides(
         argc,
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
         magic_state_placement_strategy,
         number_of_magic_states,
         border_distance_percentage
-        , routing_method
+        , routing_strategy
     );
     argument_parsing(
         argc,
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
         magic_state_placement_strategy,
         number_of_magic_states,
         border_distance_percentage
-        , routing_method
+        , routing_strategy
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
     std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
     std::cout << "number_of_magic_states: " << number_of_magic_states << std::endl;
     std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
-    std::cout << "routing method: " << routing_method << std::endl;
+    std::cout << "routing strategy: " << routing_strategy << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
     constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
     constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::DYNAMIC_PER_LAYER;
     std::unique_ptr<IPathStrategy> pathStrategyPtr;
-    if (routing_method == "naive") {
+    if (routing_strategy == "naive") {
         pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
     } else { // default to congestion-aware
         pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
