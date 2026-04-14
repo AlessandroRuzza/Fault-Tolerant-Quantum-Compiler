@@ -1,7 +1,7 @@
 {
   "circuit": "qft_20",
 
-  "type": "gaussian",
+  "type": ["gaussian", "magic_aware"],
   "magic_aware_strategy": "center",
   "gaussian_strategy": "coarse",
   "safe_passage_strategy": "cube",
@@ -17,7 +17,5 @@
   "BASE_GAUSSIAN_WEIGHT": 1.0,
   
   "x": 10,
-  "y": 10,
-
-  "routing_strategy": "congestion"
+  "y": 10
 }

@@ -41,6 +41,15 @@ add_custom_target(run-main
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+# Target to run the executable in bench mode:
+# make run-bench BENCH_PATH=<path_or_name>
+add_custom_target(run-bench
+    DEPENDS FaultTolerantQuantumCompiler
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler> "$$BENCH_PATH"
+    COMMENT "Running FaultTolerantQuantumCompiler with --bench_path"
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 # ------Eigen-------------
 
 # Suppress deprecated enum-enum conversion warning
