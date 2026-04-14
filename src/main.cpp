@@ -1,48 +1,165 @@
-#include "circuit.hpp"
-#include "graph.hpp"
-#include "layering.hpp"
-#include "maxHeap.hpp"
-#include "mapping.hpp"
-#include "routing.hpp"
-#include "defines.hpp"
+#include "one_execution.hpp"
+#include "expand_config_variants.hpp"
 #include "parsing.hpp"
+#include "write_csv.hpp"
 
+#include <algorithm>
+#include <chrono>
+#include <cctype>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <unordered_set>
-#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
-using namespace std;
+#include <nlohmann/json.hpp>
 
 namespace {
-void clear_visualization_outputs() {
-    namespace fs = std::filesystem;
 
-    const fs::path visualization_dir = fs::path(PROJECT_ROOT) / "visualization";
-    fs::create_directories(visualization_dir);
+using json = nlohmann::json;
 
-    const std::unordered_set<std::string> keep_entries = {
-        "README.md",
-        "graph_viewer.cpp"
-    };
+bool extract_bench_path_arg(int argc, char **argv, std::string &bench_path) {
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
 
-    for (const auto& entry : fs::directory_iterator(visualization_dir)) {
-        const std::string name = entry.path().filename().string();
-        if (keep_entries.find(name) != keep_entries.end()) {
-            continue;
+        if (arg == "--bench_path") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value for --bench_path");
+            }
+            bench_path = argv[i + 1];
+            return true;
         }
 
-        std::error_code ec;
-        fs::remove_all(entry.path(), ec);
-        if (ec) {
-            std::cerr << "Warning: failed to remove visualization output "
-                      << entry.path() << ": " << ec.message() << "\n";
+        const std::string prefix = "--bench_path=";
+        if (arg.rfind(prefix, 0) == 0) {
+            bench_path = arg.substr(prefix.size());
+            if (bench_path.empty()) {
+                throw std::runtime_error("Missing value for --bench_path");
+            }
+            return true;
         }
     }
-}
-} // namespace
 
-int main(int argc, char **argv) {
+    return false;
+}
+
+std::string extract_bench_name(const std::string &bench_path_arg) {
+    std::filesystem::path p(bench_path_arg);
+    if (p.has_extension()) {
+        p = p.stem();
+    }
+    return p.filename().string();
+}
+
+
+std::string format_now_date(const std::chrono::system_clock::time_point &tp) {
+    const std::time_t tt = std::chrono::system_clock::to_time_t(tp);
+    std::tm tm {};
+#if defined(_WIN32)
+    localtime_s(&tm, &tt);
+#else
+    localtime_r(&tt, &tm);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d");
+    return oss.str();
+}
+
+std::string format_now_datetime(const std::chrono::system_clock::time_point &tp) {
+    const std::time_t tt = std::chrono::system_clock::to_time_t(tp);
+    std::tm tm {};
+#if defined(_WIN32)
+    localtime_s(&tm, &tt);
+#else
+    localtime_r(&tt, &tm);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+}
+
+std::string sanitize_filename(std::string value) {
+    for (char &c : value) {
+        const unsigned char uc = static_cast<unsigned char>(c);
+        if (!std::isalnum(uc) && c != '_' && c != '-' && c != '.') {
+            c = '_';
+        }
+    }
+    if (value.empty()) {
+        value = "case";
+    }
+    return value;
+}
+
+std::string compact_line(std::string s) {
+    for (char &c : s) {
+        if (c == '\n' || c == '\r' || c == '\t') {
+            c = ' ';
+        }
+    }
+    return s;
+}
+
+std::string limit_text(const std::string &s, std::size_t max_len) {
+    if (s.size() <= max_len) {
+        return s;
+    }
+    return s.substr(0, max_len);
+}
+
+std::string json_value_to_string(const json &value) {
+    if (value.is_null()) {
+        return "";
+    }
+    if (value.is_string()) {
+        return value.get<std::string>();
+    }
+    if (value.is_boolean()) {
+        return value.get<bool>() ? "true" : "false";
+    }
+    if (value.is_number_integer() || value.is_number_unsigned()) {
+        return std::to_string(value.get<long long>());
+    }
+    if (value.is_number_float()) {
+        std::ostringstream oss;
+        oss << std::setprecision(12) << value.get<double>();
+        return oss.str();
+    }
+    return value.dump();
+}
+
+std::string get_json_field(const json &obj, const std::vector<std::string> &keys) {
+    for (const std::string &key : keys) {
+        if (obj.contains(key)) {
+            return json_value_to_string(obj.at(key));
+        }
+    }
+    return "";
+}
+
+class ScopedStreamRedirect {
+public:
+    ScopedStreamRedirect() : old_cout_(std::cout.rdbuf(buffer_.rdbuf())), old_cerr_(std::cerr.rdbuf(buffer_.rdbuf())) {}
+
+    ~ScopedStreamRedirect() {
+        std::cout.rdbuf(old_cout_);
+        std::cerr.rdbuf(old_cerr_);
+    }
+
+    std::string str() const { return buffer_.str(); }
+
+private:
+    std::ostringstream buffer_;
+    std::streambuf *old_cout_;
+    std::streambuf *old_cerr_;
+};
+
+int run_one_execution_from_args(int argc, char **argv) {
+    clear_visualization_outputs();
 
     std::string path = "../qasms/example.qasm";
     std::string magic_aware_strategy = "distance";
@@ -88,6 +205,7 @@ int main(int argc, char **argv) {
         border_distance_percentage
         , routing_strategy
     );
+
     argument_parsing(
         argc,
         argv,
@@ -132,64 +250,8 @@ int main(int argc, char **argv) {
         std::cout << "graph dimensions: " << x << "x" << y << std::endl;
     }
 
-    clear_visualization_outputs();
-
-    const bool use_generated_graph = graph_path.empty();
-    
-    if (use_generated_graph) {
-        std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
-    } else {
-        std::cout << "Loading graph from " << graph_path << "...\n";
-    }
-
-    Graph graph(
-        use_generated_graph,
-        100,
-        number_of_magic_states,
-        border_distance_percentage,
-        magic_state_placement_strategy,
-        x,
-        y,
-        graph_path
-    );
-
-    if (graph.get_node_count() <= 0) {
-        std::cerr << "error: graph is empty or invalid.\n";
-        return 2;
-    }
-    if (graph.get_magic_state_ids().empty()) {
-        std::cerr << "error: graph has no magic states.\n";
-        return 2;
-    }
-
-    Circuit circuit = Circuit();
-
-    try {
-        circuit.parse_qasm_file(path);
-        auto gates = circuit.getGates();
-        for (size_t i = 0; i < gates.size(); ++i) {
-            const auto &g = gates[i];
-            if (PRINT_PARSING) std::cout << g.id << ": " << g.to_string() << "\n";
-        }
-    } catch (const std::exception &e) {
-        std::cerr << "error: " << e.what() << std::endl;
-        return 2;
-    }
-
-    if (PRINT_CIRCUIT) circuit.print_qubit_heap();
-
-    std::filesystem::path original_name = std::filesystem::path(path).stem();
-    std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
-    circuit.write_qasm_file(output_path);
-
-    std::cout << "------- MAPPING ---------" << std::endl;
-
-
-    if (PRINT_MAPPING) graph.print_rectangular();
-
-    Mapping mapping(
-        circuit,
-        graph,
+    return one_execution(
+        path,
         magic_aware_strategy,
         type,
         gaussian_strategy,
@@ -200,44 +262,211 @@ int main(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        maximum_iterations
+        x,
+        y,
+        graph_path,
+        magic_state_placement_strategy,
+        number_of_magic_states,
+        border_distance_percentage,
+        maximum_iterations,
+        routing_strategy
     );
+}
 
-    mapping.map();
+int run_bench_mode(const std::string &bench_path_arg, char *executable) {
+    const std::string bench_name = extract_bench_name(bench_path_arg);
+    if (bench_name.empty()) {
+        throw std::runtime_error("Invalid bench name for --bench_path");
+    }
 
-    for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
-        if (circuit.getQubit(qubit) == nullptr) {
-            continue;
+    const std::filesystem::path expanded_path = expand_config_variants(bench_name);
+    std::ifstream expanded_stream(expanded_path);
+    if (!expanded_stream.is_open()) {
+        throw std::runtime_error("Cannot open expanded bench file: " + expanded_path.string());
+    }
+
+    json bench_data;
+    expanded_stream >> bench_data;
+    if (!bench_data.is_array()) {
+        throw std::runtime_error("Expanded bench file must contain a JSON array: " + expanded_path.string());
+    }
+
+    const std::filesystem::path project_root(PROJECT_ROOT);
+    const std::filesystem::path results_dir = project_root / "benchmarks" / "results";
+    const std::filesystem::path logs_dir = project_root / "benchmarks" / "logs";
+    std::filesystem::create_directories(results_dir);
+    std::filesystem::create_directories(logs_dir);
+
+    const std::filesystem::path csv_path = results_dir / "benchmark_runs.csv";
+    write_csv::ensure_initialized(csv_path, write_csv::kBenchmarkRunsCsvHeader);
+    int next_run_id = write_csv::read_max_run_id(csv_path) + 1;
+
+    const std::filesystem::path temp_config_path = expanded_path.parent_path() / "__bench_runtime_config.json";
+
+    auto cleanup_temp = [&]() {
+        std::error_code ec;
+        std::filesystem::remove(temp_config_path, ec);
+    };
+
+    auto persist_expanded = [&]() {
+        std::ofstream out(expanded_path);
+        if (!out.is_open()) {
+            throw std::runtime_error("Cannot write expanded bench file: " + expanded_path.string());
         }
-        if (mapping.get_mapped_node(qubit) < 0) {
-            throw std::runtime_error(
-                "Incomplete mapping: qubit " + std::to_string(qubit) + " was not mapped."
+        out << bench_data.dump(2) << '\n';
+    };
+
+    int final_exit_code = 0;
+
+    try {
+        for (std::size_t i = 0; i < bench_data.size(); ++i) {
+            if (!bench_data.at(i).is_object()) {
+                throw std::runtime_error("Bench entry " + std::to_string(i + 1) + " must be a JSON object.");
+            }
+            json &entry = bench_data.at(i);
+
+            const int run_id = next_run_id++;
+            const auto start_tp = std::chrono::system_clock::now();
+            const auto start_steady = std::chrono::steady_clock::now();
+            const std::string run_date = format_now_date(start_tp);
+            const std::string run_datetime = format_now_datetime(start_tp);
+
+            std::string case_id = get_json_field(entry, {"case_id"});
+            if (case_id.empty()) {
+                case_id = get_json_field(entry, {"id"});
+            }
+
+            const std::string log_file_name =
+                "run_" + std::to_string(run_id) + "_" + sanitize_filename(case_id.empty() ? std::to_string(i + 1) : case_id) + ".log";
+            const std::filesystem::path log_path = logs_dir / log_file_name;
+
+            std::ofstream temp_stream(temp_config_path);
+            if (!temp_stream.is_open()) {
+                throw std::runtime_error("Cannot write temporary config: " + temp_config_path.string());
+            }
+            temp_stream << entry.dump(2) << '\n';
+            temp_stream.close();
+
+            std::vector<std::string> bench_args_storage = {
+                std::string(executable),
+                "--config",
+                temp_config_path.string()
+            };
+            std::vector<char *> bench_argv;
+            bench_argv.reserve(bench_args_storage.size());
+            for (auto &arg : bench_args_storage) {
+                bench_argv.push_back(arg.data());
+            }
+
+            std::string status = "success";
+            int exit_code = 0;
+            std::string routing_steps;
+            std::string error_excerpt;
+            std::string captured_output;
+
+            {
+                ScopedStreamRedirect capture;
+                try {
+                    const int routing_value = run_one_execution_from_args(
+                        static_cast<int>(bench_argv.size()),
+                        bench_argv.data()
+                    );
+                    routing_steps = std::to_string(routing_value);
+                } catch (const std::exception &e) {
+                    status = "failed";
+                    exit_code = 1;
+                    final_exit_code = 1;
+                    error_excerpt = e.what();
+                } catch (...) {
+                    status = "failed";
+                    exit_code = 1;
+                    final_exit_code = 1;
+                    error_excerpt = "Unknown error";
+                }
+                captured_output = capture.str();
+            }
+
+            std::ofstream log_out(log_path);
+            if (log_out.is_open()) {
+                log_out << captured_output;
+            }
+
+            if (error_excerpt.empty() && status != "success") {
+                error_excerpt = "Execution failed";
+            }
+
+            entry["executed"] = true;
+            persist_expanded();
+
+            const auto end_steady = std::chrono::steady_clock::now();
+            const std::chrono::duration<double> elapsed = end_steady - start_steady;
+            std::ostringstream duration_ss;
+            duration_ss << std::fixed << std::setprecision(6) << elapsed.count();
+
+            const std::string circuit = get_json_field(entry, {"circuit"});
+            const std::string graph_x = get_json_field(entry, {"graph_x", "x"});
+            const std::string graph_y = get_json_field(entry, {"graph_y", "y"});
+            std::string graph_dimensions = get_json_field(entry, {"graph_dimensions"});
+            if (graph_dimensions.empty() && !graph_x.empty() && !graph_y.empty()) {
+                graph_dimensions = graph_x + "x" + graph_y;
+            }
+
+            std::string circuit_graph_label = get_json_field(entry, {"circuit_graph_label"});
+            if (circuit_graph_label.empty() && !circuit.empty() && !graph_dimensions.empty()) {
+                circuit_graph_label = circuit + "-" + graph_dimensions;
+            }
+
+            write_csv::append_row(
+                csv_path,
+                {
+                    std::to_string(run_id),
+                    run_date,
+                    run_datetime,
+                    get_json_field(entry, {"benchmark_suite"}),
+                    get_json_field(entry, {"chart_group"}),
+                    case_id,
+                    circuit,
+                    graph_x,
+                    graph_y,
+                    graph_dimensions,
+                    circuit_graph_label,
+                    get_json_field(entry, {"mapping_type", "type"}),
+                    get_json_field(entry, {"magic_aware_strategy"}),
+                    get_json_field(entry, {"gaussian_strategy"}),
+                    get_json_field(entry, {"safe_passage_strategy"}),
+                    get_json_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
+                    get_json_field(entry, {"border_distance_percentage"}),
+                    get_json_field(entry, {"number_of_magic_states"}),
+                    routing_steps,
+                    status,
+                    std::to_string(exit_code),
+                    duration_ss.str(),
+                    log_path.string(),
+                    limit_text(compact_line(error_excerpt), 300)
+                }
             );
         }
+    } catch (...) {
+        cleanup_temp();
+        throw;
     }
 
-    graph.print_rectangular();
+    cleanup_temp();
+    return final_exit_code;
+}
 
-    std::cout << "------- LAYERING ---------" << std::endl;
-    LayeredCircuit layeredCircuit = LayeredCircuit(circuit);
-    if (PRINT_LAYER) layeredCircuit.print_layered();
+} // namespace
 
-    std::cout << "------- ROUTING ---------" << std::endl;
-    constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
-    constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
-    std::unique_ptr<IPathStrategy> pathStrategyPtr;
-    if (routing_strategy == "naive") {
-        pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
-    } else { // default to congestion-aware
-        pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
+int main(int argc, char **argv) {
+    try {
+        std::string bench_path;
+        if (extract_bench_path_arg(argc, argv, bench_path)) {
+            return run_bench_mode(bench_path, argv[0]);
+        }
+        run_one_execution_from_args(argc, argv);
+        return 0;
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << '\n';
+        return 1;
     }
-
-    QubitRouter router(mapping, layeredCircuit, graph, pathStrategyPtr.get());
-    router.route_circuit();
-
-    std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;
-    if (PRINT_ROUTING) router.print_routing_steps();
-    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n\n";
-
-    return 0;
 }
