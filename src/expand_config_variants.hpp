@@ -5,6 +5,7 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -12,6 +13,19 @@
 
 inline std::string expand_config_variants(const std::string &json_name) {
     using json = nlohmann::json;
+    const auto make_signature = [](const json &entry) {
+        json normalized = json::object();
+        if (!entry.is_object()) {
+            return std::string {};
+        }
+        for (auto it = entry.begin(); it != entry.end(); ++it) {
+            if (it.key() == "id" || it.key() == "executed") {
+                continue;
+            }
+            normalized[it.key()] = it.value();
+        }
+        return normalized.dump();
+    };
 
 #ifdef PROJECT_ROOT
     const std::filesystem::path project_root = PROJECT_ROOT;
@@ -62,15 +76,12 @@ inline std::string expand_config_variants(const std::string &json_name) {
         keys.push_back(key);
     }
 
-    json expanded = json::array();
+    json generated = json::array();
     json current = json::object();
-    std::size_t next_id = 1;
 
     std::function<void(std::size_t)> build = [&](std::size_t idx) {
         if (idx == keys.size()) {
-            current["id"] = next_id++;
-            current["executed"] = false;
-            expanded.push_back(current);
+            generated.push_back(current);
             return;
         }
 
@@ -82,6 +93,67 @@ inline std::string expand_config_variants(const std::string &json_name) {
     };
 
     build(0);
+
+    std::unordered_map<std::string, json> existing_by_signature;
+    std::size_t next_id = 1;
+
+    if (std::filesystem::exists(output_path)) {
+        std::ifstream existing_stream(output_path);
+        if (existing_stream.is_open()) {
+            json existing_data;
+            try {
+                existing_stream >> existing_data;
+                if (existing_data.is_array()) {
+                    for (const auto &existing_entry : existing_data) {
+                        if (!existing_entry.is_object()) {
+                            continue;
+                        }
+
+                        const std::string signature = make_signature(existing_entry);
+                        if (signature.empty()) {
+                            continue;
+                        }
+
+                        existing_by_signature[signature] = existing_entry;
+
+                        if (existing_entry.contains("id") && existing_entry["id"].is_number_integer()) {
+                            const int id_value = existing_entry["id"].get<int>();
+                            if (id_value >= 1) {
+                                next_id = std::max(next_id, static_cast<std::size_t>(id_value + 1));
+                            }
+                        }
+                    }
+                }
+            } catch (const std::exception &) {
+            }
+        }
+    }
+
+    json expanded = json::array();
+    for (const auto &generated_entry : generated) {
+        json final_entry = generated_entry;
+        const std::string signature = make_signature(generated_entry);
+
+        auto it = existing_by_signature.find(signature);
+        if (it != existing_by_signature.end()) {
+            const json &existing_entry = it->second;
+            if (existing_entry.contains("id") && existing_entry["id"].is_number_integer()) {
+                final_entry["id"] = existing_entry["id"].get<int>();
+            } else {
+                final_entry["id"] = static_cast<int>(next_id++);
+            }
+            if (existing_entry.contains("executed") && existing_entry["executed"].is_boolean()) {
+                final_entry["executed"] = existing_entry["executed"].get<bool>();
+            } else {
+                final_entry["executed"] = false;
+            }
+        } else {
+            final_entry["id"] = static_cast<int>(next_id++);
+            final_entry["executed"] = false;
+        }
+
+        expanded.push_back(final_entry);
+    }
 
     std::ofstream output_stream(output_path);
     if (!output_stream.is_open()) {

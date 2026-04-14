@@ -100,7 +100,7 @@ int one_execution(std::string path, std::string magic_aware_strategy, std::strin
     std::cout << "------- MAPPING ---------" << std::endl;
 
 
-    if (PRINT_MAPPING) graph.print_rectangular();
+    if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
 
     Mapping mapping(
         circuit,
@@ -131,7 +131,7 @@ int one_execution(std::string path, std::string magic_aware_strategy, std::strin
         }
     }
 
-    graph.print_rectangular();
+    if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
 
     std::cout << "------- LAYERING ---------" << std::endl;
     LayeredCircuit layeredCircuit = LayeredCircuit(circuit);
