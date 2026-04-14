@@ -111,6 +111,10 @@ std::string limit_text(const std::string &s, std::size_t max_len) {
     return s.substr(0, max_len);
 }
 
+std::string empty_to_dash(const std::string &s) {
+    return s.empty() ? "-" : s;
+}
+
 std::string json_value_to_string(const json &value) {
     if (value.is_null()) {
         return "";
@@ -317,6 +321,7 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
     };
 
     int final_exit_code = 0;
+    const std::size_t total_cases = bench_data.size();
 
     try {
         for (std::size_t i = 0; i < bench_data.size(); ++i) {
@@ -325,16 +330,26 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
             }
             json &entry = bench_data.at(i);
 
+            std::string case_id = get_json_field(entry, {"case_id"});
+            if (case_id.empty()) {
+                case_id = get_json_field(entry, {"id"});
+            }
+
+            const bool already_executed =
+                entry.contains("executed") && entry["executed"].is_boolean() && entry["executed"].get<bool>();
+            if (already_executed) {
+                std::cout
+                    << "[" << (i + 1) << "/" << total_cases << "] SKIP"
+                    << " " << empty_to_dash(case_id)
+                    << " executed=true\n";
+                continue;
+            }
+
             const int run_id = next_run_id++;
             const auto start_tp = std::chrono::system_clock::now();
             const auto start_steady = std::chrono::steady_clock::now();
             const std::string run_date = format_now_date(start_tp);
             const std::string run_datetime = format_now_datetime(start_tp);
-
-            std::string case_id = get_json_field(entry, {"case_id"});
-            if (case_id.empty()) {
-                case_id = get_json_field(entry, {"id"});
-            }
 
             const std::string log_file_name =
                 "run_" + std::to_string(run_id) + "_" + sanitize_filename(case_id.empty() ? std::to_string(i + 1) : case_id) + ".log";
@@ -402,6 +417,8 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
             const std::chrono::duration<double> elapsed = end_steady - start_steady;
             std::ostringstream duration_ss;
             duration_ss << std::fixed << std::setprecision(6) << elapsed.count();
+            std::ostringstream duration_short_ss;
+            duration_short_ss << std::fixed << std::setprecision(3) << elapsed.count() << "s";
 
             const std::string circuit = get_json_field(entry, {"circuit"});
             const std::string graph_x = get_json_field(entry, {"graph_x", "x"});
@@ -445,6 +462,37 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
                     limit_text(compact_line(error_excerpt), 300)
                 }
             );
+
+            const std::string mw = get_json_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
+            const std::string bw = get_json_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
+            const std::string mh = get_json_field(entry, {"MAGIC_HIGH", "magic_high"});
+            const std::string ml = get_json_field(entry, {"MAGIC_LOW", "magic_low"});
+            const std::string ch = get_json_field(entry, {"CNOT_HIGH", "cnot_high"});
+            const std::string cl = get_json_field(entry, {"CNOT_LOW", "cnot_low"});
+
+            if (status == "success") {
+                std::cout
+                    << "[" << (i + 1) << "/" << total_cases << "] OK"
+                    << " #" << run_id
+                    << " " << empty_to_dash(case_id)
+                    << " routing_steps=" << empty_to_dash(routing_steps)
+                    << " duration=" << duration_short_ss.str()
+                    << " mw=" << empty_to_dash(mw)
+                    << " bw=" << empty_to_dash(bw)
+                    << " mh=" << empty_to_dash(mh)
+                    << " ml=" << empty_to_dash(ml)
+                    << " ch=" << empty_to_dash(ch)
+                    << " cl=" << empty_to_dash(cl)
+                    << "\n";
+            } else {
+                std::cout
+                    << "[" << (i + 1) << "/" << total_cases << "] FAIL"
+                    << " #" << run_id
+                    << " " << empty_to_dash(case_id)
+                    << " duration=" << duration_short_ss.str()
+                    << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120))
+                    << "\n";
+            }
         }
     } catch (...) {
         cleanup_temp();
