@@ -192,8 +192,8 @@ std::filesystem::path extract_config_path(int argc, char **argv, std::string& co
 } // namespace
 
 void print_usage(const char* executable) {
-    std::cout << "Usage: " << executable
-              << " --circuit [circuit_name|circuit_name.qasm|full_path_to_qasm] "
+    std::cout << "Usage: " << executable << "\n"
+              << "[--circuit [circuit_name|circuit_name.qasm|full_path_to_qasm]]\n"
               << "[--magic-aware-strategy [" << Mapping::available_mapping_strategies() << "]]\n"
               << "[--type [" << Mapping::available_mapping_types() << "]]\n"
               << "[--gaussian-strategy [" << Mapping::available_gaussian_strategies() << "]]\n"
@@ -212,9 +212,9 @@ void print_usage(const char* executable) {
               << "[--graph <graph_path>]\n"
               << "[--config <json_file_path>]\n"
               << "Configuration precedence:\n"
-              << "  1) hardcoded defaults\n"
+              << "  1) CLI options\n"
               << "  2) config file \n"
-              << "  3) CLI options\n"
+              << "  3) hardcoded defaults\n"
               << "   or: " << executable << " --help\n";
 }
 
