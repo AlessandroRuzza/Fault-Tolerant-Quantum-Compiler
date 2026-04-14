@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <iostream>
 #include <unordered_set>
+#include <memory>
 
 using namespace std;
 
@@ -62,6 +63,7 @@ int main(int argc, char **argv) {
     int x = 10;
     int y = 11;
     int maximum_iterations = 100;
+    std::string routing_method = "congestion";
 
     apply_config_overrides(
         argc,
@@ -84,6 +86,7 @@ int main(int argc, char **argv) {
         magic_state_placement_strategy,
         number_of_magic_states,
         border_distance_percentage
+        , routing_method
     );
     argument_parsing(
         argc,
@@ -105,6 +108,7 @@ int main(int argc, char **argv) {
         magic_state_placement_strategy,
         number_of_magic_states,
         border_distance_percentage
+        , routing_method
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -121,6 +125,7 @@ int main(int argc, char **argv) {
     std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
     std::cout << "number_of_magic_states: " << number_of_magic_states << std::endl;
     std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
+    std::cout << "routing method: " << routing_method << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -218,8 +223,16 @@ int main(int argc, char **argv) {
     if (PRINT_LAYER) layeredCircuit.print_layered();
 
     std::cout << "------- ROUTING ---------" << std::endl;
-    NaiveShortestPath pathStrat(graph);
-    QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
+    constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
+    constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::DYNAMIC_PER_LAYER;
+    std::unique_ptr<IPathStrategy> pathStrategyPtr;
+    if (routing_method == "naive") {
+        pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
+    } else { // default to congestion-aware
+        pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
+    }
+
+    QubitRouter router(mapping, layeredCircuit, graph, pathStrategyPtr.get());
     router.route_circuit();
 
     std::cout << "-------- FINAL ROUTING RESULT -------------" << std::endl;

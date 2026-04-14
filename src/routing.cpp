@@ -53,6 +53,10 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         used_nodes.insert(node); // Cannot route through qubit nodes.
     }
 
+    if (const auto* congestion_strategy = dynamic_cast<const CongestionAwareShortestPath*>(pathStrategy)) {
+        congestion_strategy->prepare_for_layer(circuit, mapping, used_nodes);
+    }
+
 
     /*** Order Layer Gates by node distance length ******/
     std::vector<Gate> ordered_gates;

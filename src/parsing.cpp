@@ -117,6 +117,26 @@ std::string normalize_magic_state_placement_strategy(std::string value) {
     return value;
 }
 
+std::string normalize_routing_method(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    std::replace(value.begin(), value.end(), '-', '_');
+    if (value == "congestion_aware" || value == "congestionaware" ) return "congestion";
+    if (value == "simple" ) return "naive";
+    return value;
+}
+
+void validate_routing_method(const std::string& value, const char* executable) {
+    const std::string normalized = normalize_routing_method(value);
+    const std::vector<std::string> valid_methods = {"congestion", "naive"};
+    if (std::find(valid_methods.begin(), valid_methods.end(), normalized) == valid_methods.end()) {
+        std::cerr << "Invalid routing method: " << value << "\n";
+        print_usage(executable);
+        throw std::runtime_error("Invalid routing method: " + value);
+    }
+}
+
 void validate_magic_aware_strategy(const std::string& value, const char* executable) {
     const std::vector<std::string> valid_strategies = Mapping::get_available_mapping_strategies();
     if (std::find(valid_strategies.begin(), valid_strategies.end(), value) == valid_strategies.end()) {
@@ -207,6 +227,7 @@ void print_usage(const char* executable) {
               << "[--cnot-low <float>=0]\n"
               << "[--mapped-gaussian-weight <float>=0]\n"
               << "[--base-gaussian-weight <float>=0]\n"
+              << "[--routing-method [congestion|naive]]\n"
               << "[--x <integer>]\n"
               << "[--y <integer>]\n"
               << "[--graph <graph_path>]\n"
@@ -238,7 +259,8 @@ void apply_config_overrides(
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,
-    double& border_distance_percentage
+    double& border_distance_percentage,
+    std::string& routing_method
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -442,6 +464,15 @@ void apply_config_overrides(
         }
         graph_path = resolve_config_graph_path(config_json["graph"].get<std::string>(), resolved_config_path);
     }
+
+    if (config_json.contains("routing_method") || config_json.contains("routing-method")) {
+        const std::string rm = config_json.contains("routing_method") ?
+            config_json["routing_method"].get<std::string>() :
+            config_json["routing-method"].get<std::string>();
+        std::string normalized = normalize_routing_method(rm);
+        validate_routing_method(normalized, argv[0]);
+        routing_method = normalized;
+    }
 }
 
 void argument_parsing(
@@ -463,7 +494,8 @@ void argument_parsing(
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,
-    double& border_distance_percentage
+    double& border_distance_percentage,
+    std::string& routing_method
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -665,6 +697,17 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --graph");
             }
             graph_path = resolve_cli_graph_path(argv[++i]);
+            continue;
+        }
+
+        if (arg == "--routing-method" || arg == "--routing_method" || arg == "--routing") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --routing-method\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --routing-method");
+            }
+            routing_method = normalize_routing_method(argv[++i]);
+            validate_routing_method(routing_method, argv[0]);
             continue;
         }
 
