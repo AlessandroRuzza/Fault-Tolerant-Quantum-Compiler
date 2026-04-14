@@ -24,7 +24,8 @@ void apply_config_overrides(
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,
-    double& border_distance_percentage
+    double& border_distance_percentage,
+    std::string& routing_method
 );
 void argument_parsing(
     int argc,
@@ -45,7 +46,8 @@ void argument_parsing(
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,
-    double& border_distance_percentage
+    double& border_distance_percentage,
+    std::string& routing_method
 );
 
 #endif // PARSING_HPP
