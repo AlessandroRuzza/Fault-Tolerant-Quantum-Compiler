@@ -61,6 +61,40 @@ inline bool extract_bench_path_arg(int argc, char **argv, std::string &bench_pat
     return false;
 }
 
+inline bool extract_rerun_timeouts_arg(int argc, char **argv) {
+    const auto parse_bool_value = [](std::string value) {
+        for (char &c : value) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (value == "1" || value == "true" || value == "yes" || value == "on") {
+            return true;
+        }
+        if (value == "0" || value == "false" || value == "no" || value == "off") {
+            return false;
+        }
+        throw std::runtime_error("Invalid value for --rerun-timeouts: " + value);
+    };
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--rerun-timeouts" || arg == "--rerun_timeouts") {
+            return true;
+        }
+
+        const std::string prefix_dash = "--rerun-timeouts=";
+        if (arg.rfind(prefix_dash, 0) == 0) {
+            return parse_bool_value(arg.substr(prefix_dash.size()));
+        }
+
+        const std::string prefix_underscore = "--rerun_timeouts=";
+        if (arg.rfind(prefix_underscore, 0) == 0) {
+            return parse_bool_value(arg.substr(prefix_underscore.size()));
+        }
+    }
+
+    return false;
+}
+
 inline std::string extract_bench_name(const std::string &bench_path_arg) {
     std::filesystem::path p(bench_path_arg);
     if (p.has_extension()) {

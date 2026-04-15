@@ -42,10 +42,10 @@ add_custom_target(run-main
 )
 
 # Target to run the executable in bench mode:
-# make run-bench BENCH_PATH=<path_or_name>
+# make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1]
 add_custom_target(run-bench
     DEPENDS FaultTolerantQuantumCompiler
-    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler> "$$BENCH_PATH"
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler> "$$BENCH_PATH" "$$RERUN_TIMEOUTS"
     COMMENT "Running FaultTolerantQuantumCompiler with --bench_path"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
