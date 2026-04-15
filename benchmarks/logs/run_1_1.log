@@ -12,6 +12,7 @@ safe passage strategy: cube
 MagicStatePlacementStrategy: center_circle
 number_of_magic_states: 10
 border_distance_percentage: 0
+routing strategy: congestion
 graph dimensions: 10x10
 Creating rectangular graph with dimensions 10x10...
 Setting up circuit with 20 qubits.
@@ -39,16 +40,6 @@ Qubit{id=18, T=0, CNOTmax=2}
 Qubit{id=19, T=0, CNOTmax=2}
 
 ------- MAPPING ---------
-[1;32m[0m    [1;32m[0m    [1;32m[0m  
-          
-          
-         [1;32m[0m 
-[1;32m[0m          
-     [1;32m[0m     
-          
-         [1;32m[0m 
-[1;32m[0m          
-   [1;32m[0m    [1;32m[0m   
 
 
 total_qubits:20
@@ -429,21 +420,12 @@ Mapping based on CNOT_count
 Qubits with CNOT count above threshold (2): 0 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 Mapped qubit 1 to node 70
 Mapped qubits: 20/20
 
-[1;32m[0m [1;31m[0m  [1;31m[0m [1;32m[0m [1;31m[0m  [1;31m[0m [1;32m[0m [1;31m[0m 
-          
-[1;31m[0m  [1;31m[0m  [1;31m[0m  [1;31m[0m  [1;31m[0m  
-         [1;32m[0m 
-[1;32m[0m  [1;31m[0m  [1;31m[0m  [1;31m[0m  [1;31m[0m  
-[1;31m[0m     [1;32m[0m     
-  [1;31m[0m  [1;31m[0m  [1;31m[0m  [1;31m[0m  
-[1;31m[0m         [1;32m[0m 
-[1;32m[0m          
-   [1;32m[0m    [1;32m[0m   
 ------- LAYERING ---------
 ------- ROUTING ---------
 Starting qubit routing...
 Qubit routing completed.
--------- FINAL ROUTING RESULT -------------
 
-Total routing steps: 130
+Total routing steps (congestion): 130
+
+Average Parallelism (congestion): 3
 
