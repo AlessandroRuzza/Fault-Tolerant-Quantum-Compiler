@@ -131,8 +131,12 @@ void QubitRouter::route_circuit() {
     routing_steps.clear();
     routing_steps.reserve(circuit.getNumLayers());
 
+    int l = 0;
+    int tot = circuit.getNumLayers();
+
     while(circuit.getNumLayers() > 0){
         const Layer& topLayer = circuit.getLayer(0);
+        std::cout << "Routing Layer " << l++ << "/" << tot << "...\n";
 
         if (topLayer.empty()) {
             throw std::runtime_error("Layer is empty: no gates to route.");
