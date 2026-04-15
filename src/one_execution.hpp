@@ -15,6 +15,7 @@ using namespace std;
 
 struct benchmarkResult {
     int routing_steps = 0;
+    double avg_parallelism = 1;
 };
 
 namespace {
@@ -155,7 +156,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
     router.route_circuit();    
     if (PRINT_ROUTING) router.print_routing_steps();
-    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n\n";
+    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n";
     
-    return benchmarkResult{router.get_routing_length()};
+    double avg_parallelism = circuit.getNumGates() / router.get_routing_length();
+    std::cout << "\nAverage Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
+
+    return benchmarkResult{router.get_routing_length(), avg_parallelism};
 }
