@@ -206,8 +206,8 @@ int run_one_execution_from_args(int argc, char **argv) {
         graph_path,
         magic_state_placement_strategy,
         number_of_magic_states,
-        border_distance_percentage
-        , routing_strategy
+        border_distance_percentage, 
+        routing_strategy
     );
 
     argument_parsing(
@@ -229,8 +229,8 @@ int run_one_execution_from_args(int argc, char **argv) {
         graph_path,
         magic_state_placement_strategy,
         number_of_magic_states,
-        border_distance_percentage
-        , routing_strategy
+        border_distance_percentage,
+        routing_strategy
     );
 
     std::cout << "circuit path: " << path << std::endl;
