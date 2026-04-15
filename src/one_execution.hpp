@@ -13,6 +13,10 @@
 
 using namespace std;
 
+struct benchmarkResult {
+    int routing_steps = 0;
+};
+
 namespace {
 void clear_visualization_outputs() {
     namespace fs = std::filesystem;
@@ -41,7 +45,7 @@ void clear_visualization_outputs() {
 }
 } // namespace
 
-int one_execution(std::string path, std::string magic_aware_strategy, std::string type, 
+benchmarkResult one_execution(std::string path, std::string magic_aware_strategy, std::string type, 
     std::string gaussian_strategy, std::string safe_passage_strategy, double magic_high, 
     double magic_low, double cnot_high, double cnot_low, double mapped_gaussian_weight, 
     double base_gaussian_weight, int x, int y, std::string graph_path, 
@@ -153,5 +157,5 @@ int one_execution(std::string path, std::string magic_aware_strategy, std::strin
     if (PRINT_ROUTING) router.print_routing_steps();
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n\n";
     
-    return router.get_routing_length();
+    return benchmarkResult{router.get_routing_length()};
 }
