@@ -139,7 +139,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
 
     std::cout << "------- LAYERING ---------" << std::endl;
-    LayeredCircuit layeredCircuit = LayeredCircuit(circuit);
+    LayeredCircuit layeredCircuit = LayeredCircuit(circuit, 2); //Lookahead only 2 layers
     if (PRINT_LAYER) layeredCircuit.print_layered();
 
 
