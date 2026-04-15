@@ -1,7 +1,35 @@
-{
+[
+  {
+    "circuit": "qft_20",
+
+    "type": ["gaussian", "magic_aware"],
+    "magic_aware_strategy": "center",
+    "gaussian_strategy": "coarse",
+    "safe_passage_strategy": "cube",
+    "MagicStatePlacementStrategy": "center_circle",
+    "number_of_magic_states": 10,
+    "border_distance_percentage": 0.0,
+
+    "MAGIC_HIGH": 1.5,
+    "MAGIC_LOW": 0.5,
+    "CNOT_HIGH": 1.5,
+    "CNOT_LOW": 0.5,
+    "MAPPED_GAUSSIAN_WEIGHT": 0.8,
+    "BASE_GAUSSIAN_WEIGHT": 1.0,
+    
+    "x": 10,
+    "y": 10,
+
+    "timeout": 10,
+    "timeout_reached": false,
+
+    "routing_strategy": "congestion"
+  },
+
+  {
   "circuit": "qft_20",
 
-  "type": ["gaussian", "magic_aware"],
+  "type": "homogeneous",
   "magic_aware_strategy": "center",
   "gaussian_strategy": "coarse",
   "safe_passage_strategy": "cube",
@@ -18,7 +46,8 @@
   
   "x": 10,
   "y": 10,
-
-  "timeout": 10,
-  "timeout_reached": false
+  "routing_strategy": "congestion"
 }
+
+
+]
