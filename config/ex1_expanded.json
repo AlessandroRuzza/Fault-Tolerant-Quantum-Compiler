@@ -17,7 +17,8 @@
     "safe_passage_strategy": "cube",
     "type": "gaussian",
     "x": 10,
-    "y": 10
+    "y": 10,
+    "routing_strategy": "congestion"
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -37,6 +38,7 @@
     "safe_passage_strategy": "cube",
     "type": "magic_aware",
     "x": 10,
-    "y": 10
+    "y": 10,
+    "routing_strategy": "congestion"
   }
 ]
