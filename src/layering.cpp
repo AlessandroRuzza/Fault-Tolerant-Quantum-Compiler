@@ -25,9 +25,95 @@ void LayeredCircuit::build_layers() {
     }
 }
 
+inline void LayeredCircuit::remove_routed_from_topLayer(const std::unordered_set<Gate>& routed_set) {
+    if (routed_set.empty() || layers.empty()) {
+        return;
+    }
+
+    Layer& topLayer = layers.front();
+    for (auto it = topLayer.begin(); it != topLayer.end(); ) {
+        if (routed_set.count(*it) > 0) {
+            it = topLayer.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+inline void LayeredCircuit::remove_leading_empty_layers() {
+    std::size_t first_non_empty = 0;
+    while (first_non_empty < layers.size() && layers[first_non_empty].empty()) {
+        ++first_non_empty;
+    }
+    if (first_non_empty > 0) {
+        layers.erase(layers.begin(), layers.begin() + first_non_empty);
+    }
+}
+
+inline void LayeredCircuit::remove_trailing_empty_layers() {
+    while (!layers.empty() && layers.back().empty()) {
+        layers.pop_back();
+    }
+}
+
+void LayeredCircuit::pull_gates_into_top_layer(std::size_t max_lookahead_layers) {
+    if (layers.empty() || max_lookahead_layers == 0 || layers.size() < 2) {
+        return;
+    }
+
+    std::unordered_set<uint32_t> blocked_qubits;
+    for (const Gate& gate : layers[0]) {
+        for (uint32_t q : gate.qubits) {
+            blocked_qubits.insert(q);
+        }
+    }
+
+    const std::size_t max_layer_index = std::min(max_lookahead_layers, layers.size() - 1);
+    for (std::size_t layer_idx = 1; layer_idx <= max_layer_index; ++layer_idx) {
+        std::vector<Gate> movable_gates;
+        movable_gates.reserve(layers[layer_idx].size());
+
+        for (const Gate& gate : layers[layer_idx]) {
+            bool is_blocked = false;
+            for (uint32_t q : gate.qubits) {
+                if (blocked_qubits.count(q) > 0) {
+                    is_blocked = true;
+                    break;
+                }
+            }
+            if (!is_blocked) {
+                movable_gates.push_back(gate);
+            }
+        }
+
+        for (const Gate& gate : movable_gates) {
+            layers[layer_idx].erase(gate);
+            layers[0].insert(gate);
+            for (uint32_t q : gate.qubits) {
+                blocked_qubits.insert(q);
+            }
+        }
+
+        for (const Gate& gate : layers[layer_idx]) {
+            for (uint32_t q : gate.qubits) {
+                blocked_qubits.insert(q);
+            }
+        }
+    }
+}
+
 void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
+    if (routed_gates.empty()) {
+        return;
+    }
+
     ignored_gates.insert(routed_gates.begin(), routed_gates.end());
-    build_layers();
+
+    std::unordered_set<Gate> routed_set(routed_gates.begin(), routed_gates.end());
+    remove_routed_from_topLayer(routed_set);
+    remove_leading_empty_layers();
+    pull_gates_into_top_layer(layer_pull_lookahead);
+    remove_trailing_empty_layers();
 }
 void LayeredCircuit::reset(){
     ignored_gates.clear();
