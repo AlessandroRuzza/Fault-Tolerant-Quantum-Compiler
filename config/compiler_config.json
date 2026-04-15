@@ -1,5 +1,5 @@
 {
-  "circuit": "qft_20",
+  "circuit": "factor247_n15",
 
   "type": "gaussian",
   "magic_aware_strategy": "center",
@@ -16,8 +16,8 @@
   "MAPPED_GAUSSIAN_WEIGHT": 0.8,
   "BASE_GAUSSIAN_WEIGHT": 1.0,
   
-  "x": 10,
-  "y": 10,
+  "x": 20,
+  "y": 20,
 
   "routing_strategy": "congestion"
 }

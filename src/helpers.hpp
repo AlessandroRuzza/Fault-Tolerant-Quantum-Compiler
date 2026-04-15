@@ -57,6 +57,8 @@ inline bool extract_bench_path_arg(int argc, char **argv, std::string &bench_pat
             return true;
         }
     }
+
+    return false;
 }
 
 inline std::string extract_bench_name(const std::string &bench_path_arg) {
