@@ -13,6 +13,12 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "run_id,run_date,run_datetime,benchmark_suite,chart_group,case_id,circuit,graph_x,graph_y,"
     "graph_dimensions,circuit_graph_label,mapping_type,magic_aware_strategy,gaussian_strategy,"
     "safe_passage_strategy,magic_state_placement_strategy,border_distance_percentage,"
+    "number_of_magic_states,routing_steps,timeout_reached,status,exit_code,duration_seconds,log_file,error_excerpt";
+
+inline constexpr const char *kLegacyBenchmarkRunsCsvHeader =
+    "run_id,run_date,run_datetime,benchmark_suite,chart_group,case_id,circuit,graph_x,graph_y,"
+    "graph_dimensions,circuit_graph_label,mapping_type,magic_aware_strategy,gaussian_strategy,"
+    "safe_passage_strategy,magic_state_placement_strategy,border_distance_percentage,"
     "number_of_magic_states,routing_steps,status,exit_code,duration_seconds,log_file,error_excerpt";
 
 inline std::string escape(const std::string &value) {
@@ -68,6 +74,41 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     if (std::filesystem::is_regular_file(csv_path) && std::filesystem::file_size(csv_path) == 0) {
         std::ofstream out(csv_path, std::ios::app);
         out << header << '\n';
+        return;
+    }
+
+    std::ifstream in(csv_path);
+    if (!in.is_open()) {
+        return;
+    }
+
+    std::string first_line;
+    if (!std::getline(in, first_line)) {
+        return;
+    }
+
+    if (first_line == header) {
+        return;
+    }
+
+    if (header == kBenchmarkRunsCsvHeader && first_line == kLegacyBenchmarkRunsCsvHeader) {
+        std::vector<std::string> rows;
+        std::string line;
+        while (std::getline(in, line)) {
+            if (!line.empty()) {
+                rows.push_back(line);
+            }
+        }
+
+        std::ofstream out(csv_path, std::ios::trunc);
+        if (!out.is_open()) {
+            throw std::runtime_error("Cannot migrate CSV file: " + csv_path.string());
+        }
+
+        out << header << '\n';
+        for (const std::string &row : rows) {
+            out << row << ",false\n";
+        }
     }
 }
 

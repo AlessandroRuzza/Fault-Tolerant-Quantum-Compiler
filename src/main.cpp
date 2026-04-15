@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cctype>
+#include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -19,15 +21,18 @@
 
 #include <nlohmann/json.hpp>
 
+#include <sys/wait.h>
 
-int run_bench_mode(const std::string &bench_path_arg, char *executable);
+
+int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rerun_timeouts);
 benchmarkResult run_one_execution_from_args(int argc, char **argv);
 
 int main(int argc, char **argv) {
     try {
         std::string bench_path;
         if (extract_bench_path_arg(argc, argv, bench_path)) {
-            return run_bench_mode(bench_path, argv[0]);
+            const bool rerun_timeouts = extract_rerun_timeouts_arg(argc, argv);
+            return run_bench_mode(bench_path, argv[0], rerun_timeouts);
         }
         run_one_execution_from_args(argc, argv);
         return 0;
@@ -152,7 +157,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     );
 }
 
-int run_bench_mode(const std::string &bench_path_arg, char *executable) {
+int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rerun_timeouts) {
     const std::string bench_name = extract_bench_name(bench_path_arg);
     if (bench_name.empty()) {
         throw std::runtime_error("Invalid bench name for --bench_path");
@@ -199,12 +204,90 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
     int final_exit_code = 0;
     const std::size_t total_cases = bench_data.size();
 
+    const auto parse_timeout_seconds = [](const json &entry) -> double {
+        if (!entry.contains("timeout")) {
+            return -1.0;
+        }
+
+        const json &timeout_value = entry.at("timeout");
+        if (!timeout_value.is_number()) {
+            throw std::runtime_error("Bench field 'timeout' must be numeric.");
+        }
+
+        const double timeout_seconds = timeout_value.get<double>();
+        if (!std::isfinite(timeout_seconds) || timeout_seconds < 0.0) {
+            throw std::runtime_error("Bench field 'timeout' must be a finite number >= 0.");
+        }
+
+        return timeout_seconds;
+    };
+
+    const auto shell_quote = [](const std::string &value) {
+        std::string quoted = "'";
+        for (char c : value) {
+            if (c == '\'') {
+                quoted += "'\"'\"'";
+            } else {
+                quoted.push_back(c);
+            }
+        }
+        quoted.push_back('\'');
+        return quoted;
+    };
+
+    const auto decode_system_exit_code = [](int system_rc) {
+        if (system_rc == -1) {
+            return 1;
+        }
+        if (WIFEXITED(system_rc)) {
+            return WEXITSTATUS(system_rc);
+        }
+        if (WIFSIGNALED(system_rc)) {
+            return 128 + WTERMSIG(system_rc);
+        }
+        return 1;
+    };
+
+    const auto extract_routing_steps_from_log = [](const std::filesystem::path &log_path) {
+        std::ifstream in(log_path);
+        if (!in.is_open()) {
+            return std::string {};
+        }
+
+        std::string line;
+        std::string last_match;
+        while (std::getline(in, line)) {
+            const std::size_t marker_pos = line.find("Total routing steps");
+            if (marker_pos == std::string::npos) {
+                continue;
+            }
+            const std::size_t colon_pos = line.rfind(':');
+            if (colon_pos == std::string::npos || colon_pos <= marker_pos) {
+                continue;
+            }
+            std::string tail = line.substr(colon_pos + 1);
+            while (!tail.empty() && std::isspace(static_cast<unsigned char>(tail.front()))) {
+                tail.erase(tail.begin());
+            }
+            std::size_t digits_len = 0;
+            while (digits_len < tail.size() && std::isdigit(static_cast<unsigned char>(tail[digits_len]))) {
+                ++digits_len;
+            }
+            if (digits_len > 0) {
+                last_match = tail.substr(0, digits_len);
+            }
+        }
+        return last_match;
+    };
+
     try {
         for (std::size_t i = 0; i < bench_data.size(); ++i) {
             if (!bench_data.at(i).is_object()) {
                 throw std::runtime_error("Bench entry " + std::to_string(i + 1) + " must be a JSON object.");
             }
             json &entry = bench_data.at(i);
+            const double timeout_seconds = parse_timeout_seconds(entry);
+            const bool timeout_enabled = timeout_seconds >= 0.0;
 
             std::string case_id = get_json_field(entry, {"case_id"});
             if (case_id.empty()) {
@@ -213,12 +296,25 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
 
             const bool already_executed =
                 entry.contains("executed") && entry["executed"].is_boolean() && entry["executed"].get<bool>();
-            if (already_executed) {
+            const bool timeout_reached_before =
+                entry.contains("timeout_reached") &&
+                entry["timeout_reached"].is_boolean() &&
+                entry["timeout_reached"].get<bool>();
+            const bool rerun_timeout_case = rerun_timeouts && already_executed && timeout_reached_before;
+
+            if (already_executed && !rerun_timeout_case) {
                 std::cout
                     << "[" << (i + 1) << "/" << total_cases << "] SKIP"
                     << " " << empty_to_dash(case_id)
                     << " executed=true\n";
                 continue;
+            }
+
+            if (rerun_timeout_case) {
+                std::cout
+                    << "[" << (i + 1) << "/" << total_cases << "] RERUN_TIMEOUT"
+                    << " " << empty_to_dash(case_id)
+                    << " executed=true timeout_reached=true\n";
             }
 
             const int run_id = next_run_id++;
@@ -238,57 +334,48 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
             temp_stream << entry.dump(2) << '\n';
             temp_stream.close();
 
-            std::vector<std::string> bench_args_storage = {
-                std::string(executable),
-                "--config",
-                temp_config_path.string()
-            };
-            std::vector<char *> bench_argv;
-            bench_argv.reserve(bench_args_storage.size());
-            for (auto &arg : bench_args_storage) {
-                bench_argv.push_back(arg.data());
-            }
-
             std::string status = "success";
             int exit_code = 0;
             std::string routing_steps;
-            std::string avg_parallelism;
             std::string error_excerpt;
-            std::string captured_output;
+            bool timeout_reached = false;
 
-            {
-                ScopedStreamRedirect capture;
-                try {
-                    const benchmarkResult run_result = run_one_execution_from_args(
-                        static_cast<int>(bench_argv.size()),
-                        bench_argv.data()
-                    );
-                    routing_steps = std::to_string(run_result.routing_steps);
-                } catch (const std::exception &e) {
-                    status = "failed";
-                    exit_code = 1;
-                    final_exit_code = 1;
-                    error_excerpt = e.what();
-                } catch (...) {
-                    status = "failed";
-                    exit_code = 1;
-                    final_exit_code = 1;
-                    error_excerpt = "Unknown error";
+            std::string command;
+            if (timeout_enabled) {
+                std::ostringstream timeout_ss;
+                timeout_ss << std::fixed << std::setprecision(3) << timeout_seconds;
+                command =
+                    "timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
+                    " " + shell_quote(executable) +
+                    " --config " + shell_quote(temp_config_path.string()) +
+                    " > " + shell_quote(log_path.string()) +
+                    " 2>&1";
+            } else {
+                command =
+                    shell_quote(executable) +
+                    " --config " + shell_quote(temp_config_path.string()) +
+                    " > " + shell_quote(log_path.string()) +
+                    " 2>&1";
+            }
+
+            exit_code = decode_system_exit_code(std::system(command.c_str()));
+            timeout_reached = timeout_enabled && exit_code == 124;
+
+            if (timeout_reached) {
+                status = "timeout";
+                // Timeout is tracked in CSV, but should not fail the whole benchmark target.
+                std::ostringstream timeout_ss;
+                timeout_ss << std::fixed << std::setprecision(3) << timeout_seconds;
+                error_excerpt = "Execution exceeded timeout of " + timeout_ss.str() + "s";
+            } else if (exit_code != 0) {
+                status = "failed";
+                if (final_exit_code == 0) {
+                    final_exit_code = exit_code;
                 }
-                captured_output = capture.str();
+                error_excerpt = "Execution failed with exit code " + std::to_string(exit_code);
+            } else {
+                routing_steps = extract_routing_steps_from_log(log_path);
             }
-
-            std::ofstream log_out(log_path);
-            if (log_out.is_open()) {
-                log_out << captured_output;
-            }
-
-            if (error_excerpt.empty() && status != "success") {
-                error_excerpt = "Execution failed";
-            }
-
-            entry["executed"] = true;
-            persist_expanded();
 
             const auto end_steady = std::chrono::steady_clock::now();
             const std::chrono::duration<double> elapsed = end_steady - start_steady;
@@ -296,6 +383,14 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
             duration_ss << std::fixed << std::setprecision(6) << elapsed.count();
             std::ostringstream duration_short_ss;
             duration_short_ss << std::fixed << std::setprecision(3) << elapsed.count() << "s";
+
+            if (error_excerpt.empty() && status != "success") {
+                error_excerpt = "Execution failed";
+            }
+
+            entry["executed"] = true;
+            entry["timeout_reached"] = timeout_reached;
+            persist_expanded();
 
             const std::string circuit = get_json_field(entry, {"circuit"});
             const std::string graph_x = get_json_field(entry, {"graph_x", "x"});
@@ -332,6 +427,7 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
                     get_json_field(entry, {"border_distance_percentage"}),
                     get_json_field(entry, {"number_of_magic_states"}),
                     routing_steps,
+                    timeout_reached ? "true" : "false",
                     status,
                     std::to_string(exit_code),
                     duration_ss.str(),
@@ -360,6 +456,15 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
                     << " ml=" << empty_to_dash(ml)
                     << " ch=" << empty_to_dash(ch)
                     << " cl=" << empty_to_dash(cl)
+                    << " timeout_reached=" << (timeout_reached ? "true" : "false")
+                    << "\n";
+            } else if (status == "timeout") {
+                std::cout
+                    << "[" << (i + 1) << "/" << total_cases << "] TIMEOUT"
+                    << " #" << run_id
+                    << " " << empty_to_dash(case_id)
+                    << " duration=" << duration_short_ss.str()
+                    << " timeout_reached=true"
                     << "\n";
             } else {
                 std::cout

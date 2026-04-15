@@ -19,5 +19,6 @@
   "x": 10,
   "y": 10,
 
-  "routing_strategy": "congestion"
+  "timeout": 10,
+  "timeout_reached": false
 }

@@ -19,7 +19,11 @@ inline std::string expand_config_variants(const std::string &json_name) {
             return std::string {};
         }
         for (auto it = entry.begin(); it != entry.end(); ++it) {
-            if (it.key() == "id" || it.key() == "executed") {
+            // Runtime-only fields must not affect identity of a benchmark case.
+            if (it.key() == "id" ||
+                it.key() == "executed" ||
+                it.key() == "timeout" ||
+                it.key() == "timeout_reached") {
                 continue;
             }
             normalized[it.key()] = it.value();
@@ -147,9 +151,18 @@ inline std::string expand_config_variants(const std::string &json_name) {
             } else {
                 final_entry["executed"] = false;
             }
+
+            if (existing_entry.contains("timeout_reached") && existing_entry["timeout_reached"].is_boolean()) {
+                final_entry["timeout_reached"] = existing_entry["timeout_reached"].get<bool>();
+            } else if (!final_entry.contains("timeout_reached")) {
+                final_entry["timeout_reached"] = false;
+            }
         } else {
             final_entry["id"] = static_cast<int>(next_id++);
             final_entry["executed"] = false;
+            if (!final_entry.contains("timeout_reached")) {
+                final_entry["timeout_reached"] = false;
+            }
         }
 
         expanded.push_back(final_entry);
