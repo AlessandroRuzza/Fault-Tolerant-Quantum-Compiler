@@ -162,7 +162,7 @@ private:
     std::streambuf *old_cerr_;
 };
 
-int run_one_execution_from_args(int argc, char **argv) {
+benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     clear_visualization_outputs();
 
     std::string path = "../qasms/example.qasm";
@@ -376,17 +376,18 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
             std::string status = "success";
             int exit_code = 0;
             std::string routing_steps;
+            std::string avg_parallelism;
             std::string error_excerpt;
             std::string captured_output;
 
             {
                 ScopedStreamRedirect capture;
                 try {
-                    const int routing_value = run_one_execution_from_args(
+                    const benchmarkResult run_result = run_one_execution_from_args(
                         static_cast<int>(bench_argv.size()),
                         bench_argv.data()
                     );
-                    routing_steps = std::to_string(routing_value);
+                    routing_steps = std::to_string(run_result.routing_steps);
                 } catch (const std::exception &e) {
                     status = "failed";
                     exit_code = 1;
