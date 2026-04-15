@@ -1,5 +1,6 @@
 #include "one_execution.hpp"
 #include "expand_config_variants.hpp"
+#include "helpers.hpp"
 #include "parsing.hpp"
 #include "write_csv.hpp"
 
@@ -18,149 +19,29 @@
 
 #include <nlohmann/json.hpp>
 
-namespace {
 
-using json = nlohmann::json;
+int run_bench_mode(const std::string &bench_path_arg, char *executable);
+benchmarkResult run_one_execution_from_args(int argc, char **argv);
 
-bool extract_bench_path_arg(int argc, char **argv, std::string &bench_path) {
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
 
-        if (arg == "--bench_path") {
-            if (i + 1 >= argc) {
-                throw std::runtime_error("Missing value for --bench_path");
-            }
-            bench_path = argv[i + 1];
-            return true;
+
+int main(int argc, char **argv) {
+    try {
+        std::string bench_path;
+        if (extract_bench_path_arg(argc, argv, bench_path)) {
+            return run_bench_mode(bench_path, argv[0]);
         }
-
-        const std::string prefix = "--bench_path=";
-        if (arg.rfind(prefix, 0) == 0) {
-            bench_path = arg.substr(prefix.size());
-            if (bench_path.empty()) {
-                throw std::runtime_error("Missing value for --bench_path");
-            }
-            return true;
-        }
+        run_one_execution_from_args(argc, argv);
+        return 0;
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << '\n';
+        return 1;
     }
-
-    return false;
-}
-
-std::string extract_bench_name(const std::string &bench_path_arg) {
-    std::filesystem::path p(bench_path_arg);
-    if (p.has_extension()) {
-        p = p.stem();
-    }
-    return p.filename().string();
 }
 
 
-std::string format_now_date(const std::chrono::system_clock::time_point &tp) {
-    const std::time_t tt = std::chrono::system_clock::to_time_t(tp);
-    std::tm tm {};
-#if defined(_WIN32)
-    localtime_s(&tm, &tt);
-#else
-    localtime_r(&tt, &tm);
-#endif
-    std::ostringstream oss;
-    oss << std::put_time(&tm, "%Y-%m-%d");
-    return oss.str();
-}
 
-std::string format_now_datetime(const std::chrono::system_clock::time_point &tp) {
-    const std::time_t tt = std::chrono::system_clock::to_time_t(tp);
-    std::tm tm {};
-#if defined(_WIN32)
-    localtime_s(&tm, &tt);
-#else
-    localtime_r(&tt, &tm);
-#endif
-    std::ostringstream oss;
-    oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
-    return oss.str();
-}
 
-std::string sanitize_filename(std::string value) {
-    for (char &c : value) {
-        const unsigned char uc = static_cast<unsigned char>(c);
-        if (!std::isalnum(uc) && c != '_' && c != '-' && c != '.') {
-            c = '_';
-        }
-    }
-    if (value.empty()) {
-        value = "case";
-    }
-    return value;
-}
-
-std::string compact_line(std::string s) {
-    for (char &c : s) {
-        if (c == '\n' || c == '\r' || c == '\t') {
-            c = ' ';
-        }
-    }
-    return s;
-}
-
-std::string limit_text(const std::string &s, std::size_t max_len) {
-    if (s.size() <= max_len) {
-        return s;
-    }
-    return s.substr(0, max_len);
-}
-
-std::string empty_to_dash(const std::string &s) {
-    return s.empty() ? "-" : s;
-}
-
-std::string json_value_to_string(const json &value) {
-    if (value.is_null()) {
-        return "";
-    }
-    if (value.is_string()) {
-        return value.get<std::string>();
-    }
-    if (value.is_boolean()) {
-        return value.get<bool>() ? "true" : "false";
-    }
-    if (value.is_number_integer() || value.is_number_unsigned()) {
-        return std::to_string(value.get<long long>());
-    }
-    if (value.is_number_float()) {
-        std::ostringstream oss;
-        oss << std::setprecision(12) << value.get<double>();
-        return oss.str();
-    }
-    return value.dump();
-}
-
-std::string get_json_field(const json &obj, const std::vector<std::string> &keys) {
-    for (const std::string &key : keys) {
-        if (obj.contains(key)) {
-            return json_value_to_string(obj.at(key));
-        }
-    }
-    return "";
-}
-
-class ScopedStreamRedirect {
-public:
-    ScopedStreamRedirect() : old_cout_(std::cout.rdbuf(buffer_.rdbuf())), old_cerr_(std::cerr.rdbuf(buffer_.rdbuf())) {}
-
-    ~ScopedStreamRedirect() {
-        std::cout.rdbuf(old_cout_);
-        std::cerr.rdbuf(old_cerr_);
-    }
-
-    std::string str() const { return buffer_.str(); }
-
-private:
-    std::ostringstream buffer_;
-    std::streambuf *old_cout_;
-    std::streambuf *old_cerr_;
-};
 
 benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     clear_visualization_outputs();
@@ -301,7 +182,8 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
     std::filesystem::create_directories(results_dir);
     std::filesystem::create_directories(logs_dir);
 
-    const std::filesystem::path csv_path = results_dir / "benchmark_runs.csv";
+    const std::string csv_file_name = sanitize_filename(bench_name) + "_runs.csv";
+    const std::filesystem::path csv_path = results_dir / csv_file_name;
     write_csv::ensure_initialized(csv_path, write_csv::kBenchmarkRunsCsvHeader);
     int next_run_id = write_csv::read_max_run_id(csv_path) + 1;
 
@@ -502,20 +384,4 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable) {
 
     cleanup_temp();
     return final_exit_code;
-}
-
-} // namespace
-
-int main(int argc, char **argv) {
-    try {
-        std::string bench_path;
-        if (extract_bench_path_arg(argc, argv, bench_path)) {
-            return run_bench_mode(bench_path, argv[0]);
-        }
-        run_one_execution_from_args(argc, argv);
-        return 0;
-    } catch (const std::exception &e) {
-        std::cerr << "Error: " << e.what() << '\n';
-        return 1;
-    }
 }
