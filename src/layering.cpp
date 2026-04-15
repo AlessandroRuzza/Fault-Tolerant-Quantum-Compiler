@@ -111,9 +111,17 @@ void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
 
     std::unordered_set<Gate> routed_set(routed_gates.begin(), routed_gates.end());
     remove_routed_from_topLayer(routed_set);
-    remove_leading_empty_layers();
-    pull_gates_into_top_layer(layer_pull_lookahead);
-    remove_trailing_empty_layers();
+    
+    if (layers.empty())
+        return;
+
+    if (layers.front().empty()) {
+        remove_leading_empty_layers();
+    }
+    else{
+        pull_gates_into_top_layer(layer_pull_lookahead);
+        remove_trailing_empty_layers();
+    }
 }
 void LayeredCircuit::reset(){
     ignored_gates.clear();
