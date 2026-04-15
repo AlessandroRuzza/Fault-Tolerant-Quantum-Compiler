@@ -280,6 +280,51 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         return last_match;
     };
 
+    const auto extract_error_excerpt_from_log = [](const std::filesystem::path &log_path) {
+        std::ifstream in(log_path);
+        if (!in.is_open()) {
+            return std::string {};
+        }
+
+        const auto trim = [](const std::string &s) {
+            std::size_t start = 0;
+            while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) {
+                ++start;
+            }
+            std::size_t end = s.size();
+            while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) {
+                --end;
+            }
+            return s.substr(start, end - start);
+        };
+
+        std::string line;
+        std::string last_non_empty;
+        std::string best_hint;
+        while (std::getline(in, line)) {
+            std::string cleaned = trim(line);
+            if (cleaned.empty()) {
+                continue;
+            }
+            last_non_empty = cleaned;
+
+            std::string lowered = cleaned;
+            std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            if (lowered.find("error") != std::string::npos ||
+                lowered.find("failed") != std::string::npos ||
+                lowered.find("invalid") != std::string::npos ||
+                lowered.find("exception") != std::string::npos ||
+                lowered.find("terminate") != std::string::npos ||
+                lowered.find("what():") != std::string::npos) {
+                best_hint = cleaned;
+            }
+        }
+
+        return best_hint.empty() ? last_non_empty : best_hint;
+    };
+
     try {
         for (std::size_t i = 0; i < bench_data.size(); ++i) {
             if (!bench_data.at(i).is_object()) {
@@ -372,7 +417,11 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                 if (final_exit_code == 0) {
                     final_exit_code = exit_code;
                 }
+                const std::string log_excerpt = extract_error_excerpt_from_log(log_path);
                 error_excerpt = "Execution failed with exit code " + std::to_string(exit_code);
+                if (!log_excerpt.empty()) {
+                    error_excerpt += ": " + log_excerpt;
+                }
             } else {
                 routing_steps = extract_routing_steps_from_log(log_path);
             }

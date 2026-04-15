@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -18,15 +19,39 @@ inline std::string expand_config_variants(const std::string &json_name) {
         if (!entry.is_object()) {
             return std::string {};
         }
-        for (auto it = entry.begin(); it != entry.end(); ++it) {
+
+        const auto is_runtime_key = [](const std::string &key) {
             // Runtime-only fields must not affect identity of a benchmark case.
-            if (it.key() == "id" ||
-                it.key() == "executed" ||
-                it.key() == "timeout" ||
-                it.key() == "timeout_reached") {
+            return key == "id" ||
+                   key == "executed" ||
+                   key == "timeout" ||
+                   key == "timeout_reached";
+        };
+
+        // First pass: copy non-runtime, non-object fields as-is.
+        for (auto it = entry.begin(); it != entry.end(); ++it) {
+            if (is_runtime_key(it.key())) {
                 continue;
             }
-            normalized[it.key()] = it.value();
+            if (!it.value().is_object()) {
+                normalized[it.key()] = it.value();
+            }
+        }
+
+        // Compatibility pass: flatten object-valued fields.
+        // This keeps identity stable across:
+        // - old expansion format that stored object-list entries under a key
+        // - new format that merges those object fields at top-level
+        for (auto it = entry.begin(); it != entry.end(); ++it) {
+            if (is_runtime_key(it.key()) || !it.value().is_object()) {
+                continue;
+            }
+            for (auto nested = it.value().begin(); nested != it.value().end(); ++nested) {
+                if (is_runtime_key(nested.key())) {
+                    continue;
+                }
+                normalized[nested.key()] = nested.value();
+            }
         }
         return normalized.dump();
     };
@@ -49,54 +74,121 @@ inline std::string expand_config_variants(const std::string &json_name) {
     json source;
     input_stream >> source;
 
-    if (!source.is_object()) {
-        throw std::invalid_argument("Input JSON must be an object.");
-    }
+    const auto is_runtime_key = [](const std::string &key) {
+        return key == "id" || key == "executed";
+    };
 
-    std::vector<std::string> keys;
-    std::vector<std::vector<json>> values_per_key;
-
-    for (auto it = source.begin(); it != source.end(); ++it) {
-        const std::string key = it.key();
-        if (key == "id" || key == "executed") {
-            continue;
+    std::function<std::vector<json>(const json &)> expand_entry_variants;
+    expand_entry_variants = [&](const json &entry) -> std::vector<json> {
+        if (!entry.is_object()) {
+            throw std::invalid_argument("Each benchmark entry must be a JSON object.");
         }
 
-        if (it.value().is_array()) {
+        // Support lists of JSON objects inside the main config object.
+        // Example:
+        // {
+        //   "timeout": 10,
+        //   "cases": [ {"circuit":"a"}, {"circuit":"b"} ]
+        // }
+        // The key containing the list ("cases" here) is treated as expansion-only
+        // and is not copied to generated entries.
+        for (auto it = entry.begin(); it != entry.end(); ++it) {
+            const std::string key = it.key();
+            if (is_runtime_key(key) || !it.value().is_array()) {
+                continue;
+            }
             if (it.value().empty()) {
                 throw std::invalid_argument("Field '" + key + "' cannot be an empty list.");
             }
 
-            std::vector<json> values;
-            values.reserve(it.value().size());
-            for (const auto &value : it.value()) {
-                values.push_back(value);
+            bool all_objects = true;
+            for (const auto &candidate : it.value()) {
+                if (!candidate.is_object()) {
+                    all_objects = false;
+                    break;
+                }
             }
-            values_per_key.push_back(std::move(values));
-        } else {
-            values_per_key.push_back({it.value()});
+            if (!all_objects) {
+                continue;
+            }
+
+            json base_entry = entry;
+            base_entry.erase(key);
+            std::vector<json> expanded_group;
+            for (const auto &obj_override : it.value()) {
+                json merged_entry = base_entry;
+                for (auto override_it = obj_override.begin(); override_it != obj_override.end(); ++override_it) {
+                    merged_entry[override_it.key()] = override_it.value();
+                }
+
+                std::vector<json> nested = expand_entry_variants(merged_entry);
+                expanded_group.insert(expanded_group.end(), nested.begin(), nested.end());
+            }
+            return expanded_group;
         }
 
-        keys.push_back(key);
-    }
+        std::vector<std::string> keys;
+        std::vector<std::vector<json>> values_per_key;
+        for (auto it = entry.begin(); it != entry.end(); ++it) {
+            const std::string key = it.key();
+            if (is_runtime_key(key)) {
+                continue;
+            }
+
+            if (it.value().is_array()) {
+                if (it.value().empty()) {
+                    throw std::invalid_argument("Field '" + key + "' cannot be an empty list.");
+                }
+
+                std::vector<json> values;
+                values.reserve(it.value().size());
+                for (const auto &value : it.value()) {
+                    values.push_back(value);
+                }
+                values_per_key.push_back(std::move(values));
+            } else {
+                values_per_key.push_back({it.value()});
+            }
+
+            keys.push_back(key);
+        }
+
+        std::vector<json> generated_entries;
+        json current = json::object();
+        std::function<void(std::size_t)> build = [&](std::size_t idx) {
+            if (idx == keys.size()) {
+                generated_entries.push_back(current);
+                return;
+            }
+
+            const std::string &key = keys[idx];
+            for (const auto &value : values_per_key[idx]) {
+                current[key] = value;
+                build(idx + 1);
+            }
+        };
+
+        build(0);
+        return generated_entries;
+    };
 
     json generated = json::array();
-    json current = json::object();
-
-    std::function<void(std::size_t)> build = [&](std::size_t idx) {
-        if (idx == keys.size()) {
-            generated.push_back(current);
-            return;
-        }
-
-        const std::string &key = keys[idx];
-        for (const auto &value : values_per_key[idx]) {
-            current[key] = value;
-            build(idx + 1);
+    const auto append_expanded_entries = [&](const json &entry) {
+        const std::vector<json> expanded_entries = expand_entry_variants(entry);
+        for (const auto &expanded_entry : expanded_entries) {
+            generated.push_back(expanded_entry);
         }
     };
 
-    build(0);
+    if (source.is_object()) {
+        append_expanded_entries(source);
+    } else if (source.is_array()) {
+        for (const auto &entry : source) {
+            append_expanded_entries(entry);
+        }
+    } else {
+        throw std::invalid_argument("Input JSON must be an object or an array of objects.");
+    }
 
     std::unordered_map<std::string, json> existing_by_signature;
     std::size_t next_id = 1;
