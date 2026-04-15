@@ -13,19 +13,24 @@
 
 using json = nlohmann::json;
 
+
 inline bool extract_bench_path_arg(int argc, char **argv, std::string &bench_path) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-
-        if (arg == "--bench_path") {
+        
+        if (arg == "--bench_path" || arg == "--bench-path" || arg == "--bench") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("Missing value for --bench_path");
             }
             bench_path = argv[i + 1];
+            if (arg.rfind("--", 0) || arg.rfind("-", 0)) {
+                throw std::runtime_error("Missing value for --bench_path");
+            }
             return true;
         }
-
-        const std::string prefix = "--bench_path=";
+        
+        
+        std::string prefix = "--bench_path=";
         if (arg.rfind(prefix, 0) == 0) {
             bench_path = arg.substr(prefix.size());
             if (bench_path.empty()) {
@@ -33,9 +38,25 @@ inline bool extract_bench_path_arg(int argc, char **argv, std::string &bench_pat
             }
             return true;
         }
-    }
 
-    return false;
+        prefix = "--bench-path=";
+        if (arg.rfind(prefix, 0) == 0) {
+            bench_path = arg.substr(prefix.size());
+            if (bench_path.empty()) {
+                throw std::runtime_error("Missing value for --bench-path");
+            }
+            return true;
+        }
+
+        prefix = "--bench=";
+        if (arg.rfind(prefix, 0) == 0) {
+            bench_path = arg.substr(prefix.size());
+            if (bench_path.empty()) {
+                throw std::runtime_error("Missing value for --bench-path");
+            }
+            return true;
+        }
+    }
 }
 
 inline std::string extract_bench_name(const std::string &bench_path_arg) {

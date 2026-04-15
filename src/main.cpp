@@ -23,8 +23,6 @@
 int run_bench_mode(const std::string &bench_path_arg, char *executable);
 benchmarkResult run_one_execution_from_args(int argc, char **argv);
 
-
-
 int main(int argc, char **argv) {
     try {
         std::string bench_path;
@@ -38,10 +36,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 }
-
-
-
-
 
 benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     clear_visualization_outputs();
