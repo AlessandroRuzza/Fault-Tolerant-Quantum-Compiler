@@ -5,6 +5,7 @@
 #include "mapping.hpp"
 #include "routing.hpp"
 #include "defines.hpp"
+#include "compute_dimensions.hpp"
 
 #include <memory>
 #include <filesystem>
@@ -54,9 +55,37 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double border_distance_percentage, int maximum_iterations, std::string routing_strategy) {
 
 
+    //----------circuit------------
+
+    Circuit circuit = Circuit();
+
+    try {
+        circuit.parse_qasm_file(path);
+        auto gates = circuit.getGates();
+        for (size_t i = 0; i < gates.size(); ++i) {
+            const auto &g = gates[i];
+            if (PRINT_PARSING) std::cout << g.id << ": " << g.to_string() << "\n";
+        }
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        throw std::runtime_error("Error parsing QASM file");
+    }
+
+    if (PRINT_CIRCUIT) circuit.print_qubit_heap();
+
+    std::filesystem::path original_name = std::filesystem::path(path).stem();
+    std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
+    circuit.write_qasm_file(output_path);
+
+    //---------------graph----------------
+
     const bool use_generated_graph = graph_path.empty();
     
     if (use_generated_graph) {
+        if (x == -1 || y == -1){
+            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type);
+            y = x;
+        }
         std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
     } else {
         std::cout << "Loading graph from " << graph_path << "...\n";
@@ -82,25 +111,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         throw std::runtime_error("Error: graph has no magic states");
     }
 
-    Circuit circuit = Circuit();
-
-    try {
-        circuit.parse_qasm_file(path);
-        auto gates = circuit.getGates();
-        for (size_t i = 0; i < gates.size(); ++i) {
-            const auto &g = gates[i];
-            if (PRINT_PARSING) std::cout << g.id << ": " << g.to_string() << "\n";
-        }
-    } catch (const std::exception &e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        throw std::runtime_error("Error parsing QASM file");
-    }
-
-    if (PRINT_CIRCUIT) circuit.print_qubit_heap();
-
-    std::filesystem::path original_name = std::filesystem::path(path).stem();
-    std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
-    circuit.write_qasm_file(output_path);
 
     std::cout << "------- MAPPING ---------" << std::endl;
 
@@ -136,7 +146,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         }
     }
 
-    if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
+    graph.print_rectangular();
 
     std::cout << "------- LAYERING ---------" << std::endl;
     LayeredCircuit layeredCircuit = LayeredCircuit(circuit, 2); //Lookahead only 2 layers
