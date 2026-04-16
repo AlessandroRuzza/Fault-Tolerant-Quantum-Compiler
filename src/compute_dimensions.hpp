@@ -14,7 +14,7 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
         if (type == "homogeneous") {
             return static_cast<int>(std::round(dimension * 0.8));
         } else {
-            return static_cast<int>(std::round(dimension * 0.7));
+            return static_cast<int>(std::round(dimension * 0.8));
         }
     }
 

@@ -12,6 +12,6 @@
 
 #define PRINT_LAYER false // global variable to control layered circuit printing
 #define PRINT_ROUTING false // global variable to control routing steps printing
-#define PRINT_ROUTING_PROGRESS true // global variable to control routing layer progress printing
+#define PRINT_ROUTING_PROGRESS false // global variable to control routing layer progress printing
 
 #endif // DEFINES_HPP
