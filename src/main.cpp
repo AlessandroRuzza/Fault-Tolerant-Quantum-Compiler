@@ -280,6 +280,53 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         return last_match;
     };
 
+    const auto extract_resolved_graph_dimensions_from_log = [](const std::filesystem::path &log_path) {
+        std::ifstream in(log_path);
+        if (!in.is_open()) {
+            return std::pair<std::string, std::string> {"", ""};
+        }
+
+        std::string line;
+        std::string last_x;
+        std::string last_y;
+        const std::string marker = "resolved graph dimensions:";
+        while (std::getline(in, line)) {
+            const std::size_t marker_pos = line.find(marker);
+            if (marker_pos == std::string::npos) {
+                continue;
+            }
+
+            std::string tail = line.substr(marker_pos + marker.size());
+            while (!tail.empty() && std::isspace(static_cast<unsigned char>(tail.front()))) {
+                tail.erase(tail.begin());
+            }
+
+            std::size_t i = 0;
+            while (i < tail.size() && std::isdigit(static_cast<unsigned char>(tail[i]))) {
+                ++i;
+            }
+            if (i == 0 || i >= tail.size() || tail[i] != 'x') {
+                continue;
+            }
+            const std::string x = tail.substr(0, i);
+
+            std::size_t j = i + 1;
+            std::size_t k = j;
+            while (k < tail.size() && std::isdigit(static_cast<unsigned char>(tail[k]))) {
+                ++k;
+            }
+            if (k == j) {
+                continue;
+            }
+            const std::string y = tail.substr(j, k - j);
+
+            last_x = x;
+            last_y = y;
+        }
+
+        return std::pair<std::string, std::string> {last_x, last_y};
+    };
+
     const auto extract_error_excerpt_from_log = [](const std::filesystem::path &log_path) {
         std::ifstream in(log_path);
         if (!in.is_open()) {
@@ -384,6 +431,8 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
             std::string routing_steps;
             std::string error_excerpt;
             bool timeout_reached = false;
+            std::string resolved_graph_x;
+            std::string resolved_graph_y;
 
             std::string command;
             if (timeout_enabled) {
@@ -425,6 +474,11 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
             } else {
                 routing_steps = extract_routing_steps_from_log(log_path);
             }
+            {
+                const auto resolved_dims = extract_resolved_graph_dimensions_from_log(log_path);
+                resolved_graph_x = resolved_dims.first;
+                resolved_graph_y = resolved_dims.second;
+            }
 
             const auto end_steady = std::chrono::steady_clock::now();
             const std::chrono::duration<double> elapsed = end_steady - start_steady;
@@ -442,16 +496,17 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
             persist_expanded();
 
             const std::string circuit = get_json_field(entry, {"circuit"});
-            const std::string graph_x = get_json_field(entry, {"graph_x", "x"});
-            const std::string graph_y = get_json_field(entry, {"graph_y", "y"});
-            std::string graph_dimensions = get_json_field(entry, {"graph_dimensions"});
-            if (graph_dimensions.empty() && !graph_x.empty() && !graph_y.empty()) {
-                graph_dimensions = graph_x + "x" + graph_y;
-            }
 
             std::string circuit_graph_label = get_json_field(entry, {"circuit_graph_label"});
-            if (circuit_graph_label.empty() && !circuit.empty() && !graph_dimensions.empty()) {
-                circuit_graph_label = circuit + "-" + graph_dimensions;
+            if (circuit_graph_label.empty() && !circuit.empty() && !resolved_graph_x.empty() && !resolved_graph_y.empty()) {
+                circuit_graph_label = circuit + "-" + resolved_graph_x + "x" + resolved_graph_y;
+            }
+            std::string routing_strategy_csv = get_json_field(
+                entry,
+                {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}
+            );
+            if (routing_strategy_csv.empty()) {
+                routing_strategy_csv = "congestion";
             }
 
             write_csv::append_row(
@@ -460,13 +515,9 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     std::to_string(run_id),
                     run_date,
                     run_datetime,
-                    get_json_field(entry, {"benchmark_suite"}),
-                    get_json_field(entry, {"chart_group"}),
-                    case_id,
                     circuit,
-                    graph_x,
-                    graph_y,
-                    graph_dimensions,
+                    resolved_graph_x,
+                    resolved_graph_y,
                     circuit_graph_label,
                     get_json_field(entry, {"mapping_type", "type"}),
                     get_json_field(entry, {"magic_aware_strategy"}),
@@ -475,6 +526,7 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     get_json_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
                     get_json_field(entry, {"border_distance_percentage"}),
                     get_json_field(entry, {"number_of_magic_states"}),
+                    routing_strategy_csv,
                     routing_steps,
                     timeout_reached ? "true" : "false",
                     status,
