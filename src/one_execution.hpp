@@ -111,6 +111,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         throw std::runtime_error("Error: graph has no magic states");
     }
 
+    const int resolved_graph_x = graph.getMaxX() + 1;
+    const int resolved_graph_y = graph.getMaxY() + 1;
+    std::cout << "resolved graph dimensions: " << resolved_graph_x << "x" << resolved_graph_y << "\n";
+
 
     std::cout << "------- MAPPING ---------" << std::endl;
 
