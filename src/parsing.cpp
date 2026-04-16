@@ -443,7 +443,8 @@ void apply_config_overrides(
             throw std::runtime_error("Config key 'x' must be an integer");
         }
         x = config_json["x"].get<int>();
-        if (x <= 0) {
+        // -1 means compute from circuit dimensions
+        if (x <= 0 && x != -1) {
             throw std::runtime_error("Config key 'x' must be > 0");
         }
     }
@@ -453,7 +454,8 @@ void apply_config_overrides(
             throw std::runtime_error("Config key 'y' must be an integer");
         }
         y = config_json["y"].get<int>();
-        if (y <= 0) {
+        // -1 means compute from circuit dimensions
+        if (y <= 0 && y != -1) {
             throw std::runtime_error("Config key 'y' must be > 0");
         }
     }
@@ -690,7 +692,10 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --x");
             }
-            x = parse_positive_integer(argv[++i], "--x");
+            // -1 means compute from circuit dimensions
+            if (x != -1) {
+                x = parse_positive_integer(argv[++i], "--x");
+            }
             continue;
         }
 
@@ -700,7 +705,10 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --y");
             }
-            y = parse_positive_integer(argv[++i], "--y");
+            // -1 means compute from circuit dimensions
+            if (y != -1) {
+                y = parse_positive_integer(argv[++i], "--y");
+            }
             continue;
         }
 

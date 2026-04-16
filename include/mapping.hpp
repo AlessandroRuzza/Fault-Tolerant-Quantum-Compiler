@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <cctype>
 #include <cmath>
 
@@ -253,10 +254,20 @@ public:
         graph_to_circuit.clear();
     }
 
-    const bool mapToNeighbor(int qubit, int node_id, int iterations);
+    const bool mapToNeighbor(
+        int qubit,
+        int node_id,
+        int iterations,
+        std::unordered_set<int>* visited_nodes = nullptr
+    );
 
 
-    int map_qubit_to_node(int qubit, int node, int iterations);
+    int map_qubit_to_node(
+        int qubit,
+        int node,
+        int iterations,
+        std::unordered_set<int>* visited_nodes = nullptr
+    );
 
 
     // ----------mapping algorithms----------

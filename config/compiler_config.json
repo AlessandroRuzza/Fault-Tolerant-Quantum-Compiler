@@ -1,7 +1,7 @@
 {
-  "circuit": "factor247_n15",
+  "circuit": "continuous_3_17_13",
 
-  "type": "gaussian",
+  "type": "homogeneous",
   "magic_aware_strategy": "center",
   "gaussian_strategy": "coarse",
   "safe_passage_strategy": "cube",
@@ -16,8 +16,8 @@
   "MAPPED_GAUSSIAN_WEIGHT": 0.8,
   "BASE_GAUSSIAN_WEIGHT": 1.0,
   
-  "x": 20,
-  "y": 20,
+  "x": -1,
+  "y": -1,
 
   "routing_strategy": "congestion"
 }
