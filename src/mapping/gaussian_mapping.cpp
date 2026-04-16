@@ -166,9 +166,12 @@ void update_gaussians_coarse(
 
         std::vector<int> highCnotQubits = qubit->highCnotQubits(cnot_threshold);
 
-        std::cout << "Qubits with CNOT count above threshold (" << cnot_threshold << "): ";
-        for (int i : highCnotQubits) {
-            std::cout << i << " ";
+        if (MAPPING_VERBOSE) {
+            std::cout << "Qubits with CNOT count above threshold (" << cnot_threshold << "): ";
+            for (int i : highCnotQubits) {
+                std::cout << i << " ";
+            }
+            std::cout << "\n";
         }
         
         for (int i : highCnotQubits) {
