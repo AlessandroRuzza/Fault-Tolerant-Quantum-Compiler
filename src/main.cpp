@@ -60,6 +60,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::string graph_path = "";
     std::string magic_state_placement_strategy = "center_circle";
     int number_of_magic_states = 10;
+    double number_of_magic_states_multiplier = 0.0;
     double border_distance_percentage = 10.0;
     int x = 10;
     int y = 11;
@@ -86,6 +87,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         graph_path,
         magic_state_placement_strategy,
         number_of_magic_states,
+        number_of_magic_states_multiplier,
         border_distance_percentage, 
         routing_strategy
     );
@@ -109,6 +111,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         graph_path,
         magic_state_placement_strategy,
         number_of_magic_states,
+        number_of_magic_states_multiplier,
         border_distance_percentage,
         routing_strategy
     );
@@ -125,7 +128,12 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
-    std::cout << "number_of_magic_states: " << number_of_magic_states << std::endl;
+    if (number_of_magic_states_multiplier > 0.0) {
+        std::cout << "number_of_magic_states: qubits*" << number_of_magic_states_multiplier
+                  << " (resolved at runtime)" << std::endl;
+    } else {
+        std::cout << "number_of_magic_states: " << number_of_magic_states << std::endl;
+    }
     std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
     std::cout << "routing strategy: " << routing_strategy << std::endl;
     if (!graph_path.empty()) {
@@ -151,6 +159,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         graph_path,
         magic_state_placement_strategy,
         number_of_magic_states,
+        number_of_magic_states_multiplier,
         border_distance_percentage,
         maximum_iterations,
         routing_strategy

@@ -38,6 +38,9 @@ public:
 
     static MagicStatePlacementStrategy parse_magic_state_placement_strategy(const std::string& strategy_name);
 
+    const MagicStatePlacementStrategy get_magic_state_placement_strategy() const {
+        return magic_state_placement_strategy;
+    }
 
     using SpMat = Eigen::SparseMatrix<int, Eigen::RowMajor>;
     using Triplet = Eigen::Triplet<int>;

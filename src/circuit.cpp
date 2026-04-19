@@ -77,6 +77,8 @@ void Circuit::parse_qasm_file(const std::string &path) {
             continue;
         }
         if (s.rfind("creg", 0) == 0) continue;
+        if (s.rfind("barrier", 0) == 0) continue;
+        if (s.rfind("measure", 0) == 0) continue;
 
         std::smatch m;
         if (std::regex_search(s, m, gate_re)) {

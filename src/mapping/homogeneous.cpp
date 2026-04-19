@@ -21,6 +21,11 @@ void Mapping::homogeneous_mapping() {
                 if (std::find(magic_state_ids.begin(), magic_state_ids.end(), node_id) != magic_state_ids.end()) {
                     continue;
                 }
+                // safe_passage fallback may place the current qubit on a different
+                // node that will be visited later by this scan.
+                if (graph.is_occupied(node_id)) {
+                    continue;
+                }
                 map_qubit_to_node(qubit_id, node_id, 0);
                 ++mapped;
                 ++qubit_id;

@@ -1,0 +1,16 @@
+{
+  "circuit": ["qft_20", "continuous_3_17_13", "dnn_n16", "example", "adder_n64_transpiled", "bb84_n8", "bigadder_n18_transpiled", "cat_n130", "ghz_state_n23", "ghz_n255", "qaoa_n6", "wstate_n27"],
+  "type": "homogeneous",
+  "safe_passage_strategy": "passage",
+  "MagicStatePlacementStrategy": "center_circle", 
+  "border_distance_percentage": 1.0,
+  "number_of_magic_states": 0.8,
+
+  "x": -1,
+  "y": -1,
+
+  "timeout": 3600,
+  "timeout_reached": false,
+  "routing_strategy": "congestion"
+
+}
