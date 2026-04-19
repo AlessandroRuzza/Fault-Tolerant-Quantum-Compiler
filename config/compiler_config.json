@@ -6,8 +6,8 @@
   "gaussian_strategy": "coarse",
   "safe_passage_strategy": "passage",
   "MagicStatePlacementStrategy": "center_circle",
-  "number_of_magic_states": 0.8,
-  "border_distance_percentage": 1.0,
+  "number_of_magic_states": 0.7,
+  "border_distance_percentage": 0.0,
 
   "MAGIC_HIGH": 1.5,
   "MAGIC_LOW": 0.5,
@@ -21,6 +21,3 @@
 
   "routing_strategy": "congestion"
 }
-
-
-
