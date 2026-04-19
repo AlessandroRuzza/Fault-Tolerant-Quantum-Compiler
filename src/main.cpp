@@ -518,6 +518,13 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                 routing_strategy_csv = "congestion";
             }
 
+            const std::string mw = get_json_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
+            const std::string bw = get_json_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
+            const std::string mh = get_json_field(entry, {"MAGIC_HIGH", "magic_high"});
+            const std::string ml = get_json_field(entry, {"MAGIC_LOW", "magic_low"});
+            const std::string ch = get_json_field(entry, {"CNOT_HIGH", "cnot_high"});
+            const std::string cl = get_json_field(entry, {"CNOT_LOW", "cnot_low"});
+
             write_csv::append_row(
                 csv_path,
                 {
@@ -531,6 +538,12 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     get_json_field(entry, {"mapping_type", "type"}),
                     get_json_field(entry, {"magic_aware_strategy"}),
                     get_json_field(entry, {"gaussian_strategy"}),
+                    mh,
+                    ml,
+                    ch,
+                    cl,
+                    mw,
+                    bw,
                     get_json_field(entry, {"safe_passage_strategy"}),
                     get_json_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
                     get_json_field(entry, {"border_distance_percentage"}),
@@ -545,13 +558,6 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     limit_text(compact_line(error_excerpt), 300)
                 }
             );
-
-            const std::string mw = get_json_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
-            const std::string bw = get_json_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
-            const std::string mh = get_json_field(entry, {"MAGIC_HIGH", "magic_high"});
-            const std::string ml = get_json_field(entry, {"MAGIC_LOW", "magic_low"});
-            const std::string ch = get_json_field(entry, {"CNOT_HIGH", "cnot_high"});
-            const std::string cl = get_json_field(entry, {"CNOT_LOW", "cnot_low"});
 
             if (status == "success") {
                 std::cout
