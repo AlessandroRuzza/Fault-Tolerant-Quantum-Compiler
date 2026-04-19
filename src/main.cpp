@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cctype>
+#include <csignal>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -23,6 +24,16 @@
 
 #include <sys/wait.h>
 
+
+namespace {
+volatile std::sig_atomic_t g_bench_interrupt_requested = 0;
+volatile std::sig_atomic_t g_bench_interrupt_signal = 0;
+
+void handle_bench_interrupt(int signal_number) {
+    g_bench_interrupt_requested = 1;
+    g_bench_interrupt_signal = signal_number;
+}
+} // namespace
 
 int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rerun_timeouts);
 benchmarkResult run_one_execution_from_args(int argc, char **argv);
@@ -381,8 +392,32 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         return best_hint.empty() ? last_non_empty : best_hint;
     };
 
+    g_bench_interrupt_requested = 0;
+    g_bench_interrupt_signal = 0;
+    using SignalHandler = void (*)(int);
+    const SignalHandler previous_sigint_handler = std::signal(SIGINT, handle_bench_interrupt);
+    const SignalHandler previous_sigterm_handler = std::signal(SIGTERM, handle_bench_interrupt);
+    const SignalHandler previous_sighup_handler = std::signal(SIGHUP, handle_bench_interrupt);
+    auto restore_signal_handlers = [&]() {
+        if (previous_sigint_handler != SIG_ERR) {
+            std::signal(SIGINT, previous_sigint_handler);
+        }
+        if (previous_sigterm_handler != SIG_ERR) {
+            std::signal(SIGTERM, previous_sigterm_handler);
+        }
+        if (previous_sighup_handler != SIG_ERR) {
+            std::signal(SIGHUP, previous_sighup_handler);
+        }
+    };
+
     try {
         for (std::size_t i = 0; i < bench_data.size(); ++i) {
+            if (g_bench_interrupt_requested != 0) {
+                final_exit_code = 130;
+                std::cout << "\nInterrupt received. Stopping benchmark loop.\n";
+                break;
+            }
+
             if (!bench_data.at(i).is_object()) {
                 throw std::runtime_error("Bench entry " + std::to_string(i + 1) + " must be a JSON object.");
             }
@@ -461,10 +496,28 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     " 2>&1";
             }
 
-            exit_code = decode_system_exit_code(std::system(command.c_str()));
-            timeout_reached = timeout_enabled && exit_code == 124;
+            const int system_rc = std::system(command.c_str());
+            exit_code = decode_system_exit_code(system_rc);
+            const bool interrupted_by_signal =
+                system_rc != -1 &&
+                WIFSIGNALED(system_rc) &&
+                (WTERMSIG(system_rc) == SIGINT || WTERMSIG(system_rc) == SIGTERM || WTERMSIG(system_rc) == SIGHUP);
+            const bool interrupted_by_exit_code = (exit_code == 130) || (exit_code == 143) || (exit_code == 129);
+            const bool interrupted = (g_bench_interrupt_requested != 0) || interrupted_by_signal || interrupted_by_exit_code;
+            if (interrupted && g_bench_interrupt_requested == 0) {
+                g_bench_interrupt_requested = 1;
+                if (interrupted_by_signal) {
+                    g_bench_interrupt_signal = WTERMSIG(system_rc);
+                }
+            }
 
-            if (timeout_reached) {
+            timeout_reached = !interrupted && timeout_enabled && exit_code == 124;
+
+            if (interrupted) {
+                status = "interrupted";
+                final_exit_code = 130;
+                error_excerpt = "Execution interrupted by SIGINT (Ctrl+C)";
+            } else if (timeout_reached) {
                 status = "timeout";
                 // Timeout is tracked in CSV, but should not fail the whole benchmark target.
                 std::ostringstream timeout_ss;
@@ -500,7 +553,8 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                 error_excerpt = "Execution failed";
             }
 
-            entry["executed"] = true;
+            const bool mark_entry_as_executed = (status != "interrupted");
+            entry["executed"] = mark_entry_as_executed;
             entry["timeout_reached"] = timeout_reached;
             persist_expanded();
 
@@ -582,6 +636,13 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     << " duration=" << duration_short_ss.str()
                     << " timeout_reached=true"
                     << "\n";
+            } else if (status == "interrupted") {
+                std::cout
+                    << "[" << (i + 1) << "/" << total_cases << "] INTERRUPTED"
+                    << " #" << run_id
+                    << " " << empty_to_dash(case_id)
+                    << " duration=" << duration_short_ss.str()
+                    << "\n";
             } else {
                 std::cout
                     << "[" << (i + 1) << "/" << total_cases << "] FAIL"
@@ -591,12 +652,19 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120))
                     << "\n";
             }
+
+            if (status == "interrupted") {
+                std::cout << "Stopping benchmark on Ctrl+C.\n";
+                break;
+            }
         }
     } catch (...) {
+        restore_signal_handlers();
         cleanup_temp();
         throw;
     }
 
+    restore_signal_handlers();
     cleanup_temp();
     return final_exit_code;
 }

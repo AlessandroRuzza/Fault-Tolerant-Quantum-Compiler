@@ -11,7 +11,7 @@ if [ -z "$binary_path" ] || [ -z "$bench_path" ]; then
 fi
 
 if [ -n "$rerun_timeouts" ] && [ "$rerun_timeouts" != "0" ] && [ "$rerun_timeouts" != "false" ] && [ "$rerun_timeouts" != "False" ]; then
-    "$binary_path" --bench_path "$bench_path" --rerun-timeouts
+    exec "$binary_path" --bench_path "$bench_path" --rerun-timeouts
 else
-    "$binary_path" --bench_path "$bench_path"
+    exec "$binary_path" --bench_path "$bench_path"
 fi
