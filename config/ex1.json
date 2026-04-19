@@ -1,9 +1,9 @@
 {
-  "circuit": ["qft_20", "continuous_3_17_13", "dnn_n16", "example"],
+  "circuit": ["qft_20", "continuous_3_17_13", "dnn_n16", "example", "adder_n64_transpiled", "bb84_n8", "bigadder_n18_transpiled", "cat_n130", "ghz_state_n23", "ghz_n255", "qaoa_n6", "wstate_n27"],
   "safe_passage_strategy": ["cube", "passage"],
   "MagicStatePlacementStrategy": ["center_circle", "right_row"],
   "border_distance_percentage": [0.0, 5.0],
-  "number_of_magic_states": 10,
+  "number_of_magic_states": [0.7, 0.9],
 
   "MAGIC_HIGH": 1.5,
   "MAGIC_LOW": 0.5,
