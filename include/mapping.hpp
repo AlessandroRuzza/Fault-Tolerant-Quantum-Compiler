@@ -109,7 +109,7 @@ private:
     int CNOT_threshold;
     int maximum_iterations;
     FarthestFromMagicSelector farthest_from_magic_selector;
-
+    int safe_passage_ignore_outer_layers;
 
 public:
 
@@ -126,7 +126,8 @@ public:
         double cnot_low,
         double mapped_gaussian_weight,
         double base_gaussian_weight,
-        int maximum_iterations
+        int maximum_iterations,
+        int safe_passage_ignore_outer_layers
     ) :
     circuit(circuit),
     graph(graph),
@@ -137,6 +138,7 @@ public:
     mappedGaussianWeight(mapped_gaussian_weight),
     baseGaussianWeight(base_gaussian_weight),
     maximum_iterations(maximum_iterations),
+    safe_passage_ignore_outer_layers(safe_passage_ignore_outer_layers),
     farthest_from_magic_selector(graph)  {
         if (!set_mapping_strategy(magic_aware_strategy_name)) {
             throw std::invalid_argument("Invalid magic-aware strategy: " + magic_aware_strategy_name);

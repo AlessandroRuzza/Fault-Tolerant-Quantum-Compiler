@@ -107,6 +107,10 @@ public:
         return magic_states_ids;
     }
 
+    inline int get_magic_state_size() const {
+        return magic_states_ids.size();
+    }
+
 
 
     // ---------get_coord-----------

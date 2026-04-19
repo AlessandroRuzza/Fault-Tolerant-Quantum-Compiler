@@ -57,7 +57,6 @@ public:
     }
 
     inline void setupCircuit(int num_qubits) {
-        std::cout << "Setting up circuit with " << num_qubits << " qubits." << std::endl;
         qubitsHeap = MaxHeap<Qubit*>(num_qubits);
         qubitsVector = std::vector<Qubit*>(num_qubits, nullptr);
     }

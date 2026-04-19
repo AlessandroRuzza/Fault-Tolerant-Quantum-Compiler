@@ -8,8 +8,10 @@
 #include "compute_dimensions.hpp"
 
 #include <memory>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <unordered_set>
 
 using namespace std;
@@ -51,7 +53,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::string gaussian_strategy, std::string safe_passage_strategy, double magic_high, 
     double magic_low, double cnot_high, double cnot_low, double mapped_gaussian_weight, 
     double base_gaussian_weight, int x, int y, std::string graph_path, 
-    std::string magic_state_placement_strategy, int number_of_magic_states, 
+    std::string magic_state_placement_strategy, int number_of_magic_states,
+    double number_of_magic_states_multiplier,
     double border_distance_percentage, int maximum_iterations, std::string routing_strategy) {
 
 
@@ -73,6 +76,25 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     if (PRINT_CIRCUIT) circuit.print_qubit_heap();
 
+    std::cout << "Setting up circuit with " << circuit.getNumQubits() << " qubits." << std::endl;
+
+    if (number_of_magic_states_multiplier > 0.0) {
+        number_of_magic_states = static_cast<int>(std::round(static_cast<double>(circuit.getNumQubits()) * number_of_magic_states_multiplier));
+        if (!std::isfinite(number_of_magic_states) || number_of_magic_states <= 0.0) {
+            throw std::runtime_error("Resolved number_of_magic_states must be > 0");
+        }
+
+        if (number_of_magic_states < 1) {
+            number_of_magic_states = 1;
+        }
+
+
+        std::cout
+            << "Resolved number_of_magic_states from multiplier: "
+            << circuit.getNumQubits() << " * " << number_of_magic_states_multiplier
+            << " -> " << number_of_magic_states << "\n";
+    }
+
     std::filesystem::path original_name = std::filesystem::path(path).stem();
     std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
     circuit.write_qasm_file(output_path);
@@ -83,12 +105,22 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     
     if (use_generated_graph) {
         if (x == -1 || y == -1){
-            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type);
+            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type, border_distance_percentage);
             y = x;
         }
         std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
     } else {
         std::cout << "Loading graph from " << graph_path << "...\n";
+    }
+
+
+    int safe_passage_ignore_outer_layers = 0;
+    if (magic_state_placement_strategy == "center_circle" &&
+        number_of_magic_states > 2*x + 2*y - 5) {
+        
+        safe_passage_ignore_outer_layers = 1;
+        border_distance_percentage = 0.0;
+        std::cout << "Safe passage will ignore outer layer of graph due to large number of magic states with center_circle placement strategy.\n";
     }
 
     Graph graph(
@@ -134,7 +166,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        maximum_iterations
+        maximum_iterations,
+        safe_passage_ignore_outer_layers
     );
 
     mapping.map();

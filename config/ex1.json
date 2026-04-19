@@ -22,12 +22,10 @@
   "configs": [
     {
       "type": "gaussian",
-      "magic_aware_strategy": "center",
       "gaussian_strategy": ["coarse", "fine"]
     },
     {
-      "type": "homogeneous",
-      "magic_aware_strategy": "center"
+      "type": "homogeneous"
     },
     {
       "type": "magic_aware",

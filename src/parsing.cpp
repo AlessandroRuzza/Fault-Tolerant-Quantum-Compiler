@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -84,6 +85,34 @@ int parse_positive_integer(const std::string& value, const char* flag_name) {
     }
 
     return parsed_value;
+}
+
+bool is_effectively_integer(double value) {
+    constexpr double kEpsilon = 1e-9;
+    return std::fabs(value - std::round(value)) < kEpsilon;
+}
+
+void assign_magic_state_count_or_multiplier(
+    double parsed_value,
+    const std::string& source_name,
+    int& number_of_magic_states,
+    double& number_of_magic_states_multiplier
+) {
+    if (!std::isfinite(parsed_value) || parsed_value <= 0.0) {
+        throw std::runtime_error(source_name + " must be a finite number > 0");
+    }
+
+    if (is_effectively_integer(parsed_value)) {
+        const double rounded = std::round(parsed_value);
+        if (rounded > static_cast<double>(std::numeric_limits<int>::max())) {
+            throw std::runtime_error(source_name + " is too large");
+        }
+        number_of_magic_states = static_cast<int>(rounded);
+        number_of_magic_states_multiplier = 0.0;
+        return;
+    }
+
+    number_of_magic_states_multiplier = parsed_value;
 }
 
 double parse_non_negative_double(const std::string& value, const char* flag_name) {
@@ -219,7 +248,7 @@ void print_usage(const char* executable) {
               << "[--gaussian-strategy [" << Mapping::available_gaussian_strategies() << "]]\n"
               << "[--safe-passage [" << Mapping::available_safe_passage_strategies() << "]]\n"
               << "[--magic-state-placement-strategy [" << Graph::available_magic_state_placement_strategies() << "]]\n"
-              << "[--number-of-magic-states <integer> >0]\n"
+              << "[--number-of-magic-states <integer|float> >0]\n"
               << "[--border-distance-percentage <float> in [0,100]]\n"
               << "[--magic-high <float>=0]\n"
               << "[--magic-low <float>=0]\n"
@@ -259,6 +288,7 @@ void apply_config_overrides(
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,
+    double& number_of_magic_states_multiplier,
     double& border_distance_percentage,
     std::string& routing_method
 ) {
@@ -403,13 +433,16 @@ void apply_config_overrides(
         if (!config_json.contains(key)) {
             return false;
         }
-        if (!config_json[key].is_number_integer()) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be an integer");
+        if (!config_json[key].is_number()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
         }
-        number_of_magic_states = config_json[key].get<int>();
-        if (number_of_magic_states <= 0) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be > 0");
-        }
+        const double parsed_value = config_json[key].get<double>();
+        assign_magic_state_count_or_multiplier(
+            parsed_value,
+            std::string("Config key '") + key + "'",
+            number_of_magic_states,
+            number_of_magic_states_multiplier
+        );
         return true;
     };
 
@@ -510,6 +543,7 @@ void argument_parsing(
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,
+    double& number_of_magic_states_multiplier,
     double& border_distance_percentage,
     std::string& routing_method
 ) {
@@ -670,7 +704,13 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --number-of-magic-states");
             }
-            number_of_magic_states = parse_positive_integer(argv[++i], "--number-of-magic-states");
+            const double parsed_value = parse_non_negative_double(argv[++i], "--number-of-magic-states");
+            assign_magic_state_count_or_multiplier(
+                parsed_value,
+                "--number-of-magic-states",
+                number_of_magic_states,
+                number_of_magic_states_multiplier
+            );
             continue;
         }
 

@@ -141,7 +141,8 @@ bool has_exit_path_from_occupied(
     const Node& occupied_node,
     const std::vector<Node>& blocked_nodes,
     int width,
-    int height
+    int height,
+    int safe_passage_ignore_outer_layers
 );
 
 
@@ -198,7 +199,7 @@ bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_n
     }
 
     for (const Node& occupied_node : occupied_after) {
-        if (!has_exit_path_from_occupied(occupied_node, blocked_nodes, width, height)) {
+        if (!has_exit_path_from_occupied(occupied_node, blocked_nodes, width, height, safe_passage_ignore_outer_layers)) {
             return false;
         }
     }
@@ -215,8 +216,29 @@ bool has_exit_path_from_occupied(
     const Node& occupied_node,
     const std::vector<Node>& blocked_nodes,
     int width,
-    int height
+    int height,
+    int safe_passage_ignore_outer_layers
 ) {
+    int min_x = 0;
+    int min_y = 0;
+    int max_x = width - 1;
+    int max_y = height - 1;
+
+    const int ignored_outer_layers = std::max(0, safe_passage_ignore_outer_layers);
+    min_x += ignored_outer_layers;
+    min_y += ignored_outer_layers;
+    max_x -= ignored_outer_layers;
+    max_y -= ignored_outer_layers;
+
+
+    if (min_x > max_x || min_y > max_y) {
+        return false;
+    }
+
+    const auto is_inside_effective_area = [min_x, min_y, max_x, max_y](int x, int y) {
+        return x >= min_x && x <= max_x && y >= min_y && y <= max_y;
+    };
+
     const auto is_blocked = [&blocked_nodes](int x, int y) {
         for (const Node& blocked : blocked_nodes) {
             if (blocked.coordX == x && blocked.coordY == y) {
@@ -226,29 +248,36 @@ bool has_exit_path_from_occupied(
         return false;
     };
 
+    if (!is_inside_effective_area(occupied_node.coordX, occupied_node.coordY)) {
+        // This node belongs to the ignored outer layers.
+        return true;
+    }
+
     if (occupied_node.coordX < 0 || occupied_node.coordX >= width || occupied_node.coordY < 0 || occupied_node.coordY >= height) {
         return false;
     }
 
-    if (occupied_node.coordY == 0 && (occupied_node.coordY + 1 >= height || is_blocked(occupied_node.coordX, occupied_node.coordY + 1))) {
+    if (occupied_node.coordY == min_y && (occupied_node.coordY + 1 > max_y || is_blocked(occupied_node.coordX, occupied_node.coordY + 1))) {
         return false;
     }
-    if (occupied_node.coordY == height - 1 && (occupied_node.coordY - 1 < 0 || is_blocked(occupied_node.coordX, occupied_node.coordY - 1))) {
+    if (occupied_node.coordY == max_y && (occupied_node.coordY - 1 < min_y || is_blocked(occupied_node.coordX, occupied_node.coordY - 1))) {
         return false;
     }
-    if (occupied_node.coordX == 0 && (occupied_node.coordX + 1 >= width || is_blocked(occupied_node.coordX + 1, occupied_node.coordY))) {
+    if (occupied_node.coordX == min_x && (occupied_node.coordX + 1 > max_x || is_blocked(occupied_node.coordX + 1, occupied_node.coordY))) {
         return false;
     }
-    if (occupied_node.coordX == width - 1 && (occupied_node.coordX - 1 < 0 || is_blocked(occupied_node.coordX - 1, occupied_node.coordY))) {
+    if (occupied_node.coordX == max_x && (occupied_node.coordX - 1 < min_x || is_blocked(occupied_node.coordX - 1, occupied_node.coordY))) {
         return false;
     }
 
-    std::vector<char> visited(static_cast<std::size_t>(width * height), 0);
+    const int effective_width = max_x - min_x + 1;
+    const int effective_height = max_y - min_y + 1;
+    std::vector<char> visited(static_cast<std::size_t>(effective_width * effective_height), 0);
     std::vector<std::pair<int, int>> queue;
-    queue.reserve(static_cast<std::size_t>(width * height));
+    queue.reserve(static_cast<std::size_t>(effective_width * effective_height));
 
-    const auto index = [width](int x, int y) {
-        return y * width + x;
+    const auto index = [min_x, min_y, effective_width](int x, int y) {
+        return (y - min_y) * effective_width + (x - min_x);
     };
 
     const int directions[4][2] = {
@@ -263,7 +292,7 @@ bool has_exit_path_from_occupied(
     for (const auto& direction : directions) {
         const int nx = occupied_node.coordX + direction[0];
         const int ny = occupied_node.coordY + direction[1];
-        if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
+        if (!is_inside_effective_area(nx, ny)) {
             continue;
         }
         if (is_blocked(nx, ny)) {
@@ -284,14 +313,14 @@ bool has_exit_path_from_occupied(
         const int x = queue[head].first;
         const int y = queue[head].second;
 
-        if (x == 0 || x == width - 1 || y == 0 || y == height - 1) {
+        if (x == min_x || x == max_x || y == min_y || y == max_y) {
             return true;
         }
 
         for (const auto& direction : directions) {
             const int nx = x + direction[0];
             const int ny = y + direction[1];
-            if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
+            if (!is_inside_effective_area(nx, ny)) {
                 continue;
             }
             if (is_blocked(nx, ny)) {
