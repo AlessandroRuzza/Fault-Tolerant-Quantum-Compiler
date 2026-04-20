@@ -1,4 +1,23 @@
 #include "routing.hpp"
+#include <map>
+#include <iomanip>
+
+namespace {
+void print_non_routed_histogram(const std::map<std::size_t, std::size_t>& non_routed_histogram) {
+    std::cout << "\n\033[35mNon-routed gates histogram (top layer per step)\033[0m\n";
+    const int col1w = 45;
+    const int col2w = 8;
+    std::cout << "\033[35m" << std::left
+              << std::setw(col1w) << "number of non routed gates in the top layer"
+              << std::right << std::setw(col2w) << "count"
+              << "\033[0m\n";
+    std::cout << "\033[35m" << std::string(col1w + col2w, '-') << "\033[0m\n";
+    for (const auto& [value, count] : non_routed_histogram) {
+        std::cout << "\033[35m" << std::left << std::setw(col1w) << value
+                  << std::right << std::setw(col2w) << count << "\033[0m\n";
+    }
+}
+}
 
 float QubitRouter::minGateRouteLength(const Gate& g) const {
     if (g.qubits.empty()) {
@@ -130,6 +149,7 @@ void QubitRouter::route_circuit() {
 
     routing_steps.clear();
     routing_steps.reserve(circuit.getNumLayers());
+    std::map<std::size_t, std::size_t> non_routed_histogram;
 
     while(circuit.getNumLayers() > 0){
         const Layer& topLayer = circuit.getLayer(0);
@@ -155,6 +175,8 @@ void QubitRouter::route_circuit() {
         *                instead scan the 2nd layer and move gates to first layer.
         */
         Routing route = route_layer(topLayer);
+        const std::size_t non_routed = topLayer.size() - route.size();
+        non_routed_histogram[non_routed]++;
         if(route.size() == 0){
             std::cout << "ERROR trying to route layer with " << topLayer.size() << " gates:" << std::endl;
             for (const auto& gate : topLayer) {
@@ -182,6 +204,7 @@ void QubitRouter::route_circuit() {
 
     
     std::cout << "Qubit routing completed.\n";
+    print_non_routed_histogram(non_routed_histogram);
 }
 
 void QubitRouter::print_routing_steps() const {
