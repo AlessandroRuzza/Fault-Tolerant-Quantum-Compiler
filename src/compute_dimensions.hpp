@@ -11,7 +11,10 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
         //return dimension;
     }
 
-    else if (safe_passage_strategy == "passage") {
+    else if (
+        safe_passage_strategy == "passage" ||
+        safe_passage_strategy == "passage_no_subgraphs"
+    ) {
         if (type == "homogeneous") {
             dimension = dimension * 0.7;
         } else if (type == "gaussian") {
@@ -23,4 +26,3 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
 
     return static_cast<int>(std::round(std::sqrt(dimension) * (1.1 + border_distance_percentage/100.0)));
 }
-

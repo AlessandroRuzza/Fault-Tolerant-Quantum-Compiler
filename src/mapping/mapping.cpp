@@ -207,10 +207,62 @@ bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_n
     return true;
 }
 
+bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes, int width, int height) {
+    // TODO: implement a connectivity check that rejects placements splitting the free lattice into disconnected subgraphs.
+    std::queue<Node> node_queue;
+    node_queue.push(node);
+    std::unordered_set<int> visited_ids;
 
+    const auto magic_ids = graph.get_magic_state_ids();
+    std::unordered_set<int> magic_ids_set(magic_ids.begin(), magic_ids.end());
 
+    int num_touching_borders = 0;
 
+    for (Node current = node_queue.front(); !node_queue.empty() && num_touching_borders < 2;
+         node_queue.pop(), current = node_queue.empty() ? current : node_queue.front()) {
 
+        if (visited_ids.count(current.id) > 0) continue;
+        
+
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (dx == 0 && dy == 0) continue; // salta il nodo centrale
+
+                const int nx = current.coordX + dx;  // era node.coordX
+                const int ny = current.coordY + dy;  // era node.coordY
+
+                if (nx < 0 || nx > graph.getMaxX() || ny < 0 || ny > graph.getMaxY()) continue;
+
+                const int nid = ny * width + nx;
+
+                if (visited_ids.count(nid) == 0 && (graph.is_occupied(nid) || graph.get_magic_state_ids().contains(nid))) {
+                    node_queue.push(graph.get_node(nid));
+                }
+            }
+        }
+            // Check if the current node touches the border of the lattice
+        if (current.coordX == 0 || current.coordX == graph.getMaxX() || current.coordY == 0 || current.coordY == graph.getMaxY()) {
+            for (int vid : visited_ids) {
+                const Node& v = graph.get_node(vid);
+                if (v.coordX == 0 || v.coordX == graph.getMaxX() ||
+                    v.coordY == 0 || v.coordY == graph.getMaxY()) {
+                    if (std::abs(v.coordX - current.coordX) > 1 ||
+                        std::abs(v.coordY - current.coordY) > 1) {
+                        num_touching_borders++;
+                        break;
+                    }
+                }
+            }
+        }
+        visited_ids.insert(current.id);
+    }
+    
+    if (num_touching_borders < 2 && safe_passage(node, occupied_nodes, width, height)) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
 bool has_exit_path_from_occupied(
     const Node& occupied_node,
