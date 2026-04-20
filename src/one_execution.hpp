@@ -199,8 +199,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     } else { // default to congestion-aware
         pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
     }
-    NaiveShortestPath pathStrat(graph);
-    QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
+    // NaiveShortestPath pathStrat(graph);
+    // QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
+    QubitRouter router(mapping, layeredCircuit, graph, pathStrategyPtr.get());
     router.route_circuit();    
     if (PRINT_ROUTING) router.print_routing_steps();
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n";
