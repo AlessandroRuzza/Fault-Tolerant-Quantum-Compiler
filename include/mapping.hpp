@@ -53,6 +53,7 @@ public:
 
     enum class SafePassageStrategy {
         PASSAGE,
+        PASSAGE_NO_SUBGRAPHS,
         CUBE
     };
 
@@ -69,7 +70,7 @@ public:
     }
 
     static vector<std::string> get_available_safe_passage_strategies() {
-        return {"passage", "cube"};
+        return {"passage", "passage_no_subgraphs", "cube"};
     }
 
 
@@ -86,7 +87,7 @@ public:
     }
 
     static std::string available_safe_passage_strategies() {
-        return "passage | cube";
+        return "passage | passage_no_subgraphs | cube";
     }
 
 
@@ -195,6 +196,8 @@ public:
         switch (safePassageStrategy) {
             case SafePassageStrategy::PASSAGE:
                 return safe_passage(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
+            case SafePassageStrategy::PASSAGE_NO_SUBGRAPHS:
+                return safe_passage_no_subgraphs(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
             case SafePassageStrategy::CUBE:
                 return _3x3_occupied(node, graph.get_occupied_nodes());
             default:
@@ -283,6 +286,7 @@ public:
     bool _3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes);
 
     bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int maxX, int maxY);
+    bool safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes, int maxX, int maxY);
 
 private:
 
@@ -397,6 +401,9 @@ private:
 
         if (normalized_name == "passage") {
             safePassageStrategy = SafePassageStrategy::PASSAGE;
+            return true;
+        } else if (normalized_name == "passage_no_subgraphs") {
+            safePassageStrategy = SafePassageStrategy::PASSAGE_NO_SUBGRAPHS;
             return true;
         } else if (normalized_name == "cube") {
             safePassageStrategy = SafePassageStrategy::CUBE;
