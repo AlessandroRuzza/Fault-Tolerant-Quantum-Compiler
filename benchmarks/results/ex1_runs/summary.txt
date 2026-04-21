@@ -1,0 +1,40 @@
+Benchmark Plot Summary
+======================
+
+Generated at: 2026-04-21T16:26:07
+CSV files scanned: 1
+Rows analyzed: 1152
+Unique circuits: 12
+
+Status counts:
+  - success: 998
+  - failed: 124
+  - timeout: 30
+Overall success rate: 86.63%
+
+Duration s: min=0.05, median=0.09, max=600.05
+Routing steps (successful): min=15.00, median=48.00, max=387.00
+Best routing combo: magic_aware:random | passage | right_row (mean routing steps = 65.24, n=33)
+
+Generated plots:
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/00_overview_dashboard.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/01_status_and_exit_codes.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/02_circuit_summary_bars.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/03_box_routing_by_circuit.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/04_box_elapsed_by_circuit.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/05_box_routing_by_placement.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/06_box_routing_by_safe_passage.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/07_box_routing_by_magic_strategy.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/19_box_routing_by_gaussian_strategy.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/08_scatter_elapsed_vs_routing_by_circuit.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/10_scatter_magic_states_vs_routing.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/11_scatter_border_vs_routing_center_circle.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/13_heatmap_success_safe_vs_placement.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/14_heatmap_routing_safe_vs_placement.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/15_heatmap_routing_magic_vs_safe.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/20_heatmap_routing_gaussian_strategy_vs_placement.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/16_heatmap_success_by_grid_xy.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/17_experiment_set_routing_gaussian_homogeneous.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/18_experiment_set_routing_magicaware_homogeneous.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/22_experiment_set_routing_all_mappings.png
+  - /home/federico/Desktop/Projects/Fault-Tolerant-Quantum-Compiler/benchmarks/results/ex1_runs/21_box_gaussian_weight_combinations_vs_routing.png

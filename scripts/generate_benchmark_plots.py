@@ -212,6 +212,10 @@ def gaussian_weight_combo_label(row):
 
 def load_rows(csv_glob):
     files = sorted(glob.glob(csv_glob, recursive=True))
+    return load_rows_from_files(files)
+
+
+def load_rows_from_files(files):
     rows = []
 
     for path in files:
@@ -1330,29 +1334,46 @@ def write_report_markdown(
 
 def main():
     parser = argparse.ArgumentParser(description="Generate benchmark plots from CSV results.")
-    parser.add_argument(
+    input_group = parser.add_mutually_exclusive_group()
+    input_group.add_argument(
+        "--csv",
+        help="Single CSV input file. If set and --output-dir is omitted, plots are written to <csv_dir>/<csv_name>_plots/",
+    )
+    input_group.add_argument(
         "--csv-glob",
         default="benchmarks/results/**/*.csv",
         help="Glob for CSV inputs (default: benchmarks/results/**/*.csv)",
     )
     parser.add_argument(
         "--output-dir",
-        default="benchmarks/results/plots",
+        default=None,
         help="Output directory for generated plots",
     )
     args = parser.parse_args()
 
     plt.style.use("seaborn-v0_8-whitegrid")
 
-    rows, csv_files = load_rows(args.csv_glob)
+    if args.csv:
+        csv_path = os.path.abspath(args.csv)
+        rows, csv_files = load_rows_from_files([csv_path])
+        output_dir = args.output_dir or os.path.join(
+            os.path.dirname(csv_path),
+            os.path.splitext(os.path.basename(csv_path))[0] + "_plots",
+        )
+    else:
+        rows, csv_files = load_rows(args.csv_glob)
+        output_dir = args.output_dir or "benchmarks/results/plots"
+
     if not rows:
+        if args.csv:
+            raise RuntimeError(f"No valid rows found in CSV: {args.csv}")
         raise RuntimeError(f"No valid rows found for glob: {args.csv_glob}")
 
     generated = []
 
-    plot_overview_dashboard(rows, args.output_dir, generated)
-    plot_status_and_exit(rows, args.output_dir, generated)
-    plot_summary_tables(rows, args.output_dir, generated)
+    plot_overview_dashboard(rows, output_dir, generated)
+    plot_status_and_exit(rows, output_dir, generated)
+    plot_summary_tables(rows, output_dir, generated)
 
     rows_success_with_routing = [r for r in rows if r["success"] and r["routing_steps_f"] is not None]
     rows_gaussian_with_routing = [
@@ -1372,7 +1393,7 @@ def main():
         "Routing Steps by Circuit (Success Only)",
         "routing steps",
         "03_box_routing_by_circuit.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     boxplot_by_category(
@@ -1382,7 +1403,7 @@ def main():
         "Duration by Circuit",
         "duration_seconds",
         "04_box_elapsed_by_circuit.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     boxplot_by_category(
@@ -1392,7 +1413,7 @@ def main():
         "Routing Steps by Magic Placement",
         "routing steps",
         "05_box_routing_by_placement.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     boxplot_by_category(
@@ -1402,7 +1423,7 @@ def main():
         "Routing Steps by Safe Passage Strategy",
         "routing steps",
         "06_box_routing_by_safe_passage.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     boxplot_by_category(
@@ -1412,7 +1433,7 @@ def main():
         "Routing Steps by Magic-Aware Strategy (Magic-Aware Runs Only)",
         "routing steps",
         "07_box_routing_by_magic_strategy.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     boxplot_by_category(
@@ -1422,7 +1443,7 @@ def main():
         "Routing Steps by Gaussian Strategy (Gaussian Runs Only)",
         "routing steps",
         "19_box_routing_by_gaussian_strategy.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
 
@@ -1435,7 +1456,7 @@ def main():
         "duration_seconds",
         "routing steps",
         "08_scatter_elapsed_vs_routing_by_circuit.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     scatter_plot(
@@ -1447,7 +1468,7 @@ def main():
         "data_density",
         "routing steps",
         "09_scatter_density_vs_routing.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     scatter_plot(
@@ -1459,7 +1480,7 @@ def main():
         "number_of_magic_states",
         "routing steps",
         "10_scatter_magic_states_vs_routing.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
 
@@ -1476,7 +1497,7 @@ def main():
         "border_distance_percentage",
         "routing steps",
         "11_scatter_border_vs_routing_center_circle.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
 
@@ -1489,7 +1510,7 @@ def main():
         "interaction_pressure",
         "duration_seconds",
         "12_scatter_pressure_vs_elapsed.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
 
@@ -1501,7 +1522,7 @@ def main():
         "Success Rate Heatmap",
         "success rate (%)",
         "13_heatmap_success_safe_vs_placement.png",
-        args.output_dir,
+        output_dir,
         generated,
         value_format="{:.1f}",
     )
@@ -1513,7 +1534,7 @@ def main():
         "Mean Routing Steps Heatmap",
         "mean routing steps",
         "14_heatmap_routing_safe_vs_placement.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     make_pair_heatmap(
@@ -1524,7 +1545,7 @@ def main():
         "Mean Routing by Magic-Aware Strategy and Safe Passage",
         "mean routing steps",
         "15_heatmap_routing_magic_vs_safe.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     make_pair_heatmap(
@@ -1535,7 +1556,7 @@ def main():
         "Mean Routing by Gaussian Strategy and Placement",
         "mean routing steps",
         "20_heatmap_routing_gaussian_strategy_vs_placement.png",
-        args.output_dir,
+        output_dir,
         generated,
     )
     make_pair_heatmap(
@@ -1546,40 +1567,40 @@ def main():
         "Success Rate by Grid Size (y rows vs x cols)",
         "success rate (%)",
         "16_heatmap_success_by_grid_xy.png",
-        args.output_dir,
+        output_dir,
         generated,
         value_format="{:.0f}",
     )
-    plot_requested_comparisons(rows_success_with_routing, args.output_dir, generated)
-    plot_gaussian_weight_combinations(rows_gaussian_with_routing, args.output_dir, generated)
+    plot_requested_comparisons(rows_success_with_routing, output_dir, generated)
+    plot_gaussian_weight_combinations(rows_gaussian_with_routing, output_dir, generated)
 
     best_mapping_entries = best_mapping_table_entries(rows)
     best_mapping_entries, best_mapping_csv_path = write_best_mapping_table(
         best_mapping_entries,
-        args.output_dir,
+        output_dir,
         "best_mapping_by_circuit_dimension.csv",
     )
     best_mapping_exit0_entries = best_mapping_table_entries_exit0_only(rows)
     best_mapping_exit0_entries, best_mapping_exit0_csv_path = write_best_mapping_table(
         best_mapping_exit0_entries,
-        args.output_dir,
+        output_dir,
         "best_mapping_by_circuit_dimension_all_families_exit0.csv",
     )
-    write_summary(rows, csv_files, args.output_dir, generated)
+    write_summary(rows, csv_files, output_dir, generated)
     write_report_markdown(
-        args.output_dir,
+        output_dir,
         generated,
         best_mapping_entries,
         best_mapping_csv_path,
         best_mapping_exit0_entries,
         best_mapping_exit0_csv_path,
     )
-    print(f"Generated {len(generated)} plots in: {args.output_dir}")
+    print(f"Generated {len(generated)} plots in: {output_dir}")
     for path in generated:
         print(path)
     print(best_mapping_csv_path)
     print(best_mapping_exit0_csv_path)
-    print(os.path.join(args.output_dir, "summary.txt"))
+    print(os.path.join(output_dir, "summary.txt"))
 
 
 if __name__ == "__main__":

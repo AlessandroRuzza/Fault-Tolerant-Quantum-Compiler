@@ -60,3 +60,4 @@ benchmarks/logs/
 tmp/
 scripts/__pycache__/
 QASMBench-master/
+*.png
