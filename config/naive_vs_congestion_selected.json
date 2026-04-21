@@ -16,7 +16,7 @@
       "y": 18,
       "type": "magic_aware",
       "magic_aware_strategy": "distance",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -28,7 +28,7 @@
       "y": 19,
       "type": "magic_aware",
       "magic_aware_strategy": "distance",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -88,7 +88,7 @@
       "y": 6,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -100,7 +100,7 @@
       "y": 7,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
       "routing_strategy": ["naive", "congestion"]
@@ -124,7 +124,7 @@
       "y": 4,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -148,7 +148,7 @@
       "y": 9,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -160,7 +160,7 @@
       "y": 10,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
       "routing_strategy": ["naive", "congestion"]
@@ -220,7 +220,7 @@
       "y": 11,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -232,7 +232,7 @@
       "y": 12,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
       "routing_strategy": ["naive", "congestion"]
@@ -268,7 +268,7 @@
       "y": 5,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -280,7 +280,7 @@
       "y": 6,
       "type": "gaussian",
       "gaussian_strategy": "coarse",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -304,7 +304,7 @@
       "y": 10,
       "type": "gaussian",
       "gaussian_strategy": "fine",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "right_row",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -316,7 +316,7 @@
       "y": 11,
       "type": "magic_aware",
       "magic_aware_strategy": "random",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
@@ -352,7 +352,7 @@
       "y": 12,
       "type": "gaussian",
       "gaussian_strategy": "fine",
-      "safe_passage_strategy": "passage_path_to_one_border",
+      "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
       "routing_strategy": ["naive", "congestion"]
