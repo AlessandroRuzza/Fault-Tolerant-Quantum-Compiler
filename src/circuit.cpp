@@ -150,7 +150,9 @@ void Circuit::parse_qasm_file(const std::string &path) {
                     }
                 } else if(lname == "swap"){
                     addGate(gate, "cx", globalID++);
+                    gate.qubits = {gate.qubits[1], gate.qubits[0]}; // swap control and target for second CNOT
                     addGate(gate, "cx", globalID++);
+                    gate.qubits = {gate.qubits[1], gate.qubits[0]}; // swap control and target for second CNOT
                     addGate(gate, "cx", globalID++);
                 } else {
                    addGate(gate, gate.name, globalID++);
