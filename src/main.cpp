@@ -5,6 +5,7 @@
 #include "write_csv.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cctype>
 #include <csignal>
@@ -24,6 +25,10 @@
 #include <nlohmann/json.hpp>
 
 #include <sys/wait.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 
 namespace {
@@ -55,7 +60,9 @@ int main(int argc, char **argv) {
 }
 
 benchmarkResult run_one_execution_from_args(int argc, char **argv) {
-    clear_visualization_outputs();
+    if (benchmark_artifacts_enabled()) {
+        clear_visualization_outputs();
+    }
 
     std::string path = "../qasms/example.qasm";
     std::string magic_aware_strategy = "distance";
@@ -206,13 +213,6 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
     write_csv::ensure_initialized(csv_path, write_csv::kBenchmarkRunsCsvHeader);
     int next_run_id = write_csv::read_max_run_id(csv_path) + 1;
 
-    const std::filesystem::path temp_config_path = expanded_path.parent_path() / "__bench_runtime_config.json";
-
-    auto cleanup_temp = [&]() {
-        std::error_code ec;
-        std::filesystem::remove(temp_config_path, ec);
-    };
-
     auto persist_expanded = [&]() {
         std::ofstream out(expanded_path);
         if (!out.is_open()) {
@@ -221,7 +221,6 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         out << bench_data.dump(2) << '\n';
     };
 
-    int final_exit_code = 0;
     const std::size_t total_cases = bench_data.size();
 
     const auto parse_timeout_seconds = [](const json &entry) -> double {
@@ -410,137 +409,196 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         }
     };
 
-    try {
-        for (std::size_t i = 0; i < bench_data.size(); ++i) {
-            if (g_bench_interrupt_requested != 0) {
-                final_exit_code = 130;
-                std::cout << "\nInterrupt received. Stopping benchmark loop.\n";
-                break;
-            }
+    struct BenchCasePlan {
+        std::size_t index = 0;
+        json entry;
+        std::string case_id;
+        double timeout_seconds = -1.0;
+        bool timeout_enabled = false;
+        bool already_executed = false;
+        bool timeout_reached_before = false;
+        bool rerun_timeout_case = false;
+    };
 
+    struct BenchCaseResult {
+        bool completed = false;
+        std::size_t index = 0;
+        int run_id = 0;
+        std::string case_id;
+        std::string status = "failed";
+        int exit_code = 1;
+        bool timeout_reached = false;
+        bool interrupted = false;
+        bool mark_entry_as_executed = false;
+        std::string progress_line;
+        std::vector<std::string> csv_row;
+    };
+
+    std::vector<BenchCaseResult> results(total_cases);
+    bool stop_message_printed = false;
+
+    try {
+        std::vector<BenchCasePlan> plans;
+        plans.reserve(total_cases);
+        std::vector<std::size_t> runnable_indices;
+        runnable_indices.reserve(total_cases);
+
+        for (std::size_t i = 0; i < total_cases; ++i) {
             if (!bench_data.at(i).is_object()) {
                 throw std::runtime_error("Bench entry " + std::to_string(i + 1) + " must be a JSON object.");
             }
-            json &entry = bench_data.at(i);
-            const double timeout_seconds = parse_timeout_seconds(entry);
-            const bool timeout_enabled = timeout_seconds >= 0.0;
 
-            std::string case_id = get_json_field(entry, {"case_id"});
-            if (case_id.empty()) {
-                case_id = get_json_field(entry, {"id"});
+            BenchCasePlan plan;
+            plan.index = i;
+            plan.entry = bench_data.at(i);
+            plan.timeout_seconds = parse_timeout_seconds(plan.entry);
+            plan.timeout_enabled = plan.timeout_seconds >= 0.0;
+            plan.case_id = get_json_field(plan.entry, {"case_id"});
+            if (plan.case_id.empty()) {
+                plan.case_id = get_json_field(plan.entry, {"id"});
             }
+            plan.already_executed =
+                plan.entry.contains("executed") && plan.entry["executed"].is_boolean() && plan.entry["executed"].get<bool>();
+            plan.timeout_reached_before =
+                plan.entry.contains("timeout_reached") &&
+                plan.entry["timeout_reached"].is_boolean() &&
+                plan.entry["timeout_reached"].get<bool>();
+            plan.rerun_timeout_case = rerun_timeouts && plan.already_executed && plan.timeout_reached_before;
 
-            const bool already_executed =
-                entry.contains("executed") && entry["executed"].is_boolean() && entry["executed"].get<bool>();
-            const bool timeout_reached_before =
-                entry.contains("timeout_reached") &&
-                entry["timeout_reached"].is_boolean() &&
-                entry["timeout_reached"].get<bool>();
-            const bool rerun_timeout_case = rerun_timeouts && already_executed && timeout_reached_before;
-
-            if (already_executed && !rerun_timeout_case) {
+            if (plan.already_executed && !plan.rerun_timeout_case) {
                 std::cout
                     << "[" << (i + 1) << "/" << total_cases << "] SKIP"
-                    << " " << empty_to_dash(case_id)
+                    << " " << empty_to_dash(plan.case_id)
                     << " executed=true\n";
-                continue;
+            } else {
+                if (plan.rerun_timeout_case) {
+                    std::cout
+                        << "[" << (i + 1) << "/" << total_cases << "] RERUN_TIMEOUT"
+                        << " " << empty_to_dash(plan.case_id)
+                        << " executed=true timeout_reached=true\n";
+                }
+                runnable_indices.push_back(i);
             }
 
-            if (rerun_timeout_case) {
-                std::cout
-                    << "[" << (i + 1) << "/" << total_cases << "] RERUN_TIMEOUT"
-                    << " " << empty_to_dash(case_id)
-                    << " executed=true timeout_reached=true\n";
-            }
+            plans.push_back(std::move(plan));
+        }
 
-            const int run_id = next_run_id++;
+        if (!runnable_indices.empty()) {
+#ifdef _OPENMP
+            std::cout
+                << "Benchmark parallelism: up to " << omp_get_max_threads()
+                << " OpenMP worker(s).\n";
+#else
+            std::cout << "Benchmark parallelism: OpenMP not enabled, running sequentially.\n";
+#endif
+        }
+
+        const auto execute_case = [&](const BenchCasePlan &plan, int run_id) {
+            BenchCaseResult result;
+            result.completed = true;
+            result.index = plan.index;
+            result.run_id = run_id;
+            result.case_id = plan.case_id;
+            result.status = "success";
+            result.exit_code = 0;
+
             const auto start_tp = std::chrono::system_clock::now();
             const auto start_steady = std::chrono::steady_clock::now();
             const std::string run_date = format_now_date(start_tp);
             const std::string run_datetime = format_now_datetime(start_tp);
 
             const std::string log_file_name =
-                "run_" + std::to_string(run_id) + "_" + sanitize_filename(case_id.empty() ? std::to_string(i + 1) : case_id) + ".log";
+                "run_" + std::to_string(run_id) + "_" +
+                sanitize_filename(plan.case_id.empty() ? std::to_string(plan.index + 1) : plan.case_id) + ".log";
             const std::filesystem::path log_path = logs_dir / log_file_name;
+            const std::filesystem::path temp_config_path =
+                expanded_path.parent_path() /
+                ("__bench_runtime_config_" + std::to_string(run_id) + ".json");
 
-            std::ofstream temp_stream(temp_config_path);
-            if (!temp_stream.is_open()) {
-                throw std::runtime_error("Cannot write temporary config: " + temp_config_path.string());
-            }
-            temp_stream << entry.dump(2) << '\n';
-            temp_stream.close();
+            const auto cleanup_temp = [&]() {
+                std::error_code ec;
+                std::filesystem::remove(temp_config_path, ec);
+            };
 
-            std::string status = "success";
-            int exit_code = 0;
             std::string routing_steps;
             std::string error_excerpt;
-            bool timeout_reached = false;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
 
-            std::string command;
-            if (timeout_enabled) {
-                std::ostringstream timeout_ss;
-                timeout_ss << std::fixed << std::setprecision(3) << timeout_seconds;
-                command =
-                    "timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
-                    " " + shell_quote(executable) +
-                    " --config " + shell_quote(temp_config_path.string()) +
-                    " > " + shell_quote(log_path.string()) +
-                    " 2>&1";
-            } else {
-                command =
-                    shell_quote(executable) +
-                    " --config " + shell_quote(temp_config_path.string()) +
-                    " > " + shell_quote(log_path.string()) +
-                    " 2>&1";
-            }
-
-            const int system_rc = std::system(command.c_str());
-            exit_code = decode_system_exit_code(system_rc);
-            const bool interrupted_by_signal =
-                system_rc != -1 &&
-                WIFSIGNALED(system_rc) &&
-                (WTERMSIG(system_rc) == SIGINT || WTERMSIG(system_rc) == SIGTERM || WTERMSIG(system_rc) == SIGHUP);
-            const bool interrupted_by_exit_code = (exit_code == 130) || (exit_code == 143) || (exit_code == 129);
-            const bool interrupted = (g_bench_interrupt_requested != 0) || interrupted_by_signal || interrupted_by_exit_code;
-            if (interrupted && g_bench_interrupt_requested == 0) {
-                g_bench_interrupt_requested = 1;
-                if (interrupted_by_signal) {
-                    g_bench_interrupt_signal = WTERMSIG(system_rc);
+            try {
+                std::ofstream temp_stream(temp_config_path);
+                if (!temp_stream.is_open()) {
+                    throw std::runtime_error("Cannot write temporary config: " + temp_config_path.string());
                 }
-            }
+                temp_stream << plan.entry.dump(2) << '\n';
+                temp_stream.close();
 
-            timeout_reached = !interrupted && timeout_enabled && exit_code == 124;
+                std::string command;
+                if (plan.timeout_enabled) {
+                    std::ostringstream timeout_ss;
+                    timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
+                    command =
+                        "FTQC_BENCH_WORKER=1 timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
+                        " " + shell_quote(executable) +
+                        " --config " + shell_quote(temp_config_path.string()) +
+                        " > " + shell_quote(log_path.string()) +
+                        " 2>&1";
+                } else {
+                    command =
+                        "FTQC_BENCH_WORKER=1 " + shell_quote(executable) +
+                        " --config " + shell_quote(temp_config_path.string()) +
+                        " > " + shell_quote(log_path.string()) +
+                        " 2>&1";
+                }
 
-            if (interrupted) {
-                status = "interrupted";
-                final_exit_code = 130;
-                error_excerpt = "Execution interrupted by SIGINT (Ctrl+C)";
-            } else if (timeout_reached) {
-                status = "timeout";
-                // Timeout is tracked in CSV, but should not fail the whole benchmark target.
-                std::ostringstream timeout_ss;
-                timeout_ss << std::fixed << std::setprecision(3) << timeout_seconds;
-                error_excerpt = "Execution exceeded timeout of " + timeout_ss.str() + "s";
-            } else if (exit_code != 0) {
-                status = "failed";
-                if (final_exit_code == 0) {
-                    final_exit_code = exit_code;
+                const int system_rc = std::system(command.c_str());
+                result.exit_code = decode_system_exit_code(system_rc);
+                const bool interrupted_by_signal =
+                    system_rc != -1 &&
+                    WIFSIGNALED(system_rc) &&
+                    (WTERMSIG(system_rc) == SIGINT || WTERMSIG(system_rc) == SIGTERM || WTERMSIG(system_rc) == SIGHUP);
+                const bool interrupted_by_exit_code =
+                    (result.exit_code == 130) || (result.exit_code == 143) || (result.exit_code == 129);
+                result.interrupted =
+                    (g_bench_interrupt_requested != 0) || interrupted_by_signal || interrupted_by_exit_code;
+                if (result.interrupted && g_bench_interrupt_requested == 0) {
+                    g_bench_interrupt_requested = 1;
+                    if (interrupted_by_signal) {
+                        g_bench_interrupt_signal = WTERMSIG(system_rc);
+                    }
                 }
-                const std::string log_excerpt = extract_error_excerpt_from_log(log_path);
-                error_excerpt = "Execution failed with exit code " + std::to_string(exit_code);
-                if (!log_excerpt.empty()) {
-                    error_excerpt += ": " + log_excerpt;
+
+                result.timeout_reached = !result.interrupted && plan.timeout_enabled && result.exit_code == 124;
+
+                if (result.interrupted) {
+                    result.status = "interrupted";
+                    error_excerpt = "Execution interrupted by SIGINT (Ctrl+C)";
+                } else if (result.timeout_reached) {
+                    result.status = "timeout";
+                    std::ostringstream timeout_ss;
+                    timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
+                    error_excerpt = "Execution exceeded timeout of " + timeout_ss.str() + "s";
+                } else if (result.exit_code != 0) {
+                    result.status = "failed";
+                    const std::string log_excerpt = extract_error_excerpt_from_log(log_path);
+                    error_excerpt = "Execution failed with exit code " + std::to_string(result.exit_code);
+                    if (!log_excerpt.empty()) {
+                        error_excerpt += ": " + log_excerpt;
+                    }
+                } else {
+                    routing_steps = extract_routing_steps_from_log(log_path);
                 }
-            } else {
-                routing_steps = extract_routing_steps_from_log(log_path);
-            }
-            {
+
                 const auto resolved_dims = extract_resolved_graph_dimensions_from_log(log_path);
                 resolved_graph_x = resolved_dims.first;
                 resolved_graph_y = resolved_dims.second;
+            } catch (const std::exception &e) {
+                result.status = "failed";
+                result.exit_code = 1;
+                error_excerpt = e.what();
             }
+
+            cleanup_temp();
 
             const auto end_steady = std::chrono::steady_clock::now();
             const std::chrono::duration<double> elapsed = end_steady - start_steady;
@@ -549,75 +607,70 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
             std::ostringstream duration_short_ss;
             duration_short_ss << std::fixed << std::setprecision(3) << elapsed.count() << "s";
 
-            if (error_excerpt.empty() && status != "success") {
+            if (error_excerpt.empty() && result.status != "success") {
                 error_excerpt = "Execution failed";
             }
 
-            const bool mark_entry_as_executed = (status != "interrupted");
-            entry["executed"] = mark_entry_as_executed;
-            entry["timeout_reached"] = timeout_reached;
-            persist_expanded();
+            result.mark_entry_as_executed = (result.status != "interrupted");
 
-            const std::string circuit = get_json_field(entry, {"circuit"});
-
-            std::string circuit_graph_label = get_json_field(entry, {"circuit_graph_label"});
+            const std::string circuit = get_json_field(plan.entry, {"circuit"});
+            std::string circuit_graph_label = get_json_field(plan.entry, {"circuit_graph_label"});
             if (circuit_graph_label.empty() && !circuit.empty() && !resolved_graph_x.empty() && !resolved_graph_y.empty()) {
                 circuit_graph_label = circuit + "-" + resolved_graph_x + "x" + resolved_graph_y;
             }
+
             std::string routing_strategy_csv = get_json_field(
-                entry,
+                plan.entry,
                 {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}
             );
             if (routing_strategy_csv.empty()) {
                 routing_strategy_csv = "congestion";
             }
 
-            const std::string mw = get_json_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
-            const std::string bw = get_json_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
-            const std::string mh = get_json_field(entry, {"MAGIC_HIGH", "magic_high"});
-            const std::string ml = get_json_field(entry, {"MAGIC_LOW", "magic_low"});
-            const std::string ch = get_json_field(entry, {"CNOT_HIGH", "cnot_high"});
-            const std::string cl = get_json_field(entry, {"CNOT_LOW", "cnot_low"});
+            const std::string mw = get_json_field(plan.entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
+            const std::string bw = get_json_field(plan.entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
+            const std::string mh = get_json_field(plan.entry, {"MAGIC_HIGH", "magic_high"});
+            const std::string ml = get_json_field(plan.entry, {"MAGIC_LOW", "magic_low"});
+            const std::string ch = get_json_field(plan.entry, {"CNOT_HIGH", "cnot_high"});
+            const std::string cl = get_json_field(plan.entry, {"CNOT_LOW", "cnot_low"});
 
-            write_csv::append_row(
-                csv_path,
-                {
-                    std::to_string(run_id),
-                    run_date,
-                    run_datetime,
-                    circuit,
-                    resolved_graph_x,
-                    resolved_graph_y,
-                    circuit_graph_label,
-                    get_json_field(entry, {"mapping_type", "type"}),
-                    get_json_field(entry, {"magic_aware_strategy"}),
-                    get_json_field(entry, {"gaussian_strategy"}),
-                    mh,
-                    ml,
-                    ch,
-                    cl,
-                    mw,
-                    bw,
-                    get_json_field(entry, {"safe_passage_strategy"}),
-                    get_json_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
-                    get_json_field(entry, {"border_distance_percentage"}),
-                    get_json_field(entry, {"number_of_magic_states"}),
-                    routing_strategy_csv,
-                    routing_steps,
-                    timeout_reached ? "true" : "false",
-                    status,
-                    std::to_string(exit_code),
-                    duration_ss.str(),
-                    log_path.string(),
-                    limit_text(compact_line(error_excerpt), 300)
-                }
-            );
+            result.csv_row = {
+                std::to_string(run_id),
+                run_date,
+                run_datetime,
+                circuit,
+                resolved_graph_x,
+                resolved_graph_y,
+                circuit_graph_label,
+                get_json_field(plan.entry, {"mapping_type", "type"}),
+                get_json_field(plan.entry, {"magic_aware_strategy"}),
+                get_json_field(plan.entry, {"gaussian_strategy"}),
+                mh,
+                ml,
+                ch,
+                cl,
+                mw,
+                bw,
+                get_json_field(plan.entry, {"safe_passage_strategy"}),
+                get_json_field(plan.entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
+                get_json_field(plan.entry, {"border_distance_percentage"}),
+                get_json_field(plan.entry, {"number_of_magic_states"}),
+                routing_strategy_csv,
+                routing_steps,
+                result.timeout_reached ? "true" : "false",
+                result.status,
+                std::to_string(result.exit_code),
+                duration_ss.str(),
+                log_path.string(),
+                limit_text(compact_line(error_excerpt), 300)
+            };
 
-            if (status == "success") {
-                std::cout
-                    << "[" << (i + 1) << "/" << total_cases << "] OK"
+            std::ostringstream progress;
+            if (result.status == "success") {
+                progress
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] OK"
                     << " #" << run_id
-                    << " " << empty_to_dash(case_id)
+                    << " " << empty_to_dash(plan.case_id)
                     << " routing_steps=" << empty_to_dash(routing_steps)
                     << " duration=" << duration_short_ss.str()
                     << " mw=" << empty_to_dash(mw)
@@ -626,45 +679,106 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                     << " ml=" << empty_to_dash(ml)
                     << " ch=" << empty_to_dash(ch)
                     << " cl=" << empty_to_dash(cl)
-                    << " timeout_reached=" << (timeout_reached ? "true" : "false")
-                    << "\n";
-            } else if (status == "timeout") {
-                std::cout
-                    << "[" << (i + 1) << "/" << total_cases << "] TIMEOUT"
+                    << " timeout_reached=" << (result.timeout_reached ? "true" : "false");
+            } else if (result.status == "timeout") {
+                progress
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] TIMEOUT"
                     << " #" << run_id
-                    << " " << empty_to_dash(case_id)
+                    << " " << empty_to_dash(plan.case_id)
                     << " duration=" << duration_short_ss.str()
-                    << " timeout_reached=true"
-                    << "\n";
-            } else if (status == "interrupted") {
-                std::cout
-                    << "[" << (i + 1) << "/" << total_cases << "] INTERRUPTED"
+                    << " timeout_reached=true";
+            } else if (result.status == "interrupted") {
+                progress
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] INTERRUPTED"
                     << " #" << run_id
-                    << " " << empty_to_dash(case_id)
-                    << " duration=" << duration_short_ss.str()
-                    << "\n";
+                    << " " << empty_to_dash(plan.case_id)
+                    << " duration=" << duration_short_ss.str();
             } else {
-                std::cout
-                    << "[" << (i + 1) << "/" << total_cases << "] FAIL"
+                progress
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] FAIL"
                     << " #" << run_id
-                    << " " << empty_to_dash(case_id)
+                    << " " << empty_to_dash(plan.case_id)
                     << " duration=" << duration_short_ss.str()
-                    << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120))
-                    << "\n";
+                    << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120));
+            }
+            progress << "\n";
+            result.progress_line = progress.str();
+
+            return result;
+        };
+
+        std::atomic<int> next_run_id_counter(next_run_id);
+        std::atomic<bool> fatal_error(false);
+        std::string fatal_error_message;
+
+        const long long runnable_count = static_cast<long long>(runnable_indices.size());
+
+#pragma omp parallel for schedule(dynamic, 1) if(runnable_count > 1)
+        for (long long runnable_idx = 0; runnable_idx < runnable_count; ++runnable_idx) {
+            if (fatal_error.load() || g_bench_interrupt_requested != 0) {
+                continue;
             }
 
-            if (status == "interrupted") {
-                std::cout << "Stopping benchmark on Ctrl+C.\n";
-                break;
+            const std::size_t plan_index = runnable_indices[static_cast<std::size_t>(runnable_idx)];
+            const BenchCasePlan &plan = plans[plan_index];
+            const int run_id = next_run_id_counter.fetch_add(1);
+            BenchCaseResult result = execute_case(plan, run_id);
+            results[plan.index] = result;
+
+#pragma omp critical(bench_commit)
+            {
+                if (!fatal_error.load()) {
+                    try {
+                        bench_data.at(result.index)["executed"] = result.mark_entry_as_executed;
+                        bench_data.at(result.index)["timeout_reached"] = result.timeout_reached;
+                        persist_expanded();
+                        write_csv::append_row(csv_path, result.csv_row);
+                    } catch (const std::exception &e) {
+                        fatal_error = true;
+                        fatal_error_message = e.what();
+                    }
+                }
+
+                if (!fatal_error.load()) {
+                    std::cout << result.progress_line;
+                    if (result.status == "interrupted" && !stop_message_printed) {
+                        std::cout << "Stopping benchmark on Ctrl+C.\n";
+                        stop_message_printed = true;
+                    }
+                }
             }
+        }
+
+        if (fatal_error.load()) {
+            throw std::runtime_error(fatal_error_message);
         }
     } catch (...) {
         restore_signal_handlers();
-        cleanup_temp();
         throw;
     }
 
+    int final_exit_code = 0;
+    if (g_bench_interrupt_requested != 0) {
+        final_exit_code = 130;
+        if (!stop_message_printed) {
+            std::cout << "\nInterrupt received. Stopping benchmark loop.\n";
+        }
+    } else {
+        for (std::size_t i = 0; i < total_cases; ++i) {
+            const BenchCaseResult &result = results[i];
+            if (!result.completed) {
+                continue;
+            }
+            if (result.status == "interrupted") {
+                final_exit_code = 130;
+                break;
+            }
+            if (result.status == "failed" && final_exit_code == 0) {
+                final_exit_code = result.exit_code;
+            }
+        }
+    }
+
     restore_signal_handlers();
-    cleanup_temp();
     return final_exit_code;
 }

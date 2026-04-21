@@ -36,6 +36,7 @@ Bundled dependency:
 
 Optional tools used by specific flows:
 
+- OpenMP runtime/library for parallel benchmark execution.
 - `timeout` (GNU coreutils) for benchmark timeout support.
 - `gnuplot` for Gaussian frame plotting.
 - `ffmpeg` for the `make-video` target.
@@ -145,6 +146,12 @@ From `build/`:
 ./FaultTolerantQuantumCompiler --bench ex1
 ```
 
+To limit or increase benchmark parallelism, set `OMP_NUM_THREADS`:
+
+```bash
+OMP_NUM_THREADS=8 ./FaultTolerantQuantumCompiler --bench ex1
+```
+
 Equivalent aliases:
 
 ```bash
@@ -174,10 +181,22 @@ From `build/`:
 make run-bench BENCH_PATH=ex1
 ```
 
+To control benchmark parallelism from the make target:
+
+```bash
+make run-bench BENCH_PATH=ex1 BENCH_JOBS=8
+```
+
 With timeout rerun enabled:
 
 ```bash
 make run-bench BENCH_PATH=ex1 RERUN_TIMEOUTS=1
+```
+
+You can combine both:
+
+```bash
+make run-bench BENCH_PATH=ex1 RERUN_TIMEOUTS=1 BENCH_JOBS=8
 ```
 
 ## Where execution results are written
@@ -215,6 +234,8 @@ Benchmark mode writes persistent artifacts in three places:
 	- `benchmarks/results/<bench_name>_runs.csv`
 
 CSV rows include status fields such as `status`, `exit_code`, `duration_seconds`, `timeout_reached`, `routing_steps`, and log path.
+
+Benchmark workers disable shared visualization/QASM artifact generation so parallel runs do not interfere with each other; logs and CSV outputs remain the persistent benchmark outputs.
 
 ## Benchmark JSON notes
 
