@@ -274,6 +274,16 @@ Defaults:
 - merged CSV: `benchmarks/results/merged_runs.csv`
 - plots dir: `benchmarks/results/plots/`
 
+Generate plots from a single benchmark CSV:
+
+```bash
+python3 scripts/generate_benchmark_plots.py --csv benchmarks/results/ex1_runs.csv
+```
+
+Default output for single-CSV mode:
+
+- `benchmarks/results/<csv_name_without_extension>_plots/`
+
 Create a readable CSV view from one benchmark CSV:
 
 ```bash
