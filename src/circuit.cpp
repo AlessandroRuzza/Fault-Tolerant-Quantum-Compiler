@@ -159,6 +159,9 @@ void Circuit::parse_qasm_file(const std::string &path) {
                 }
             }
         }
+        else{
+            if(PRINT_PARSING) std::cout << "Unrecognized line: " << s << "\n";
+        }
         // otherwise ignore unknown lines
     }
 }

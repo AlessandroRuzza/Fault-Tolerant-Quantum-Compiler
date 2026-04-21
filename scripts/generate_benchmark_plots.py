@@ -304,7 +304,7 @@ def plot_overview_dashboard(rows, output_dir, generated):
         if subset:
             success_by_circuit[c] = sum(1 for r in subset if r["success"]) / len(subset)
 
-    duration_values = non_empty([r["duration_s_f"] for r in rows])
+    duration_values = non_empty([r["duration_s_f"] for r in rows if r["success"]])
     routing_ok = non_empty([r["routing_steps_f"] for r in rows if r["success"]])
 
     fig, axs = plt.subplots(2, 3, figsize=(18, 10))
@@ -328,7 +328,7 @@ def plot_overview_dashboard(rows, output_dir, generated):
 
     if duration_values:
         axs[3].hist(duration_values, bins=min(20, max(8, int(len(duration_values) ** 0.5))), color="#277DA1")
-    axs[3].set_title("Duration Distribution")
+    axs[3].set_title("Duration Distribution (Successful Runs)")
     axs[3].set_xlabel("duration_seconds")
 
     if routing_ok:
