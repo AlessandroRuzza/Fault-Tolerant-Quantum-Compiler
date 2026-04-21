@@ -2,6 +2,7 @@
 #include <filesystem>
 
 #include "gaussian.hpp"
+#include "../helpers.hpp"
 
 
 namespace GaussianMappingVisualization {
@@ -119,6 +120,10 @@ void save_gaussian_frame(
     const Graph& graph,
     const Qubit& qubit
 ) {
+    if (!benchmark_artifacts_enabled()) {
+        return;
+    }
+
     static int frame_id = 0;
 
     const int width = graph.get_maxX() + 1;

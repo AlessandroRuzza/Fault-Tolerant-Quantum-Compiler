@@ -6,6 +6,7 @@
 #include "routing.hpp"
 #include "defines.hpp"
 #include "compute_dimensions.hpp"
+#include "helpers.hpp"
 
 #include <memory>
 #include <cmath>
@@ -24,6 +25,10 @@ struct benchmarkResult {
 namespace {
 void clear_visualization_outputs() {
     namespace fs = std::filesystem;
+
+    if (!benchmark_artifacts_enabled()) {
+        return;
+    }
 
     const fs::path visualization_dir = fs::path(PROJECT_ROOT) / "visualization";
     fs::create_directories(visualization_dir);
@@ -97,7 +102,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     std::filesystem::path original_name = std::filesystem::path(path).stem();
     std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
-    circuit.write_qasm_file(output_path);
+    if (benchmark_artifacts_enabled()) {
+        circuit.write_qasm_file(output_path);
+    }
 
     //---------------graph----------------
 

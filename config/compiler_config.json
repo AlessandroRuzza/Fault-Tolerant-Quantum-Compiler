@@ -1,7 +1,7 @@
 {
-  "circuit": "cat_n130",
+  "circuit": "test",
 
-  "type": "gaussian",
+  "type": "homogeneous",
   "magic_aware_strategy": "center",
   "gaussian_strategy": "coarse",
   "safe_passage_strategy": "passage",
