@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <unordered_set>
 #include <sstream>
 #include <stdexcept>
@@ -75,7 +76,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double border_distance_percentage = 10.0;
     int x = 10;
     int y = 11;
-    int maximum_iterations = 100;
+    int maximum_iterations = 500;
     std::string routing_strategy = "congestion";
 
     apply_config_overrides(
@@ -172,7 +173,6 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         number_of_magic_states,
         number_of_magic_states_multiplier,
         border_distance_percentage,
-        maximum_iterations,
         routing_strategy
     );
 }
