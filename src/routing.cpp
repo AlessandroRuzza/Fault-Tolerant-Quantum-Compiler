@@ -2,6 +2,14 @@
 #include <map>
 #include <iomanip>
 
+void draw_routing_layer(
+    int step_index,
+    const Graph& graph,
+    const Mapping& mapping,
+    const Layer& layer_gates,
+    const Routing& routing
+);
+
 namespace {
 void print_non_routed_histogram(const std::map<std::size_t, std::size_t>& non_routed_histogram) {
     std::cout << "\n\033[35mNon-routed gates histogram (top layer per step)\033[0m\n";
@@ -175,6 +183,13 @@ void QubitRouter::route_circuit() {
         *                instead scan the 2nd layer and move gates to first layer.
         */
         Routing route = route_layer(topLayer);
+        draw_routing_layer(
+            static_cast<int>(routing_steps.size()) + 1,
+            graph,
+            mapping,
+            topLayer,
+            route
+        );
         const std::size_t non_routed = topLayer.size() - route.size();
         non_routed_histogram[non_routed]++;
         if(route.size() == 0){

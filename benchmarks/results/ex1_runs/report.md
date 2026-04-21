@@ -40,10 +40,6 @@ See also `summary.txt` for aggregate metrics.
 
 ![Duration vs routing](08_scatter_elapsed_vs_routing_by_circuit.png)
 
-## Magic state parameter vs routing
-
-![Magic state parameter vs routing](10_scatter_magic_states_vs_routing.png)
-
 ## Border distance vs routing
 
 ![Border distance vs routing](11_scatter_border_vs_routing_center_circle.png)
