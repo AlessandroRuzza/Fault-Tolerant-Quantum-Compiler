@@ -1,7 +1,7 @@
 Benchmark Plot Summary
 ======================
 
-Generated at: 2026-04-21T16:29:02
+Generated at: 2026-04-21T16:21:58
 CSV files scanned: 1
 Rows analyzed: 1152
 Unique circuits: 12

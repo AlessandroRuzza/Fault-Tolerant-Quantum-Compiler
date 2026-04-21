@@ -21,6 +21,10 @@ std::tuple<int, int> max_cnot_count() const {
     int max_count = 0;
     int index = -1;
     for (int count : CNOT_count) {
+        if (c == qubit_id) {
+            c++;
+            continue;
+        }
         if (count > max_count) {
             index = c;
             max_count = count;
@@ -34,6 +38,9 @@ std::tuple<int, int> max_cnot_count() const {
 std::vector<int> high_cnot_qubits(int threshold) const {
     std::vector<int> high_qubits;
     for (size_t i = 0; i < CNOT_count.size(); ++i) {
+        if (static_cast<int>(i) == qubit_id) {
+            continue;
+        }
         if (CNOT_count[i] >= threshold) {
             high_qubits.push_back(i);
         }
