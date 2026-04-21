@@ -131,6 +131,14 @@ void Mapping::gaussian_mapping() {
         }
         if (PRINT_MAPPING) std::cout << "Mapped qubits: " << iterations << "/" << total_qubits << "\n\n";
     }
+
+    if (circuit.getHeapSize() > 0 && iterations >= maximum_iterations) {
+        throw std::runtime_error(
+            "Mapping stopped after reaching the maximum iteration limit (" +
+            std::to_string(maximum_iterations) +
+            ") before all active qubits were processed."
+        );
+    }
 }
 
 

@@ -58,3 +58,4 @@ qasms/vqe_n24.qasm
 benchmarks/logs/
 tmp/
 scripts/__pycache__/
+QASMBench-master/

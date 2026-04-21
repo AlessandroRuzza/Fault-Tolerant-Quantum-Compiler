@@ -24,6 +24,28 @@ REQUESTED_SAFE_PASSAGES = {"passage", "cube"}
 REQUESTED_PLACEMENT_VARIANTS = ("right_row", "center_circle_0", "center_circle_5")
 REQUESTED_GAUSSIAN_STRATEGIES = {"coarse", "fine"}
 REQUESTED_MAGIC_AWARE_STRATEGIES = {"center", "distance", "random"}
+STATUS_DISPLAY_LABELS = {
+    "ok": "ok",
+    "ok_no_routing_metric": "ok (no routing metric)",
+    "success": "success",
+    "failed": "failed",
+    "timeout": "timeout",
+    "interrupted": "interrupted (signal)",
+}
+STATUS_COLORS = {
+    "ok": "#2A9D8F",
+    "ok_no_routing_metric": "#2A9D8F",
+    "success": "#2A9D8F",
+    "failed": "#E76F51",
+    "timeout": "#E9C46A",
+    "interrupted": "#577590",
+}
+EXIT_CODE_DISPLAY_LABELS = {
+    124: "124 (timeout)",
+    129: "129 (SIGHUP)",
+    130: "130 (Ctrl+C)",
+    143: "143 (SIGTERM)",
+}
 
 
 def normalize_text(value):
@@ -74,6 +96,31 @@ def placement_variant_label(variant):
     if variant == "center_circle_5":
         return "center_circle(5%)"
     return variant
+
+
+def status_display_label(status):
+    return STATUS_DISPLAY_LABELS.get(status, status or "unknown")
+
+
+def status_color(status):
+    return STATUS_COLORS.get(status, "#577590")
+
+
+def exit_code_display_label(exit_code):
+    code = to_int(exit_code)
+    if code is None:
+        text = str(exit_code).strip() if exit_code is not None else ""
+        return text or "unknown"
+    return EXIT_CODE_DISPLAY_LABELS.get(code, str(code))
+
+
+def exit_code_color(exit_code):
+    code = to_int(exit_code)
+    if code == 124:
+        return status_color("timeout")
+    if code in {129, 130, 143}:
+        return status_color("interrupted")
+    return "#F9844A"
 
 
 def to_float(value):
@@ -294,13 +341,6 @@ def plot_overview_dashboard(rows, output_dir, generated):
         for r in rows
         if r["duration_s_f"] is not None and r["routing_steps_f"] is not None
     ]
-    status_palette = {
-        "ok": "#2A9D8F",
-        "ok_no_routing_metric": "#2A9D8F",
-        "success": "#2A9D8F",
-        "failed": "#E76F51",
-        "timeout": "#E9C46A",
-    }
     for status in sorted({p[2] for p in points}):
         subset = [p for p in points if p[2] == status]
         if not subset:
@@ -310,8 +350,8 @@ def plot_overview_dashboard(rows, output_dir, generated):
             [p[1] for p in subset],
             s=28,
             alpha=0.7,
-            label=status,
-            color=status_palette.get(status, "#577590"),
+            label=status_display_label(status),
+            color=status_color(status),
         )
     axs[5].set_title("Duration vs Routing Steps")
     axs[5].set_xlabel("duration_seconds")
@@ -323,21 +363,27 @@ def plot_overview_dashboard(rows, output_dir, generated):
 
 def plot_status_and_exit(rows, output_dir, generated):
     status_counts = Counter(r["status"] for r in rows)
-    exit_counts = Counter(str(r["exit_code_i"]) for r in rows if r["exit_code_i"] is not None)
+    exit_counts = Counter(r["exit_code_i"] for r in rows if r["exit_code_i"] is not None)
 
     fig, axs = plt.subplots(1, 2, figsize=(14, 5))
 
-    s_labels = list(status_counts.keys())
-    s_vals = [status_counts[k] for k in s_labels]
-    axs[0].bar(s_labels, s_vals, color="#4D908E")
+    s_keys = list(status_counts.keys())
+    s_labels = [status_display_label(k) for k in s_keys]
+    s_vals = [status_counts[k] for k in s_keys]
+    s_colors = [status_color(k) for k in s_keys]
+    axs[0].bar(s_labels, s_vals, color=s_colors)
     axs[0].set_title("Status Counts")
     axs[0].set_ylabel("Count")
+    axs[0].tick_params(axis="x", rotation=15)
 
-    e_labels = sorted(exit_counts.keys(), key=lambda x: int(x))
-    e_vals = [exit_counts[k] for k in e_labels]
-    axs[1].bar(e_labels, e_vals, color="#F9844A")
+    e_codes = sorted(exit_counts.keys())
+    e_labels = [exit_code_display_label(code) for code in e_codes]
+    e_vals = [exit_counts[code] for code in e_codes]
+    e_colors = [exit_code_color(code) for code in e_codes]
+    axs[1].bar(e_labels, e_vals, color=e_colors)
     axs[1].set_title("Exit Code Counts")
     axs[1].set_xlabel("exit_code")
+    axs[1].tick_params(axis="x", rotation=15)
 
     save_fig(fig, output_dir, "01_status_and_exit_codes.png", generated)
 
@@ -1020,6 +1066,15 @@ def best_mapping_strategy_label(row):
     return mapping
 
 
+def best_mapping_sort_key(row):
+    return (
+        row["routing_steps_f"],
+        best_mapping_strategy_label(row),
+        row.get("safe_passage_norm", ""),
+        row.get("placement_detail", ""),
+    )
+
+
 def build_best_mapping_entries(inclusion_rows_by_group, candidate_rows_by_group):
     required_families = {"gaussian", "homogeneous", "magic_aware"}
     entries = []
@@ -1038,28 +1093,33 @@ def build_best_mapping_entries(inclusion_rows_by_group, candidate_rows_by_group)
         if not successful_rows:
             continue
 
-        best_row = min(
-            successful_rows,
-            key=lambda row: (
-                row["routing_steps_f"],
-                best_mapping_strategy_label(row),
-                row.get("safe_passage_norm", ""),
-                row.get("placement_detail", ""),
-            ),
-        )
+        sorted_rows = sorted(successful_rows, key=best_mapping_sort_key)
+        best_routing_steps = sorted_rows[0]["routing_steps_f"]
+        seen_best_entries = set()
 
-        entries.append(
-            {
-                "circuit_graph_label": requested_x_label(x_key),
-                "circuit": x_key[0],
-                "graph_x": x_key[1],
-                "graph_y": x_key[2],
-                "best_mapping": best_mapping_strategy_label(best_row),
-                "safe_passage": best_row.get("safe_passage_norm", "") or "n/a",
-                "magic_placement": best_row.get("placement_detail", "") or "n/a",
-                "routing_steps": best_row["routing_steps_f"],
-            }
-        )
+        for best_row in sorted_rows:
+            if best_row["routing_steps_f"] != best_routing_steps:
+                break
+            entry_key = (
+                best_mapping_strategy_label(best_row),
+                best_row.get("safe_passage_norm", "") or "n/a",
+                best_row.get("placement_detail", "") or "n/a",
+            )
+            if entry_key in seen_best_entries:
+                continue
+            seen_best_entries.add(entry_key)
+            entries.append(
+                {
+                    "circuit_graph_label": requested_x_label(x_key),
+                    "circuit": x_key[0],
+                    "graph_x": x_key[1],
+                    "graph_y": x_key[2],
+                    "best_mapping": best_mapping_strategy_label(best_row),
+                    "safe_passage": best_row.get("safe_passage_norm", "") or "n/a",
+                    "magic_placement": best_row.get("placement_detail", "") or "n/a",
+                    "routing_steps": best_row["routing_steps_f"],
+                }
+            )
 
     return entries
 
@@ -1158,7 +1218,7 @@ def write_summary(rows, csv_files, output_dir, generated):
 
         f.write("Status counts:\n")
         for k, v in status_counts.items():
-            f.write(f"  - {k}: {v}\n")
+            f.write(f"  - {status_display_label(k)}: {v}\n")
         f.write(f"Overall success rate: {success_pct:.2f}%\n\n")
 
         if duration_values:
@@ -1232,8 +1292,9 @@ def write_report_markdown(
             f.write("## Best Mapping Table\n\n")
             f.write(
                 "Only circuit x graph-dimensions where `gaussian`, `homogeneous`, and "
-                "`magic-aware` all appear in the runs. Best configuration is chosen among "
-                "successful runs with routing steps available.\n\n"
+                "`magic-aware` all appear in the runs. All configurations tied for the "
+                "lowest routing steps are listed among successful runs with routing steps "
+                "available.\n\n"
             )
             f.write(f"CSV export: `{csv_name}`\n\n")
             f.write("| circuit x dimensions | best mapping | safe passage | magic placement | routing steps |\n")
@@ -1251,8 +1312,9 @@ def write_report_markdown(
             f.write("## Best Mapping Table (All Families Exit Code 0)\n\n")
             f.write(
                 "Only circuit x graph-dimensions where `gaussian`, `homogeneous`, and "
-                "`magic-aware` all appear among runs with `exit_code = 0`. Best configuration "
-                "is chosen only from those `exit_code = 0` runs.\n\n"
+                "`magic-aware` all appear among runs with `exit_code = 0`. All configurations "
+                "tied for the lowest routing steps are listed only from those "
+                "`exit_code = 0` runs.\n\n"
             )
             f.write(f"CSV export: `{csv_name}`\n\n")
             f.write("| circuit x dimensions | best mapping | safe passage | magic placement | routing steps |\n")

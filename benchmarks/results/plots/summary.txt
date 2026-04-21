@@ -1,20 +1,20 @@
 Benchmark Plot Summary
 ======================
 
-Generated at: 2026-04-20T12:24:01
+Generated at: 2026-04-20T18:48:09
 CSV files scanned: 3
-Rows analyzed: 1152
-Unique circuits: 12
+Rows analyzed: 966
+Unique circuits: 11
 
 Status counts:
-  - success: 928
-  - failed: 194
-  - timeout: 30
-Overall success rate: 80.56%
+  - success: 864
+  - failed: 99
+  - timeout: 3
+Overall success rate: 89.44%
 
-Duration s: min=0.02, median=0.19, max=600.01
-Routing steps (successful): min=15.00, median=42.00, max=387.00
-Best routing combo: magic_aware:random | passage | right_row (mean routing steps = 51.65, n=31)
+Duration s: min=0.02, median=0.10, max=600.01
+Routing steps (successful): min=15.00, median=37.00, max=387.00
+Best routing combo: magic_aware:random | passage | right_row (mean routing steps = 46.24, n=29)
 
 Generated plots:
   - benchmarks/results/plots/00_overview_dashboard.png

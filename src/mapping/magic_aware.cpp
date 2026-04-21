@@ -31,6 +31,14 @@ void Mapping::magic_aware_mapping() {
         }
         if (PRINT_MAPPING) std::cout << "Mapped qubits: " << iterations << "/" << total_qubits << "\n\n";
     }
+
+    if (circuit.getHeapSize() > 0 && iterations >= maximum_iterations) {
+        throw std::runtime_error(
+            "Mapping stopped after reaching the maximum iteration limit (" +
+            std::to_string(maximum_iterations) +
+            ") before all active qubits were processed."
+        );
+    }
 }
 
 void Mapping::one_iteration_magic_aware_mapping(Qubit* qubit, int* iterations) {

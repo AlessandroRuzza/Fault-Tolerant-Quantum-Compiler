@@ -1,5 +1,5 @@
 {
-  "circuit": "adder_n64_transpiled",
+  "circuit": "cat_n130",
 
   "type": "gaussian",
   "magic_aware_strategy": "center",
