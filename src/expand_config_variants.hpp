@@ -12,8 +12,12 @@
 
 #include <nlohmann/json.hpp>
 
-inline std::string expand_config_variants(const std::string &json_name) {
+inline std::string expand_config_variants(const std::string &json_name, int process_count = 1) {
     using json = nlohmann::json;
+    if (process_count <= 0) {
+        throw std::invalid_argument("process_count must be > 0");
+    }
+
     const auto make_signature = [](const json &entry) {
         json normalized = json::object();
         if (!entry.is_object()) {
@@ -24,6 +28,7 @@ inline std::string expand_config_variants(const std::string &json_name) {
             // Runtime-only fields must not affect identity of a benchmark case.
             return key == "id" ||
                    key == "executed" ||
+                   key == "process" ||
                    key == "timeout" ||
                    key == "timeout_reached";
         };
@@ -75,7 +80,7 @@ inline std::string expand_config_variants(const std::string &json_name) {
     input_stream >> source;
 
     const auto is_runtime_key = [](const std::string &key) {
-        return key == "id" || key == "executed";
+        return key == "id" || key == "executed" || key == "process";
     };
 
     std::function<std::vector<json>(const json &)> expand_entry_variants;
@@ -226,7 +231,8 @@ inline std::string expand_config_variants(const std::string &json_name) {
     }
 
     json expanded = json::array();
-    for (const auto &generated_entry : generated) {
+    for (std::size_t generated_index = 0; generated_index < generated.size(); ++generated_index) {
+        const auto &generated_entry = generated[generated_index];
         json final_entry = generated_entry;
         const std::string signature = make_signature(generated_entry);
 
@@ -257,6 +263,7 @@ inline std::string expand_config_variants(const std::string &json_name) {
             }
         }
 
+        final_entry["process"] = static_cast<int>(generated_index % static_cast<std::size_t>(process_count));
         expanded.push_back(final_entry);
     }
 

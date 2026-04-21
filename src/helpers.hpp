@@ -98,6 +98,79 @@ inline bool extract_rerun_timeouts_arg(int argc, char **argv) {
     return false;
 }
 
+inline int extract_process_count_arg(int argc, char **argv) {
+    const auto parse_positive_value = [](const std::string &value) {
+        int parsed_value = 0;
+        try {
+            parsed_value = std::stoi(value);
+        } catch (const std::exception &) {
+            throw std::runtime_error("Invalid value for --process-count: " + value);
+        }
+
+        if (parsed_value <= 0) {
+            throw std::runtime_error("--process-count must be > 0");
+        }
+
+        return parsed_value;
+    };
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--process-count" || arg == "--process_count") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value for --process-count");
+            }
+            return parse_positive_value(argv[i + 1]);
+        }
+
+        const std::string prefix_dash = "--process-count=";
+        if (arg.rfind(prefix_dash, 0) == 0) {
+            return parse_positive_value(arg.substr(prefix_dash.size()));
+        }
+
+        const std::string prefix_underscore = "--process_count=";
+        if (arg.rfind(prefix_underscore, 0) == 0) {
+            return parse_positive_value(arg.substr(prefix_underscore.size()));
+        }
+    }
+
+    return 1;
+}
+
+inline int extract_processor_arg(int argc, char **argv) {
+    const auto parse_non_negative_value = [](const std::string &value) {
+        int parsed_value = 0;
+        try {
+            parsed_value = std::stoi(value);
+        } catch (const std::exception &) {
+            throw std::runtime_error("Invalid value for --processor: " + value);
+        }
+
+        if (parsed_value < 0) {
+            throw std::runtime_error("--processor must be >= 0");
+        }
+
+        return parsed_value;
+    };
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--processor") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("Missing value for --processor");
+            }
+            return parse_non_negative_value(argv[i + 1]);
+        }
+
+        const std::string prefix = "--processor=";
+        if (arg.rfind(prefix, 0) == 0) {
+            return parse_non_negative_value(arg.substr(prefix.size()));
+        }
+    }
+
+    return 0;
+}
+
 inline std::string extract_bench_name(const std::string &bench_path_arg) {
     std::filesystem::path p(bench_path_arg);
     if (p.has_extension()) {

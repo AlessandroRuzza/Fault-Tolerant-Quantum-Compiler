@@ -187,6 +187,13 @@ To control benchmark parallelism from the make target:
 make run-bench BENCH_PATH=ex1 BENCH_JOBS=8
 ```
 
+To control the round-robin `process` field written into the expanded JSON, use a separate process count:
+
+```bash
+./FaultTolerantQuantumCompiler --bench ex1 --process-count 4
+make run-bench BENCH_PATH=ex1 BENCH_PROCESS_COUNT=4
+```
+
 With timeout rerun enabled:
 
 ```bash

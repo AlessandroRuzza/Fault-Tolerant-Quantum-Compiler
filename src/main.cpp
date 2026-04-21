@@ -41,7 +41,13 @@ void handle_bench_interrupt(int signal_number) {
 }
 } // namespace
 
-int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rerun_timeouts);
+int run_bench_mode(
+    const std::string &bench_path_arg,
+    char *executable,
+    bool rerun_timeouts,
+    int process_count,
+    int processor
+);
 benchmarkResult run_one_execution_from_args(int argc, char **argv);
 
 int main(int argc, char **argv) {
@@ -49,7 +55,9 @@ int main(int argc, char **argv) {
         std::string bench_path;
         if (extract_bench_path_arg(argc, argv, bench_path)) {
             const bool rerun_timeouts = extract_rerun_timeouts_arg(argc, argv);
-            return run_bench_mode(bench_path, argv[0], rerun_timeouts);
+            const int process_count = extract_process_count_arg(argc, argv);
+            const int processor = extract_processor_arg(argc, argv);
+            return run_bench_mode(bench_path, argv[0], rerun_timeouts, process_count, processor);
         }
         run_one_execution_from_args(argc, argv);
         return 0;
@@ -184,13 +192,19 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     );
 }
 
-int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rerun_timeouts) {
+int run_bench_mode(
+    const std::string &bench_path_arg,
+    char *executable,
+    bool rerun_timeouts,
+    int process_count,
+    int processor
+) {
     const std::string bench_name = extract_bench_name(bench_path_arg);
     if (bench_name.empty()) {
         throw std::runtime_error("Invalid bench name for --bench_path");
     }
 
-    const std::filesystem::path expanded_path = expand_config_variants(bench_name);
+    const std::filesystem::path expanded_path = expand_config_variants(bench_name, process_count);
     std::ifstream expanded_stream(expanded_path);
     if (!expanded_stream.is_open()) {
         throw std::runtime_error("Cannot open expanded bench file: " + expanded_path.string());
@@ -239,6 +253,28 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         }
 
         return timeout_seconds;
+    };
+
+    const auto parse_entry_processor = [](const json &entry) -> int {
+        const json *processor_value = nullptr;
+        if (entry.contains("processor")) {
+            processor_value = &entry.at("processor");
+        } else if (entry.contains("process")) {
+            processor_value = &entry.at("process");
+        } else {
+            return 0;
+        }
+
+        if (!processor_value->is_number_integer()) {
+            throw std::runtime_error("Bench field 'processor' must be an integer.");
+        }
+
+        const int parsed_processor = processor_value->get<int>();
+        if (parsed_processor < 0) {
+            throw std::runtime_error("Bench field 'processor' must be >= 0.");
+        }
+
+        return parsed_processor;
     };
 
     const auto shell_quote = [](const std::string &value) {
@@ -413,6 +449,7 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         std::size_t index = 0;
         json entry;
         std::string case_id;
+        int processor = 0;
         double timeout_seconds = -1.0;
         bool timeout_enabled = false;
         bool already_executed = false;
@@ -443,6 +480,8 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
         std::vector<std::size_t> runnable_indices;
         runnable_indices.reserve(total_cases);
 
+        std::cout << "Benchmark processor filter: processor=" << processor << "\n";
+
         for (std::size_t i = 0; i < total_cases; ++i) {
             if (!bench_data.at(i).is_object()) {
                 throw std::runtime_error("Bench entry " + std::to_string(i + 1) + " must be a JSON object.");
@@ -451,6 +490,7 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
             BenchCasePlan plan;
             plan.index = i;
             plan.entry = bench_data.at(i);
+            plan.processor = parse_entry_processor(plan.entry);
             plan.timeout_seconds = parse_timeout_seconds(plan.entry);
             plan.timeout_enabled = plan.timeout_seconds >= 0.0;
             plan.case_id = get_json_field(plan.entry, {"case_id"});
@@ -465,7 +505,13 @@ int run_bench_mode(const std::string &bench_path_arg, char *executable, bool rer
                 plan.entry["timeout_reached"].get<bool>();
             plan.rerun_timeout_case = rerun_timeouts && plan.already_executed && plan.timeout_reached_before;
 
-            if (plan.already_executed && !plan.rerun_timeout_case) {
+            if (plan.processor != processor) {
+                std::cout
+                    << "[" << (i + 1) << "/" << total_cases << "] SKIP"
+                    << " " << empty_to_dash(plan.case_id)
+                    << " processor=" << plan.processor
+                    << " selected_processor=" << processor << "\n";
+            } else if (plan.already_executed && !plan.rerun_timeout_case) {
                 std::cout
                     << "[" << (i + 1) << "/" << total_cases << "] SKIP"
                     << " " << empty_to_dash(plan.case_id)
