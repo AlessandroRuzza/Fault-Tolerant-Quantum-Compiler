@@ -148,6 +148,10 @@ void Circuit::parse_qasm_file(const std::string &path) {
                     for (int i = 0; i < 4; ++i) {
                         addGate(gate, "t", globalID++);
                     }
+                } else if(lname == "swap"){
+                    addGate(gate, "cx", globalID++);
+                    addGate(gate, "cx", globalID++);
+                    addGate(gate, "cx", globalID++);
                 } else {
                    addGate(gate, gate.name, globalID++);
                 }

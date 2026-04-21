@@ -235,7 +235,7 @@ bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node
 
                 const int nid = ny * width + nx;
 
-                if (visited_ids.count(nid) == 0 && (graph.is_occupied(nid) || graph.get_magic_state_ids().contains(nid))) {
+                if (visited_ids.count(nid) == 0 && (graph.is_occupied(nid) || magic_ids_set.count(nid) > 0)) {
                     node_queue.push(graph.get_node(nid));
                 }
             }
