@@ -97,12 +97,11 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | circuit x dimensions | best mapping | safe passage | magic placement | routing steps |
 | --- | --- | --- | --- | ---: |
 | adder_n64_transpiled-18x18 | magic-aware (distance) | passage | center_circle(0%) | 246 |
-| adder_n64_transpiled-19x19 | magic-aware (distance) | passage | center_circle(0%) | 246 |
-| adder_n64_transpiled-21x21 | magic-aware (distance) | cube | center_circle(0%) | 246 |
+| adder_n64_transpiled-19x19 | magic-aware (distance) | passage | center_circle(0%) | 247 |
+| adder_n64_transpiled-19x19 | magic-aware (distance) | passage | center_circle(5%) | 247 |
+| adder_n64_transpiled-21x21 | magic-aware (distance) | cube | center_circle(0%) | 247 |
 | adder_n64_transpiled-22x22 | gaussian (fine) | cube | center_circle(5%) | 248 |
-| adder_n64_transpiled-23x23 | gaussian (coarse) | cube | center_circle(0%) | 248 |
-| adder_n64_transpiled-23x23 | gaussian (fine) | cube | center_circle(0%) | 248 |
-| adder_n64_transpiled-24x24 | gaussian (coarse) | cube | center_circle(5%) | 248 |
+| adder_n64_transpiled-23x23 | gaussian (fine) | cube | center_circle(0%) | 250 |
 | adder_n64_transpiled-24x24 | gaussian (fine) | cube | center_circle(5%) | 248 |
 | bb84_n8-6x6 | gaussian (coarse) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | gaussian (coarse) | passage | center_circle(5%) | 15 |
@@ -110,6 +109,7 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | bb84_n8-6x6 | gaussian (fine) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | gaussian (fine) | passage | center_circle(5%) | 15 |
 | bb84_n8-6x6 | gaussian (fine) | passage | right_row | 15 |
+| bb84_n8-6x6 | homogeneous | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | magic-aware (center) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | magic-aware (distance) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | magic-aware (random) | passage | center_circle(0%) | 15 |
@@ -120,10 +120,13 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | bb84_n8-7x7 | homogeneous | passage | center_circle(0%) | 15 |
 | bb84_n8-7x7 | homogeneous | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (center) | passage | center_circle(0%) | 15 |
+| bb84_n8-7x7 | magic-aware (center) | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (center) | passage | right_row | 15 |
 | bb84_n8-7x7 | magic-aware (distance) | passage | center_circle(0%) | 15 |
+| bb84_n8-7x7 | magic-aware (distance) | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (distance) | passage | right_row | 15 |
 | bb84_n8-7x7 | magic-aware (random) | passage | center_circle(0%) | 15 |
+| bb84_n8-7x7 | magic-aware (random) | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (random) | passage | right_row | 15 |
 | bb84_n8-8x8 | gaussian (coarse) | cube | center_circle(0%) | 15 |
 | bb84_n8-8x8 | gaussian (coarse) | cube | center_circle(5%) | 15 |
@@ -146,9 +149,11 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | bigadder_n18_transpiled-6x6 | gaussian (coarse) | passage | center_circle(5%) | 157 |
 | bigadder_n18_transpiled-6x6 | gaussian (fine) | passage | center_circle(0%) | 157 |
 | bigadder_n18_transpiled-6x6 | gaussian (fine) | passage | center_circle(5%) | 157 |
+| bigadder_n18_transpiled-6x6 | homogeneous | passage | center_circle(0%) | 157 |
 | bigadder_n18_transpiled-7x7 | gaussian (coarse) | passage | center_circle(5%) | 157 |
 | bigadder_n18_transpiled-7x7 | gaussian (fine) | passage | center_circle(5%) | 157 |
 | bigadder_n18_transpiled-7x7 | homogeneous | passage | center_circle(0%) | 157 |
+| bigadder_n18_transpiled-7x7 | homogeneous | passage | center_circle(5%) | 157 |
 | bigadder_n18_transpiled-8x8 | gaussian (coarse) | cube | center_circle(0%) | 157 |
 | bigadder_n18_transpiled-8x8 | gaussian (coarse) | cube | center_circle(5%) | 157 |
 | bigadder_n18_transpiled-8x8 | gaussian (coarse) | cube | right_row | 157 |
@@ -156,6 +161,59 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | bigadder_n18_transpiled-8x8 | gaussian (fine) | cube | center_circle(5%) | 157 |
 | bigadder_n18_transpiled-8x8 | gaussian (fine) | cube | right_row | 157 |
 | bigadder_n18_transpiled-8x8 | homogeneous | cube | center_circle(0%) | 157 |
+| bigadder_n18_transpiled-8x8 | homogeneous | cube | center_circle(5%) | 157 |
+| cat_n130-26x26 | homogeneous | passage | center_circle(0%) | 130 |
+| cat_n130-26x26 | homogeneous | passage | right_row | 130 |
+| cat_n130-26x26 | magic-aware (distance) | passage | center_circle(0%) | 130 |
+| cat_n130-26x26 | magic-aware (distance) | passage | right_row | 130 |
+| cat_n130-26x26 | magic-aware (random) | passage | center_circle(0%) | 130 |
+| cat_n130-27x27 | homogeneous | passage | center_circle(0%) | 130 |
+| cat_n130-27x27 | homogeneous | passage | right_row | 130 |
+| cat_n130-27x27 | magic-aware (distance) | passage | center_circle(0%) | 130 |
+| cat_n130-27x27 | magic-aware (distance) | passage | right_row | 130 |
+| cat_n130-27x27 | magic-aware (random) | passage | right_row | 130 |
+| cat_n130-31x31 | gaussian (coarse) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | gaussian (coarse) | cube | right_row | 130 |
+| cat_n130-31x31 | gaussian (fine) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | gaussian (fine) | cube | right_row | 130 |
+| cat_n130-31x31 | homogeneous | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | homogeneous | cube | right_row | 130 |
+| cat_n130-31x31 | magic-aware (center) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | magic-aware (center) | cube | right_row | 130 |
+| cat_n130-31x31 | magic-aware (distance) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | magic-aware (distance) | cube | right_row | 130 |
+| cat_n130-31x31 | magic-aware (random) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | magic-aware (random) | cube | right_row | 130 |
+| cat_n130-32x32 | gaussian (coarse) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | gaussian (coarse) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | gaussian (coarse) | cube | right_row | 130 |
+| cat_n130-32x32 | gaussian (fine) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | gaussian (fine) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | gaussian (fine) | cube | right_row | 130 |
+| cat_n130-32x32 | homogeneous | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | homogeneous | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | homogeneous | cube | right_row | 130 |
+| cat_n130-32x32 | magic-aware (center) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | magic-aware (center) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | magic-aware (center) | cube | right_row | 130 |
+| cat_n130-32x32 | magic-aware (distance) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | magic-aware (distance) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | magic-aware (distance) | cube | right_row | 130 |
+| cat_n130-32x32 | magic-aware (random) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | magic-aware (random) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | magic-aware (random) | cube | right_row | 130 |
+| cat_n130-34x34 | gaussian (coarse) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | gaussian (coarse) | cube | right_row | 130 |
+| cat_n130-34x34 | gaussian (fine) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | gaussian (fine) | cube | right_row | 130 |
+| cat_n130-34x34 | homogeneous | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | homogeneous | cube | right_row | 130 |
+| cat_n130-34x34 | magic-aware (center) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | magic-aware (center) | cube | right_row | 130 |
+| cat_n130-34x34 | magic-aware (distance) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | magic-aware (distance) | cube | right_row | 130 |
+| cat_n130-34x34 | magic-aware (random) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | magic-aware (random) | cube | right_row | 130 |
 | continuous_3_17_13-4x4 | gaussian (coarse) | passage | center_circle(0%) | 19 |
 | continuous_3_17_13-4x4 | gaussian (coarse) | passage | center_circle(5%) | 19 |
 | continuous_3_17_13-4x4 | gaussian (coarse) | passage | right_row | 19 |
@@ -177,9 +235,11 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | continuous_3_17_13-5x5 | gaussian (coarse) | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (coarse) | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (coarse) | cube | right_row | 19 |
+| continuous_3_17_13-5x5 | gaussian (coarse) | passage | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (fine) | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (fine) | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (fine) | cube | right_row | 19 |
+| continuous_3_17_13-5x5 | gaussian (fine) | passage | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | homogeneous | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | homogeneous | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | homogeneous | cube | right_row | 19 |
@@ -192,6 +252,42 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | continuous_3_17_13-5x5 | magic-aware (random) | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | magic-aware (random) | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | magic-aware (random) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | homogeneous | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | homogeneous | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | passage | right_row | 19 |
 | dnn_n16-9x9 | gaussian (coarse) | passage | center_circle(0%) | 48 |
 | dnn_n16-9x9 | gaussian (coarse) | passage | center_circle(5%) | 48 |
 | dnn_n16-9x9 | gaussian (coarse) | passage | right_row | 48 |
@@ -203,22 +299,19 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | dnn_n16-10x10 | gaussian (fine) | passage | center_circle(5%) | 48 |
 | dnn_n16-10x10 | gaussian (fine) | passage | right_row | 48 |
 | dnn_n16-10x10 | homogeneous | passage | center_circle(5%) | 48 |
+| dnn_n16-10x10 | homogeneous | passage | right_row | 48 |
 | dnn_n16-11x11 | gaussian (coarse) | cube | center_circle(0%) | 48 |
 | dnn_n16-11x11 | gaussian (coarse) | cube | center_circle(5%) | 48 |
 | dnn_n16-11x11 | gaussian (coarse) | cube | right_row | 48 |
 | dnn_n16-11x11 | gaussian (fine) | cube | center_circle(0%) | 48 |
 | dnn_n16-11x11 | gaussian (fine) | cube | center_circle(5%) | 48 |
 | dnn_n16-11x11 | gaussian (fine) | cube | right_row | 48 |
+| dnn_n16-11x11 | homogeneous | cube | right_row | 48 |
 | dnn_n16-11x11 | magic-aware (center) | cube | center_circle(0%) | 48 |
-| dnn_n16-11x11 | magic-aware (center) | cube | center_circle(5%) | 48 |
-| dnn_n16-11x11 | magic-aware (center) | cube | right_row | 48 |
-| dnn_n16-11x11 | magic-aware (random) | cube | center_circle(0%) | 48 |
-| dnn_n16-11x11 | magic-aware (random) | cube | right_row | 48 |
 | dnn_n16-12x12 | gaussian (coarse) | cube | center_circle(5%) | 48 |
 | dnn_n16-12x12 | gaussian (coarse) | cube | right_row | 48 |
 | dnn_n16-12x12 | gaussian (fine) | cube | center_circle(5%) | 48 |
 | dnn_n16-12x12 | gaussian (fine) | cube | right_row | 48 |
-| dnn_n16-12x12 | magic-aware (center) | cube | center_circle(5%) | 48 |
 | example-5x5 | gaussian (coarse) | cube | center_circle(0%) | 51 |
 | example-5x5 | gaussian (coarse) | cube | right_row | 51 |
 | example-5x5 | gaussian (coarse) | passage | center_circle(0%) | 51 |
@@ -230,7 +323,6 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | example-5x5 | gaussian (fine) | passage | center_circle(5%) | 51 |
 | example-5x5 | gaussian (fine) | passage | right_row | 51 |
 | example-5x5 | homogeneous | cube | center_circle(0%) | 51 |
-| example-5x5 | homogeneous | cube | right_row | 51 |
 | example-5x5 | homogeneous | passage | center_circle(0%) | 51 |
 | example-5x5 | homogeneous | passage | center_circle(5%) | 51 |
 | example-5x5 | homogeneous | passage | right_row | 51 |
@@ -252,9 +344,11 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | example-6x6 | gaussian (coarse) | cube | center_circle(0%) | 51 |
 | example-6x6 | gaussian (coarse) | cube | center_circle(5%) | 51 |
 | example-6x6 | gaussian (coarse) | cube | right_row | 51 |
+| example-6x6 | gaussian (coarse) | passage | center_circle(0%) | 51 |
 | example-6x6 | gaussian (fine) | cube | center_circle(0%) | 51 |
 | example-6x6 | gaussian (fine) | cube | center_circle(5%) | 51 |
 | example-6x6 | gaussian (fine) | cube | right_row | 51 |
+| example-6x6 | gaussian (fine) | passage | center_circle(0%) | 51 |
 | example-6x6 | homogeneous | cube | center_circle(0%) | 51 |
 | example-6x6 | magic-aware (center) | cube | center_circle(0%) | 51 |
 | example-6x6 | magic-aware (center) | cube | center_circle(5%) | 51 |
@@ -265,6 +359,100 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | example-6x6 | magic-aware (random) | cube | center_circle(0%) | 51 |
 | example-6x6 | magic-aware (random) | cube | center_circle(5%) | 51 |
 | example-6x6 | magic-aware (random) | cube | right_row | 51 |
+| example-10x10 | gaussian (coarse) | cube | center_circle(0%) | 51 |
+| example-10x10 | gaussian (coarse) | cube | center_circle(5%) | 51 |
+| example-10x10 | gaussian (coarse) | cube | right_row | 51 |
+| example-10x10 | gaussian (coarse) | passage | center_circle(0%) | 51 |
+| example-10x10 | gaussian (coarse) | passage | center_circle(5%) | 51 |
+| example-10x10 | gaussian (coarse) | passage | right_row | 51 |
+| example-10x10 | gaussian (fine) | cube | center_circle(0%) | 51 |
+| example-10x10 | gaussian (fine) | cube | center_circle(5%) | 51 |
+| example-10x10 | gaussian (fine) | cube | right_row | 51 |
+| example-10x10 | gaussian (fine) | passage | center_circle(0%) | 51 |
+| example-10x10 | gaussian (fine) | passage | center_circle(5%) | 51 |
+| example-10x10 | gaussian (fine) | passage | right_row | 51 |
+| example-10x10 | homogeneous | cube | center_circle(0%) | 51 |
+| example-10x10 | homogeneous | cube | center_circle(5%) | 51 |
+| example-10x10 | homogeneous | passage | center_circle(0%) | 51 |
+| example-10x10 | homogeneous | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (center) | cube | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (center) | cube | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (center) | cube | right_row | 51 |
+| example-10x10 | magic-aware (center) | passage | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (center) | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (center) | passage | right_row | 51 |
+| example-10x10 | magic-aware (distance) | cube | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (distance) | cube | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (distance) | cube | right_row | 51 |
+| example-10x10 | magic-aware (distance) | passage | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (distance) | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (distance) | passage | right_row | 51 |
+| example-10x10 | magic-aware (random) | cube | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (random) | cube | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (random) | cube | right_row | 51 |
+| example-10x10 | magic-aware (random) | passage | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (random) | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (random) | passage | right_row | 51 |
+| ghz_n255-36x36 | homogeneous | passage | center_circle(0%) | 255 |
+| ghz_n255-36x36 | homogeneous | passage | right_row | 255 |
+| ghz_n255-36x36 | magic-aware (distance) | passage | center_circle(0%) | 255 |
+| ghz_n255-36x36 | magic-aware (distance) | passage | right_row | 255 |
+| ghz_n255-36x36 | magic-aware (random) | passage | center_circle(0%) | 255 |
+| ghz_n255-36x36 | magic-aware (random) | passage | right_row | 255 |
+| ghz_n255-37x37 | homogeneous | passage | center_circle(5%) | 255 |
+| ghz_n255-37x37 | homogeneous | passage | right_row | 255 |
+| ghz_n255-37x37 | magic-aware (distance) | passage | center_circle(5%) | 255 |
+| ghz_n255-37x37 | magic-aware (distance) | passage | right_row | 255 |
+| ghz_n255-37x37 | magic-aware (random) | passage | center_circle(5%) | 255 |
+| ghz_n255-37x37 | magic-aware (random) | passage | right_row | 255 |
+| ghz_n255-38x38 | homogeneous | passage | center_circle(0%) | 255 |
+| ghz_n255-38x38 | homogeneous | passage | right_row | 255 |
+| ghz_n255-38x38 | magic-aware (distance) | passage | center_circle(0%) | 255 |
+| ghz_n255-38x38 | magic-aware (distance) | passage | right_row | 255 |
+| ghz_n255-38x38 | magic-aware (random) | passage | center_circle(0%) | 255 |
+| ghz_n255-38x38 | magic-aware (random) | passage | right_row | 255 |
+| ghz_n255-43x43 | gaussian (coarse) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | gaussian (coarse) | cube | right_row | 255 |
+| ghz_n255-43x43 | gaussian (fine) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | gaussian (fine) | cube | right_row | 255 |
+| ghz_n255-43x43 | homogeneous | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | homogeneous | cube | right_row | 255 |
+| ghz_n255-43x43 | magic-aware (center) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | magic-aware (center) | cube | right_row | 255 |
+| ghz_n255-43x43 | magic-aware (distance) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | magic-aware (distance) | cube | right_row | 255 |
+| ghz_n255-43x43 | magic-aware (random) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | magic-aware (random) | cube | right_row | 255 |
+| ghz_n255-45x45 | gaussian (coarse) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | gaussian (coarse) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | gaussian (coarse) | cube | right_row | 255 |
+| ghz_n255-45x45 | gaussian (fine) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | gaussian (fine) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | gaussian (fine) | cube | right_row | 255 |
+| ghz_n255-45x45 | homogeneous | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | homogeneous | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | homogeneous | cube | right_row | 255 |
+| ghz_n255-45x45 | magic-aware (center) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | magic-aware (center) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | magic-aware (center) | cube | right_row | 255 |
+| ghz_n255-45x45 | magic-aware (distance) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | magic-aware (distance) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | magic-aware (distance) | cube | right_row | 255 |
+| ghz_n255-45x45 | magic-aware (random) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | magic-aware (random) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | magic-aware (random) | cube | right_row | 255 |
+| ghz_n255-47x47 | gaussian (coarse) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | gaussian (coarse) | cube | right_row | 255 |
+| ghz_n255-47x47 | gaussian (fine) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | gaussian (fine) | cube | right_row | 255 |
+| ghz_n255-47x47 | homogeneous | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | homogeneous | cube | right_row | 255 |
+| ghz_n255-47x47 | magic-aware (center) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | magic-aware (center) | cube | right_row | 255 |
+| ghz_n255-47x47 | magic-aware (distance) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | magic-aware (distance) | cube | right_row | 255 |
+| ghz_n255-47x47 | magic-aware (random) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | magic-aware (random) | cube | right_row | 255 |
 | ghz_state_n23-11x11 | gaussian (coarse) | passage | center_circle(0%) | 23 |
 | ghz_state_n23-11x11 | gaussian (coarse) | passage | center_circle(5%) | 23 |
 | ghz_state_n23-11x11 | gaussian (coarse) | passage | right_row | 23 |
@@ -288,7 +476,6 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | ghz_state_n23-12x12 | homogeneous | passage | right_row | 23 |
 | ghz_state_n23-12x12 | magic-aware (distance) | passage | center_circle(5%) | 23 |
 | ghz_state_n23-12x12 | magic-aware (distance) | passage | right_row | 23 |
-| ghz_state_n23-12x12 | magic-aware (random) | passage | center_circle(5%) | 23 |
 | ghz_state_n23-12x12 | magic-aware (random) | passage | right_row | 23 |
 | ghz_state_n23-13x13 | gaussian (coarse) | cube | center_circle(0%) | 23 |
 | ghz_state_n23-13x13 | gaussian (coarse) | cube | center_circle(5%) | 23 |
@@ -333,6 +520,7 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | qaoa_n6-5x5 | gaussian (fine) | passage | center_circle(5%) | 34 |
 | qaoa_n6-5x5 | gaussian (fine) | passage | right_row | 34 |
 | qaoa_n6-5x5 | magic-aware (distance) | passage | right_row | 34 |
+| qaoa_n6-5x5 | magic-aware (random) | passage | right_row | 34 |
 | qaoa_n6-6x6 | gaussian (coarse) | passage | center_circle(0%) | 34 |
 | qaoa_n6-6x6 | gaussian (coarse) | passage | right_row | 34 |
 | qaoa_n6-6x6 | gaussian (fine) | passage | center_circle(0%) | 34 |
@@ -351,16 +539,14 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | qaoa_n6-7x7 | gaussian (fine) | cube | center_circle(5%) | 34 |
 | qaoa_n6-7x7 | gaussian (fine) | cube | right_row | 34 |
 | qaoa_n6-7x7 | magic-aware (center) | cube | center_circle(0%) | 34 |
-| qaoa_n6-7x7 | magic-aware (center) | cube | center_circle(5%) | 34 |
 | qaoa_n6-7x7 | magic-aware (center) | cube | right_row | 34 |
 | qaoa_n6-7x7 | magic-aware (distance) | cube | center_circle(0%) | 34 |
 | qaoa_n6-7x7 | magic-aware (distance) | cube | right_row | 34 |
 | qaoa_n6-7x7 | magic-aware (random) | cube | center_circle(0%) | 34 |
 | qaoa_n6-7x7 | magic-aware (random) | cube | center_circle(5%) | 34 |
 | qaoa_n6-7x7 | magic-aware (random) | cube | right_row | 34 |
-| qft_20-10x10 | gaussian (fine) | passage | right_row | 127 |
-| qft_20-10x10 | magic-aware (distance) | passage | center_circle(0%) | 127 |
-| qft_20-11x11 | magic-aware (random) | passage | center_circle(0%) | 118 |
+| qft_20-10x10 | magic-aware (random) | cube | center_circle(0%) | 117 |
+| qft_20-11x11 | magic-aware (random) | passage | center_circle(0%) | 124 |
 | qft_20-12x12 | gaussian (coarse) | cube | right_row | 103 |
 | qft_20-13x13 | gaussian (coarse) | cube | center_circle(5%) | 98 |
 | wstate_n27-12x12 | gaussian (fine) | passage | center_circle(0%) | 34 |
@@ -373,7 +559,9 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | wstate_n27-12x12 | magic-aware (center) | passage | right_row | 34 |
 | wstate_n27-12x12 | magic-aware (distance) | passage | center_circle(0%) | 34 |
 | wstate_n27-12x12 | magic-aware (distance) | passage | center_circle(5%) | 34 |
+| wstate_n27-12x12 | magic-aware (distance) | passage | right_row | 34 |
 | wstate_n27-12x12 | magic-aware (random) | passage | center_circle(0%) | 34 |
+| wstate_n27-12x12 | magic-aware (random) | passage | center_circle(5%) | 34 |
 | wstate_n27-12x12 | magic-aware (random) | passage | right_row | 34 |
 | wstate_n27-14x14 | gaussian (coarse) | cube | center_circle(0%) | 34 |
 | wstate_n27-14x14 | gaussian (fine) | cube | center_circle(0%) | 34 |
@@ -381,7 +569,9 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | wstate_n27-14x14 | homogeneous | cube | center_circle(0%) | 34 |
 | wstate_n27-14x14 | homogeneous | cube | right_row | 34 |
 | wstate_n27-14x14 | magic-aware (center) | cube | center_circle(0%) | 34 |
+| wstate_n27-14x14 | magic-aware (center) | cube | right_row | 34 |
 | wstate_n27-14x14 | magic-aware (distance) | cube | center_circle(0%) | 34 |
+| wstate_n27-14x14 | magic-aware (distance) | cube | right_row | 34 |
 | wstate_n27-14x14 | magic-aware (random) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | gaussian (coarse) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | gaussian (coarse) | cube | center_circle(5%) | 34 |
@@ -393,10 +583,13 @@ CSV export: `best_mapping_by_circuit_dimension.csv`
 | wstate_n27-15x15 | homogeneous | cube | right_row | 34 |
 | wstate_n27-15x15 | magic-aware (center) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | magic-aware (center) | cube | center_circle(5%) | 34 |
+| wstate_n27-15x15 | magic-aware (center) | cube | right_row | 34 |
 | wstate_n27-15x15 | magic-aware (distance) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | magic-aware (distance) | cube | center_circle(5%) | 34 |
+| wstate_n27-15x15 | magic-aware (distance) | cube | right_row | 34 |
 | wstate_n27-15x15 | magic-aware (random) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | magic-aware (random) | cube | center_circle(5%) | 34 |
+| wstate_n27-15x15 | magic-aware (random) | cube | right_row | 34 |
 
 ## Best Mapping Table (All Families Exit Code 0)
 
@@ -407,12 +600,11 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | circuit x dimensions | best mapping | safe passage | magic placement | routing steps |
 | --- | --- | --- | --- | ---: |
 | adder_n64_transpiled-18x18 | magic-aware (distance) | passage | center_circle(0%) | 246 |
-| adder_n64_transpiled-19x19 | magic-aware (distance) | passage | center_circle(0%) | 246 |
-| adder_n64_transpiled-21x21 | magic-aware (distance) | cube | center_circle(0%) | 246 |
+| adder_n64_transpiled-19x19 | magic-aware (distance) | passage | center_circle(0%) | 247 |
+| adder_n64_transpiled-19x19 | magic-aware (distance) | passage | center_circle(5%) | 247 |
+| adder_n64_transpiled-21x21 | magic-aware (distance) | cube | center_circle(0%) | 247 |
 | adder_n64_transpiled-22x22 | gaussian (fine) | cube | center_circle(5%) | 248 |
-| adder_n64_transpiled-23x23 | gaussian (coarse) | cube | center_circle(0%) | 248 |
-| adder_n64_transpiled-23x23 | gaussian (fine) | cube | center_circle(0%) | 248 |
-| adder_n64_transpiled-24x24 | gaussian (coarse) | cube | center_circle(5%) | 248 |
+| adder_n64_transpiled-23x23 | gaussian (fine) | cube | center_circle(0%) | 250 |
 | adder_n64_transpiled-24x24 | gaussian (fine) | cube | center_circle(5%) | 248 |
 | bb84_n8-6x6 | gaussian (coarse) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | gaussian (coarse) | passage | center_circle(5%) | 15 |
@@ -420,6 +612,7 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | bb84_n8-6x6 | gaussian (fine) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | gaussian (fine) | passage | center_circle(5%) | 15 |
 | bb84_n8-6x6 | gaussian (fine) | passage | right_row | 15 |
+| bb84_n8-6x6 | homogeneous | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | magic-aware (center) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | magic-aware (distance) | passage | center_circle(0%) | 15 |
 | bb84_n8-6x6 | magic-aware (random) | passage | center_circle(0%) | 15 |
@@ -430,10 +623,13 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | bb84_n8-7x7 | homogeneous | passage | center_circle(0%) | 15 |
 | bb84_n8-7x7 | homogeneous | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (center) | passage | center_circle(0%) | 15 |
+| bb84_n8-7x7 | magic-aware (center) | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (center) | passage | right_row | 15 |
 | bb84_n8-7x7 | magic-aware (distance) | passage | center_circle(0%) | 15 |
+| bb84_n8-7x7 | magic-aware (distance) | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (distance) | passage | right_row | 15 |
 | bb84_n8-7x7 | magic-aware (random) | passage | center_circle(0%) | 15 |
+| bb84_n8-7x7 | magic-aware (random) | passage | center_circle(5%) | 15 |
 | bb84_n8-7x7 | magic-aware (random) | passage | right_row | 15 |
 | bb84_n8-8x8 | gaussian (coarse) | cube | center_circle(0%) | 15 |
 | bb84_n8-8x8 | gaussian (coarse) | cube | center_circle(5%) | 15 |
@@ -452,6 +648,48 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | bb84_n8-8x8 | magic-aware (random) | cube | center_circle(0%) | 15 |
 | bb84_n8-8x8 | magic-aware (random) | cube | center_circle(5%) | 15 |
 | bb84_n8-8x8 | magic-aware (random) | cube | right_row | 15 |
+| cat_n130-31x31 | gaussian (coarse) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | gaussian (coarse) | cube | right_row | 130 |
+| cat_n130-31x31 | gaussian (fine) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | gaussian (fine) | cube | right_row | 130 |
+| cat_n130-31x31 | homogeneous | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | homogeneous | cube | right_row | 130 |
+| cat_n130-31x31 | magic-aware (center) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | magic-aware (center) | cube | right_row | 130 |
+| cat_n130-31x31 | magic-aware (distance) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | magic-aware (distance) | cube | right_row | 130 |
+| cat_n130-31x31 | magic-aware (random) | cube | center_circle(0%) | 130 |
+| cat_n130-31x31 | magic-aware (random) | cube | right_row | 130 |
+| cat_n130-32x32 | gaussian (coarse) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | gaussian (coarse) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | gaussian (coarse) | cube | right_row | 130 |
+| cat_n130-32x32 | gaussian (fine) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | gaussian (fine) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | gaussian (fine) | cube | right_row | 130 |
+| cat_n130-32x32 | homogeneous | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | homogeneous | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | homogeneous | cube | right_row | 130 |
+| cat_n130-32x32 | magic-aware (center) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | magic-aware (center) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | magic-aware (center) | cube | right_row | 130 |
+| cat_n130-32x32 | magic-aware (distance) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | magic-aware (distance) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | magic-aware (distance) | cube | right_row | 130 |
+| cat_n130-32x32 | magic-aware (random) | cube | center_circle(0%) | 130 |
+| cat_n130-32x32 | magic-aware (random) | cube | center_circle(5%) | 130 |
+| cat_n130-32x32 | magic-aware (random) | cube | right_row | 130 |
+| cat_n130-34x34 | gaussian (coarse) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | gaussian (coarse) | cube | right_row | 130 |
+| cat_n130-34x34 | gaussian (fine) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | gaussian (fine) | cube | right_row | 130 |
+| cat_n130-34x34 | homogeneous | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | homogeneous | cube | right_row | 130 |
+| cat_n130-34x34 | magic-aware (center) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | magic-aware (center) | cube | right_row | 130 |
+| cat_n130-34x34 | magic-aware (distance) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | magic-aware (distance) | cube | right_row | 130 |
+| cat_n130-34x34 | magic-aware (random) | cube | center_circle(5%) | 130 |
+| cat_n130-34x34 | magic-aware (random) | cube | right_row | 130 |
 | continuous_3_17_13-4x4 | gaussian (coarse) | passage | center_circle(0%) | 19 |
 | continuous_3_17_13-4x4 | gaussian (coarse) | passage | center_circle(5%) | 19 |
 | continuous_3_17_13-4x4 | gaussian (coarse) | passage | right_row | 19 |
@@ -473,9 +711,11 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | continuous_3_17_13-5x5 | gaussian (coarse) | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (coarse) | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (coarse) | cube | right_row | 19 |
+| continuous_3_17_13-5x5 | gaussian (coarse) | passage | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (fine) | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (fine) | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | gaussian (fine) | cube | right_row | 19 |
+| continuous_3_17_13-5x5 | gaussian (fine) | passage | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | homogeneous | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | homogeneous | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | homogeneous | cube | right_row | 19 |
@@ -488,6 +728,42 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | continuous_3_17_13-5x5 | magic-aware (random) | cube | center_circle(0%) | 19 |
 | continuous_3_17_13-5x5 | magic-aware (random) | cube | center_circle(5%) | 19 |
 | continuous_3_17_13-5x5 | magic-aware (random) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (coarse) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | gaussian (fine) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | homogeneous | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | homogeneous | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | homogeneous | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (center) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (distance) | passage | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | cube | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | cube | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | cube | right_row | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | passage | center_circle(0%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | passage | center_circle(5%) | 19 |
+| continuous_3_17_13-10x10 | magic-aware (random) | passage | right_row | 19 |
 | dnn_n16-9x9 | gaussian (coarse) | passage | center_circle(0%) | 48 |
 | dnn_n16-9x9 | gaussian (coarse) | passage | center_circle(5%) | 48 |
 | dnn_n16-9x9 | gaussian (coarse) | passage | right_row | 48 |
@@ -499,22 +775,19 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | dnn_n16-10x10 | gaussian (fine) | passage | center_circle(5%) | 48 |
 | dnn_n16-10x10 | gaussian (fine) | passage | right_row | 48 |
 | dnn_n16-10x10 | homogeneous | passage | center_circle(5%) | 48 |
+| dnn_n16-10x10 | homogeneous | passage | right_row | 48 |
 | dnn_n16-11x11 | gaussian (coarse) | cube | center_circle(0%) | 48 |
 | dnn_n16-11x11 | gaussian (coarse) | cube | center_circle(5%) | 48 |
 | dnn_n16-11x11 | gaussian (coarse) | cube | right_row | 48 |
 | dnn_n16-11x11 | gaussian (fine) | cube | center_circle(0%) | 48 |
 | dnn_n16-11x11 | gaussian (fine) | cube | center_circle(5%) | 48 |
 | dnn_n16-11x11 | gaussian (fine) | cube | right_row | 48 |
+| dnn_n16-11x11 | homogeneous | cube | right_row | 48 |
 | dnn_n16-11x11 | magic-aware (center) | cube | center_circle(0%) | 48 |
-| dnn_n16-11x11 | magic-aware (center) | cube | center_circle(5%) | 48 |
-| dnn_n16-11x11 | magic-aware (center) | cube | right_row | 48 |
-| dnn_n16-11x11 | magic-aware (random) | cube | center_circle(0%) | 48 |
-| dnn_n16-11x11 | magic-aware (random) | cube | right_row | 48 |
 | dnn_n16-12x12 | gaussian (coarse) | cube | center_circle(5%) | 48 |
 | dnn_n16-12x12 | gaussian (coarse) | cube | right_row | 48 |
 | dnn_n16-12x12 | gaussian (fine) | cube | center_circle(5%) | 48 |
 | dnn_n16-12x12 | gaussian (fine) | cube | right_row | 48 |
-| dnn_n16-12x12 | magic-aware (center) | cube | center_circle(5%) | 48 |
 | example-5x5 | gaussian (coarse) | cube | center_circle(0%) | 51 |
 | example-5x5 | gaussian (coarse) | cube | right_row | 51 |
 | example-5x5 | gaussian (coarse) | passage | center_circle(0%) | 51 |
@@ -526,7 +799,6 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | example-5x5 | gaussian (fine) | passage | center_circle(5%) | 51 |
 | example-5x5 | gaussian (fine) | passage | right_row | 51 |
 | example-5x5 | homogeneous | cube | center_circle(0%) | 51 |
-| example-5x5 | homogeneous | cube | right_row | 51 |
 | example-5x5 | homogeneous | passage | center_circle(0%) | 51 |
 | example-5x5 | homogeneous | passage | center_circle(5%) | 51 |
 | example-5x5 | homogeneous | passage | right_row | 51 |
@@ -548,9 +820,11 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | example-6x6 | gaussian (coarse) | cube | center_circle(0%) | 51 |
 | example-6x6 | gaussian (coarse) | cube | center_circle(5%) | 51 |
 | example-6x6 | gaussian (coarse) | cube | right_row | 51 |
+| example-6x6 | gaussian (coarse) | passage | center_circle(0%) | 51 |
 | example-6x6 | gaussian (fine) | cube | center_circle(0%) | 51 |
 | example-6x6 | gaussian (fine) | cube | center_circle(5%) | 51 |
 | example-6x6 | gaussian (fine) | cube | right_row | 51 |
+| example-6x6 | gaussian (fine) | passage | center_circle(0%) | 51 |
 | example-6x6 | homogeneous | cube | center_circle(0%) | 51 |
 | example-6x6 | magic-aware (center) | cube | center_circle(0%) | 51 |
 | example-6x6 | magic-aware (center) | cube | center_circle(5%) | 51 |
@@ -561,6 +835,82 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | example-6x6 | magic-aware (random) | cube | center_circle(0%) | 51 |
 | example-6x6 | magic-aware (random) | cube | center_circle(5%) | 51 |
 | example-6x6 | magic-aware (random) | cube | right_row | 51 |
+| example-10x10 | gaussian (coarse) | cube | center_circle(0%) | 51 |
+| example-10x10 | gaussian (coarse) | cube | center_circle(5%) | 51 |
+| example-10x10 | gaussian (coarse) | cube | right_row | 51 |
+| example-10x10 | gaussian (coarse) | passage | center_circle(0%) | 51 |
+| example-10x10 | gaussian (coarse) | passage | center_circle(5%) | 51 |
+| example-10x10 | gaussian (coarse) | passage | right_row | 51 |
+| example-10x10 | gaussian (fine) | cube | center_circle(0%) | 51 |
+| example-10x10 | gaussian (fine) | cube | center_circle(5%) | 51 |
+| example-10x10 | gaussian (fine) | cube | right_row | 51 |
+| example-10x10 | gaussian (fine) | passage | center_circle(0%) | 51 |
+| example-10x10 | gaussian (fine) | passage | center_circle(5%) | 51 |
+| example-10x10 | gaussian (fine) | passage | right_row | 51 |
+| example-10x10 | homogeneous | cube | center_circle(0%) | 51 |
+| example-10x10 | homogeneous | cube | center_circle(5%) | 51 |
+| example-10x10 | homogeneous | passage | center_circle(0%) | 51 |
+| example-10x10 | homogeneous | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (center) | cube | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (center) | cube | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (center) | cube | right_row | 51 |
+| example-10x10 | magic-aware (center) | passage | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (center) | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (center) | passage | right_row | 51 |
+| example-10x10 | magic-aware (distance) | cube | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (distance) | cube | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (distance) | cube | right_row | 51 |
+| example-10x10 | magic-aware (distance) | passage | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (distance) | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (distance) | passage | right_row | 51 |
+| example-10x10 | magic-aware (random) | cube | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (random) | cube | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (random) | cube | right_row | 51 |
+| example-10x10 | magic-aware (random) | passage | center_circle(0%) | 51 |
+| example-10x10 | magic-aware (random) | passage | center_circle(5%) | 51 |
+| example-10x10 | magic-aware (random) | passage | right_row | 51 |
+| ghz_n255-43x43 | gaussian (coarse) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | gaussian (coarse) | cube | right_row | 255 |
+| ghz_n255-43x43 | gaussian (fine) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | gaussian (fine) | cube | right_row | 255 |
+| ghz_n255-43x43 | homogeneous | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | homogeneous | cube | right_row | 255 |
+| ghz_n255-43x43 | magic-aware (center) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | magic-aware (center) | cube | right_row | 255 |
+| ghz_n255-43x43 | magic-aware (distance) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | magic-aware (distance) | cube | right_row | 255 |
+| ghz_n255-43x43 | magic-aware (random) | cube | center_circle(0%) | 255 |
+| ghz_n255-43x43 | magic-aware (random) | cube | right_row | 255 |
+| ghz_n255-45x45 | gaussian (coarse) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | gaussian (coarse) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | gaussian (coarse) | cube | right_row | 255 |
+| ghz_n255-45x45 | gaussian (fine) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | gaussian (fine) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | gaussian (fine) | cube | right_row | 255 |
+| ghz_n255-45x45 | homogeneous | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | homogeneous | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | homogeneous | cube | right_row | 255 |
+| ghz_n255-45x45 | magic-aware (center) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | magic-aware (center) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | magic-aware (center) | cube | right_row | 255 |
+| ghz_n255-45x45 | magic-aware (distance) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | magic-aware (distance) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | magic-aware (distance) | cube | right_row | 255 |
+| ghz_n255-45x45 | magic-aware (random) | cube | center_circle(0%) | 255 |
+| ghz_n255-45x45 | magic-aware (random) | cube | center_circle(5%) | 255 |
+| ghz_n255-45x45 | magic-aware (random) | cube | right_row | 255 |
+| ghz_n255-47x47 | gaussian (coarse) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | gaussian (coarse) | cube | right_row | 255 |
+| ghz_n255-47x47 | gaussian (fine) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | gaussian (fine) | cube | right_row | 255 |
+| ghz_n255-47x47 | homogeneous | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | homogeneous | cube | right_row | 255 |
+| ghz_n255-47x47 | magic-aware (center) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | magic-aware (center) | cube | right_row | 255 |
+| ghz_n255-47x47 | magic-aware (distance) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | magic-aware (distance) | cube | right_row | 255 |
+| ghz_n255-47x47 | magic-aware (random) | cube | center_circle(5%) | 255 |
+| ghz_n255-47x47 | magic-aware (random) | cube | right_row | 255 |
 | ghz_state_n23-11x11 | gaussian (coarse) | passage | center_circle(0%) | 23 |
 | ghz_state_n23-11x11 | gaussian (coarse) | passage | center_circle(5%) | 23 |
 | ghz_state_n23-11x11 | gaussian (coarse) | passage | right_row | 23 |
@@ -584,7 +934,6 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | ghz_state_n23-12x12 | homogeneous | passage | right_row | 23 |
 | ghz_state_n23-12x12 | magic-aware (distance) | passage | center_circle(5%) | 23 |
 | ghz_state_n23-12x12 | magic-aware (distance) | passage | right_row | 23 |
-| ghz_state_n23-12x12 | magic-aware (random) | passage | center_circle(5%) | 23 |
 | ghz_state_n23-12x12 | magic-aware (random) | passage | right_row | 23 |
 | ghz_state_n23-13x13 | gaussian (coarse) | cube | center_circle(0%) | 23 |
 | ghz_state_n23-13x13 | gaussian (coarse) | cube | center_circle(5%) | 23 |
@@ -629,6 +978,7 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | qaoa_n6-5x5 | gaussian (fine) | passage | center_circle(5%) | 34 |
 | qaoa_n6-5x5 | gaussian (fine) | passage | right_row | 34 |
 | qaoa_n6-5x5 | magic-aware (distance) | passage | right_row | 34 |
+| qaoa_n6-5x5 | magic-aware (random) | passage | right_row | 34 |
 | qaoa_n6-6x6 | gaussian (coarse) | passage | center_circle(0%) | 34 |
 | qaoa_n6-6x6 | gaussian (coarse) | passage | right_row | 34 |
 | qaoa_n6-6x6 | gaussian (fine) | passage | center_circle(0%) | 34 |
@@ -647,16 +997,14 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | qaoa_n6-7x7 | gaussian (fine) | cube | center_circle(5%) | 34 |
 | qaoa_n6-7x7 | gaussian (fine) | cube | right_row | 34 |
 | qaoa_n6-7x7 | magic-aware (center) | cube | center_circle(0%) | 34 |
-| qaoa_n6-7x7 | magic-aware (center) | cube | center_circle(5%) | 34 |
 | qaoa_n6-7x7 | magic-aware (center) | cube | right_row | 34 |
 | qaoa_n6-7x7 | magic-aware (distance) | cube | center_circle(0%) | 34 |
 | qaoa_n6-7x7 | magic-aware (distance) | cube | right_row | 34 |
 | qaoa_n6-7x7 | magic-aware (random) | cube | center_circle(0%) | 34 |
 | qaoa_n6-7x7 | magic-aware (random) | cube | center_circle(5%) | 34 |
 | qaoa_n6-7x7 | magic-aware (random) | cube | right_row | 34 |
-| qft_20-10x10 | gaussian (fine) | passage | right_row | 127 |
-| qft_20-10x10 | magic-aware (distance) | passage | center_circle(0%) | 127 |
-| qft_20-11x11 | magic-aware (random) | passage | center_circle(0%) | 118 |
+| qft_20-10x10 | magic-aware (random) | cube | center_circle(0%) | 117 |
+| qft_20-11x11 | magic-aware (random) | passage | center_circle(0%) | 124 |
 | qft_20-12x12 | gaussian (coarse) | cube | right_row | 103 |
 | qft_20-13x13 | gaussian (coarse) | cube | center_circle(5%) | 98 |
 | wstate_n27-12x12 | gaussian (fine) | passage | center_circle(0%) | 34 |
@@ -669,7 +1017,9 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | wstate_n27-12x12 | magic-aware (center) | passage | right_row | 34 |
 | wstate_n27-12x12 | magic-aware (distance) | passage | center_circle(0%) | 34 |
 | wstate_n27-12x12 | magic-aware (distance) | passage | center_circle(5%) | 34 |
+| wstate_n27-12x12 | magic-aware (distance) | passage | right_row | 34 |
 | wstate_n27-12x12 | magic-aware (random) | passage | center_circle(0%) | 34 |
+| wstate_n27-12x12 | magic-aware (random) | passage | center_circle(5%) | 34 |
 | wstate_n27-12x12 | magic-aware (random) | passage | right_row | 34 |
 | wstate_n27-14x14 | gaussian (coarse) | cube | center_circle(0%) | 34 |
 | wstate_n27-14x14 | gaussian (fine) | cube | center_circle(0%) | 34 |
@@ -677,7 +1027,9 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | wstate_n27-14x14 | homogeneous | cube | center_circle(0%) | 34 |
 | wstate_n27-14x14 | homogeneous | cube | right_row | 34 |
 | wstate_n27-14x14 | magic-aware (center) | cube | center_circle(0%) | 34 |
+| wstate_n27-14x14 | magic-aware (center) | cube | right_row | 34 |
 | wstate_n27-14x14 | magic-aware (distance) | cube | center_circle(0%) | 34 |
+| wstate_n27-14x14 | magic-aware (distance) | cube | right_row | 34 |
 | wstate_n27-14x14 | magic-aware (random) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | gaussian (coarse) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | gaussian (coarse) | cube | center_circle(5%) | 34 |
@@ -689,8 +1041,11 @@ CSV export: `best_mapping_by_circuit_dimension_all_families_exit0.csv`
 | wstate_n27-15x15 | homogeneous | cube | right_row | 34 |
 | wstate_n27-15x15 | magic-aware (center) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | magic-aware (center) | cube | center_circle(5%) | 34 |
+| wstate_n27-15x15 | magic-aware (center) | cube | right_row | 34 |
 | wstate_n27-15x15 | magic-aware (distance) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | magic-aware (distance) | cube | center_circle(5%) | 34 |
+| wstate_n27-15x15 | magic-aware (distance) | cube | right_row | 34 |
 | wstate_n27-15x15 | magic-aware (random) | cube | center_circle(0%) | 34 |
 | wstate_n27-15x15 | magic-aware (random) | cube | center_circle(5%) | 34 |
+| wstate_n27-15x15 | magic-aware (random) | cube | right_row | 34 |
 

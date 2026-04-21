@@ -1,11 +1,10 @@
 circuit_graph_label,circuit,graph_x,graph_y,best_mapping,safe_passage,magic_placement,routing_steps
 adder_n64_transpiled-18x18,adder_n64_transpiled,18,18,magic-aware (distance),passage,center_circle(0%),246.0
-adder_n64_transpiled-19x19,adder_n64_transpiled,19,19,magic-aware (distance),passage,center_circle(0%),246.0
-adder_n64_transpiled-21x21,adder_n64_transpiled,21,21,magic-aware (distance),cube,center_circle(0%),246.0
+adder_n64_transpiled-19x19,adder_n64_transpiled,19,19,magic-aware (distance),passage,center_circle(0%),247.0
+adder_n64_transpiled-19x19,adder_n64_transpiled,19,19,magic-aware (distance),passage,center_circle(5%),247.0
+adder_n64_transpiled-21x21,adder_n64_transpiled,21,21,magic-aware (distance),cube,center_circle(0%),247.0
 adder_n64_transpiled-22x22,adder_n64_transpiled,22,22,gaussian (fine),cube,center_circle(5%),248.0
-adder_n64_transpiled-23x23,adder_n64_transpiled,23,23,gaussian (coarse),cube,center_circle(0%),248.0
-adder_n64_transpiled-23x23,adder_n64_transpiled,23,23,gaussian (fine),cube,center_circle(0%),248.0
-adder_n64_transpiled-24x24,adder_n64_transpiled,24,24,gaussian (coarse),cube,center_circle(5%),248.0
+adder_n64_transpiled-23x23,adder_n64_transpiled,23,23,gaussian (fine),cube,center_circle(0%),250.0
 adder_n64_transpiled-24x24,adder_n64_transpiled,24,24,gaussian (fine),cube,center_circle(5%),248.0
 bb84_n8-6x6,bb84_n8,6,6,gaussian (coarse),passage,center_circle(0%),15.0
 bb84_n8-6x6,bb84_n8,6,6,gaussian (coarse),passage,center_circle(5%),15.0
@@ -13,6 +12,7 @@ bb84_n8-6x6,bb84_n8,6,6,gaussian (coarse),passage,right_row,15.0
 bb84_n8-6x6,bb84_n8,6,6,gaussian (fine),passage,center_circle(0%),15.0
 bb84_n8-6x6,bb84_n8,6,6,gaussian (fine),passage,center_circle(5%),15.0
 bb84_n8-6x6,bb84_n8,6,6,gaussian (fine),passage,right_row,15.0
+bb84_n8-6x6,bb84_n8,6,6,homogeneous,passage,center_circle(0%),15.0
 bb84_n8-6x6,bb84_n8,6,6,magic-aware (center),passage,center_circle(0%),15.0
 bb84_n8-6x6,bb84_n8,6,6,magic-aware (distance),passage,center_circle(0%),15.0
 bb84_n8-6x6,bb84_n8,6,6,magic-aware (random),passage,center_circle(0%),15.0
@@ -23,10 +23,13 @@ bb84_n8-7x7,bb84_n8,7,7,gaussian (fine),passage,right_row,15.0
 bb84_n8-7x7,bb84_n8,7,7,homogeneous,passage,center_circle(0%),15.0
 bb84_n8-7x7,bb84_n8,7,7,homogeneous,passage,center_circle(5%),15.0
 bb84_n8-7x7,bb84_n8,7,7,magic-aware (center),passage,center_circle(0%),15.0
+bb84_n8-7x7,bb84_n8,7,7,magic-aware (center),passage,center_circle(5%),15.0
 bb84_n8-7x7,bb84_n8,7,7,magic-aware (center),passage,right_row,15.0
 bb84_n8-7x7,bb84_n8,7,7,magic-aware (distance),passage,center_circle(0%),15.0
+bb84_n8-7x7,bb84_n8,7,7,magic-aware (distance),passage,center_circle(5%),15.0
 bb84_n8-7x7,bb84_n8,7,7,magic-aware (distance),passage,right_row,15.0
 bb84_n8-7x7,bb84_n8,7,7,magic-aware (random),passage,center_circle(0%),15.0
+bb84_n8-7x7,bb84_n8,7,7,magic-aware (random),passage,center_circle(5%),15.0
 bb84_n8-7x7,bb84_n8,7,7,magic-aware (random),passage,right_row,15.0
 bb84_n8-8x8,bb84_n8,8,8,gaussian (coarse),cube,center_circle(0%),15.0
 bb84_n8-8x8,bb84_n8,8,8,gaussian (coarse),cube,center_circle(5%),15.0
@@ -45,6 +48,48 @@ bb84_n8-8x8,bb84_n8,8,8,magic-aware (distance),cube,right_row,15.0
 bb84_n8-8x8,bb84_n8,8,8,magic-aware (random),cube,center_circle(0%),15.0
 bb84_n8-8x8,bb84_n8,8,8,magic-aware (random),cube,center_circle(5%),15.0
 bb84_n8-8x8,bb84_n8,8,8,magic-aware (random),cube,right_row,15.0
+cat_n130-31x31,cat_n130,31,31,gaussian (coarse),cube,center_circle(0%),130.0
+cat_n130-31x31,cat_n130,31,31,gaussian (coarse),cube,right_row,130.0
+cat_n130-31x31,cat_n130,31,31,gaussian (fine),cube,center_circle(0%),130.0
+cat_n130-31x31,cat_n130,31,31,gaussian (fine),cube,right_row,130.0
+cat_n130-31x31,cat_n130,31,31,homogeneous,cube,center_circle(0%),130.0
+cat_n130-31x31,cat_n130,31,31,homogeneous,cube,right_row,130.0
+cat_n130-31x31,cat_n130,31,31,magic-aware (center),cube,center_circle(0%),130.0
+cat_n130-31x31,cat_n130,31,31,magic-aware (center),cube,right_row,130.0
+cat_n130-31x31,cat_n130,31,31,magic-aware (distance),cube,center_circle(0%),130.0
+cat_n130-31x31,cat_n130,31,31,magic-aware (distance),cube,right_row,130.0
+cat_n130-31x31,cat_n130,31,31,magic-aware (random),cube,center_circle(0%),130.0
+cat_n130-31x31,cat_n130,31,31,magic-aware (random),cube,right_row,130.0
+cat_n130-32x32,cat_n130,32,32,gaussian (coarse),cube,center_circle(0%),130.0
+cat_n130-32x32,cat_n130,32,32,gaussian (coarse),cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,gaussian (coarse),cube,right_row,130.0
+cat_n130-32x32,cat_n130,32,32,gaussian (fine),cube,center_circle(0%),130.0
+cat_n130-32x32,cat_n130,32,32,gaussian (fine),cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,gaussian (fine),cube,right_row,130.0
+cat_n130-32x32,cat_n130,32,32,homogeneous,cube,center_circle(0%),130.0
+cat_n130-32x32,cat_n130,32,32,homogeneous,cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,homogeneous,cube,right_row,130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (center),cube,center_circle(0%),130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (center),cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (center),cube,right_row,130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (distance),cube,center_circle(0%),130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (distance),cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (distance),cube,right_row,130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (random),cube,center_circle(0%),130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (random),cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (random),cube,right_row,130.0
+cat_n130-34x34,cat_n130,34,34,gaussian (coarse),cube,center_circle(5%),130.0
+cat_n130-34x34,cat_n130,34,34,gaussian (coarse),cube,right_row,130.0
+cat_n130-34x34,cat_n130,34,34,gaussian (fine),cube,center_circle(5%),130.0
+cat_n130-34x34,cat_n130,34,34,gaussian (fine),cube,right_row,130.0
+cat_n130-34x34,cat_n130,34,34,homogeneous,cube,center_circle(5%),130.0
+cat_n130-34x34,cat_n130,34,34,homogeneous,cube,right_row,130.0
+cat_n130-34x34,cat_n130,34,34,magic-aware (center),cube,center_circle(5%),130.0
+cat_n130-34x34,cat_n130,34,34,magic-aware (center),cube,right_row,130.0
+cat_n130-34x34,cat_n130,34,34,magic-aware (distance),cube,center_circle(5%),130.0
+cat_n130-34x34,cat_n130,34,34,magic-aware (distance),cube,right_row,130.0
+cat_n130-34x34,cat_n130,34,34,magic-aware (random),cube,center_circle(5%),130.0
+cat_n130-34x34,cat_n130,34,34,magic-aware (random),cube,right_row,130.0
 continuous_3_17_13-4x4,continuous_3_17_13,4,4,gaussian (coarse),passage,center_circle(0%),19.0
 continuous_3_17_13-4x4,continuous_3_17_13,4,4,gaussian (coarse),passage,center_circle(5%),19.0
 continuous_3_17_13-4x4,continuous_3_17_13,4,4,gaussian (coarse),passage,right_row,19.0
@@ -66,9 +111,11 @@ continuous_3_17_13-4x4,continuous_3_17_13,4,4,magic-aware (random),passage,right
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),cube,center_circle(0%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),cube,center_circle(5%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),cube,right_row,19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),passage,center_circle(0%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (fine),cube,center_circle(0%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (fine),cube,center_circle(5%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (fine),cube,right_row,19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (fine),passage,center_circle(0%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,homogeneous,cube,center_circle(0%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,homogeneous,cube,center_circle(5%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,homogeneous,cube,right_row,19.0
@@ -81,6 +128,42 @@ continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (distance),cube,right_
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (random),cube,center_circle(0%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (random),cube,center_circle(5%),19.0
 continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (random),cube,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (coarse),cube,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (coarse),cube,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (coarse),cube,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (coarse),passage,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (coarse),passage,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (coarse),passage,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (fine),cube,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (fine),cube,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (fine),cube,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (fine),passage,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (fine),passage,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,gaussian (fine),passage,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,homogeneous,cube,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,homogeneous,cube,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,homogeneous,cube,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,homogeneous,passage,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,homogeneous,passage,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,homogeneous,passage,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (center),cube,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (center),cube,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (center),cube,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (center),passage,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (center),passage,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (center),passage,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (distance),cube,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (distance),cube,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (distance),cube,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (distance),passage,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (distance),passage,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (distance),passage,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (random),cube,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (random),cube,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (random),cube,right_row,19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (random),passage,center_circle(0%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (random),passage,center_circle(5%),19.0
+continuous_3_17_13-10x10,continuous_3_17_13,10,10,magic-aware (random),passage,right_row,19.0
 dnn_n16-9x9,dnn_n16,9,9,gaussian (coarse),passage,center_circle(0%),48.0
 dnn_n16-9x9,dnn_n16,9,9,gaussian (coarse),passage,center_circle(5%),48.0
 dnn_n16-9x9,dnn_n16,9,9,gaussian (coarse),passage,right_row,48.0
@@ -92,22 +175,19 @@ dnn_n16-10x10,dnn_n16,10,10,gaussian (coarse),passage,right_row,48.0
 dnn_n16-10x10,dnn_n16,10,10,gaussian (fine),passage,center_circle(5%),48.0
 dnn_n16-10x10,dnn_n16,10,10,gaussian (fine),passage,right_row,48.0
 dnn_n16-10x10,dnn_n16,10,10,homogeneous,passage,center_circle(5%),48.0
+dnn_n16-10x10,dnn_n16,10,10,homogeneous,passage,right_row,48.0
 dnn_n16-11x11,dnn_n16,11,11,gaussian (coarse),cube,center_circle(0%),48.0
 dnn_n16-11x11,dnn_n16,11,11,gaussian (coarse),cube,center_circle(5%),48.0
 dnn_n16-11x11,dnn_n16,11,11,gaussian (coarse),cube,right_row,48.0
 dnn_n16-11x11,dnn_n16,11,11,gaussian (fine),cube,center_circle(0%),48.0
 dnn_n16-11x11,dnn_n16,11,11,gaussian (fine),cube,center_circle(5%),48.0
 dnn_n16-11x11,dnn_n16,11,11,gaussian (fine),cube,right_row,48.0
+dnn_n16-11x11,dnn_n16,11,11,homogeneous,cube,right_row,48.0
 dnn_n16-11x11,dnn_n16,11,11,magic-aware (center),cube,center_circle(0%),48.0
-dnn_n16-11x11,dnn_n16,11,11,magic-aware (center),cube,center_circle(5%),48.0
-dnn_n16-11x11,dnn_n16,11,11,magic-aware (center),cube,right_row,48.0
-dnn_n16-11x11,dnn_n16,11,11,magic-aware (random),cube,center_circle(0%),48.0
-dnn_n16-11x11,dnn_n16,11,11,magic-aware (random),cube,right_row,48.0
 dnn_n16-12x12,dnn_n16,12,12,gaussian (coarse),cube,center_circle(5%),48.0
 dnn_n16-12x12,dnn_n16,12,12,gaussian (coarse),cube,right_row,48.0
 dnn_n16-12x12,dnn_n16,12,12,gaussian (fine),cube,center_circle(5%),48.0
 dnn_n16-12x12,dnn_n16,12,12,gaussian (fine),cube,right_row,48.0
-dnn_n16-12x12,dnn_n16,12,12,magic-aware (center),cube,center_circle(5%),48.0
 example-5x5,example,5,5,gaussian (coarse),cube,center_circle(0%),51.0
 example-5x5,example,5,5,gaussian (coarse),cube,right_row,51.0
 example-5x5,example,5,5,gaussian (coarse),passage,center_circle(0%),51.0
@@ -119,7 +199,6 @@ example-5x5,example,5,5,gaussian (fine),passage,center_circle(0%),51.0
 example-5x5,example,5,5,gaussian (fine),passage,center_circle(5%),51.0
 example-5x5,example,5,5,gaussian (fine),passage,right_row,51.0
 example-5x5,example,5,5,homogeneous,cube,center_circle(0%),51.0
-example-5x5,example,5,5,homogeneous,cube,right_row,51.0
 example-5x5,example,5,5,homogeneous,passage,center_circle(0%),51.0
 example-5x5,example,5,5,homogeneous,passage,center_circle(5%),51.0
 example-5x5,example,5,5,homogeneous,passage,right_row,51.0
@@ -141,9 +220,11 @@ example-5x5,example,5,5,magic-aware (random),passage,right_row,51.0
 example-6x6,example,6,6,gaussian (coarse),cube,center_circle(0%),51.0
 example-6x6,example,6,6,gaussian (coarse),cube,center_circle(5%),51.0
 example-6x6,example,6,6,gaussian (coarse),cube,right_row,51.0
+example-6x6,example,6,6,gaussian (coarse),passage,center_circle(0%),51.0
 example-6x6,example,6,6,gaussian (fine),cube,center_circle(0%),51.0
 example-6x6,example,6,6,gaussian (fine),cube,center_circle(5%),51.0
 example-6x6,example,6,6,gaussian (fine),cube,right_row,51.0
+example-6x6,example,6,6,gaussian (fine),passage,center_circle(0%),51.0
 example-6x6,example,6,6,homogeneous,cube,center_circle(0%),51.0
 example-6x6,example,6,6,magic-aware (center),cube,center_circle(0%),51.0
 example-6x6,example,6,6,magic-aware (center),cube,center_circle(5%),51.0
@@ -154,6 +235,82 @@ example-6x6,example,6,6,magic-aware (distance),cube,right_row,51.0
 example-6x6,example,6,6,magic-aware (random),cube,center_circle(0%),51.0
 example-6x6,example,6,6,magic-aware (random),cube,center_circle(5%),51.0
 example-6x6,example,6,6,magic-aware (random),cube,right_row,51.0
+example-10x10,example,10,10,gaussian (coarse),cube,center_circle(0%),51.0
+example-10x10,example,10,10,gaussian (coarse),cube,center_circle(5%),51.0
+example-10x10,example,10,10,gaussian (coarse),cube,right_row,51.0
+example-10x10,example,10,10,gaussian (coarse),passage,center_circle(0%),51.0
+example-10x10,example,10,10,gaussian (coarse),passage,center_circle(5%),51.0
+example-10x10,example,10,10,gaussian (coarse),passage,right_row,51.0
+example-10x10,example,10,10,gaussian (fine),cube,center_circle(0%),51.0
+example-10x10,example,10,10,gaussian (fine),cube,center_circle(5%),51.0
+example-10x10,example,10,10,gaussian (fine),cube,right_row,51.0
+example-10x10,example,10,10,gaussian (fine),passage,center_circle(0%),51.0
+example-10x10,example,10,10,gaussian (fine),passage,center_circle(5%),51.0
+example-10x10,example,10,10,gaussian (fine),passage,right_row,51.0
+example-10x10,example,10,10,homogeneous,cube,center_circle(0%),51.0
+example-10x10,example,10,10,homogeneous,cube,center_circle(5%),51.0
+example-10x10,example,10,10,homogeneous,passage,center_circle(0%),51.0
+example-10x10,example,10,10,homogeneous,passage,center_circle(5%),51.0
+example-10x10,example,10,10,magic-aware (center),cube,center_circle(0%),51.0
+example-10x10,example,10,10,magic-aware (center),cube,center_circle(5%),51.0
+example-10x10,example,10,10,magic-aware (center),cube,right_row,51.0
+example-10x10,example,10,10,magic-aware (center),passage,center_circle(0%),51.0
+example-10x10,example,10,10,magic-aware (center),passage,center_circle(5%),51.0
+example-10x10,example,10,10,magic-aware (center),passage,right_row,51.0
+example-10x10,example,10,10,magic-aware (distance),cube,center_circle(0%),51.0
+example-10x10,example,10,10,magic-aware (distance),cube,center_circle(5%),51.0
+example-10x10,example,10,10,magic-aware (distance),cube,right_row,51.0
+example-10x10,example,10,10,magic-aware (distance),passage,center_circle(0%),51.0
+example-10x10,example,10,10,magic-aware (distance),passage,center_circle(5%),51.0
+example-10x10,example,10,10,magic-aware (distance),passage,right_row,51.0
+example-10x10,example,10,10,magic-aware (random),cube,center_circle(0%),51.0
+example-10x10,example,10,10,magic-aware (random),cube,center_circle(5%),51.0
+example-10x10,example,10,10,magic-aware (random),cube,right_row,51.0
+example-10x10,example,10,10,magic-aware (random),passage,center_circle(0%),51.0
+example-10x10,example,10,10,magic-aware (random),passage,center_circle(5%),51.0
+example-10x10,example,10,10,magic-aware (random),passage,right_row,51.0
+ghz_n255-43x43,ghz_n255,43,43,gaussian (coarse),cube,center_circle(0%),255.0
+ghz_n255-43x43,ghz_n255,43,43,gaussian (coarse),cube,right_row,255.0
+ghz_n255-43x43,ghz_n255,43,43,gaussian (fine),cube,center_circle(0%),255.0
+ghz_n255-43x43,ghz_n255,43,43,gaussian (fine),cube,right_row,255.0
+ghz_n255-43x43,ghz_n255,43,43,homogeneous,cube,center_circle(0%),255.0
+ghz_n255-43x43,ghz_n255,43,43,homogeneous,cube,right_row,255.0
+ghz_n255-43x43,ghz_n255,43,43,magic-aware (center),cube,center_circle(0%),255.0
+ghz_n255-43x43,ghz_n255,43,43,magic-aware (center),cube,right_row,255.0
+ghz_n255-43x43,ghz_n255,43,43,magic-aware (distance),cube,center_circle(0%),255.0
+ghz_n255-43x43,ghz_n255,43,43,magic-aware (distance),cube,right_row,255.0
+ghz_n255-43x43,ghz_n255,43,43,magic-aware (random),cube,center_circle(0%),255.0
+ghz_n255-43x43,ghz_n255,43,43,magic-aware (random),cube,right_row,255.0
+ghz_n255-45x45,ghz_n255,45,45,gaussian (coarse),cube,center_circle(0%),255.0
+ghz_n255-45x45,ghz_n255,45,45,gaussian (coarse),cube,center_circle(5%),255.0
+ghz_n255-45x45,ghz_n255,45,45,gaussian (coarse),cube,right_row,255.0
+ghz_n255-45x45,ghz_n255,45,45,gaussian (fine),cube,center_circle(0%),255.0
+ghz_n255-45x45,ghz_n255,45,45,gaussian (fine),cube,center_circle(5%),255.0
+ghz_n255-45x45,ghz_n255,45,45,gaussian (fine),cube,right_row,255.0
+ghz_n255-45x45,ghz_n255,45,45,homogeneous,cube,center_circle(0%),255.0
+ghz_n255-45x45,ghz_n255,45,45,homogeneous,cube,center_circle(5%),255.0
+ghz_n255-45x45,ghz_n255,45,45,homogeneous,cube,right_row,255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (center),cube,center_circle(0%),255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (center),cube,center_circle(5%),255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (center),cube,right_row,255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (distance),cube,center_circle(0%),255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (distance),cube,center_circle(5%),255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (distance),cube,right_row,255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (random),cube,center_circle(0%),255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (random),cube,center_circle(5%),255.0
+ghz_n255-45x45,ghz_n255,45,45,magic-aware (random),cube,right_row,255.0
+ghz_n255-47x47,ghz_n255,47,47,gaussian (coarse),cube,center_circle(5%),255.0
+ghz_n255-47x47,ghz_n255,47,47,gaussian (coarse),cube,right_row,255.0
+ghz_n255-47x47,ghz_n255,47,47,gaussian (fine),cube,center_circle(5%),255.0
+ghz_n255-47x47,ghz_n255,47,47,gaussian (fine),cube,right_row,255.0
+ghz_n255-47x47,ghz_n255,47,47,homogeneous,cube,center_circle(5%),255.0
+ghz_n255-47x47,ghz_n255,47,47,homogeneous,cube,right_row,255.0
+ghz_n255-47x47,ghz_n255,47,47,magic-aware (center),cube,center_circle(5%),255.0
+ghz_n255-47x47,ghz_n255,47,47,magic-aware (center),cube,right_row,255.0
+ghz_n255-47x47,ghz_n255,47,47,magic-aware (distance),cube,center_circle(5%),255.0
+ghz_n255-47x47,ghz_n255,47,47,magic-aware (distance),cube,right_row,255.0
+ghz_n255-47x47,ghz_n255,47,47,magic-aware (random),cube,center_circle(5%),255.0
+ghz_n255-47x47,ghz_n255,47,47,magic-aware (random),cube,right_row,255.0
 ghz_state_n23-11x11,ghz_state_n23,11,11,gaussian (coarse),passage,center_circle(0%),23.0
 ghz_state_n23-11x11,ghz_state_n23,11,11,gaussian (coarse),passage,center_circle(5%),23.0
 ghz_state_n23-11x11,ghz_state_n23,11,11,gaussian (coarse),passage,right_row,23.0
@@ -177,7 +334,6 @@ ghz_state_n23-12x12,ghz_state_n23,12,12,homogeneous,passage,center_circle(5%),23
 ghz_state_n23-12x12,ghz_state_n23,12,12,homogeneous,passage,right_row,23.0
 ghz_state_n23-12x12,ghz_state_n23,12,12,magic-aware (distance),passage,center_circle(5%),23.0
 ghz_state_n23-12x12,ghz_state_n23,12,12,magic-aware (distance),passage,right_row,23.0
-ghz_state_n23-12x12,ghz_state_n23,12,12,magic-aware (random),passage,center_circle(5%),23.0
 ghz_state_n23-12x12,ghz_state_n23,12,12,magic-aware (random),passage,right_row,23.0
 ghz_state_n23-13x13,ghz_state_n23,13,13,gaussian (coarse),cube,center_circle(0%),23.0
 ghz_state_n23-13x13,ghz_state_n23,13,13,gaussian (coarse),cube,center_circle(5%),23.0
@@ -222,6 +378,7 @@ qaoa_n6-5x5,qaoa_n6,5,5,gaussian (fine),passage,center_circle(0%),34.0
 qaoa_n6-5x5,qaoa_n6,5,5,gaussian (fine),passage,center_circle(5%),34.0
 qaoa_n6-5x5,qaoa_n6,5,5,gaussian (fine),passage,right_row,34.0
 qaoa_n6-5x5,qaoa_n6,5,5,magic-aware (distance),passage,right_row,34.0
+qaoa_n6-5x5,qaoa_n6,5,5,magic-aware (random),passage,right_row,34.0
 qaoa_n6-6x6,qaoa_n6,6,6,gaussian (coarse),passage,center_circle(0%),34.0
 qaoa_n6-6x6,qaoa_n6,6,6,gaussian (coarse),passage,right_row,34.0
 qaoa_n6-6x6,qaoa_n6,6,6,gaussian (fine),passage,center_circle(0%),34.0
@@ -240,16 +397,14 @@ qaoa_n6-7x7,qaoa_n6,7,7,gaussian (fine),cube,center_circle(0%),34.0
 qaoa_n6-7x7,qaoa_n6,7,7,gaussian (fine),cube,center_circle(5%),34.0
 qaoa_n6-7x7,qaoa_n6,7,7,gaussian (fine),cube,right_row,34.0
 qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (center),cube,center_circle(0%),34.0
-qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (center),cube,center_circle(5%),34.0
 qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (center),cube,right_row,34.0
 qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (distance),cube,center_circle(0%),34.0
 qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (distance),cube,right_row,34.0
 qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (random),cube,center_circle(0%),34.0
 qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (random),cube,center_circle(5%),34.0
 qaoa_n6-7x7,qaoa_n6,7,7,magic-aware (random),cube,right_row,34.0
-qft_20-10x10,qft_20,10,10,gaussian (fine),passage,right_row,127.0
-qft_20-10x10,qft_20,10,10,magic-aware (distance),passage,center_circle(0%),127.0
-qft_20-11x11,qft_20,11,11,magic-aware (random),passage,center_circle(0%),118.0
+qft_20-10x10,qft_20,10,10,magic-aware (random),cube,center_circle(0%),117.0
+qft_20-11x11,qft_20,11,11,magic-aware (random),passage,center_circle(0%),124.0
 qft_20-12x12,qft_20,12,12,gaussian (coarse),cube,right_row,103.0
 qft_20-13x13,qft_20,13,13,gaussian (coarse),cube,center_circle(5%),98.0
 wstate_n27-12x12,wstate_n27,12,12,gaussian (fine),passage,center_circle(0%),34.0
@@ -262,7 +417,9 @@ wstate_n27-12x12,wstate_n27,12,12,magic-aware (center),passage,center_circle(5%)
 wstate_n27-12x12,wstate_n27,12,12,magic-aware (center),passage,right_row,34.0
 wstate_n27-12x12,wstate_n27,12,12,magic-aware (distance),passage,center_circle(0%),34.0
 wstate_n27-12x12,wstate_n27,12,12,magic-aware (distance),passage,center_circle(5%),34.0
+wstate_n27-12x12,wstate_n27,12,12,magic-aware (distance),passage,right_row,34.0
 wstate_n27-12x12,wstate_n27,12,12,magic-aware (random),passage,center_circle(0%),34.0
+wstate_n27-12x12,wstate_n27,12,12,magic-aware (random),passage,center_circle(5%),34.0
 wstate_n27-12x12,wstate_n27,12,12,magic-aware (random),passage,right_row,34.0
 wstate_n27-14x14,wstate_n27,14,14,gaussian (coarse),cube,center_circle(0%),34.0
 wstate_n27-14x14,wstate_n27,14,14,gaussian (fine),cube,center_circle(0%),34.0
@@ -270,7 +427,9 @@ wstate_n27-14x14,wstate_n27,14,14,gaussian (fine),cube,right_row,34.0
 wstate_n27-14x14,wstate_n27,14,14,homogeneous,cube,center_circle(0%),34.0
 wstate_n27-14x14,wstate_n27,14,14,homogeneous,cube,right_row,34.0
 wstate_n27-14x14,wstate_n27,14,14,magic-aware (center),cube,center_circle(0%),34.0
+wstate_n27-14x14,wstate_n27,14,14,magic-aware (center),cube,right_row,34.0
 wstate_n27-14x14,wstate_n27,14,14,magic-aware (distance),cube,center_circle(0%),34.0
+wstate_n27-14x14,wstate_n27,14,14,magic-aware (distance),cube,right_row,34.0
 wstate_n27-14x14,wstate_n27,14,14,magic-aware (random),cube,center_circle(0%),34.0
 wstate_n27-15x15,wstate_n27,15,15,gaussian (coarse),cube,center_circle(0%),34.0
 wstate_n27-15x15,wstate_n27,15,15,gaussian (coarse),cube,center_circle(5%),34.0
@@ -282,7 +441,10 @@ wstate_n27-15x15,wstate_n27,15,15,homogeneous,cube,center_circle(5%),34.0
 wstate_n27-15x15,wstate_n27,15,15,homogeneous,cube,right_row,34.0
 wstate_n27-15x15,wstate_n27,15,15,magic-aware (center),cube,center_circle(0%),34.0
 wstate_n27-15x15,wstate_n27,15,15,magic-aware (center),cube,center_circle(5%),34.0
+wstate_n27-15x15,wstate_n27,15,15,magic-aware (center),cube,right_row,34.0
 wstate_n27-15x15,wstate_n27,15,15,magic-aware (distance),cube,center_circle(0%),34.0
 wstate_n27-15x15,wstate_n27,15,15,magic-aware (distance),cube,center_circle(5%),34.0
+wstate_n27-15x15,wstate_n27,15,15,magic-aware (distance),cube,right_row,34.0
 wstate_n27-15x15,wstate_n27,15,15,magic-aware (random),cube,center_circle(0%),34.0
 wstate_n27-15x15,wstate_n27,15,15,magic-aware (random),cube,center_circle(5%),34.0
+wstate_n27-15x15,wstate_n27,15,15,magic-aware (random),cube,right_row,34.0

@@ -50,6 +50,7 @@
 
 build/
 env/
+.env/
 
 visualization/
 universal_set_qasms
