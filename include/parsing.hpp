@@ -26,7 +26,9 @@ void apply_config_overrides(
     int& number_of_magic_states,
     double& number_of_magic_states_multiplier,
     double& border_distance_percentage,
-    std::string& routing_method
+    std::string& routing_method,
+    std::string& t_routing_mode,
+    int& patience_threshold
 );
 void argument_parsing(
     int argc,
@@ -49,7 +51,9 @@ void argument_parsing(
     int& number_of_magic_states,
     double& number_of_magic_states_multiplier,
     double& border_distance_percentage,
-    std::string& routing_method
+    std::string& routing_method,
+    std::string& t_routing_mode,
+    int& patience_threshold
 );
 
 #endif // PARSING_HPP

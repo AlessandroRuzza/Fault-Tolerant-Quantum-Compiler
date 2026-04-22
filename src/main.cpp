@@ -93,6 +93,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     int y = 11;
     int maximum_iterations = 500;
     std::string routing_strategy = "congestion";
+    std::string t_routing_mode = "normal_t_routing";
+    int patience_threshold = 3;
 
     apply_config_overrides(
         argc,
@@ -116,7 +118,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         number_of_magic_states,
         number_of_magic_states_multiplier,
         border_distance_percentage, 
-        routing_strategy
+        routing_strategy,
+        t_routing_mode,
+        patience_threshold
     );
 
     argument_parsing(
@@ -140,7 +144,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         number_of_magic_states,
         number_of_magic_states_multiplier,
         border_distance_percentage,
-        routing_strategy
+        routing_strategy,
+        t_routing_mode,
+        patience_threshold
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -188,7 +194,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         number_of_magic_states,
         number_of_magic_states_multiplier,
         border_distance_percentage,
-        routing_strategy
+        routing_strategy,
+        t_routing_mode,
+        patience_threshold
     );
 }
 
