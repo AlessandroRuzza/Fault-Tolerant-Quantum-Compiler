@@ -50,6 +50,12 @@ add_custom_target(run-main
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+add_custom_target(clearexpanded
+    COMMAND sh -c "rm -f ${CMAKE_SOURCE_DIR}/config/*_expanded.json"
+    COMMENT "Removing config/*_expanded.json files"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # Target to run the executable in bench mode:
 # make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1] [BENCH_JOBS=<n>] [BENCH_PROCESS_COUNT=<n>] [PROCESSOR=<n>]
 add_custom_target(run-bench
