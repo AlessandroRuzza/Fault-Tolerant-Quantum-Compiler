@@ -36,6 +36,15 @@ struct Gate {
     bool operator==(const Gate& other) const {
         return id == other.id && name == other.name && qubits == other.qubits;
     }
+
+    inline bool involves_qubit(uint32_t qID) const {
+        for (const uint32_t q : qubits) {
+            if (q == qID) return true;
+        }
+        return false;
+    }
+
+    
 };
 
 

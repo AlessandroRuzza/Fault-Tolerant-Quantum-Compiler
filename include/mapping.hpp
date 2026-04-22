@@ -54,7 +54,8 @@ public:
     enum class SafePassageStrategy {
         PASSAGE,
         PASSAGE_NO_SUBGRAPHS,
-        CUBE
+        CUBE,
+        CONNECTIVITY
     };
 
     static vector<std::string> get_available_mapping_strategies() {
@@ -70,7 +71,7 @@ public:
     }
 
     static vector<std::string> get_available_safe_passage_strategies() {
-        return {"passage", "passage_no_subgraphs", "cube"};
+        return {"passage", "passage_no_subgraphs", "cube", "connectivity"};
     }
 
 
@@ -87,7 +88,7 @@ public:
     }
 
     static std::string available_safe_passage_strategies() {
-        return "passage | passage_no_subgraphs | cube";
+        return "passage | passage_no_subgraphs | cube | connectivity";
     }
 
 
@@ -192,7 +193,7 @@ public:
     }
 
 
-    inline bool check_safe_passage(const Node& node) {
+    inline bool check_safe_passage(const Node& node, const Qubit q) {
         switch (safePassageStrategy) {
             case SafePassageStrategy::PASSAGE:
                 return safe_passage(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
@@ -200,6 +201,8 @@ public:
                 return safe_passage_no_subgraphs(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
             case SafePassageStrategy::CUBE:
                 return _3x3_occupied(node, graph.get_occupied_nodes());
+            case SafePassageStrategy::CONNECTIVITY:
+                return safe_connectivity(node, q, graph.get_occupied_nodes());
             default:
                 throw std::runtime_error("Invalid safe passage strategy");
         }
@@ -287,7 +290,7 @@ public:
 
     bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int maxX, int maxY);
     bool safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes, int maxX, int maxY);
-
+    bool safe_connectivity(const Node& node, const Qubit q, const std::vector<Node>& occupied_nodes);
 private:
 
     void one_iteration_magic_aware_mapping(Qubit* qubit, int* iterations);
@@ -407,6 +410,9 @@ private:
             return true;
         } else if (normalized_name == "cube") {
             safePassageStrategy = SafePassageStrategy::CUBE;
+            return true;
+        } else if (normalized_name == "connectivity") {
+            safePassageStrategy = SafePassageStrategy::CONNECTIVITY;
             return true;
         }
 
