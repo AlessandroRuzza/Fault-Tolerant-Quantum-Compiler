@@ -1,13 +1,13 @@
 {
-  "circuit": "bigadder_n18_transpiled",
+  "circuit": "parallel",
 
-  "type": "magic_aware",
+  "type": "gaussian",
   "magic_aware_strategy": "center",
   "gaussian_strategy": "coarse",
-  "safe_passage_strategy": "passage",
+  "safe_passage_strategy": "passage_no_subgraphs",
   "MagicStatePlacementStrategy": "center_circle",
-  "number_of_magic_states": 0.7,
-  "border_distance_percentage": 5.0,
+  "number_of_magic_states": 6,
+  "border_distance_percentage": 0.0,
 
   "MAGIC_HIGH": 1.5,
   "MAGIC_LOW": 0.5,

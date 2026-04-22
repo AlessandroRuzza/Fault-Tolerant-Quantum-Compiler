@@ -214,7 +214,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n";
     
     double avg_parallelism = circuit.getNumGates() / router.get_routing_length();
-    std::cout << "\nAverage Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
+    std::cout << "Average Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
 
     return benchmarkResult{router.get_routing_length(), avg_parallelism};
 }
