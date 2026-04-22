@@ -4,8 +4,8 @@
 #define PRINT_PARSING false // global variable to control QASM parsing printing
 #define PRINT_CIRCUIT false // global variable to control circuit printing
 
-#define PRINT_MAPPING true // global variable to control mapping steps printing
-#define PRINT_MAPPING_GRAPH true // global variable to control mapping graph printing
+#define PRINT_MAPPING false // global variable to control mapping steps printing
+#define PRINT_MAPPING_GRAPH false // global variable to control mapping graph printing
 #define MAPPING_VERBOSE false // global variable to control mapping steps printing
 
 #define PRINT_SAFE_PASSAGE false // global variable to control safe passage checking printing

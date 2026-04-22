@@ -195,8 +195,11 @@ void QubitRouter::route_circuit() {
             topLayer,
             route
         );
+        
         const std::size_t non_routed = topLayer.size() - route.size();
-        non_routed_histogram[non_routed]++;
+        if(non_routed > 0)
+            non_routed_histogram[non_routed]++;
+
         if(route.size() == 0){
             std::cout << "ERROR trying to route layer with " << topLayer.size() << " gates:" << std::endl;
             for (const auto& gate : topLayer) {
@@ -224,7 +227,9 @@ void QubitRouter::route_circuit() {
 
     
     std::cout << "Qubit routing completed.\n";
-    print_non_routed_histogram(non_routed_histogram);
+    if (!non_routed_histogram.empty()) {
+        print_non_routed_histogram(non_routed_histogram);
+    }
 }
 
 void QubitRouter::print_routing_steps() const {
