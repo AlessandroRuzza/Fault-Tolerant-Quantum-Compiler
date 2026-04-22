@@ -60,7 +60,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double base_gaussian_weight, int x, int y, std::string graph_path, 
     std::string magic_state_placement_strategy, int number_of_magic_states,
     double number_of_magic_states_multiplier,
-    double border_distance_percentage, std::string routing_strategy) {
+    double border_distance_percentage, std::string routing_strategy,
+    std::string t_routing_mode, int patience_threshold) {
 
 
     //----------circuit------------
@@ -178,7 +179,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     );
 
     mapping.map();
-
     for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
         if (circuit.getQubit(qubit) == nullptr) {
             continue;
@@ -208,7 +208,17 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     }
     // NaiveShortestPath pathStrat(graph);
     // QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
-    QubitRouter router(mapping, layeredCircuit, graph, pathStrategyPtr.get());
+    QubitRouter router(
+        mapping,
+        layeredCircuit,
+        graph,
+        pathStrategyPtr.get(),
+        t_routing_mode,
+        patience_threshold
+    );
+
+    router.precompute_magic_state_order();
+
     router.route_circuit();    
     if (PRINT_ROUTING) router.print_routing_steps();
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n";

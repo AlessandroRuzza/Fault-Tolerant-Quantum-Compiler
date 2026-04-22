@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <queue>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
@@ -75,14 +76,28 @@ private:
     LayeredCircuit& circuit;
     const Graph& graph;
     const IPathStrategy* pathStrategy;
+    std::string t_routing_mode;
+    int patience_threshold;
     std::vector<Routing> routing_steps;
+    std::unordered_map<int, std::vector<int>> magic_state_order_cache;
 
     Routing route_layer(const Layer& layer_gates) const;
     float minGateRouteLength(const Gate& g) const;
 
 public:
-    QubitRouter(const Mapping& m, LayeredCircuit& c, const Graph& g, const IPathStrategy* p) 
-        : mapping(m), circuit(c), graph(g), pathStrategy(p) {}
+    QubitRouter(
+        const Mapping& m,
+        LayeredCircuit& c,
+        const Graph& g,
+        const IPathStrategy* p,
+        std::string t_routing_mode = "normal_t_routing",
+        int patience_threshold = 3
+    ) : mapping(m),
+        circuit(c),
+        graph(g),
+        pathStrategy(p),
+        t_routing_mode(std::move(t_routing_mode)),
+        patience_threshold(patience_threshold) {}
     /**
      * Routes the whole circuit, returning a vector of mappings (gate-Path).
      * @attention this will modify the layering in the internal LayeredCircuit.
@@ -102,6 +117,10 @@ public:
         circuit.reset();
         routing_steps.clear();
     }
+
+    // Precompute the order of magic states to be used for routing each gate, based on the mapping's strategy.
+    void precompute_magic_state_order();
+
     void print_routing_steps() const;
     void print_routing(int i) const;
 

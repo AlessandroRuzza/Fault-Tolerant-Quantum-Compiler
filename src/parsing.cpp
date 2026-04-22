@@ -156,6 +156,14 @@ std::string normalize_routing_method(std::string value) {
     return value;
 }
 
+std::string normalize_t_routing_mode(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    std::replace(value.begin(), value.end(), '-', '_');
+    return value;
+}
+
 void validate_routing_method(const std::string& value, const char* executable) {
     const std::string normalized = normalize_routing_method(value);
     const std::vector<std::string> valid_methods = {"congestion", "naive"};
@@ -163,6 +171,16 @@ void validate_routing_method(const std::string& value, const char* executable) {
         std::cerr << "Invalid routing method: " << value << "\n";
         print_usage(executable);
         throw std::runtime_error("Invalid routing method: " + value);
+    }
+}
+
+void validate_t_routing_mode(const std::string& value, const char* executable) {
+    const std::string normalized = normalize_t_routing_mode(value);
+    const std::vector<std::string> valid_modes = {"normal_t_routing", "smart_t_routing"};
+    if (std::find(valid_modes.begin(), valid_modes.end(), normalized) == valid_modes.end()) {
+        std::cerr << "Invalid t routing mode: " << value << "\n";
+        print_usage(executable);
+        throw std::runtime_error("Invalid t routing mode: " + value);
     }
 }
 
@@ -257,6 +275,8 @@ void print_usage(const char* executable) {
               << "[--mapped-gaussian-weight <float>=0]\n"
               << "[--base-gaussian-weight <float>=0]\n"
               << "[--routing-strategy [congestion|naive]]\n"
+              << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
+              << "[--patience-threshold <integer>=0]\n"
               << "[--x <integer>]\n"
               << "[--y <integer>]\n"
               << "[--graph <graph_path>]\n"
@@ -290,7 +310,9 @@ void apply_config_overrides(
     int& number_of_magic_states,
     double& number_of_magic_states_multiplier,
     double& border_distance_percentage,
-    std::string& routing_method
+    std::string& routing_method,
+    std::string& t_routing_mode,
+    int& patience_threshold
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -522,6 +544,25 @@ void apply_config_overrides(
         validate_routing_method(normalized, argv[0]);
         routing_method = normalized;
     }
+
+    if (config_json.contains("t_routing_mode") || config_json.contains("t-routing-mode")) {
+        const std::string configured_mode = config_json.contains("t_routing_mode") ?
+            config_json["t_routing_mode"].get<std::string>() :
+            config_json["t-routing-mode"].get<std::string>();
+        t_routing_mode = normalize_t_routing_mode(configured_mode);
+        validate_t_routing_mode(t_routing_mode, argv[0]);
+    }
+
+    if (config_json.contains("patience_threshold") || config_json.contains("patience-threshold")) {
+        const char* key = config_json.contains("patience_threshold") ? "patience_threshold" : "patience-threshold";
+        if (!config_json[key].is_number_integer()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be an integer");
+        }
+        patience_threshold = config_json[key].get<int>();
+        if (patience_threshold < 0) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be >= 0");
+        }
+    }
 }
 
 void argument_parsing(
@@ -545,7 +586,9 @@ void argument_parsing(
     int& number_of_magic_states,
     double& number_of_magic_states_multiplier,
     double& border_distance_percentage,
-    std::string& routing_method
+    std::string& routing_method,
+    std::string& t_routing_mode,
+    int& patience_threshold
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -770,6 +813,34 @@ void argument_parsing(
             }
             routing_method = normalize_routing_method(argv[++i]);
             validate_routing_method(routing_method, argv[0]);
+            continue;
+        }
+
+        if (arg == "--t-routing-mode" || arg == "--t_routing_mode") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --t-routing-mode\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --t-routing-mode");
+            }
+            t_routing_mode = normalize_t_routing_mode(argv[++i]);
+            validate_t_routing_mode(t_routing_mode, argv[0]);
+            continue;
+        }
+
+        if (arg == "--patience-threshold" || arg == "--patience_threshold") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --patience-threshold\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --patience-threshold");
+            }
+            try {
+                patience_threshold = std::stoi(argv[++i]);
+            } catch (const std::exception&) {
+                throw std::runtime_error("Invalid integer value for --patience-threshold: " + std::string(argv[i]));
+            }
+            if (patience_threshold < 0) {
+                throw std::runtime_error("--patience-threshold must be >= 0");
+            }
             continue;
         }
 
