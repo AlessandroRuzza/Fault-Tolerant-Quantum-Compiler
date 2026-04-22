@@ -1,5 +1,5 @@
 {
-  "circuit": "parallel",
+  "circuit": "parallel_big",
 
   "type": "gaussian",
   "magic_aware_strategy": "center",
