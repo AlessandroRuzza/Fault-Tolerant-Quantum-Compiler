@@ -63,6 +63,9 @@ benchmarks/old*/
 benchmarks/results/*
 !*.csv
 
+# Temp Ale log files
+*.ans
+
 tmp/
 scripts/__pycache__/
 QASMBench-master/
