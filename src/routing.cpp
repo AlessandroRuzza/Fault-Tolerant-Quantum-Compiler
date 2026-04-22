@@ -68,7 +68,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     Routing routing;
     std::unordered_set<int> used_nodes;
     
-    // Reserve mapped qubit nodes so routes do not pass through occupied data nodes.
+    // Reserve mapped qubit and magic state nodes so routes do not pass through occupied nodes.
     for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
         if (circuit.getQubit(qubit) == nullptr) {
             continue;
@@ -79,6 +79,11 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         }
         used_nodes.insert(node); // Cannot route through qubit nodes.
     }
+
+    if(MAGIC_STOPS_ROUTE)
+        for (int magic_state : graph.get_magic_state_ids()) {
+            used_nodes.insert(magic_state);
+        }
 
     if (const auto* congestion_strategy = dynamic_cast<const CongestionAwareShortestPath*>(pathStrategy)) {
         congestion_strategy->prepare_for_layer(circuit, mapping, used_nodes);

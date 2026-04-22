@@ -87,7 +87,8 @@ void draw_routing_layer(
     std::cout << "\n=== Routing Layer " << step_index << " ===\n";
     std::cout << "Legend: "
               << GREEN << "magic states" << RESET << ", "
-              << RED << "qubits" << RESET << ", "
+              << RED << "idle qubits" << RESET << ", "
+              << YELLOW << "active qubits" << RESET << ", "
               << BLUE << "routes" << RESET << "\n\n";
 
     for (int y = 0; y < height; ++y) {

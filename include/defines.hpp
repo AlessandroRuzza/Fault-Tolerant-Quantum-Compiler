@@ -6,13 +6,16 @@
 
 #define PRINT_MAPPING true // global variable to control mapping steps printing
 #define PRINT_MAPPING_GRAPH true // global variable to control mapping graph printing
-#define MAPPING_VERBOSE true // global variable to control mapping steps printing
+#define MAPPING_VERBOSE false // global variable to control mapping steps printing
 
-#define PRINT_SAFE_PASSAGE true // global variable to control safe passage checking printing
+#define PRINT_SAFE_PASSAGE false // global variable to control safe passage checking printing
 
 #define PRINT_LAYER false // global variable to control layered circuit printing
 #define PRINT_ROUTING false // global variable to control routing steps printing
-#define PRINT_DRAW_ROUTING false // global variable to control routing lattice drawing printing
+#define PRINT_DRAW_ROUTING true // global variable to control routing lattice drawing printing
 #define PRINT_ROUTING_PROGRESS false // global variable to control routing layer progress printing
+
+//// BEHAVIORAL FLAGS
+#define MAGIC_STOPS_ROUTE true
 
 #endif // DEFINES_HPP
