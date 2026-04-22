@@ -1,4 +1,5 @@
 #include "mapping.hpp"
+#include "routing.hpp"
 
 const bool Mapping::mapToNeighbor(
     int qubit,
@@ -82,7 +83,7 @@ int Mapping::map_qubit_to_node(
         );
     }
 
-    if (!check_safe_passage(graph.get_node(node))) {
+    if (!check_safe_passage(graph.get_node(node), *q)) {
         if (PRINT_SAFE_PASSAGE) {
             std::cout
                 << "[safe-passage] qubit=" << qubit
@@ -161,7 +162,57 @@ bool Mapping::_3x3_occupied(const Node& node, const std::vector<Node>& occupied_
 }
 
 
+bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vector<Node>& occupied_nodes){
+    // Add magic states to occupied_nodes
+    const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
+    std::vector<Node> blocked_nodes = occupied_nodes;
+    for (int magic_state_id : magic_state_ids) {
+        blocked_nodes.push_back(graph.get_node(magic_state_id));
+    }
+    
+    for (const Node& blocked_node : blocked_nodes) {
+        if (blocked_node.id == node.id) {
+            return false;
+        }
+    }
 
+    const auto pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
+    std::unordered_set<int> used_nodes;
+    for(const Node& node : blocked_nodes){
+        used_nodes.insert(node.id);
+    }
+    const auto path_exists = [&pathStrategyPtr, &used_nodes](const int start, const int goal) -> bool {
+        Path path = pathStrategyPtr->find_shortest_path(start, goal, used_nodes);
+        return !path.empty();
+    };
+
+    std::vector<Gate> gates = circuit.getGates();
+    int qID = q.getQubitID();
+    // Filter gates, keep only those involving qID
+    gates.erase(
+        std::remove_if(gates.begin(), gates.end(), [qID](const Gate& gate) {
+            return gate.qubits.size() < 2 || !gate.involves_qubit(qID);
+        }),
+        gates.end()
+    );
+
+    const auto otherQubit = [&qID](const Gate& gate) -> int {
+        if (gate.qubits.size() < 2) return -1;
+        return (gate.qubits[0] == qID) ? gate.qubits[1] : gate.qubits[0];
+    };
+
+    for (const Gate& gate : gates) {
+        const int other_qid = otherQubit(gate);
+        if (other_qid < 0 || get_mapped_node(other_qid) < 0) {
+            continue; // 1-qubit gate or unmapped other qubit
+        }
+        if (!path_exists(node.id, other_qid)) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 
 bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int width, int height) {

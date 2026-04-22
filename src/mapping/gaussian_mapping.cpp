@@ -334,7 +334,7 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
             continue;
         }
 
-        bool is_safe = check_safe_passage(node);
+        bool is_safe = check_safe_passage(node, qubit);
         if (!is_safe) {
             continue;
         }
