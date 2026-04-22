@@ -14,9 +14,11 @@ if "MPLCONFIGDIR" not in os.environ:
     os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib-cache"
 os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
 
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.lines import Line2D
+def importMatplotlib():
+    global plt, np, Line2D
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.lines import Line2D
 
 
 SUCCESS_STATUSES = {"ok", "ok_no_routing_metric", "success"}
@@ -1350,6 +1352,8 @@ def main():
         help="Output directory for generated plots",
     )
     args = parser.parse_args()
+
+    importMatplotlib()
 
     plt.style.use("seaborn-v0_8-whitegrid")
 

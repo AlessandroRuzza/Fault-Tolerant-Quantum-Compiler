@@ -178,9 +178,11 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
 
     const auto pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
     std::unordered_set<int> used_nodes;
-    for(const Node& node : blocked_nodes){
-        used_nodes.insert(node.id);
+    used_nodes.reserve(blocked_nodes.size());
+    for(const Node& n : blocked_nodes){
+        used_nodes.insert(n.id);
     }
+
     const auto path_exists = [&pathStrategyPtr, &used_nodes](const int start, const int goal) -> bool {
         Path path = pathStrategyPtr->find_shortest_path(start, goal, used_nodes);
         return !path.empty();
@@ -203,10 +205,12 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
 
     for (const Gate& gate : gates) {
         const int other_qid = otherQubit(gate);
-        if (other_qid < 0 || get_mapped_node(other_qid) < 0) {
+        const int other_node = get_mapped_node(other_qid);
+
+        if (other_qid < 0 || other_node < 0) {
             continue; // 1-qubit gate or unmapped other qubit
         }
-        if (!path_exists(node.id, other_qid)) {
+        if (!path_exists(node.id, other_node)) {
             return false;
         }
     }

@@ -1,6 +1,6 @@
 {
   "circuit": ["qft_20", "example"],
-  "safe_passage_strategy": ["cube", "passage"],
+  "safe_passage_strategy": ["cube", "passage", "passage_no_subgraphs", "connectivity"],
   "MagicStatePlacementStrategy": ["center_circle", "right_row"],
   "border_distance_percentage": [0.0, 5.0],
   "number_of_magic_states": [0.7, 0.9],

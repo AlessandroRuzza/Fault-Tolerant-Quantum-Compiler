@@ -3,8 +3,8 @@
 
   "type": "gaussian",
   "magic_aware_strategy": "center",
-  "gaussian_strategy": "fine",
-  "safe_passage_strategy": "connectivity",
+  "gaussian_strategy": "coarse",
+  "safe_passage_strategy": "passage_no_subgraphs",
   "MagicStatePlacementStrategy": "center_circle",
   "number_of_magic_states": 13,
   "border_distance_percentage": 0.0,
