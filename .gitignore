@@ -57,6 +57,7 @@ universal_set_qasms
 qasms/vqe_n24.qasm
 .codex
 benchmarks/logs/
+benchmarks/
 tmp/
 scripts/__pycache__/
 QASMBench-master/
