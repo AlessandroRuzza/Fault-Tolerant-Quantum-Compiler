@@ -680,6 +680,13 @@ int run_bench_mode(
             if (routing_strategy_csv.empty()) {
                 routing_strategy_csv = "congestion";
             }
+            std::string t_routing_mode_csv = get_json_field(
+                plan.entry,
+                {"t_routing_mode", "t-routing-mode"}
+            );
+            if (t_routing_mode_csv.empty()) {
+                t_routing_mode_csv = "normal_t_routing";
+            }
 
             const std::string mw = get_json_field(plan.entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
             const std::string bw = get_json_field(plan.entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
@@ -710,6 +717,7 @@ int run_bench_mode(
                 get_json_field(plan.entry, {"border_distance_percentage"}),
                 get_json_field(plan.entry, {"number_of_magic_states"}),
                 routing_strategy_csv,
+                t_routing_mode_csv,
                 routing_steps,
                 result.timeout_reached ? "true" : "false",
                 result.status,

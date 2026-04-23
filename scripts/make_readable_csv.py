@@ -119,6 +119,8 @@ def main() -> None:
         "magic_state_placement_strategy",
         "border_distance_percentage",
         "number_of_magic_states",
+        "routing_strategy",
+        "t_routing_mode",
         "routing_steps",
         "error_excerpt",
     ]
@@ -166,6 +168,17 @@ def main() -> None:
                         "number_of_magic_states",
                         "number of magic states",
                         "number of magi cstates",
+                    ),
+                    "routing_strategy": pick_value(
+                        row,
+                        "routing_strategy",
+                        "routing strategy",
+                    ),
+                    "t_routing_mode": pick_value(
+                        row,
+                        "t_routing_mode",
+                        "t-routing-mode",
+                        "t routing mode",
                     ),
                     "routing_steps": pick_value(row, "routing_steps", "routing steps"),
                     "error_excerpt": pick_value(row, "error_excerpt", "error excerpt"),
