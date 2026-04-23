@@ -548,7 +548,6 @@ def prepare_rows_for_analysis(raw_rows):
         row["safe_passage_norm"] = normalize_text(row.get("safe_passage_strategy"))
         row["magic_aware_strategy_norm"] = normalize_text(row.get("magic_aware_strategy"))
         row["gaussian_strategy_norm"] = normalize_text(row.get("gaussian_strategy"))
-
         row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
         row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
         row["total_nodes_i"] = to_int(row.get("total_nodes"))
@@ -613,6 +612,27 @@ def category_color_map(labels):
     return {label: cmap(i) for i, label in enumerate(labels)}
 
 
+def label_with_sample_count(label, count):
+    return f"{label}\n(n={count})"
+
+
+def legend_label_with_sample_count(label, count):
+    return f"{label} (n={count})"
+
+
+def annotate_bars(ax, bars, fmt="{:.0f}"):
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(
+            bar.get_x() + bar.get_width() / 2.0,
+            height,
+            fmt.format(height),
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+
 def plot_overview_dashboard(rows, output_dir, generated):
     status_counts = Counter(r["status"] for r in rows)
     circuits = sorted({r["circuit_name"] for r in rows if r["circuit_name"]})
@@ -631,28 +651,34 @@ def plot_overview_dashboard(rows, output_dir, generated):
 
     labels = list(status_counts.keys())
     vals = [status_counts[k] for k in labels]
-    axs[0].bar(labels, vals, color=["#3A7CA5", "#B94E48", "#D9A441"][: len(labels)])
+    bars = axs[0].bar(labels, vals, color=["#3A7CA5", "#B94E48", "#D9A441"][: len(labels)])
     axs[0].set_title("Runs by Status")
     axs[0].set_ylabel("Count")
+    annotate_bars(axs[0], bars)
 
-    axs[1].bar(circuits, [circuit_counts[c] for c in circuits], color="#577590")
+    bars = axs[1].bar(circuits, [circuit_counts[c] for c in circuits], color="#577590")
     axs[1].set_title("Runs by Circuit")
     axs[1].tick_params(axis="x", rotation=35)
+    annotate_bars(axs[1], bars)
 
-    axs[2].bar(circuits, [success_by_circuit.get(c, 0.0) * 100 for c in circuits], color="#43AA8B")
+    circuit_sample_labels = [label_with_sample_count(c, circuit_counts[c]) for c in circuits]
+    bars = axs[2].bar(circuits, [success_by_circuit.get(c, 0.0) * 100 for c in circuits], color="#43AA8B")
     axs[2].set_title("Success Rate by Circuit")
     axs[2].set_ylabel("%")
     axs[2].set_ylim(0, 105)
+    axs[2].set_xticks(range(len(circuits)))
+    axs[2].set_xticklabels(circuit_sample_labels)
     axs[2].tick_params(axis="x", rotation=35)
+    annotate_bars(axs[2], bars, fmt="{:.1f}")
 
     if duration_values:
         axs[3].hist(duration_values, bins=min(20, max(8, int(len(duration_values) ** 0.5))), color="#277DA1")
-    axs[3].set_title("Duration Distribution (Successful Runs)")
+    axs[3].set_title(f"Duration Distribution (Successful Runs, n={len(duration_values)})")
     axs[3].set_xlabel("duration_seconds")
 
     if routing_ok:
         axs[4].hist(routing_ok, bins=min(20, max(8, int(len(routing_ok) ** 0.5))), color="#90BE6D")
-    axs[4].set_title("Routing Steps (Successful Runs)")
+    axs[4].set_title(f"Routing Steps (Successful Runs, n={len(routing_ok)})")
     axs[4].set_xlabel("total_routing_steps")
 
     points = [
@@ -669,10 +695,10 @@ def plot_overview_dashboard(rows, output_dir, generated):
             [p[1] for p in subset],
             s=28,
             alpha=0.7,
-            label=status_display_label(status),
+            label=legend_label_with_sample_count(status_display_label(status), len(subset)),
             color=status_color(status),
         )
-    axs[5].set_title("Duration vs Routing Steps")
+    axs[5].set_title(f"Duration vs Routing Steps (n={len(points)})")
     axs[5].set_xlabel("duration_seconds")
     axs[5].set_ylabel("routing_steps")
     axs[5].legend(fontsize=8)
@@ -690,19 +716,21 @@ def plot_status_and_exit(rows, output_dir, generated):
     s_labels = [status_display_label(k) for k in s_keys]
     s_vals = [status_counts[k] for k in s_keys]
     s_colors = [status_color(k) for k in s_keys]
-    axs[0].bar(s_labels, s_vals, color=s_colors)
+    bars = axs[0].bar(s_labels, s_vals, color=s_colors)
     axs[0].set_title("Status Counts")
     axs[0].set_ylabel("Count")
     axs[0].tick_params(axis="x", rotation=15)
+    annotate_bars(axs[0], bars)
 
     e_codes = sorted(exit_counts.keys())
     e_labels = [exit_code_display_label(code) for code in e_codes]
     e_vals = [exit_counts[code] for code in e_codes]
     e_colors = [exit_code_color(code) for code in e_codes]
-    axs[1].bar(e_labels, e_vals, color=e_colors)
+    bars = axs[1].bar(e_labels, e_vals, color=e_colors)
     axs[1].set_title("Exit Code Counts")
     axs[1].set_xlabel("exit_code")
     axs[1].tick_params(axis="x", rotation=15)
+    annotate_bars(axs[1], bars)
 
     save_fig(fig, output_dir, "01_status_and_exit_codes.png", generated)
 
@@ -723,8 +751,9 @@ def boxplot_by_category(rows, category_key, value_key, title, ylabel, filename, 
         return
 
     values = [grouped[k] for k in labels]
-    fig, ax = plt.subplots(figsize=(max(8, len(labels) * 0.9), 6))
-    ax.boxplot(values, tick_labels=labels, showfliers=False)
+    display_labels = [label_with_sample_count(label, len(grouped[label])) for label in labels]
+    fig, ax = plt.subplots(figsize=(max(8, len(labels) * 1.0), 6.5))
+    ax.boxplot(values, tick_labels=display_labels, showfliers=False)
     ax.set_title(title)
     ax.set_ylabel(ylabel)
     ax.tick_params(axis="x", rotation=35)
@@ -756,13 +785,13 @@ def scatter_plot(rows, x_key, y_key, color_key, title, xlabel, ylabel, filename,
         ax.scatter(
             [p[0] for p in subset],
             [p[1] for p in subset],
-            label=label,
+            label=legend_label_with_sample_count(label, len(subset)),
             alpha=0.7,
             s=28,
             color=colors[label],
         )
 
-    ax.set_title(title)
+    ax.set_title(f"{title} (n={len(points)})")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.legend(fontsize=8)
@@ -797,10 +826,14 @@ def plot_gaussian_weight_combinations(rows, output_dir, generated):
     if not any(value_groups):
         return
 
+    display_labels = [
+        label_with_sample_count(label, len(values))
+        for label, values in zip(ordered_labels, value_groups)
+    ]
     fig, ax = plt.subplots(figsize=(max(10, len(ordered_labels) * 3.4), 7))
     box = ax.boxplot(
         value_groups,
-        tick_labels=ordered_labels,
+        tick_labels=display_labels,
         showfliers=False,
         patch_artist=True,
     )
@@ -892,10 +925,12 @@ def aggregate_series_values(rows, build_series_key):
     x_labels = [requested_x_label(xk) for xk in x_keys_sorted]
 
     mean_by_pair = {}
+    count_by_pair = {}
     for key, values in grouped.items():
         mean_by_pair[key] = float(np.mean(values))
+        count_by_pair[key] = len(values)
 
-    return x_keys_sorted, x_labels, mean_by_pair
+    return x_keys_sorted, x_labels, mean_by_pair, count_by_pair
 
 
 def requested_mapping_display_name(mapping_key):
@@ -1075,7 +1110,7 @@ def plot_requested_grouped_scatter(
     if not aggregated[0]:
         return
 
-    x_keys_sorted, x_labels, mean_by_pair = aggregated
+    x_keys_sorted, x_labels, mean_by_pair, count_by_pair = aggregated
     available_series = [
         series_key
         for series_key in series_order
@@ -1120,6 +1155,21 @@ def plot_requested_grouped_scatter(
             alpha=0.95,
             zorder=3,
         )
+        x_keys_masked = [x_key for x_key, keep in zip(x_keys_sorted, mask) if keep]
+        for x_pos, y_val, x_key in zip(x_positions[mask], y_values[mask], x_keys_masked):
+            sample_count = count_by_pair.get((x_key, series_key), 0)
+            ax.annotate(
+                f"n={sample_count}",
+                (x_pos, y_val),
+                textcoords="offset points",
+                xytext=(0, 4),
+                ha="center",
+                va="bottom",
+                fontsize=5,
+                color=color,
+                alpha=0.85,
+                zorder=4,
+            )
 
     ax.set_title(title)
     ax.set_xlabel("circuit x graph dimensions")
@@ -1286,26 +1336,28 @@ def make_pair_heatmap(
     generated,
     value_format="{:.2f}",
 ):
-    row_labels = sorted({str(r.get(row_key, "unknown")) for r in rows})
-    col_labels = sorted({str(r.get(col_key, "unknown")) for r in rows})
+    row_labels = sorted({heatmap_axis_value(r, row_key) for r in rows})
+    col_labels = sorted({heatmap_axis_value(r, col_key) for r in rows})
     if not row_labels or not col_labels:
         return
 
     matrix = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
+    count_matrix = np.zeros((len(row_labels), len(col_labels)), dtype=int)
     row_index = {k: i for i, k in enumerate(row_labels)}
     col_index = {k: j for j, k in enumerate(col_labels)}
 
     grouped = defaultdict(list)
     for r in rows:
-        grouped[(str(r.get(row_key, "unknown")), str(r.get(col_key, "unknown")))].append(r)
+        grouped[(heatmap_axis_value(r, row_key), heatmap_axis_value(r, col_key))].append(r)
 
     for (rk, ck), subset in grouped.items():
         val = value_fn(subset)
+        count_matrix[row_index[rk], col_index[ck]] = len(subset)
         if val is None:
             continue
         matrix[row_index[rk], col_index[ck]] = val
 
-    fig, ax = plt.subplots(figsize=(max(7, len(col_labels) * 1.0), max(5, len(row_labels) * 0.8)))
+    fig, ax = plt.subplots(figsize=(max(7, len(col_labels) * 1.15), max(5, len(row_labels) * 0.9)))
     masked = np.ma.masked_invalid(matrix)
     im = ax.imshow(masked, cmap="viridis", aspect="auto")
     cbar = fig.colorbar(im, ax=ax)
@@ -1320,8 +1372,97 @@ def make_pair_heatmap(
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
             val = matrix[i, j]
-            text = "-" if np.isnan(val) else value_format.format(val)
-            ax.text(j, i, text, ha="center", va="center", color="white" if not np.isnan(val) else "#999999", fontsize=8)
+            sample_count = count_matrix[i, j]
+            metric_text = "-" if np.isnan(val) else value_format.format(val)
+            text = f"{metric_text}\nn={sample_count}"
+            color = "white" if not np.isnan(val) else "#999999"
+            ax.text(j, i, text, ha="center", va="center", color=color, fontsize=7, linespacing=0.9)
+
+    save_fig(fig, output_dir, filename, generated)
+
+
+def make_matched_pair_heatmap(
+    rows,
+    row_key,
+    col_key,
+    match_key_fn,
+    value_fn,
+    title,
+    colorbar_label,
+    filename,
+    output_dir,
+    generated,
+    value_format="{:.2f}",
+    min_variants=2,
+):
+    matched_groups = defaultdict(list)
+    for row in rows:
+        match_key = match_key_fn(row)
+        if match_key is None:
+            continue
+        matched_groups[match_key].append(row)
+
+    cell_values = defaultdict(list)
+    cell_sample_counts = Counter()
+    cell_group_counts = Counter()
+
+    for group_rows in matched_groups.values():
+        grouped_cells = defaultdict(list)
+        for row in group_rows:
+            cell_key = (
+                heatmap_axis_value(row, row_key),
+                heatmap_axis_value(row, col_key),
+            )
+            grouped_cells[cell_key].append(row)
+
+        if len(grouped_cells) < min_variants:
+            continue
+
+        for cell_key, cell_rows in grouped_cells.items():
+            value = value_fn(cell_rows)
+            cell_sample_counts[cell_key] += len(cell_rows)
+            if value is None:
+                continue
+            cell_values[cell_key].append(value)
+            cell_group_counts[cell_key] += 1
+
+    row_labels = sorted({cell_key[0] for cell_key in cell_values})
+    col_labels = sorted({cell_key[1] for cell_key in cell_values})
+    if not row_labels or not col_labels:
+        return
+
+    matrix = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
+    sample_matrix = np.zeros((len(row_labels), len(col_labels)), dtype=int)
+    group_matrix = np.zeros((len(row_labels), len(col_labels)), dtype=int)
+    row_index = {label: idx for idx, label in enumerate(row_labels)}
+    col_index = {label: idx for idx, label in enumerate(col_labels)}
+
+    for (row_label, col_label), values in cell_values.items():
+        row_idx = row_index[row_label]
+        col_idx = col_index[col_label]
+        matrix[row_idx, col_idx] = float(np.mean(values))
+        sample_matrix[row_idx, col_idx] = cell_sample_counts[(row_label, col_label)]
+        group_matrix[row_idx, col_idx] = cell_group_counts[(row_label, col_label)]
+
+    fig, ax = plt.subplots(figsize=(max(8, len(col_labels) * 1.3), max(5.2, len(row_labels) * 1.0)))
+    masked = np.ma.masked_invalid(matrix)
+    im = ax.imshow(masked, cmap="viridis", aspect="auto")
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label(colorbar_label)
+
+    ax.set_xticks(np.arange(len(col_labels)))
+    ax.set_xticklabels(col_labels, rotation=30, ha="right")
+    ax.set_yticks(np.arange(len(row_labels)))
+    ax.set_yticklabels(row_labels)
+    ax.set_title(title)
+
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            value = matrix[i, j]
+            metric_text = "-" if np.isnan(value) else value_format.format(value)
+            text = f"{metric_text}\nn={sample_matrix[i, j]}, g={group_matrix[i, j]}"
+            color = "white" if not np.isnan(value) else "#999999"
+            ax.text(j, i, text, ha="center", va="center", color=color, fontsize=6.5, linespacing=0.9)
 
     save_fig(fig, output_dir, filename, generated)
 
@@ -1339,26 +1480,65 @@ def success_rate(subset):
     return 100.0 * (sum(1 for r in subset if r["success"]) / len(subset))
 
 
+def heatmap_axis_value(row, key):
+    value = row.get(key)
+    if value is None:
+        return "unknown"
+    text = str(value).strip()
+    return text or "unknown"
+
+
+def same_graph_dimension_key(row):
+    if row.get("x_i") is None or row.get("y_i") is None:
+        return None
+
+    # Include the circuit so equal grid sizes from different workloads are not merged.
+    return (
+        row.get("circuit_name"),
+        row.get("x_i"),
+        row.get("y_i"),
+    )
+
+
 def plot_summary_tables(rows, output_dir, generated):
     circuits = sorted({r["circuit_name"] for r in rows})
     fig, axs = plt.subplots(1, 2, figsize=(16, 6))
 
     success_rates = []
     elapsed_median = []
+    success_sample_counts = []
+    duration_sample_counts = []
     for c in circuits:
         subset = [r for r in rows if r["circuit_name"] == c]
+        success_sample_counts.append(len(subset))
         success_rates.append(success_rate(subset) or 0.0)
         duration_vals = non_empty([r["duration_s_f"] for r in subset])
+        duration_sample_counts.append(len(duration_vals))
         elapsed_median.append(float(np.median(duration_vals)) if duration_vals else 0.0)
 
-    axs[0].barh(circuits, success_rates, color="#2A9D8F")
+    y_positions = np.arange(len(circuits))
+    axs[0].barh(y_positions, success_rates, color="#2A9D8F")
     axs[0].set_title("Success Rate by Circuit")
     axs[0].set_xlabel("%")
     axs[0].set_xlim(0, 100)
+    axs[0].set_yticks(y_positions)
+    axs[0].set_yticklabels(
+        [
+            label_with_sample_count(circuit, sample_count)
+            for circuit, sample_count in zip(circuits, success_sample_counts)
+        ]
+    )
 
-    axs[1].barh(circuits, elapsed_median, color="#577590")
+    axs[1].barh(y_positions, elapsed_median, color="#577590")
     axs[1].set_title("Median Duration by Circuit")
     axs[1].set_xlabel("duration_seconds")
+    axs[1].set_yticks(y_positions)
+    axs[1].set_yticklabels(
+        [
+            label_with_sample_count(circuit, sample_count)
+            for circuit, sample_count in zip(circuits, duration_sample_counts)
+        ]
+    )
 
     save_fig(fig, output_dir, "02_circuit_summary_bars.png", generated)
 
@@ -1604,6 +1784,14 @@ def write_report_markdown(
         ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
         ("13_heatmap_success_safe_vs_placement.png", "Success heatmap: safe passage x placement"),
         ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
+        (
+            "23_heatmap_success_safe_vs_placement_same_graph_dims.png",
+            "Success heatmap: safe passage x placement (matched same graph dimensions)",
+        ),
+        (
+            "24_heatmap_routing_safe_vs_placement_same_graph_dims.png",
+            "Routing heatmap: safe passage x placement (matched same graph dimensions)",
+        ),
         ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
         ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
         ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
@@ -1897,6 +2085,31 @@ def main():
         "Mean Routing Steps Heatmap",
         "mean routing steps",
         "14_heatmap_routing_safe_vs_placement.png",
+        output_dir,
+        generated,
+    )
+    make_matched_pair_heatmap(
+        rows,
+        "safe_passage_strategy",
+        "placement",
+        same_graph_dimension_key,
+        success_rate,
+        "Success Rate Heatmap (Matched Same Graph Dimensions)",
+        "success rate (%)",
+        "23_heatmap_success_safe_vs_placement_same_graph_dims.png",
+        output_dir,
+        generated,
+        value_format="{:.1f}",
+    )
+    make_matched_pair_heatmap(
+        rows_success_with_routing,
+        "safe_passage_strategy",
+        "placement",
+        same_graph_dimension_key,
+        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
+        "Mean Routing Steps Heatmap (Matched Same Graph Dimensions)",
+        "mean routing steps",
+        "24_heatmap_routing_safe_vs_placement_same_graph_dims.png",
         output_dir,
         generated,
     )
