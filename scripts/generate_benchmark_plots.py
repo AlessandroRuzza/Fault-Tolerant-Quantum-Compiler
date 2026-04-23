@@ -1381,92 +1381,6 @@ def make_pair_heatmap(
     save_fig(fig, output_dir, filename, generated)
 
 
-def make_matched_pair_heatmap(
-    rows,
-    row_key,
-    col_key,
-    match_key_fn,
-    value_fn,
-    title,
-    colorbar_label,
-    filename,
-    output_dir,
-    generated,
-    value_format="{:.2f}",
-    min_variants=2,
-):
-    matched_groups = defaultdict(list)
-    for row in rows:
-        match_key = match_key_fn(row)
-        if match_key is None:
-            continue
-        matched_groups[match_key].append(row)
-
-    cell_values = defaultdict(list)
-    cell_sample_counts = Counter()
-    cell_group_counts = Counter()
-
-    for group_rows in matched_groups.values():
-        grouped_cells = defaultdict(list)
-        for row in group_rows:
-            cell_key = (
-                heatmap_axis_value(row, row_key),
-                heatmap_axis_value(row, col_key),
-            )
-            grouped_cells[cell_key].append(row)
-
-        if len(grouped_cells) < min_variants:
-            continue
-
-        for cell_key, cell_rows in grouped_cells.items():
-            value = value_fn(cell_rows)
-            cell_sample_counts[cell_key] += len(cell_rows)
-            if value is None:
-                continue
-            cell_values[cell_key].append(value)
-            cell_group_counts[cell_key] += 1
-
-    row_labels = sorted({cell_key[0] for cell_key in cell_values})
-    col_labels = sorted({cell_key[1] for cell_key in cell_values})
-    if not row_labels or not col_labels:
-        return
-
-    matrix = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
-    sample_matrix = np.zeros((len(row_labels), len(col_labels)), dtype=int)
-    group_matrix = np.zeros((len(row_labels), len(col_labels)), dtype=int)
-    row_index = {label: idx for idx, label in enumerate(row_labels)}
-    col_index = {label: idx for idx, label in enumerate(col_labels)}
-
-    for (row_label, col_label), values in cell_values.items():
-        row_idx = row_index[row_label]
-        col_idx = col_index[col_label]
-        matrix[row_idx, col_idx] = float(np.mean(values))
-        sample_matrix[row_idx, col_idx] = cell_sample_counts[(row_label, col_label)]
-        group_matrix[row_idx, col_idx] = cell_group_counts[(row_label, col_label)]
-
-    fig, ax = plt.subplots(figsize=(max(8, len(col_labels) * 1.3), max(5.2, len(row_labels) * 1.0)))
-    masked = np.ma.masked_invalid(matrix)
-    im = ax.imshow(masked, cmap="viridis", aspect="auto")
-    cbar = fig.colorbar(im, ax=ax)
-    cbar.set_label(colorbar_label)
-
-    ax.set_xticks(np.arange(len(col_labels)))
-    ax.set_xticklabels(col_labels, rotation=30, ha="right")
-    ax.set_yticks(np.arange(len(row_labels)))
-    ax.set_yticklabels(row_labels)
-    ax.set_title(title)
-
-    for i in range(matrix.shape[0]):
-        for j in range(matrix.shape[1]):
-            value = matrix[i, j]
-            metric_text = "-" if np.isnan(value) else value_format.format(value)
-            text = f"{metric_text}\nn={sample_matrix[i, j]}, g={group_matrix[i, j]}"
-            color = "white" if not np.isnan(value) else "#999999"
-            ax.text(j, i, text, ha="center", va="center", color=color, fontsize=6.5, linespacing=0.9)
-
-    save_fig(fig, output_dir, filename, generated)
-
-
 def mean_of(values):
     values = non_empty(values)
     if not values:
@@ -1486,18 +1400,6 @@ def heatmap_axis_value(row, key):
         return "unknown"
     text = str(value).strip()
     return text or "unknown"
-
-
-def same_graph_dimension_key(row):
-    if row.get("x_i") is None or row.get("y_i") is None:
-        return None
-
-    # Include the circuit so equal grid sizes from different workloads are not merged.
-    return (
-        row.get("circuit_name"),
-        row.get("x_i"),
-        row.get("y_i"),
-    )
 
 
 def plot_summary_tables(rows, output_dir, generated):
@@ -1784,14 +1686,6 @@ def write_report_markdown(
         ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
         ("13_heatmap_success_safe_vs_placement.png", "Success heatmap: safe passage x placement"),
         ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
-        (
-            "23_heatmap_success_safe_vs_placement_same_graph_dims.png",
-            "Success heatmap: safe passage x placement (matched same graph dimensions)",
-        ),
-        (
-            "24_heatmap_routing_safe_vs_placement_same_graph_dims.png",
-            "Routing heatmap: safe passage x placement (matched same graph dimensions)",
-        ),
         ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
         ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
         ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
@@ -2085,31 +1979,6 @@ def main():
         "Mean Routing Steps Heatmap",
         "mean routing steps",
         "14_heatmap_routing_safe_vs_placement.png",
-        output_dir,
-        generated,
-    )
-    make_matched_pair_heatmap(
-        rows,
-        "safe_passage_strategy",
-        "placement",
-        same_graph_dimension_key,
-        success_rate,
-        "Success Rate Heatmap (Matched Same Graph Dimensions)",
-        "success rate (%)",
-        "23_heatmap_success_safe_vs_placement_same_graph_dims.png",
-        output_dir,
-        generated,
-        value_format="{:.1f}",
-    )
-    make_matched_pair_heatmap(
-        rows_success_with_routing,
-        "safe_passage_strategy",
-        "placement",
-        same_graph_dimension_key,
-        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        "Mean Routing Steps Heatmap (Matched Same Graph Dimensions)",
-        "mean routing steps",
-        "24_heatmap_routing_safe_vs_placement_same_graph_dims.png",
         output_dir,
         generated,
     )
