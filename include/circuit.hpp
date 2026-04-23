@@ -50,6 +50,9 @@ struct Gate {
 
 
 class Circuit {
+private:
+void add_TGates(const Gate& gate, int n, int& globalID);
+
 protected:
     std::vector<Gate> gates; 
     MaxHeap<Qubit*> qubitsHeap;

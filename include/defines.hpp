@@ -17,5 +17,6 @@
 
 //// BEHAVIORAL FLAGS
 #define MAGIC_STOPS_ROUTE true
+#define USE_S_GATES false
 
 #endif // DEFINES_HPP
