@@ -14,6 +14,7 @@
     "number_of_magic_states": 0.7,
     "process": 0,
     "routing_strategy": "congestion",
+    "t-routing-mode": "normal_t_routing",
     "safe_passage_strategy": "connectivity",
     "timeout": 600,
     "timeout_reached": false,
