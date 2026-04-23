@@ -16,6 +16,9 @@ const bool PRINT_ROUTING = false;
 const bool PRINT_DRAW_ROUTING = true;
 const bool PRINT_ROUTING_PROGRESS = false;
 
+/*
+############ BEHAVIORAL FLAGS ######################
+*/
 const bool MAGIC_STOPS_ROUTE = true;
 const bool USE_S_GATES = false;
 
