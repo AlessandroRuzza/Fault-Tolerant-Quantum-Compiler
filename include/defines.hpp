@@ -1,22 +1,41 @@
 #ifndef DEFINES_HPP
 #define DEFINES_HPP
 
-#define PRINT_PARSING false // global variable to control QASM parsing printing
-#define PRINT_CIRCUIT false // global variable to control circuit printing
+namespace compiler_flags {
 
-#define PRINT_MAPPING false // global variable to control mapping steps printing
-#define PRINT_MAPPING_GRAPH false // global variable to control mapping graph printing
-#define MAPPING_VERBOSE false // global variable to control mapping steps printing
+extern const bool PRINT_PARSING; // controls QASM parsing printing
+extern const bool PRINT_CIRCUIT; // controls circuit printing
 
-#define PRINT_SAFE_PASSAGE false // global variable to control safe passage checking printing
+extern const bool PRINT_MAPPING; // controls mapping steps printing
+extern const bool PRINT_MAPPING_GRAPH; // controls mapping graph printing
+extern const bool MAPPING_VERBOSE; // controls verbose mapping logs
 
-#define PRINT_LAYER false // global variable to control layered circuit printing
-#define PRINT_ROUTING false // global variable to control routing steps printing
-#define PRINT_DRAW_ROUTING true // global variable to control routing lattice drawing printing
-#define PRINT_ROUTING_PROGRESS false // global variable to control routing layer progress printing
+extern const bool PRINT_SAFE_PASSAGE; // controls safe passage checking printing
 
-//// BEHAVIORAL FLAGS
-#define MAGIC_STOPS_ROUTE true
-#define USE_S_GATES false
+extern const bool PRINT_LAYER; // controls layered circuit printing
+extern const bool PRINT_ROUTING; // controls routing steps printing
+extern const bool PRINT_DRAW_ROUTING; // controls routing lattice drawing printing
+extern const bool PRINT_ROUTING_PROGRESS; // controls routing progress printing
+
+extern const bool MAGIC_STOPS_ROUTE;
+extern const bool USE_S_GATES;
+
+} // namespace compiler_flags
+
+// Keep existing unqualified names to avoid touching all call sites.
+using namespace compiler_flags;
+
+// using compiler_flags::PRINT_PARSING;
+// using compiler_flags::PRINT_CIRCUIT;
+// using compiler_flags::PRINT_MAPPING;
+// using compiler_flags::PRINT_MAPPING_GRAPH;
+// using compiler_flags::MAPPING_VERBOSE;
+// using compiler_flags::PRINT_SAFE_PASSAGE;
+// using compiler_flags::PRINT_LAYER;
+// using compiler_flags::PRINT_ROUTING;
+// using compiler_flags::PRINT_DRAW_ROUTING;
+// using compiler_flags::PRINT_ROUTING_PROGRESS;
+// using compiler_flags::MAGIC_STOPS_ROUTE;
+// using compiler_flags::USE_S_GATES;
 
 #endif // DEFINES_HPP
