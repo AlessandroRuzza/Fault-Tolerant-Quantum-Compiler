@@ -196,9 +196,9 @@ public:
     inline bool check_safe_passage(const Node& node, const Qubit q) {
         switch (safePassageStrategy) {
             case SafePassageStrategy::PASSAGE:
-                return safe_passage(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
+                return safe_passage(node, graph.get_occupied_nodes());
             case SafePassageStrategy::PASSAGE_NO_SUBGRAPHS:
-                return safe_passage_no_subgraphs(node, graph.get_occupied_nodes(), graph.getMaxX() + 1, graph.getMaxY() + 1);
+                return safe_passage_no_subgraphs(node, graph.get_occupied_nodes());
             case SafePassageStrategy::CUBE:
                 return _3x3_occupied(node, graph.get_occupied_nodes());
             case SafePassageStrategy::CONNECTIVITY:
@@ -288,8 +288,8 @@ public:
 
     bool _3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes);
 
-    bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int maxX, int maxY);
-    bool safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes, int maxX, int maxY);
+    bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes);
+    bool safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes);
     bool safe_connectivity(const Node& node, const Qubit q, const std::vector<Node>& occupied_nodes);
 private:
 

@@ -203,6 +203,7 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
         return (gate.qubits[0] == qID) ? gate.qubits[1] : gate.qubits[0];
     };
 
+    // Make sure this mapped qubit can reach the qubits it interacts with
     for (const Gate& gate : gates) {
         const int other_qid = otherQubit(gate);
         const int other_node = get_mapped_node(other_qid);
@@ -215,11 +216,42 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
         }
     }
 
+    // Make sure previously mapped qubits can still reach the qubits they interact with
+    std::vector<Gate> otherGates = circuit.getGates();
+    otherGates.erase(
+        std::remove_if(otherGates.begin(), otherGates.end(), [qID](const Gate& gate) {
+            return gate.qubits.size() < 2 || gate.involves_qubit(qID);
+        }),
+        otherGates.end()
+    );
+    for(const Gate& gate : otherGates){
+        const int node1 = get_mapped_node(gate.qubits[0]);
+        const int node2 = get_mapped_node(gate.qubits[1]);
+        if(node1 < 0 && node2 < 0)
+            continue; // That gate was not mapped
+        else if(node1 < 0 && node2 >= 0){
+            //Fallback to safe_passage
+            bool isSafe = safe_passage(node2, occupied_nodes);
+            if(!isSafe) return false;
+        }
+        else if(node1 >= 0 && node2 < 0){
+            //Fallback to safe_passage
+            bool isSafe = safe_passage(node1, occupied_nodes);
+            if(!isSafe) return false;
+        }
+        else if (!path_exists(node1, node2)) {
+            return false; // This placement is blocking that gate path
+        }
+    }
+
     return true;
 }
 
 
-bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_nodes, int width, int height) {
+bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_nodes) {
+    int width = graph.getMaxX() + 1;
+    int height = graph.getMaxY() + 1;
+    
     if (width <= 0 || height <= 0) {
         return false;
     }
@@ -262,7 +294,9 @@ bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_n
     return true;
 }
 
-bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes, int width, int height) {
+bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes) {
+    int width = graph.getMaxX() + 1;
+    int height = graph.getMaxY() + 1;
     // TODO: implement a connectivity check that rejects placements splitting the free lattice into disconnected subgraphs.
     std::queue<Node> node_queue;
     node_queue.push(node);
@@ -312,7 +346,7 @@ bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node
         visited_ids.insert(current.id);
     }
     
-    if (num_touching_borders < 2 && safe_passage(node, occupied_nodes, width, height)) {
+    if (num_touching_borders < 2 && safe_passage(node, occupied_nodes)) {
         return true;
     } else {
         return false;
