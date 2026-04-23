@@ -9,6 +9,7 @@ import statistics
 import warnings
 from collections import Counter, defaultdict
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 if "MPLCONFIGDIR" not in os.environ:
     os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib-cache"
@@ -26,6 +27,8 @@ REQUESTED_SAFE_PASSAGES = {"passage", "cube"}
 REQUESTED_PLACEMENT_VARIANTS = ("right_row", "center_circle_0", "center_circle_5")
 REQUESTED_GAUSSIAN_STRATEGIES = {"coarse", "fine"}
 REQUESTED_MAGIC_AWARE_STRATEGIES = {"center", "distance", "random"}
+DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
+DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
 STATUS_DISPLAY_LABELS = {
     "ok": "ok",
     "ok_no_routing_metric": "ok (no routing metric)",
@@ -48,12 +51,90 @@ EXIT_CODE_DISPLAY_LABELS = {
     130: "130 (Ctrl+C)",
     143: "143 (SIGTERM)",
 }
+DISTINCT_IGNORED_COLUMNS = {
+    "routing_steps",
+    "total_routing_steps",
+    "timeout_reached",
+    "status",
+    "exit_code",
+    "duration_seconds",
+    "elapsed_ms",
+    "error_excerpt",
+    "run_id",
+    "run_date",
+    "run_datetime",
+    "log_file",
+}
+DISTINCT_SOURCE_COLUMNS = ("source_csv", "source_csv_name")
+DISTINCT_IDENTITY_ALIASES = {
+    "graph_x": ("graph_x", "x"),
+    "graph_y": ("graph_y", "y"),
+    "magic_state_placement_strategy": ("magic_state_placement_strategy", "placement"),
+}
+DISTINCT_NUMERIC_FIELDS = {
+    "graph_x",
+    "graph_y",
+    "x",
+    "y",
+    "total_nodes",
+    "magic_high",
+    "magic_low",
+    "cnot_high",
+    "cnot_low",
+    "mapped_gaussian_weight",
+    "base_gaussian_weight",
+    "border_distance_percentage",
+    "number_of_magic_states",
+    "routing_steps",
+    "total_routing_steps",
+    "interaction_pressure",
+    "data_density",
+    "overall_density",
+}
 
 
 def normalize_text(value):
     if value is None:
         return ""
     return str(value).strip().lower()
+
+
+def normalize_csv_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def normalize_distinct_decimal(value):
+    text = normalize_csv_text(value)
+    if text == "":
+        return ""
+
+    try:
+        decimal_value = Decimal(text)
+    except InvalidOperation:
+        return text
+
+    if decimal_value.is_nan():
+        return "nan"
+    if decimal_value == 0:
+        return "0"
+
+    normalized = format(decimal_value.normalize(), "f")
+    if "." in normalized:
+        normalized = normalized.rstrip("0").rstrip(".")
+    return normalized or "0"
+
+
+def normalize_distinct_value(fieldname, value):
+    text = normalize_csv_text(value)
+    if text == "":
+        return ""
+    if fieldname in DISTINCT_NUMERIC_FIELDS:
+        return normalize_distinct_decimal(text)
+    if fieldname == "status":
+        return text.lower()
+    return text
 
 
 def normalize_placement(value):
@@ -217,8 +298,92 @@ def load_rows(csv_glob):
     return load_rows_from_files(files)
 
 
-def load_rows_from_files(files):
+def add_unique_path(paths, path):
+    normalized = os.path.abspath(path)
+    if normalized not in paths:
+        paths.append(normalized)
+
+
+def resolve_csv_input_path(csv_arg):
+    requested = os.path.expanduser(csv_arg)
+    explicit_candidates = []
+    recursive_matches = []
+
+    add_unique_path(explicit_candidates, requested)
+    if os.path.splitext(requested)[1] == "":
+        add_unique_path(explicit_candidates, requested + ".csv")
+
+    if os.path.dirname(requested) == "":
+        add_unique_path(explicit_candidates, os.path.join(DEFAULT_RESULTS_DIR, requested))
+        if os.path.splitext(requested)[1] == "":
+            add_unique_path(explicit_candidates, os.path.join(DEFAULT_RESULTS_DIR, requested + ".csv"))
+
+        recursive_patterns = [
+            os.path.join(DEFAULT_RESULTS_DIR, "**", requested),
+        ]
+        if os.path.splitext(requested)[1] == "":
+            recursive_patterns.append(os.path.join(DEFAULT_RESULTS_DIR, "**", requested + ".csv"))
+
+        for pattern in recursive_patterns:
+            for match in sorted(glob.glob(pattern, recursive=True)):
+                if os.path.isfile(match):
+                    add_unique_path(recursive_matches, match)
+
+    explicit_existing = [path for path in explicit_candidates if os.path.isfile(path)]
+    if explicit_existing:
+        return explicit_existing[0]
+
+    if len(recursive_matches) == 1:
+        return recursive_matches[0]
+
+    if len(recursive_matches) > 1:
+        matches = "\n  - ".join(recursive_matches)
+        raise RuntimeError(
+            "Ambiguous CSV input for --csv. Multiple matches found:\n"
+            f"  - {matches}"
+        )
+
+    attempted = "\n  - ".join(explicit_candidates)
+    raise FileNotFoundError(
+        "Could not resolve CSV input for --csv. Tried:\n"
+        f"  - {attempted}"
+    )
+
+
+def default_output_dir_for_single_csv(csv_path, distinct):
+    suffix = "_merge_plots" if distinct else "_plots"
+    return os.path.join(
+        os.path.dirname(csv_path),
+        os.path.splitext(os.path.basename(csv_path))[0] + suffix,
+    )
+
+
+def default_output_dir_for_glob(distinct):
+    if distinct:
+        return os.path.join(DEFAULT_RESULTS_DIR, "merge_plots")
+    return os.path.join(DEFAULT_RESULTS_DIR, "plots")
+
+
+def filter_distinct_input_files(files):
+    results_dir = os.path.abspath(DEFAULT_RESULTS_DIR)
+    filtered = []
+    seen = set()
+    for path in files:
+        normalized = os.path.abspath(path)
+        if os.path.dirname(normalized) != results_dir:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        filtered.append(normalized)
+    return filtered
+
+
+def load_raw_rows_from_files(files):
     rows = []
+    fieldnames = []
+    seen_fieldnames = set()
+    accepted_files = []
 
     for path in files:
         with open(path, newline="", encoding="utf-8") as f:
@@ -228,56 +393,204 @@ def load_rows_from_files(files):
             if "run_id" not in reader.fieldnames or "status" not in reader.fieldnames:
                 continue
 
-            for raw in reader:
-                row = dict(raw)
+            accepted_files.append(path)
+            for fieldname in reader.fieldnames:
+                if fieldname in seen_fieldnames:
+                    continue
+                fieldnames.append(fieldname)
+                seen_fieldnames.add(fieldname)
+
+            for fieldname in DISTINCT_SOURCE_COLUMNS:
+                if fieldname in seen_fieldnames:
+                    continue
+                fieldnames.append(fieldname)
+                seen_fieldnames.add(fieldname)
+
+            for row_index, raw in enumerate(reader):
+                row = {fieldname: raw.get(fieldname, "") for fieldname in reader.fieldnames}
                 row["source_csv"] = path
                 row["source_csv_name"] = os.path.basename(path)
-                row["circuit_name"] = os.path.basename(row.get("circuit", ""))
-                row["placement"] = normalize_placement(
-                    pick_first(row, "magic_state_placement_strategy", "placement")
-                )
-                row["mapping_type_norm"] = normalize_text(row.get("mapping_type"))
-                row["safe_passage_norm"] = normalize_text(row.get("safe_passage_strategy"))
-                row["magic_aware_strategy_norm"] = normalize_text(row.get("magic_aware_strategy"))
-                row["gaussian_strategy_norm"] = normalize_text(row.get("gaussian_strategy"))
-
-                row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
-                row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
-                row["total_nodes_i"] = to_int(row.get("total_nodes"))
-                row["magic_states_f"] = to_float(row.get("number_of_magic_states"))
-                row["border_pct_f"] = to_float(row.get("border_distance_percentage"))
-                row["magic_high_f"] = to_float(row.get("magic_high"))
-                row["magic_low_f"] = to_float(row.get("magic_low"))
-                row["cnot_high_f"] = to_float(row.get("cnot_high"))
-                row["cnot_low_f"] = to_float(row.get("cnot_low"))
-                row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
-                row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
-                duration_seconds = to_float(row.get("duration_seconds"))
-                elapsed_ms = to_float(row.get("elapsed_ms"))
-                if duration_seconds is not None:
-                    row["duration_s_f"] = duration_seconds
-                elif elapsed_ms is not None:
-                    row["duration_s_f"] = elapsed_ms / 1000.0
-                else:
-                    row["duration_s_f"] = None
-                row["routing_steps_f"] = to_float(pick_first(row, "routing_steps", "total_routing_steps"))
-                row["interaction_pressure_f"] = to_float(row.get("interaction_pressure"))
-                row["data_density_f"] = to_float(row.get("data_density"))
-                row["overall_density_f"] = to_float(row.get("overall_density"))
-                row["exit_code_i"] = to_int(row.get("exit_code"))
-                row["success"] = normalize_text(row.get("status")) in SUCCESS_STATUSES
-
-                if row["x_i"] is not None and row["y_i"] is not None:
-                    row["grid_label"] = f"{row['x_i']}x{row['y_i']}"
-                else:
-                    row["grid_label"] = "unknown"
-                row["placement_variant"] = classify_placement_variant(row)
-                row["placement_detail"] = placement_detail_label(row)
-                row["gaussian_weight_combo_label"] = gaussian_weight_combo_label(row)
-
+                row["_merge_order"] = len(rows)
+                row["_source_row_index"] = row_index
                 rows.append(row)
 
-    return rows, files
+    return rows, fieldnames, accepted_files
+
+
+def distinct_identity_fieldnames(fieldnames):
+    identity_fields = []
+    alias_fieldnames = set()
+
+    for canonical_name, aliases in DISTINCT_IDENTITY_ALIASES.items():
+        if any(alias in fieldnames for alias in aliases):
+            identity_fields.append(canonical_name)
+            alias_fieldnames.update(aliases)
+
+    for fieldname in fieldnames:
+        if fieldname in DISTINCT_IGNORED_COLUMNS:
+            continue
+        if fieldname in DISTINCT_SOURCE_COLUMNS:
+            continue
+        if fieldname.startswith("_"):
+            continue
+        if fieldname in alias_fieldnames:
+            continue
+        identity_fields.append(fieldname)
+
+    return identity_fields
+
+
+def distinct_identity_value(row, fieldname):
+    aliases = DISTINCT_IDENTITY_ALIASES.get(fieldname)
+    if aliases is not None:
+        return pick_first(row, *aliases)
+    return row.get(fieldname)
+
+
+def distinct_identity_key(row, identity_fields):
+    return tuple(
+        normalize_distinct_value(fieldname, distinct_identity_value(row, fieldname))
+        for fieldname in identity_fields
+    )
+
+
+def distinct_result_signature(row):
+    return (
+        normalize_distinct_value("status", row.get("status")),
+        normalize_distinct_value("routing_steps", pick_first(row, "routing_steps", "total_routing_steps")),
+    )
+
+
+def csv_output_fieldnames(fieldnames):
+    return [fieldname for fieldname in fieldnames if not fieldname.startswith("_")]
+
+
+def write_csv_rows(path, fieldnames, rows):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({fieldname: row.get(fieldname, "") for fieldname in fieldnames})
+
+
+def merge_rows_distinct(raw_rows, fieldnames, output_dir, merged_file_count):
+    identity_fields = distinct_identity_fieldnames(fieldnames)
+    grouped_rows = defaultdict(list)
+    for row in raw_rows:
+        grouped_rows[distinct_identity_key(row, identity_fields)].append(row)
+
+    merged_rows = []
+    conflicting_rows = []
+    exact_duplicates_removed = 0
+    repeated_configuration_groups = 0
+    same_result_duplicate_groups = 0
+    different_result_duplicate_groups = 0
+    conflicting_groups = 0
+
+    # Keep one representative per (configuration, status, routing_steps) pair.
+    for group_rows in grouped_rows.values():
+        if len(group_rows) > 1:
+            repeated_configuration_groups += 1
+
+        result_signature_counts = Counter(distinct_result_signature(row) for row in group_rows)
+        if any(count > 1 for count in result_signature_counts.values()):
+            same_result_duplicate_groups += 1
+        if len(result_signature_counts) > 1:
+            different_result_duplicate_groups += 1
+
+        unique_variants = {}
+        ordered_variants = []
+        for row in group_rows:
+            result_signature = distinct_result_signature(row)
+            if result_signature in unique_variants:
+                exact_duplicates_removed += 1
+                continue
+            unique_variants[result_signature] = row
+            ordered_variants.append(row)
+
+        merged_rows.extend(ordered_variants)
+        if len(ordered_variants) > 1:
+            conflicting_groups += 1
+            conflicting_rows.extend(ordered_variants)
+
+    output_fieldnames = csv_output_fieldnames(fieldnames)
+    merged_csv_path = os.path.join(output_dir, f"merged_distinct_{merged_file_count}.csv")
+    duplicates_csv_path = os.path.join(output_dir, "merging_duplicates.csv")
+    write_csv_rows(merged_csv_path, output_fieldnames, merged_rows)
+    write_csv_rows(duplicates_csv_path, output_fieldnames, conflicting_rows)
+
+    return merged_rows, {
+        "merged_csv_path": merged_csv_path,
+        "duplicates_csv_path": duplicates_csv_path,
+        "identity_fields": identity_fields,
+        "input_rows": len(raw_rows),
+        "merged_rows": len(merged_rows),
+        "repeated_configuration_groups": repeated_configuration_groups,
+        "same_result_duplicate_groups": same_result_duplicate_groups,
+        "different_result_duplicate_groups": different_result_duplicate_groups,
+        "duplicate_rows_removed": exact_duplicates_removed,
+        "conflicting_groups": conflicting_groups,
+        "conflicting_rows": len(conflicting_rows),
+    }
+
+
+def prepare_rows_for_analysis(raw_rows):
+    rows = []
+
+    for raw in raw_rows:
+        row = dict(raw)
+        row["circuit_name"] = os.path.basename(row.get("circuit", ""))
+        row["placement"] = normalize_placement(
+            pick_first(row, "magic_state_placement_strategy", "placement")
+        )
+        row["mapping_type_norm"] = normalize_text(row.get("mapping_type"))
+        row["safe_passage_norm"] = normalize_text(row.get("safe_passage_strategy"))
+        row["magic_aware_strategy_norm"] = normalize_text(row.get("magic_aware_strategy"))
+        row["gaussian_strategy_norm"] = normalize_text(row.get("gaussian_strategy"))
+
+        row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
+        row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
+        row["total_nodes_i"] = to_int(row.get("total_nodes"))
+        row["magic_states_f"] = to_float(row.get("number_of_magic_states"))
+        row["border_pct_f"] = to_float(row.get("border_distance_percentage"))
+        row["magic_high_f"] = to_float(row.get("magic_high"))
+        row["magic_low_f"] = to_float(row.get("magic_low"))
+        row["cnot_high_f"] = to_float(row.get("cnot_high"))
+        row["cnot_low_f"] = to_float(row.get("cnot_low"))
+        row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
+        row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
+        duration_seconds = to_float(row.get("duration_seconds"))
+        elapsed_ms = to_float(row.get("elapsed_ms"))
+        if duration_seconds is not None:
+            row["duration_s_f"] = duration_seconds
+        elif elapsed_ms is not None:
+            row["duration_s_f"] = elapsed_ms / 1000.0
+        else:
+            row["duration_s_f"] = None
+        row["routing_steps_f"] = to_float(pick_first(row, "routing_steps", "total_routing_steps"))
+        row["interaction_pressure_f"] = to_float(row.get("interaction_pressure"))
+        row["data_density_f"] = to_float(row.get("data_density"))
+        row["overall_density_f"] = to_float(row.get("overall_density"))
+        row["exit_code_i"] = to_int(row.get("exit_code"))
+        row["success"] = normalize_text(row.get("status")) in SUCCESS_STATUSES
+
+        if row["x_i"] is not None and row["y_i"] is not None:
+            row["grid_label"] = f"{row['x_i']}x{row['y_i']}"
+        else:
+            row["grid_label"] = "unknown"
+        row["placement_variant"] = classify_placement_variant(row)
+        row["placement_detail"] = placement_detail_label(row)
+        row["gaussian_weight_combo_label"] = gaussian_weight_combo_label(row)
+
+        rows.append(row)
+
+    return rows
+
+
+def load_rows_from_files(files):
+    raw_rows, _, accepted_files = load_raw_rows_from_files(files)
+    return prepare_rows_for_analysis(raw_rows), accepted_files
 
 
 def non_empty(values):
@@ -1186,7 +1499,7 @@ def write_best_mapping_table(entries, output_dir, filename):
     return entries, csv_path
 
 
-def write_summary(rows, csv_files, output_dir, generated):
+def write_summary(rows, csv_files, output_dir, generated, distinct_info=None):
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, "summary.txt")
 
@@ -1219,6 +1532,11 @@ def write_summary(rows, csv_files, output_dir, generated):
         f.write("======================\n\n")
         f.write(f"Generated at: {datetime.now().isoformat(timespec='seconds')}\n")
         f.write(f"CSV files scanned: {len(csv_files)}\n")
+        if csv_files:
+            f.write("CSV files used:\n")
+            for csv_file in csv_files:
+                f.write(f"  - {csv_file}\n")
+            f.write("\n")
         f.write(f"Rows analyzed: {len(rows)}\n")
         f.write(f"Unique circuits: {len(set(r['circuit_name'] for r in rows))}\n\n")
 
@@ -1240,6 +1558,19 @@ def write_summary(rows, csv_files, output_dir, generated):
                 f"max={max(routing_values_ok):.2f}\n"
             )
         f.write(f"Best routing combo: {best_combo_line}\n\n")
+
+        if distinct_info is not None:
+            f.write("Distinct merge:\n")
+            f.write(f"  - merged csv: {distinct_info['merged_csv_path']}\n")
+            f.write(f"  - duplicates csv: {distinct_info['duplicates_csv_path']}\n")
+            f.write(f"  - input rows: {distinct_info['input_rows']}\n")
+            f.write(f"  - merged rows: {distinct_info['merged_rows']}\n")
+            f.write(f"  - repeated configurations: {distinct_info['repeated_configuration_groups']}\n")
+            f.write(f"  - repeated configurations with same result: {distinct_info['same_result_duplicate_groups']}\n")
+            f.write(f"  - repeated configurations with different results: {distinct_info['different_result_duplicate_groups']}\n")
+            f.write(f"  - exact duplicates removed: {distinct_info['duplicate_rows_removed']}\n")
+            f.write(f"  - conflicting configurations: {distinct_info['conflicting_groups']}\n")
+            f.write(f"  - rows written to duplicates csv: {distinct_info['conflicting_rows']}\n\n")
 
         f.write("Generated plots:\n")
         for p in generated:
@@ -1339,17 +1670,33 @@ def main():
     input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument(
         "--csv",
-        help="Single CSV input file. If set and --output-dir is omitted, plots are written to <csv_dir>/<csv_name>_plots/",
+        help=(
+            "Single CSV input file. Accepts a full path, a CSV filename, or a stem without "
+            "the .csv extension. If set and --output-dir is omitted, plots are written to "
+            "<csv_dir>/<csv_name>_plots or <csv_name>_merge_plots when --distinct is used."
+        ),
     )
     input_group.add_argument(
         "--csv-glob",
-        default="benchmarks/results/**/*.csv",
-        help="Glob for CSV inputs (default: benchmarks/results/**/*.csv)",
+        default=DEFAULT_CSV_GLOB,
+        help=(
+            "Glob for CSV inputs (default: benchmarks/results/**/*.csv). "
+            "With --distinct, only CSV files directly inside benchmarks/results are used."
+        ),
     )
     parser.add_argument(
         "--output-dir",
         default=None,
         help="Output directory for generated plots",
+    )
+    parser.add_argument(
+        "--distinct",
+        action="store_true",
+        help=(
+            "When loading multiple CSV rows, merge duplicate executions by configuration only. "
+            "Rows with the same configuration but different status or routing_steps are all kept "
+            "and exported to merging_duplicates.csv."
+        ),
     )
     args = parser.parse_args()
 
@@ -1358,20 +1705,32 @@ def main():
     plt.style.use("seaborn-v0_8-whitegrid")
 
     if args.csv:
-        csv_path = os.path.abspath(args.csv)
-        rows, csv_files = load_rows_from_files([csv_path])
-        output_dir = args.output_dir or os.path.join(
-            os.path.dirname(csv_path),
-            os.path.splitext(os.path.basename(csv_path))[0] + "_plots",
-        )
+        csv_path = resolve_csv_input_path(args.csv)
+        input_files = [csv_path]
+        output_dir = args.output_dir or default_output_dir_for_single_csv(csv_path, args.distinct)
     else:
-        rows, csv_files = load_rows(args.csv_glob)
-        output_dir = args.output_dir or "benchmarks/results/plots"
+        input_files = sorted(glob.glob(args.csv_glob, recursive=True))
+        if args.distinct:
+            input_files = filter_distinct_input_files(input_files)
+        output_dir = args.output_dir or default_output_dir_for_glob(args.distinct)
 
-    if not rows:
+    raw_rows, raw_fieldnames, csv_files = load_raw_rows_from_files(input_files)
+
+    if not raw_rows:
         if args.csv:
             raise RuntimeError(f"No valid rows found in CSV: {args.csv}")
         raise RuntimeError(f"No valid rows found for glob: {args.csv_glob}")
+
+    distinct_info = None
+    if args.distinct:
+        raw_rows, distinct_info = merge_rows_distinct(
+            raw_rows,
+            raw_fieldnames,
+            output_dir,
+            len(csv_files),
+        )
+
+    rows = prepare_rows_for_analysis(raw_rows)
 
     generated = []
 
@@ -1590,7 +1949,7 @@ def main():
         output_dir,
         "best_mapping_by_circuit_dimension_all_families_exit0.csv",
     )
-    write_summary(rows, csv_files, output_dir, generated)
+    write_summary(rows, csv_files, output_dir, generated, distinct_info=distinct_info)
     write_report_markdown(
         output_dir,
         generated,
@@ -1604,6 +1963,25 @@ def main():
         print(path)
     print(best_mapping_csv_path)
     print(best_mapping_exit0_csv_path)
+    if distinct_info is not None:
+        print(
+            "Repeated configurations found: "
+            f"{distinct_info['repeated_configuration_groups']}"
+        )
+        print(
+            "Repeated configurations with same result: "
+            f"{distinct_info['same_result_duplicate_groups']}"
+        )
+        print(
+            "Repeated configurations with different results: "
+            f"{distinct_info['different_result_duplicate_groups']}"
+        )
+        print(f"Exact duplicate rows removed: {distinct_info['duplicate_rows_removed']}")
+        print("CSV files used to build merged csv:")
+        for csv_file in csv_files:
+            print(csv_file)
+        print(distinct_info["merged_csv_path"])
+        print(distinct_info["duplicates_csv_path"])
     print(os.path.join(output_dir, "summary.txt"))
 
 
