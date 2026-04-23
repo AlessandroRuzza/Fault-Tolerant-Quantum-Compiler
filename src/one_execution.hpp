@@ -206,6 +206,12 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     } else { // default to congestion-aware
         pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
     }
+    std::unique_ptr<ITGateRoutingStrategy> tGateRoutingStrategyPtr;
+    if (t_routing_mode == "smart_t_routing") {
+        tGateRoutingStrategyPtr = std::make_unique<SmartTGateRouting>(patience_threshold);
+    } else {
+        tGateRoutingStrategyPtr = std::make_unique<NormalTGateRouting>();
+    }
     // NaiveShortestPath pathStrat(graph);
     // QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
     QubitRouter router(
@@ -213,8 +219,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         layeredCircuit,
         graph,
         pathStrategyPtr.get(),
-        t_routing_mode,
-        patience_threshold
+        tGateRoutingStrategyPtr.get()
     );
 
     router.precompute_magic_state_order();

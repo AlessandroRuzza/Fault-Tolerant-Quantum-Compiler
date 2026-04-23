@@ -72,14 +72,58 @@ public:
     Path find_shortest_path(int start_node, int end_node, const std::unordered_set<int>& used_nodes) const override;
 };
 
+class ITGateRoutingStrategy {
+public:
+    virtual ~ITGateRoutingStrategy() = default;
+    virtual Path find_t_gate_path(
+        const Gate& gate,
+        const Mapping& mapping,
+        const Graph& graph,
+        const IPathStrategy& path_strategy,
+        const std::unordered_set<int>& used_nodes,
+        const std::unordered_set<int>& used_magic_states,
+        const std::unordered_map<int, std::vector<int>>& magic_state_order_cache
+    ) const = 0;
+};
+
+class NormalTGateRouting : public ITGateRoutingStrategy {
+public:
+    Path find_t_gate_path(
+        const Gate& gate,
+        const Mapping& mapping,
+        const Graph& graph,
+        const IPathStrategy& path_strategy,
+        const std::unordered_set<int>& used_nodes,
+        const std::unordered_set<int>& used_magic_states,
+        const std::unordered_map<int, std::vector<int>>& magic_state_order_cache
+    ) const override;
+};
+
+class SmartTGateRouting : public ITGateRoutingStrategy {
+private:
+    int patience_threshold;
+
+public:
+    explicit SmartTGateRouting(int patience_threshold = 3) : patience_threshold(patience_threshold) {}
+
+    Path find_t_gate_path(
+        const Gate& gate,
+        const Mapping& mapping,
+        const Graph& graph,
+        const IPathStrategy& path_strategy,
+        const std::unordered_set<int>& used_nodes,
+        const std::unordered_set<int>& used_magic_states,
+        const std::unordered_map<int, std::vector<int>>& magic_state_order_cache
+    ) const override;
+};
+
 class QubitRouter {
 private:
     const Mapping& mapping;
     LayeredCircuit& circuit;
     const Graph& graph;
     const IPathStrategy* pathStrategy;
-    std::string t_routing_mode;
-    int patience_threshold;
+    const ITGateRoutingStrategy* tGateRoutingStrategy;
     std::vector<Routing> routing_steps;
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
 
@@ -92,14 +136,12 @@ public:
         LayeredCircuit& c,
         const Graph& g,
         const IPathStrategy* p,
-        std::string t_routing_mode = "normal_t_routing",
-        int patience_threshold = 3
+        const ITGateRoutingStrategy* t
     ) : mapping(m),
         circuit(c),
         graph(g),
         pathStrategy(p),
-        t_routing_mode(std::move(t_routing_mode)),
-        patience_threshold(patience_threshold) {}
+        tGateRoutingStrategy(t) {}
     /**
      * Routes the whole circuit, returning a vector of mappings (gate-Path).
      * @attention this will modify the layering in the internal LayeredCircuit.

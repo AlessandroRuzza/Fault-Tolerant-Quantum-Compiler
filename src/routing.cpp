@@ -27,6 +27,99 @@ void print_non_routed_histogram(const std::map<std::size_t, std::size_t>& non_ro
 }
 }
 
+Path NormalTGateRouting::find_t_gate_path(
+    const Gate& gate,
+    const Mapping& mapping,
+    const Graph& graph,
+    const IPathStrategy& path_strategy,
+    const std::unordered_set<int>& used_nodes,
+    const std::unordered_set<int>& used_magic_states,
+    const std::unordered_map<int, std::vector<int>>& magic_state_order_cache
+) const {
+    (void)magic_state_order_cache;
+
+    int closestDist = INT32_MAX;
+    Path closestPath;
+    const int start_node = mapping.get_mapped_node(gate.qubits[0]);
+    if (start_node < 0) {
+        throw std::runtime_error("Qubit " + std::to_string(gate.qubits[0]) + " was not mapped.");
+    }
+
+    for (int magicState : graph.get_magic_state_ids()) {
+        if (used_magic_states.count(magicState) > 0) {
+            continue;
+        }
+        Path path = path_strategy.find_shortest_path(start_node, magicState, used_nodes);
+        if (!path.empty() && static_cast<int>(path.size()) < closestDist) {
+            closestDist = path.size();
+            closestPath = path;
+        }
+    }
+
+    return closestPath;
+}
+
+Path SmartTGateRouting::find_t_gate_path(
+    const Gate& gate,
+    const Mapping& mapping,
+    const Graph& graph,
+    const IPathStrategy& path_strategy,
+    const std::unordered_set<int>& used_nodes,
+    const std::unordered_set<int>& used_magic_states,
+    const std::unordered_map<int, std::vector<int>>& magic_state_order_cache
+) const {
+    int closestDist = INT32_MAX;
+    Path closestPath;
+    const int start_node = mapping.get_mapped_node(gate.qubits[0]);
+    if (start_node < 0) {
+        throw std::runtime_error("Qubit " + std::to_string(gate.qubits[0]) + " was not mapped.");
+    }
+
+    const auto cache_it = magic_state_order_cache.find(start_node);
+    int failed_attempts = 0;
+    bool fallback_to_unranked_search = false;
+
+    if (cache_it == magic_state_order_cache.end() || cache_it->second.empty()) {
+        fallback_to_unranked_search = true;
+    } else {
+        for (int magicState : cache_it->second) {
+            if (used_magic_states.count(magicState) > 0) {
+                continue;
+            }
+            Path path = path_strategy.find_shortest_path(start_node, magicState, used_nodes);
+
+            if (!path.empty() && static_cast<int>(path.size()) < closestDist) {
+                closestDist = path.size();
+                closestPath = path;
+                failed_attempts = 0;
+            } else {
+                failed_attempts++;
+                if (failed_attempts >= patience_threshold && !closestPath.empty()) {
+                    break;
+                } else if (failed_attempts >= patience_threshold && closestPath.empty()) {
+                    failed_attempts = 0;
+                }
+            }
+        }
+    }
+
+    // If there are empty elements in the magic state map, fallback to unranked search among all magic states.
+    if (fallback_to_unranked_search) {
+        for (int magicState : graph.get_magic_state_ids()) {
+            if (used_magic_states.count(magicState) > 0) {
+                continue;
+            }
+            Path path = path_strategy.find_shortest_path(start_node, magicState, used_nodes);
+            if (!path.empty() && static_cast<int>(path.size()) < closestDist) {
+                closestDist = path.size();
+                closestPath = path;
+            }
+        }
+    }
+
+    return closestPath;
+}
+
 void QubitRouter::precompute_magic_state_order() {
     magic_state_order_cache.clear();
     magic_state_order_cache.reserve(circuit.getQubitsVectorSize());
@@ -195,71 +288,15 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             path = pathStrategy->find_shortest_path(node1, node2, used_nodes);
         }
         else if(gate.name == "t"){ // path to closest magic state 
-
-            const bool use_smart_t_routing = (t_routing_mode == "smart_t_routing");
-
-            int closestDist = INT32_MAX;
-            Path closestPath;
-            const int start_node = mapping.get_mapped_node(gate.qubits[0]);
-            if (start_node < 0) {
-                throw std::runtime_error("Qubit " + std::to_string(gate.qubits[0]) + " was not mapped.");
-            }
-            if(!use_smart_t_routing){   
-                for(int magicState : graph.get_magic_state_ids()){
-                    if (used_magic_states.count(magicState) > 0) {
-                        continue;
-                    }
-                    path = pathStrategy->find_shortest_path(start_node, magicState, used_nodes);
-                    if(!path.empty() && static_cast<int>(path.size()) < closestDist){
-                        closestDist = path.size();
-                        closestPath = path;
-                    }
-                }
-            }
-            else{
-                const auto cache_it = magic_state_order_cache.find(start_node);
-                int failed_attempts = 0;
-                bool fallback_to_unranked_search = false;
-
-                if (cache_it == magic_state_order_cache.end() || cache_it->second.empty()) {
-                    fallback_to_unranked_search = true;
-                } else {
-                    for (int magicState : cache_it->second) {
-                        if (used_magic_states.count(magicState) > 0) {
-                            continue;
-                        }
-                        path = pathStrategy->find_shortest_path(start_node, magicState, used_nodes);
-
-                        if (!path.empty() && static_cast<int>(path.size()) < closestDist) {
-                            closestDist = path.size();
-                            closestPath = path;
-                            failed_attempts = 0;
-                        } else {
-                            failed_attempts++;
-                            if (failed_attempts >= patience_threshold  && !closestPath.empty()) {
-                                break;
-                            }else if (failed_attempts >= patience_threshold && closestPath.empty()) {
-                                failed_attempts = 0;
-                            }
-                        }
-                    }
-                }
-
-                // If there are empty elements in the magic state map, fallback to unranked search among all magic states.
-                if (fallback_to_unranked_search) {
-                    for (int magicState : graph.get_magic_state_ids()) {
-                        if (used_magic_states.count(magicState) > 0) {
-                            continue;
-                        }
-                        path = pathStrategy->find_shortest_path(start_node, magicState, used_nodes);
-                        if (!path.empty() && static_cast<int>(path.size()) < closestDist) {
-                            closestDist = path.size();
-                            closestPath = path;
-                        }
-                    }
-                }
-            }
-            path = closestPath;
+            path = tGateRoutingStrategy->find_t_gate_path(
+                gate,
+                mapping,
+                graph,
+                *pathStrategy,
+                used_nodes,
+                used_magic_states,
+                magic_state_order_cache
+            );
         }
         else{
             std::cout << "ERROR. Unhandled Gate " << gate.to_string() << ".\n";
