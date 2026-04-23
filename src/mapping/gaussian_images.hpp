@@ -273,7 +273,7 @@ void save_gaussian_frame(
     gp_sum << "set zlabel 'amplitude'\n";
     gp_sum << "set key outside right top opaque\n";
     gp_sum << "set view 62,36\n";
-    gp_sum << "splot '" << total_dat.string() << "' using 1:2:3 with lines lc rgb '#1F6FE5' lw 2 title 'all_gaussians_sum'\n";
+    gp_sum << "splot '" << total_dat.string() << "' using 1:2:3 with lines lc rgb '#1F6FE5' lw 2 title 'all\\_gaussians\\_sum'\n";
     gp_sum.close();
 
     const std::string cmd_split = "gnuplot '" + script_gp.string() + "'";
