@@ -1,50 +1,11 @@
 #include "routing.hpp"
 
-Path CongestionAwareShortestPath::naive_unweighted_path(
+inline Path CongestionAwareShortestPath::naive_unweighted_path(
 	int start_node,
 	int end_node,
 	const std::unordered_set<int>& used_nodes
 ) const {
-	if (start_node == end_node) {
-		return {start_node};
-	}
-
-	std::unordered_map<int, int> parent;
-	auto cmp = [&](int a, int b) {
-		const Node& a_node = this->graph.get_node(a);
-		const Node& b_node = this->graph.get_node(b);
-		const Node& target = this->graph.get_node(end_node);
-		return a_node.distance(target) > b_node.distance(target);
-	};
-	std::priority_queue<int, std::vector<int>, decltype(cmp)> q(cmp);
-
-	q.push(start_node);
-	parent[start_node] = -1;
-
-	while (!q.empty()) {
-		const int current = q.top();
-		q.pop();
-
-		if (current == end_node) {
-			Path path;
-			int node = end_node;
-			while (node != -1) {
-				path.push_back(node);
-				node = parent[node];
-			}
-			std::reverse(path.begin(), path.end());
-			return path;
-		}
-
-		for (int neighbor : graph.neighbors(current)) {
-			if (neighbor == end_node || (used_nodes.count(neighbor) == 0 && parent.find(neighbor) == parent.end())) {
-				parent[neighbor] = current;
-				q.push(neighbor);
-			}
-		}
-	}
-
-	return {};
+	return naivePath.find_shortest_path(start_node, end_node, used_nodes);
 }
 
 void CongestionAwareShortestPath::accumulate_path_congestion(const Path& path) const {

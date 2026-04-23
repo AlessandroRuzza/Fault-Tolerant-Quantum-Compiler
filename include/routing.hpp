@@ -42,6 +42,7 @@ private:
     CongestionUpdatePolicy update_policy;
     mutable std::unordered_map<int, float> node_weights;
     mutable bool static_weights_ready;
+    NaiveShortestPath naivePath;
 
     Path naive_unweighted_path(int start_node, int end_node, const std::unordered_set<int>& used_nodes) const;
     void accumulate_path_congestion(const Path& path) const;
@@ -59,7 +60,8 @@ public:
     ) : IPathStrategy(g),
         congestion_penalty_scale(congestion_penalty_scale),
         update_policy(update_policy),
-        static_weights_ready(false) {}
+        static_weights_ready(false),
+        naivePath(g) {}
 
     void prepare_for_layer(
         const LayeredCircuit& circuit,
