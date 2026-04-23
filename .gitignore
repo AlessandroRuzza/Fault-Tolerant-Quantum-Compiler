@@ -57,6 +57,9 @@ universal_set_qasms
 qasms/vqe_n24.qasm
 .codex
 
+# Temporary benchmark execution files
+config/__bench_*.json
+
 # Exclude output files except for .csv (raw results)
 benchmarks/logs/
 benchmarks/old*/

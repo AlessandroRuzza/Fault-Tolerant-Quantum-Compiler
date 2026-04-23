@@ -44,7 +44,19 @@ void Circuit::addGate(const Gate& gate, std::string gate_name, int globalID) {
 }
 
 
-
+void Circuit::add_TGates(const Gate& gate, int n, int& globalID){
+    if(USE_S_GATES){
+        for (int i = 0; i < n/2; ++i) {
+            addGate(gate, "s", globalID++);
+        }
+        if(n%2) addGate(gate, "t", globalID++);
+    }
+    else{
+        for (int i = 0; i < n; ++i) {
+            addGate(gate, "t", globalID++);
+        }
+    }
+}
 
 void Circuit::parse_qasm_file(const std::string &path) {
     std::ifstream ifs(path);
@@ -126,28 +138,18 @@ void Circuit::parse_qasm_file(const std::string &path) {
                 }
 
                 if (lname == "tdg") {
-                    for (int i = 0; i < 7; ++i) {
-                        addGate(gate, "t", globalID++);
-                    }
+                    add_TGates(gate, 7, globalID);
                 } else if (lname == "x") {
                     addGate(gate, "h", globalID++);
-                    for (int i = 0; i < 4; ++i) {
-                        addGate(gate, "t", globalID++);
-                    }
+                    add_TGates(gate, 4, globalID);
                     addGate(gate, "h", globalID++);
                 } else if (lname == "z") {
-                    for (int i = 0; i < 4; ++i) {
-                        addGate(gate, "t", globalID++);
-                    }
+                    add_TGates(gate, 4, globalID);
                 } else if (lname == "y") {
                     addGate(gate, "h", globalID++);
-                    for (int i = 0; i < 4; ++i) {
-                        addGate(gate, "t", globalID++);
-                    }
+                    add_TGates(gate, 4, globalID);
                     addGate(gate, "h", globalID++);
-                    for (int i = 0; i < 4; ++i) {
-                        addGate(gate, "t", globalID++);
-                    }
+                    add_TGates(gate, 4, globalID);
                 } else if(lname == "swap"){
                     addGate(gate, "cx", globalID++);
                     gate.qubits = {gate.qubits[1], gate.qubits[0]}; // swap control and target for second CNOT
