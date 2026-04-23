@@ -463,6 +463,9 @@ int run_bench_mode(
         bool already_executed = false;
         bool timeout_reached_before = false;
         bool rerun_timeout_case = false;
+        bool replace_interrupted_csv_row = false;
+        std::size_t replacement_csv_data_row = 0;
+        int replacement_run_id = 0;
     };
 
     struct BenchCaseResult {
@@ -489,6 +492,128 @@ int run_bench_mode(
         runnable_indices.reserve(total_cases);
 
         std::cout << "Benchmark processor filter: processor=" << processor << "\n";
+
+        const auto normalize_identity_value = [](std::string value) {
+            while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front()))) {
+                value.erase(value.begin());
+            }
+            while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back()))) {
+                value.pop_back();
+            }
+
+            std::string lowered = value;
+            std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            if (lowered == "true" || lowered == "false") {
+                return lowered;
+            }
+
+            char *end_ptr = nullptr;
+            const double parsed = std::strtod(value.c_str(), &end_ptr);
+            if (end_ptr != value.c_str() && end_ptr != nullptr && *end_ptr == '\0' && std::isfinite(parsed)) {
+                std::ostringstream oss;
+                oss << std::setprecision(12) << parsed;
+                return oss.str();
+            }
+
+            return value;
+        };
+
+        const auto plan_field = [&](const json &entry, const std::vector<std::string> &keys, const std::string &fallback = "") {
+            std::string value = get_json_field(entry, keys);
+            if (value.empty()) {
+                value = fallback;
+            }
+            return normalize_identity_value(value);
+        };
+
+        const auto csv_field = [&](const std::vector<std::string> &row, std::size_t index, const std::string &fallback = "") {
+            std::string value = write_csv::at_or_empty(row, index);
+            if (value.empty()) {
+                value = fallback;
+            }
+            return normalize_identity_value(value);
+        };
+
+        const auto entry_has_explicit_graph_dimensions = [&](const json &entry) {
+            const std::string x_value = plan_field(entry, {"x"});
+            const std::string y_value = plan_field(entry, {"y"});
+            return !x_value.empty() && !y_value.empty() && x_value != "-1" && y_value != "-1";
+        };
+
+        const auto csv_row_matches_plan = [&](const std::vector<std::string> &row, const json &entry) {
+            const std::vector<std::pair<std::size_t, std::string>> comparisons = {
+                {3, plan_field(entry, {"circuit"})},
+                {7, plan_field(entry, {"mapping_type", "type"})},
+                {8, plan_field(entry, {"magic_aware_strategy"})},
+                {9, plan_field(entry, {"gaussian_strategy"})},
+                {10, plan_field(entry, {"MAGIC_HIGH", "magic_high"})},
+                {11, plan_field(entry, {"MAGIC_LOW", "magic_low"})},
+                {12, plan_field(entry, {"CNOT_HIGH", "cnot_high"})},
+                {13, plan_field(entry, {"CNOT_LOW", "cnot_low"})},
+                {14, plan_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"})},
+                {15, plan_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"})},
+                {16, plan_field(entry, {"safe_passage_strategy"})},
+                {17, plan_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"})},
+                {18, plan_field(entry, {"border_distance_percentage"})},
+                {19, plan_field(entry, {"number_of_magic_states"})},
+                {20, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
+                {21, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")}
+            };
+
+            for (const auto &[index, expected] : comparisons) {
+                const std::string fallback = (index == 21) ? "normal_t_routing" : "";
+                if (csv_field(row, index, fallback) != expected) {
+                    return false;
+                }
+            }
+
+            if (entry_has_explicit_graph_dimensions(entry)) {
+                if (csv_field(row, 4) != plan_field(entry, {"x"}) ||
+                    csv_field(row, 5) != plan_field(entry, {"y"})) {
+                    return false;
+                }
+            }
+
+            const std::string expected_label = plan_field(entry, {"circuit_graph_label"});
+            if (!expected_label.empty() && csv_field(row, 6) != expected_label) {
+                return false;
+            }
+
+            return true;
+        };
+
+        struct InterruptedCsvRow {
+            std::size_t data_row_index = 0;
+            int run_id = 0;
+            std::vector<std::string> row;
+            bool used = false;
+        };
+
+        std::vector<InterruptedCsvRow> interrupted_csv_rows;
+        const std::vector<std::vector<std::string>> existing_csv_rows = write_csv::read_data_rows(csv_path);
+        for (std::size_t row_index = 0; row_index < existing_csv_rows.size(); ++row_index) {
+            const std::vector<std::string> &row = existing_csv_rows[row_index];
+            if (csv_field(row, 24) != "interrupted") {
+                continue;
+            }
+
+            int interrupted_run_id = 0;
+            try {
+                interrupted_run_id = std::stoi(write_csv::at_or_empty(row, 0));
+            } catch (const std::exception &) {
+                continue;
+            }
+
+            interrupted_csv_rows.push_back({row_index, interrupted_run_id, row, false});
+        }
+
+        if (!interrupted_csv_rows.empty()) {
+            std::cout
+                << "Found " << interrupted_csv_rows.size()
+                << " interrupted CSV row(s) that can be reused if their configuration is scheduled again.\n";
+        }
 
         for (std::size_t i = 0; i < total_cases; ++i) {
             if (!bench_data.at(i).is_object()) {
@@ -535,6 +660,29 @@ int run_bench_mode(
             }
 
             plans.push_back(std::move(plan));
+        }
+
+        std::size_t reusable_interrupted_rows = 0;
+        for (std::size_t plan_index : runnable_indices) {
+            BenchCasePlan &plan = plans[plan_index];
+            for (InterruptedCsvRow &interrupted_row : interrupted_csv_rows) {
+                if (interrupted_row.used || !csv_row_matches_plan(interrupted_row.row, plan.entry)) {
+                    continue;
+                }
+
+                interrupted_row.used = true;
+                plan.replace_interrupted_csv_row = true;
+                plan.replacement_csv_data_row = interrupted_row.data_row_index;
+                plan.replacement_run_id = interrupted_row.run_id;
+                ++reusable_interrupted_rows;
+                break;
+            }
+        }
+
+        if (reusable_interrupted_rows > 0) {
+            std::cout
+                << "Will overwrite " << reusable_interrupted_rows
+                << " interrupted CSV row(s) instead of appending new rows.\n";
         }
 
         if (!runnable_indices.empty()) {
@@ -783,7 +931,9 @@ int run_bench_mode(
 
             const std::size_t plan_index = runnable_indices[static_cast<std::size_t>(runnable_idx)];
             const BenchCasePlan &plan = plans[plan_index];
-            const int run_id = next_run_id_counter.fetch_add(1);
+            const int run_id = plan.replace_interrupted_csv_row ?
+                plan.replacement_run_id :
+                next_run_id_counter.fetch_add(1);
             BenchCaseResult result = execute_case(plan, run_id);
             results[plan.index] = result;
 
@@ -794,7 +944,16 @@ int run_bench_mode(
                         bench_data.at(result.index)["executed"] = result.mark_entry_as_executed;
                         bench_data.at(result.index)["timeout_reached"] = result.timeout_reached;
                         persist_expanded();
-                        write_csv::append_row(csv_path, result.csv_row);
+                        const BenchCasePlan &committed_plan = plans[result.index];
+                        if (committed_plan.replace_interrupted_csv_row) {
+                            write_csv::replace_row(
+                                csv_path,
+                                committed_plan.replacement_csv_data_row,
+                                result.csv_row
+                            );
+                        } else {
+                            write_csv::append_row(csv_path, result.csv_row);
+                        }
                     } catch (const std::exception &e) {
                         fatal_error = true;
                         fatal_error_message = e.what();
