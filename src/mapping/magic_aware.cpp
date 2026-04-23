@@ -22,7 +22,17 @@ void Mapping::magic_aware_mapping() {
             pseudo_random_mapping(qubit, -1);
             iterations++; // consider this as an iteration even if it falls back to pseudo-random
         } catch (const MapNearQubitError&) {
-            pseudo_random_mapping(qubit, -1);
+            Qubit* fallback_qubit = qubit;
+            const int second_qubit_id = qubit->getMaxCNOTCountIndex();
+            if (get_mapped_node(qubit->getQubitID()) != -1 &&
+                second_qubit_id >= 0 &&
+                get_mapped_node(second_qubit_id) == -1) {
+                fallback_qubit = const_cast<Qubit*>(circuit.getQubit(second_qubit_id));
+            }
+            if (fallback_qubit == nullptr) {
+                throw std::runtime_error("Fallback mapping target is null.");
+            }
+            pseudo_random_mapping(fallback_qubit, -1);
             iterations++; // consider this as an iteration even if it falls back to pseudo-random
         } catch (const std::exception& e) {
             throw std::runtime_error(
