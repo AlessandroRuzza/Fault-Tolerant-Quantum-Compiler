@@ -19,5 +19,6 @@
   "x": -1,
   "y": -1,
 
-  "routing_strategy": "congestion"
+  "routing_strategy": "congestion",
+  "t-routing-mode": "normal_t_routing"
 }

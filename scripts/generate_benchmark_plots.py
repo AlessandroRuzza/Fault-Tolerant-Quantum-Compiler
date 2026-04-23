@@ -1686,6 +1686,8 @@ def write_report_markdown(
         ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
         ("13_heatmap_success_safe_vs_placement.png", "Success heatmap: safe passage x placement"),
         ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
+        ("23_heatmap_success_safe_vs_mapping_type.png", "Success heatmap: safe passage x mapping type"),
+        ("24_heatmap_routing_safe_vs_mapping_type.png", "Routing heatmap: safe passage x mapping type"),
         ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
         ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
         ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
@@ -1979,6 +1981,29 @@ def main():
         "Mean Routing Steps Heatmap",
         "mean routing steps",
         "14_heatmap_routing_safe_vs_placement.png",
+        output_dir,
+        generated,
+    )
+    make_pair_heatmap(
+        rows,
+        "safe_passage_strategy",
+        "mapping_type_norm",
+        success_rate,
+        "Success Rate Heatmap by Safe Passage and Mapping Type",
+        "success rate (%)",
+        "23_heatmap_success_safe_vs_mapping_type.png",
+        output_dir,
+        generated,
+        value_format="{:.1f}",
+    )
+    make_pair_heatmap(
+        rows_success_with_routing,
+        "safe_passage_strategy",
+        "mapping_type_norm",
+        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
+        "Mean Routing Steps Heatmap by Safe Passage and Mapping Type",
+        "mean routing steps",
+        "24_heatmap_routing_safe_vs_mapping_type.png",
         output_dir,
         generated,
     )

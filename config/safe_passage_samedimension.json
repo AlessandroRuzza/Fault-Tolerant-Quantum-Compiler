@@ -14,6 +14,7 @@
   "timeout": 600,
   "timeout_reached": false,
   "routing_strategy": "naive",
+  "t-routing-mode": "normal_t_routing",
 
   "configs_type": [
     {

@@ -19,7 +19,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "adder_n64_transpiled-19x19",
@@ -31,7 +32,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "adder_n64_transpiled-21x21",
@@ -43,7 +45,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "adder_n64_transpiled-22x22",
@@ -55,7 +58,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "adder_n64_transpiled-23x23",
@@ -67,7 +71,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "adder_n64_transpiled-24x24",
@@ -79,7 +84,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "bb84_n8-6x6",
@@ -91,7 +97,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "bb84_n8-7x7",
@@ -103,7 +110,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "bb84_n8-8x8",
@@ -115,7 +123,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "continuous_3_17_13-4x4",
@@ -127,7 +136,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "continuous_3_17_13-5x5",
@@ -139,7 +149,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "dnn_n16-9x9",
@@ -151,7 +162,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "dnn_n16-10x10",
@@ -163,7 +175,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "dnn_n16-11x11",
@@ -175,7 +188,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "dnn_n16-12x12",
@@ -187,7 +201,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "example-5x5",
@@ -199,7 +214,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "example-6x6",
@@ -211,7 +227,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "ghz_state_n23-11x11",
@@ -223,7 +240,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "ghz_state_n23-12x12",
@@ -235,7 +253,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "ghz_state_n23-13x13",
@@ -247,7 +266,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "ghz_state_n23-14x14",
@@ -259,7 +279,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "qaoa_n6-5x5",
@@ -271,7 +292,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "qaoa_n6-6x6",
@@ -283,7 +305,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "qaoa_n6-7x7",
@@ -295,7 +318,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "qft_20-10x10",
@@ -307,7 +331,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "right_row",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "qft_20-11x11",
@@ -319,7 +344,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "qft_20-12x12",
@@ -331,7 +357,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "right_row",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "qft_20-13x13",
@@ -343,7 +370,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 5.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "wstate_n27-12x12",
@@ -355,7 +383,8 @@
       "safe_passage_strategy": "passage_no_subgraphs",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "wstate_n27-14x14",
@@ -367,7 +396,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     },
     {
       "circuit_graph_label": "wstate_n27-15x15",
@@ -379,7 +409,8 @@
       "safe_passage_strategy": "cube",
       "magic_state_placement_strategy": "center_circle",
       "border_distance_percentage": 0.0,
-      "routing_strategy": ["naive", "congestion"]
+      "routing_strategy": ["naive", "congestion"],
+      "t-routing-mode": "normal_t_routing"
     }
   ]
 }
