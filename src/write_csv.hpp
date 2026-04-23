@@ -112,19 +112,92 @@ inline std::string escape(const std::string &value) {
     return out;
 }
 
+inline std::string render_row(const std::vector<std::string> &columns) {
+    std::string row;
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+        if (i != 0) {
+            row.push_back(',');
+        }
+        row += escape(columns[i]);
+    }
+    return row;
+}
+
 inline void append_row(const std::filesystem::path &csv_path, const std::vector<std::string> &columns) {
     std::ofstream out(csv_path, std::ios::app);
     if (!out.is_open()) {
         throw std::runtime_error("Cannot append CSV row: " + csv_path.string());
     }
 
-    for (std::size_t i = 0; i < columns.size(); ++i) {
-        if (i != 0) {
-            out << ',';
-        }
-        out << escape(columns[i]);
+    out << render_row(columns) << '\n';
+}
+
+inline void replace_row(
+    const std::filesystem::path &csv_path,
+    std::size_t data_row_index,
+    const std::vector<std::string> &columns
+) {
+    std::ifstream in(csv_path);
+    if (!in.is_open()) {
+        throw std::runtime_error("Cannot read CSV rows for replacement: " + csv_path.string());
     }
-    out << '\n';
+
+    std::string header;
+    if (!std::getline(in, header)) {
+        throw std::runtime_error("Cannot replace CSV row in empty file: " + csv_path.string());
+    }
+
+    std::vector<std::string> rows;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty()) {
+            rows.push_back(line);
+        }
+    }
+
+    if (data_row_index >= rows.size()) {
+        throw std::runtime_error("CSV replacement row index out of range: " + csv_path.string());
+    }
+
+    rows[data_row_index] = render_row(columns);
+
+    std::ofstream out(csv_path, std::ios::trunc);
+    if (!out.is_open()) {
+        throw std::runtime_error("Cannot rewrite CSV rows after replacement: " + csv_path.string());
+    }
+
+    out << header << '\n';
+    for (const std::string &row : rows) {
+        out << row << '\n';
+    }
+}
+
+inline std::vector<std::vector<std::string>> read_data_rows(const std::filesystem::path &csv_path) {
+    std::vector<std::vector<std::string>> rows;
+    if (!std::filesystem::exists(csv_path)) {
+        return rows;
+    }
+
+    std::ifstream in(csv_path);
+    if (!in.is_open()) {
+        return rows;
+    }
+
+    std::string line;
+    bool first_line = true;
+    while (std::getline(in, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        if (first_line) {
+            first_line = false;
+            if (line.rfind("run_id,", 0) == 0) {
+                continue;
+            }
+        }
+        rows.push_back(parse_row(line));
+    }
+    return rows;
 }
 
 inline void ensure_initialized(const std::filesystem::path &csv_path, const std::string &header) {
