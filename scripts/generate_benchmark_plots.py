@@ -23,6 +23,7 @@ def importMatplotlib():
 
 
 SUCCESS_STATUSES = {"ok", "ok_no_routing_metric", "success"}
+TIMEOUT_STATUSES = {"timeout"}
 REQUESTED_SAFE_PASSAGES = {"passage", "cube"}
 REQUESTED_PLACEMENT_VARIANTS = ("right_row", "center_circle_0", "center_circle_5")
 REQUESTED_GAUSSIAN_STRATEGIES = {"coarse", "fine"}
@@ -100,6 +101,12 @@ def normalize_text(value):
 
 
 def normalize_csv_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def normalize_csv_fieldname(value):
     if value is None:
         return ""
     return str(value).strip()
@@ -390,11 +397,21 @@ def load_raw_rows_from_files(files):
             reader = csv.DictReader(f)
             if not reader.fieldnames:
                 continue
-            if "run_id" not in reader.fieldnames or "status" not in reader.fieldnames:
+
+            normalized_fieldnames = []
+            normalized_to_original = {}
+            for fieldname in reader.fieldnames:
+                normalized = normalize_csv_fieldname(fieldname)
+                if not normalized or normalized in normalized_to_original:
+                    continue
+                normalized_fieldnames.append(normalized)
+                normalized_to_original[normalized] = fieldname
+
+            if "run_id" not in normalized_fieldnames or "status" not in normalized_fieldnames:
                 continue
 
             accepted_files.append(path)
-            for fieldname in reader.fieldnames:
+            for fieldname in normalized_fieldnames:
                 if fieldname in seen_fieldnames:
                     continue
                 fieldnames.append(fieldname)
@@ -407,7 +424,10 @@ def load_raw_rows_from_files(files):
                 seen_fieldnames.add(fieldname)
 
             for row_index, raw in enumerate(reader):
-                row = {fieldname: raw.get(fieldname, "") for fieldname in reader.fieldnames}
+                row = {
+                    fieldname: raw.get(normalized_to_original[fieldname], "")
+                    for fieldname in normalized_fieldnames
+                }
                 row["source_csv"] = path
                 row["source_csv_name"] = os.path.basename(path)
                 row["_merge_order"] = len(rows)
@@ -618,6 +638,14 @@ def label_with_sample_count(label, count):
 
 def legend_label_with_sample_count(label, count):
     return f"{label} (n={count})"
+
+
+def is_timeout(row):
+    return normalize_text(row.get("status")) in TIMEOUT_STATUSES
+
+
+def exclude_timeout_rows(rows):
+    return [row for row in rows if not is_timeout(row)]
 
 
 def annotate_bars(ax, bars, fmt="{:.0f}"):
@@ -1335,6 +1363,7 @@ def make_pair_heatmap(
     output_dir,
     generated,
     value_format="{:.2f}",
+    subset_transform=None,
 ):
     row_labels = sorted({heatmap_axis_value(r, row_key) for r in rows})
     col_labels = sorted({heatmap_axis_value(r, col_key) for r in rows})
@@ -1351,8 +1380,9 @@ def make_pair_heatmap(
         grouped[(heatmap_axis_value(r, row_key), heatmap_axis_value(r, col_key))].append(r)
 
     for (rk, ck), subset in grouped.items():
-        val = value_fn(subset)
-        count_matrix[row_index[rk], col_index[ck]] = len(subset)
+        metric_subset = subset_transform(subset) if subset_transform is not None else subset
+        val = value_fn(metric_subset)
+        count_matrix[row_index[rk], col_index[ck]] = len(metric_subset)
         if val is None:
             continue
         matrix[row_index[rk], col_index[ck]] = val
@@ -1685,8 +1715,16 @@ def write_report_markdown(
         ("11_scatter_border_vs_routing_center_circle.png", "Border distance vs routing"),
         ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
         ("13_heatmap_success_safe_vs_placement.png", "Success heatmap: safe passage x placement"),
+        (
+            "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
+            "Success heatmap: safe passage x placement (timeouts excluded)",
+        ),
         ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
         ("23_heatmap_success_safe_vs_mapping_type.png", "Success heatmap: safe passage x mapping type"),
+        (
+            "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
+            "Success heatmap: safe passage x mapping type (timeouts excluded)",
+        ),
         ("24_heatmap_routing_safe_vs_mapping_type.png", "Routing heatmap: safe passage x mapping type"),
         ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
         ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
@@ -1974,6 +2012,19 @@ def main():
         value_format="{:.1f}",
     )
     make_pair_heatmap(
+        rows,
+        "safe_passage_strategy",
+        "placement",
+        success_rate,
+        "Success Rate Heatmap (Timeouts Excluded)",
+        "success rate (%)",
+        "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
+        output_dir,
+        generated,
+        value_format="{:.1f}",
+        subset_transform=exclude_timeout_rows,
+    )
+    make_pair_heatmap(
         rows_success_with_routing,
         "safe_passage_strategy",
         "placement",
@@ -1995,6 +2046,19 @@ def main():
         output_dir,
         generated,
         value_format="{:.1f}",
+    )
+    make_pair_heatmap(
+        rows,
+        "safe_passage_strategy",
+        "mapping_type_norm",
+        success_rate,
+        "Success Rate Heatmap by Safe Passage and Mapping Type (Timeouts Excluded)",
+        "success rate (%)",
+        "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
+        output_dir,
+        generated,
+        value_format="{:.1f}",
+        subset_transform=exclude_timeout_rows,
     )
     make_pair_heatmap(
         rows_success_with_routing,

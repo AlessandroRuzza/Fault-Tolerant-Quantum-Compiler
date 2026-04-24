@@ -33,68 +33,68 @@
   "configs_circuit" : [
     {
       "circuit": "continuous_3_17_13",
-      "x": 5,
-      "y": 5
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "example",
-      "x": 5,
-      "y": 5
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "bb84_n8",
-      "x": 6,
-      "y": 6
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "qaoa_n6",
-      "x": 6,
-      "y": 6
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "parallel",
-      "x": 8,
-      "y": 8
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "bigadder_n18_transpiled",
-      "x": 7,
-      "y": 7
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "dnn_n16",
-      "x": 10,
-      "y": 10
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "ghz_state_n23",
-      "x": 13,
-      "y": 13
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "wstate_n27",
-      "x": 12,
-      "y": 12
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "qft_20",
-      "x": 13,
-      "y": 13
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "adder_n64_transpiled",
-      "x": 19,
-      "y": 19
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "cat_n130",
-      "x": 32,
-      "y": 32
+      "x": 100,
+      "y": 100
     },
     {
       "circuit": "ghz_n255",
-      "x": 44,
-      "y": 44
+      "x": 100,
+      "y": 100
     }
   ]
 }
