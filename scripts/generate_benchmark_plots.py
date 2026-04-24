@@ -30,6 +30,10 @@ REQUESTED_GAUSSIAN_STRATEGIES = {"coarse", "fine"}
 REQUESTED_MAGIC_AWARE_STRATEGIES = {"center", "distance", "random"}
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
 DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
+OBSOLETE_PLOT_FILENAMES = {
+    "13_heatmap_success_safe_vs_placement.png",
+    "23_heatmap_success_safe_vs_mapping_type.png",
+}
 STATUS_DISPLAY_LABELS = {
     "ok": "ok",
     "ok_no_routing_metric": "ok (no routing metric)",
@@ -625,6 +629,17 @@ def save_fig(fig, output_dir, filename, generated):
     fig.savefig(path, dpi=160, bbox_inches="tight", pad_inches=0.2)
     plt.close(fig)
     generated.append(path)
+
+
+def remove_obsolete_plots(output_dir):
+    for filename in OBSOLETE_PLOT_FILENAMES:
+        path = os.path.join(output_dir, filename)
+        if not os.path.exists(path):
+            continue
+        try:
+            os.remove(path)
+        except OSError as exc:
+            warnings.warn(f"Could not remove obsolete plot {path}: {exc}")
 
 
 def category_color_map(labels):
@@ -1714,13 +1729,11 @@ def write_report_markdown(
         ("10_scatter_magic_states_vs_routing.png", "Magic state parameter vs routing"),
         ("11_scatter_border_vs_routing_center_circle.png", "Border distance vs routing"),
         ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
-        ("13_heatmap_success_safe_vs_placement.png", "Success heatmap: safe passage x placement"),
         (
             "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
             "Success heatmap: safe passage x placement (timeouts excluded)",
         ),
         ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
-        ("23_heatmap_success_safe_vs_mapping_type.png", "Success heatmap: safe passage x mapping type"),
         (
             "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
             "Success heatmap: safe passage x mapping type (timeouts excluded)",
@@ -1853,6 +1866,7 @@ def main():
         )
 
     rows = prepare_rows_for_analysis(raw_rows)
+    remove_obsolete_plots(output_dir)
 
     generated = []
 
@@ -2004,18 +2018,6 @@ def main():
         "safe_passage_strategy",
         "placement",
         success_rate,
-        "Success Rate Heatmap",
-        "success rate (%)",
-        "13_heatmap_success_safe_vs_placement.png",
-        output_dir,
-        generated,
-        value_format="{:.1f}",
-    )
-    make_pair_heatmap(
-        rows,
-        "safe_passage_strategy",
-        "placement",
-        success_rate,
         "Success Rate Heatmap (Timeouts Excluded)",
         "success rate (%)",
         "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
@@ -2034,18 +2036,6 @@ def main():
         "14_heatmap_routing_safe_vs_placement.png",
         output_dir,
         generated,
-    )
-    make_pair_heatmap(
-        rows,
-        "safe_passage_strategy",
-        "mapping_type_norm",
-        success_rate,
-        "Success Rate Heatmap by Safe Passage and Mapping Type",
-        "success rate (%)",
-        "23_heatmap_success_safe_vs_mapping_type.png",
-        output_dir,
-        generated,
-        value_format="{:.1f}",
     )
     make_pair_heatmap(
         rows,
