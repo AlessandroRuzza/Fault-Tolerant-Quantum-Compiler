@@ -49,10 +49,7 @@ public:
     virtual void add_edge(int u, int v) = 0;
 
 
-
     // ------get_nodes----------
-
-
 
     inline Node& get_node(int id) {
         return nodes[id];
@@ -61,7 +58,6 @@ public:
     inline const Node& get_node(int id) const {
         return nodes[id];
     }
-
 
     inline std::vector<Node> get_nodes() const { 
         return nodes; 
@@ -77,9 +73,7 @@ public:
         return ids;
     } 
 
-
-
-        // Get node by coordinates
+    // Get node by coordinates
     const Node& get_node_by_coordinates(int x, int y) const {
         for (const Node& node : nodes) {
             if (node.coordX == x && node.coordY == y) {
@@ -89,10 +83,7 @@ public:
         throw std::runtime_error("Node not found at coordinates: (" + std::to_string(x) + "," + std::to_string(y) + ")");
     }
 
-
-
     // ------get_magic_states----------
-
 
     std::vector<Node> get_magic_states() const { 
         std::vector<Node> result;
@@ -101,7 +92,6 @@ public:
         }
         return result;
     }
-
 
     inline std::vector<int> get_magic_state_ids() const {
         return magic_states_ids;

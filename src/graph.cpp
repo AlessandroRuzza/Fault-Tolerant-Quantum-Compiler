@@ -371,6 +371,11 @@ void Graph::create_rectangular_with_magic_states(
         );
     }
 
+    // Occupy all graph nodes that have magic states
+    for(int magic_id : magic_states_ids){
+        occupy_node(magic_id);
+    }
+
     // Add horizontal and vertical edges in the grid.
     for (int row = 0; row < height; row++) {
         for (int col = 0; col < width; col++) {
