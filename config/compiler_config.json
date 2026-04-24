@@ -16,8 +16,8 @@
   "MAPPED_GAUSSIAN_WEIGHT": 0.8,
   "BASE_GAUSSIAN_WEIGHT": 1.0,
   
-  "x": 100,
-  "y": 100,
+  "x": 30,
+  "y": 30,
 
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing"
