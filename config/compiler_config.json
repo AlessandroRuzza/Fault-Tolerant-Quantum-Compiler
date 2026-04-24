@@ -1,13 +1,13 @@
 {
-  "circuit": "parallel_big",
+  "circuit": "bigadder_n18_transpiled",
 
-  "type": "gaussian",
+  "type": "magic_aware",
   "magic_aware_strategy": "center",
   "gaussian_strategy": "coarse",
-  "safe_passage_strategy": "passage_no_subgraphs",
+  "safe_passage_strategy": "connectivity",
   "MagicStatePlacementStrategy": "center_circle",
-  "number_of_magic_states": 13,
-  "border_distance_percentage": 0.0,
+  "number_of_magic_states": 0.7,
+  "border_distance_percentage": 5.0,
 
   "MAGIC_HIGH": 1.5,
   "MAGIC_LOW": 0.5,
@@ -16,9 +16,9 @@
   "MAPPED_GAUSSIAN_WEIGHT": 0.8,
   "BASE_GAUSSIAN_WEIGHT": 1.0,
   
-  "x": -1,
-  "y": -1,
+  "x": 100,
+  "y": 100,
 
-  "routing_strategy": "congestion",
+  "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing"
 }
