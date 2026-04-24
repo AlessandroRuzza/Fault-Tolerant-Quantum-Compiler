@@ -71,10 +71,11 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     try {
         circuit.parse_qasm_file(path);
         auto gates = circuit.getGates();
-        for (size_t i = 0; i < gates.size(); ++i) {
-            const auto &g = gates[i];
-            if (PRINT_PARSING) std::cout << g.id << ": " << g.to_string() << "\n";
-        }
+        if (PRINT_PARSING)
+            for (size_t i = 0; i < gates.size(); ++i) {
+                const auto &g = gates[i];
+                std::cout << g.id << ": " << g.to_string() << "\n";
+            }
     } catch (const std::exception &e) {
         std::cerr << "Error: " << e.what() << std::endl;
         throw std::runtime_error("Error parsing QASM file");
