@@ -75,7 +75,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double border_distance_percentage = 10.0;
     int x = 10;
     int y = 11;
-    int maximum_iterations = 100;
+    int maximum_iterations = 500;
     std::string routing_strategy = "congestion";
 
     apply_config_overrides(
