@@ -1439,6 +1439,12 @@ def success_rate(subset):
     return 100.0 * (sum(1 for r in subset if r["success"]) / len(subset))
 
 
+def timeout_count(subset):
+    if not subset:
+        return 0.0
+    return float(sum(1 for row in subset if is_timeout(row)))
+
+
 def heatmap_axis_value(row, key):
     value = row.get(key)
     if value is None:
@@ -1735,10 +1741,18 @@ def write_report_markdown(
         ),
         ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
         (
+            "25_heatmap_timeout_safe_vs_placement.png",
+            "Timeout heatmap: safe passage x placement",
+        ),
+        (
             "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
             "Success heatmap: safe passage x mapping type (timeouts excluded)",
         ),
         ("24_heatmap_routing_safe_vs_mapping_type.png", "Routing heatmap: safe passage x mapping type"),
+        (
+            "26_heatmap_timeout_safe_vs_mapping_type.png",
+            "Timeout heatmap: safe passage x mapping type",
+        ),
         ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
         ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
         ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
@@ -2040,6 +2054,18 @@ def main():
     make_pair_heatmap(
         rows,
         "safe_passage_strategy",
+        "placement",
+        timeout_count,
+        "Timeout Heatmap by Safe Passage and Placement",
+        "timeout count",
+        "25_heatmap_timeout_safe_vs_placement.png",
+        output_dir,
+        generated,
+        value_format="{:.0f}",
+    )
+    make_pair_heatmap(
+        rows,
+        "safe_passage_strategy",
         "mapping_type_norm",
         success_rate,
         "Success Rate Heatmap by Safe Passage and Mapping Type (Timeouts Excluded)",
@@ -2060,6 +2086,18 @@ def main():
         "24_heatmap_routing_safe_vs_mapping_type.png",
         output_dir,
         generated,
+    )
+    make_pair_heatmap(
+        rows,
+        "safe_passage_strategy",
+        "mapping_type_norm",
+        timeout_count,
+        "Timeout Heatmap by Safe Passage and Mapping Type",
+        "timeout count",
+        "26_heatmap_timeout_safe_vs_mapping_type.png",
+        output_dir,
+        generated,
+        value_format="{:.0f}",
     )
     make_pair_heatmap(
         rows_magicaware_with_routing,
