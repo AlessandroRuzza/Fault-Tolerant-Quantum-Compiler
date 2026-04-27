@@ -20,8 +20,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -44,8 +44,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -68,8 +68,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -92,8 +92,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -115,8 +115,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -138,8 +138,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -161,8 +161,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -184,8 +184,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -208,8 +208,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -232,8 +232,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -256,8 +256,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -280,8 +280,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -304,8 +304,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -328,8 +328,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -352,8 +352,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -374,10 +374,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -399,8 +399,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -422,8 +422,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -445,8 +445,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -468,8 +468,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -492,8 +492,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -516,8 +516,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -540,8 +540,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -564,8 +564,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 5,
+    "y": 5
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -588,8 +588,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -610,10 +610,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -634,10 +634,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -660,8 +660,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -683,8 +683,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -706,8 +706,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -729,8 +729,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -752,8 +752,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -776,8 +776,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -800,8 +800,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -824,8 +824,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -848,8 +848,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -872,8 +872,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -894,10 +894,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -918,10 +918,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -942,10 +942,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -967,8 +967,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -990,8 +990,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1013,8 +1013,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1036,8 +1036,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1060,8 +1060,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1084,8 +1084,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1108,8 +1108,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1132,8 +1132,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 6,
+    "y": 6
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1156,8 +1156,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1178,10 +1178,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1202,10 +1202,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1226,10 +1226,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1251,8 +1251,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1274,8 +1274,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1297,8 +1297,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1320,8 +1320,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1344,8 +1344,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1368,8 +1368,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1392,8 +1392,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1416,8 +1416,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 8,
+    "y": 8
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1440,8 +1440,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1462,10 +1462,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1486,10 +1486,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1510,10 +1510,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1535,8 +1535,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1558,8 +1558,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1581,8 +1581,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1604,8 +1604,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1628,8 +1628,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1652,8 +1652,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1676,8 +1676,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1700,8 +1700,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 7,
+    "y": 7
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1724,8 +1724,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1746,10 +1746,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1770,10 +1770,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1794,10 +1794,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1819,8 +1819,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1842,8 +1842,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1865,8 +1865,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1888,8 +1888,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1912,8 +1912,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1936,8 +1936,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1960,8 +1960,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -1984,8 +1984,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 10,
+    "y": 10
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2008,8 +2008,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2030,10 +2030,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2054,10 +2054,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2078,10 +2078,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2103,8 +2103,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2126,8 +2126,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2149,8 +2149,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2172,8 +2172,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2196,8 +2196,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2220,8 +2220,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2244,8 +2244,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2268,8 +2268,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2290,10 +2290,10 @@
     "safe_passage_strategy": "cube",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2314,10 +2314,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2338,10 +2338,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2362,10 +2362,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2387,8 +2387,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2410,8 +2410,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2433,8 +2433,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2456,8 +2456,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2480,8 +2480,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2504,8 +2504,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2528,8 +2528,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2552,8 +2552,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 12,
+    "y": 12
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2576,8 +2576,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2598,10 +2598,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2622,10 +2622,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2646,10 +2646,10 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2671,8 +2671,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2694,8 +2694,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2717,8 +2717,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2740,8 +2740,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2764,8 +2764,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2788,8 +2788,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2812,8 +2812,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2836,8 +2836,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 13,
+    "y": 13
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2858,10 +2858,10 @@
     "safe_passage_strategy": "cube",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2882,10 +2882,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2906,10 +2906,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2932,8 +2932,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2955,8 +2955,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -2978,8 +2978,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3001,8 +3001,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3024,8 +3024,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3048,8 +3048,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3072,8 +3072,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3096,8 +3096,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3120,8 +3120,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 19,
+    "y": 19
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3142,10 +3142,10 @@
     "safe_passage_strategy": "cube",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3168,8 +3168,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3192,8 +3192,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3216,8 +3216,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3239,8 +3239,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3262,8 +3262,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3285,8 +3285,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3308,8 +3308,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3332,8 +3332,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3354,10 +3354,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3378,10 +3378,10 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3404,8 +3404,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 32,
+    "y": 32
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3428,8 +3428,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3452,8 +3452,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3476,8 +3476,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3500,8 +3500,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "gaussian",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3521,10 +3521,10 @@
     "safe_passage_strategy": "cube",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3546,8 +3546,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3569,8 +3569,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3592,8 +3592,8 @@
     "timeout": 600,
     "timeout_reached": false,
     "type": "homogeneous",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3616,8 +3616,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3638,10 +3638,10 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3664,8 +3664,8 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   },
   {
     "BASE_GAUSSIAN_WEIGHT": 1.0,
@@ -3688,7 +3688,7 @@
     "timeout": 600,
     "timeout_reached": true,
     "type": "magic_aware",
-    "x": 100,
-    "y": 100
+    "x": 44,
+    "y": 44
   }
 ]
