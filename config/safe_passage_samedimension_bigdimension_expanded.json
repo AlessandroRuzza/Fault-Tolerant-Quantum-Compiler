@@ -658,7 +658,7 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
     "x": 100,
     "y": 100
@@ -3521,7 +3521,7 @@
     "safe_passage_strategy": "cube",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": false,
+    "timeout_reached": true,
     "type": "homogeneous",
     "x": 100,
     "y": 100
@@ -3544,7 +3544,7 @@
     "safe_passage_strategy": "passage",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": false,
+    "timeout_reached": true,
     "type": "homogeneous",
     "x": 100,
     "y": 100
@@ -3567,7 +3567,7 @@
     "safe_passage_strategy": "passage_no_subgraphs",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": false,
+    "timeout_reached": true,
     "type": "homogeneous",
     "x": 100,
     "y": 100
@@ -3590,7 +3590,7 @@
     "safe_passage_strategy": "connectivity",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": false,
+    "timeout_reached": true,
     "type": "homogeneous",
     "x": 100,
     "y": 100
@@ -3614,7 +3614,7 @@
     "safe_passage_strategy": "cube",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": false,
+    "timeout_reached": true,
     "type": "magic_aware",
     "x": 100,
     "y": 100

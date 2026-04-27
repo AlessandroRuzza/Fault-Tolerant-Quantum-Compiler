@@ -1,9 +1,8 @@
 {
-  "circuit": "bigadder_n18_transpiled",
+  "circuit": "qft_20",
 
   "type": "magic_aware",
   "magic_aware_strategy": "center",
-  "gaussian_strategy": "coarse",
   "safe_passage_strategy": "connectivity",
   "MagicStatePlacementStrategy": "center_circle",
   "number_of_magic_states": 0.7,
@@ -16,8 +15,8 @@
   "MAPPED_GAUSSIAN_WEIGHT": 0.8,
   "BASE_GAUSSIAN_WEIGHT": 1.0,
   
-  "x": 30,
-  "y": 30,
+  "x": 100,
+  "y": 100,
 
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing"

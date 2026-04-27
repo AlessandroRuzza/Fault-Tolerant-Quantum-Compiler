@@ -73,3 +73,4 @@ tmp/
 scripts/__pycache__/
 QASMBench-master/
 *.png
+src/defines.cpp
