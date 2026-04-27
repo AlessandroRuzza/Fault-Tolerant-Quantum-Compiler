@@ -176,11 +176,65 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
     for(const Node& n : occupied_nodes){
         used_nodes.insert(n.id);
     }
+
+    const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
+    std::unordered_set<int> magic_state_set(magic_state_ids.begin(), magic_state_ids.end());
+    if (magic_state_set.count(node.id) > 0) {
+        return false;
+    }
+    used_nodes.insert(magic_state_set.begin(), magic_state_set.end());
     used_nodes.insert(node.id);
 
     const auto path_exists = [&pathStrategyPtr, &used_nodes](const int start, const int goal) -> bool {
         Path path = pathStrategyPtr->find_shortest_path(start, goal, used_nodes);
         return !path.empty();
+    };
+
+    const int qID = q.getQubitID();
+    const auto mapped_node_after_candidate = [this, qID, &node](const int qubit_id) -> int {
+        if (qubit_id == qID) {
+            return node.id;
+        }
+        return get_mapped_node(qubit_id);
+    };
+
+    const auto is_boundary_node = [this](const int node_id) -> bool {
+        const Node& current = graph.get_node(node_id);
+        return current.coordX == 0 || current.coordX == graph.getMaxX() ||
+               current.coordY == 0 || current.coordY == graph.getMaxY();
+    };
+
+    const auto has_escape_path = [this, &used_nodes, &is_boundary_node](const int start_node) -> bool {
+        std::queue<int> queue;
+        std::unordered_set<int> visited;
+        visited.insert(start_node);
+
+        for (const int neighbor : graph.neighbors(start_node)) {
+            if (used_nodes.count(neighbor) > 0) {
+                continue;
+            }
+            visited.insert(neighbor);
+            queue.push(neighbor);
+        }
+
+        while (!queue.empty()) {
+            const int current = queue.front();
+            queue.pop();
+
+            if (is_boundary_node(current)) {
+                return true;
+            }
+
+            for (const int neighbor : graph.neighbors(current)) {
+                if (visited.count(neighbor) > 0 || used_nodes.count(neighbor) > 0) {
+                    continue;
+                }
+                visited.insert(neighbor);
+                queue.push(neighbor);
+            }
+        }
+
+        return false;
     };
 
     std::vector<Gate> min2q_gates = circuit.getGates();
@@ -192,93 +246,69 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
         min2q_gates.end()
     );
 
-    int qID = q.getQubitID();
-    // Filter gates, keep only those involving qID
-    std::vector<Gate> gates_qID = min2q_gates;
-    gates_qID.erase(
-        std::remove_if(gates_qID.begin(), gates_qID.end(), 
-            [qID](const Gate& gate) {
-                return !gate.involves_qubit(qID);
-            }),
-        gates_qID.end()
-    );
+    std::unordered_set<int> cnot_nodes_requiring_access;
+    for (const Gate& gate : min2q_gates) {
+        const int node1 = mapped_node_after_candidate(gate.qubits[0]);
+        const int node2 = mapped_node_after_candidate(gate.qubits[1]);
 
-    const auto otherQubit = [&qID](const Gate& gate) -> int {
-        if (gate.qubits.size() < 2) return -1;
-        return (gate.qubits[0] == qID) ? gate.qubits[1] : gate.qubits[0];
-    };
-
-    // Make sure this mapped qubit can reach the qubits it interacts with
-    for (const Gate& gate : gates_qID) {
-        const int other_qid = otherQubit(gate);
-        const int other_node = get_mapped_node(other_qid);
-
-        if (other_qid < 0 || other_node < 0) {
-            continue; // 1-qubit gate or unmapped other qubit
+        if (node1 >= 0) {
+            cnot_nodes_requiring_access.insert(node1);
         }
-        if (!path_exists(node.id, other_node)) {
+        if (node2 >= 0) {
+            cnot_nodes_requiring_access.insert(node2);
+        }
+
+        if (node1 >= 0 && node2 >= 0) {
+            if (!path_exists(node1, node2)) {
+                return false; // This placement is blocking that gate path
+            }
+        }
+    }
+
+    for (const int mapped_node : cnot_nodes_requiring_access) {
+        if (!has_escape_path(mapped_node)) {
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "CANDIDATE REJECTED " << node.id
+                          << ": it blocks CNOT connectivity for node "
+                          << mapped_node << "\n";
+            }
             return false;
         }
     }
 
-    // Make sure previously mapped qubits can still reach the qubits they interact with
-    std::vector<Gate> otherGates = min2q_gates;
-    otherGates.erase(
-        std::remove_if(otherGates.begin(), otherGates.end(), [qID](const Gate& gate) {
-            return gate.involves_qubit(qID);
-        }),
-        otherGates.end()
-    );
-    for(const Gate& gate : otherGates){
-        const int node1 = get_mapped_node(gate.qubits[0]);
-        const int node2 = get_mapped_node(gate.qubits[1]);
-        if(node1 < 0 || node2 < 0)
-            continue; // That gate was not (fully) mapped
-        /*
-        else if(node1 < 0 && node2 >= 0){
-            //Fallback to safe_passage
-            bool isSafe = safe_passage_no_subgraphs(node2, occupied_nodes);
-            if(!isSafe && PRINT_SAFE_PASSAGE){
-                std::cout << "CANDIDATE REJECTED " << node.id << ": it is blocking safe passage for node " << node2 << "\n";
-            }
-            if(!isSafe) return false;
-        }
-        else if(node1 >= 0 && node2 < 0){
-            //Fallback to safe_passage
-            bool isSafe = safe_passage_no_subgraphs(node1, occupied_nodes);
-            if(!isSafe && PRINT_SAFE_PASSAGE){
-                std::cout << "CANDIDATE REJECTED " << node.id << ": it is blocking safe passage for node " << node1 << "\n";
-            }
-            if(!isSafe) return false;
-        }
-        */
-        else if (!path_exists(node1, node2)) {
-            return false; // This placement is blocking that gate path
-        }
-    }
-
-    // Ensure all mapped qubits can reach a magic state if they need
     std::vector<Gate> t_gates = circuit.getGates();
     t_gates.erase( // Filter, keep only T gates
-        std::remove_if(t_gates.begin(), t_gates.end(), 
+        std::remove_if(t_gates.begin(), t_gates.end(),
             [](const Gate& gate) {
                 return gate.name != "t";
             }),
         t_gates.end()
     );
 
+    for (const int magic_state_id : magic_state_ids) {
+        if (!has_escape_path(magic_state_id)) {
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "CANDIDATE REJECTED " << node.id
+                          << ": it blocks magic-state access for node "
+                          << magic_state_id << "\n";
+            }
+            return false;
+        }
+    }
+
+    // Ensure all mapped qubits can reach a magic state if they need
     std::unordered_set<int> ensured_qubits;
     ensured_qubits.reserve(circuit.getNumQubits());
     for(const Gate& gate : t_gates){
         if(ensured_qubits.count(gate.qubits[0]) != 0) continue;
 
-        int node = get_mapped_node(gate.qubits[0]);
+        int node = mapped_node_after_candidate(gate.qubits[0]);
         if(node < 0){
             ensured_qubits.insert(gate.qubits[0]);
             continue; // Unmapped qubit
         }
         bool canReachMagic = false;
-        for(int magic : graph.get_magic_state_ids()){
+        for(int magic : magic_state_ids){
             if (path_exists(node, magic)) {
                 canReachMagic = true;
                 ensured_qubits.insert(gate.qubits[0]);
