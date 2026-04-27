@@ -157,11 +157,16 @@ public:
         return get_node(id).occupied;
     }
 
+    const bool is_magic(int node_id) const {
+        for(int id : magic_states_ids)
+            if(id == node_id) return true;
+        return false;
+    }
 
     const std::vector<Node> get_occupied_nodes() const {
         std::vector<Node> occupied_nodes;
         for (const Node& node : nodes) {
-            if (node.occupied) {
+            if (node.occupied || is_magic(node.id)) {
                 occupied_nodes.push_back(node);
             }
         }

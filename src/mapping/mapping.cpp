@@ -170,20 +170,15 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
         }
     }
 
+    std::vector<Node> occupied_nodes_after_map = occupied_nodes;
+    occupied_nodes_after_map.push_back(node);
+
     const auto pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
     std::unordered_set<int> used_nodes;
-    used_nodes.reserve(occupied_nodes.size());
-    for(const Node& n : occupied_nodes){
+    used_nodes.reserve(occupied_nodes_after_map.size());
+    for(const Node& n : occupied_nodes_after_map){
         used_nodes.insert(n.id);
     }
-
-    const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
-    std::unordered_set<int> magic_state_set(magic_state_ids.begin(), magic_state_ids.end());
-    if (magic_state_set.count(node.id) > 0) {
-        return false;
-    }
-    used_nodes.insert(magic_state_set.begin(), magic_state_set.end());
-    used_nodes.insert(node.id);
 
     const auto path_exists = [&pathStrategyPtr, &used_nodes](const int start, const int goal) -> bool {
         Path path = pathStrategyPtr->find_shortest_path(start, goal, used_nodes);
@@ -285,7 +280,7 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
         t_gates.end()
     );
 
-    for (const int magic_state_id : magic_state_ids) {
+    for (const int magic_state_id : graph.get_magic_state_ids()) {
         if (!has_escape_path(magic_state_id)) {
             if (PRINT_SAFE_PASSAGE) {
                 std::cout << "CANDIDATE REJECTED " << node.id
@@ -302,20 +297,28 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
     for(const Gate& gate : t_gates){
         if(ensured_qubits.count(gate.qubits[0]) != 0) continue;
 
-        int node = mapped_node_after_candidate(gate.qubits[0]);
-        if(node < 0){
+        int loc_node = mapped_node_after_candidate(gate.qubits[0]);
+        if(loc_node < 0){
             ensured_qubits.insert(gate.qubits[0]);
             continue; // Unmapped qubit
         }
         bool canReachMagic = false;
-        for(int magic : magic_state_ids){
-            if (path_exists(node, magic)) {
+        for(int magic : graph.get_magic_state_ids()){
+            if (path_exists(loc_node, magic)) {
                 canReachMagic = true;
                 ensured_qubits.insert(gate.qubits[0]);
                 break; 
             }
         }
-        if(!canReachMagic) return false;
+        if(!canReachMagic){
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "CANDIDATE REJECTED " << node.id
+                          << ": it blocks magic-state T-gate access for node "
+                          << loc_node << "\n";
+            }
+            return false;
+
+        } 
     }
 
     return true;
