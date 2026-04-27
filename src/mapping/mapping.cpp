@@ -193,45 +193,9 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
         return get_mapped_node(qubit_id);
     };
 
-    const auto is_boundary_node = [this](const int node_id) -> bool {
-        const Node& current = graph.get_node(node_id);
-        return current.coordX == 0 || current.coordX == graph.getMaxX() ||
-               current.coordY == 0 || current.coordY == graph.getMaxY();
+    const auto has_escape_path = [this, &occupied_nodes_after_map](const int node) -> bool {
+        return has_exit_path_from_occupied(graph.get_node(node), occupied_nodes_after_map, graph.getMaxX()+1, graph.getMaxY()+1, safe_passage_ignore_outer_layers);
     };
-
-    const auto has_escape_path = [this, &used_nodes, &is_boundary_node](const int start_node) -> bool {
-        std::queue<int> queue;
-        std::unordered_set<int> visited;
-        visited.insert(start_node);
-
-        for (const int neighbor : graph.neighbors(start_node)) {
-            if (used_nodes.count(neighbor) > 0) {
-                continue;
-            }
-            visited.insert(neighbor);
-            queue.push(neighbor);
-        }
-
-        while (!queue.empty()) {
-            const int current = queue.front();
-            queue.pop();
-
-            if (is_boundary_node(current)) {
-                return true;
-            }
-
-            for (const int neighbor : graph.neighbors(current)) {
-                if (visited.count(neighbor) > 0 || used_nodes.count(neighbor) > 0) {
-                    continue;
-                }
-                visited.insert(neighbor);
-                queue.push(neighbor);
-            }
-        }
-
-        return false;
-    };
-
     std::vector<Gate> min2q_gates = circuit.getGates();
     min2q_gates.erase( // Filter, keep only 2qubit gates
         std::remove_if(min2q_gates.begin(), min2q_gates.end(), 
@@ -279,17 +243,6 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
             }),
         t_gates.end()
     );
-
-    for (const int magic_state_id : graph.get_magic_state_ids()) {
-        if (!has_escape_path(magic_state_id)) {
-            if (PRINT_SAFE_PASSAGE) {
-                std::cout << "CANDIDATE REJECTED " << node.id
-                          << ": it blocks magic-state access for node "
-                          << magic_state_id << "\n";
-            }
-            return false;
-        }
-    }
 
     // Ensure all mapped qubits can reach a magic state if they need
     std::unordered_set<int> ensured_qubits;
