@@ -169,7 +169,7 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
             return false;
         }
     }
-
+    
     std::vector<Node> occupied_nodes_after_map = occupied_nodes;
     occupied_nodes_after_map.push_back(node);
 
@@ -210,20 +210,22 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vect
         const int node1 = mapped_node_after_candidate(gate.qubits[0]);
         const int node2 = mapped_node_after_candidate(gate.qubits[1]);
 
-        if (node1 >= 0) {
-            cnot_nodes_requiring_access.insert(node1);
-        }
-        if (node2 >= 0) {
-            cnot_nodes_requiring_access.insert(node2);
-        }
+        if(node1 < 0 && node2 < 0) continue; // gate fully unmapped
 
         if (node1 >= 0 && node2 >= 0) {
             if (!path_exists(node1, node2)) {
                 return false; // This placement is blocking that gate path
             }
         }
+        else{ // either node1 or node2 are mapped (>= 0)
+            if (node1 >= 0)
+                cnot_nodes_requiring_access.insert(node1);
+            else 
+                cnot_nodes_requiring_access.insert(node2);
+        }
     }
 
+    // Ensure partially mapped CNOTs have escape path
     for (const int mapped_node : cnot_nodes_requiring_access) {
         if (!has_escape_path(mapped_node)) {
             if (PRINT_SAFE_PASSAGE) {
