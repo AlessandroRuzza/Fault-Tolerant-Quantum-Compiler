@@ -1,5 +1,8 @@
+#pragma once
+
 #include <chrono>
 #include <cctype>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
@@ -101,6 +104,28 @@ inline std::string extract_bench_name(const std::string &bench_path_arg) {
         p = p.stem();
     }
     return p.filename().string();
+}
+
+inline bool env_flag_is_truthy(const char *name) {
+    const char *raw_value = std::getenv(name);
+    if (raw_value == nullptr || *raw_value == '\0') {
+        return false;
+    }
+
+    std::string value(raw_value);
+    for (char &c : value) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+
+    return value != "0" && value != "false" && value != "no" && value != "off";
+}
+
+inline bool benchmark_worker_mode_enabled() {
+    return env_flag_is_truthy("FTQC_BENCH_WORKER");
+}
+
+inline bool benchmark_artifacts_enabled() {
+    return !benchmark_worker_mode_enabled();
 }
 
 

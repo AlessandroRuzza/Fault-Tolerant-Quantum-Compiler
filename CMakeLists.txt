@@ -13,6 +13,8 @@ file(GLOB_RECURSE ALL_SRC_FILES CONFIGURE_DEPENDS src/*.cpp)
 add_executable(FaultTolerantQuantumCompiler ${ALL_SRC_FILES})
 add_definitions(-DPROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 
+find_package(OpenMP QUIET)
+
 # ------JSON and Main-------------
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
@@ -32,6 +34,13 @@ target_link_libraries(FaultTolerantQuantumCompiler
   PRIVATE nlohmann_json::nlohmann_json
 )
 
+if (OpenMP_CXX_FOUND)
+    target_link_libraries(FaultTolerantQuantumCompiler PRIVATE OpenMP::OpenMP_CXX)
+    message(STATUS "OpenMP enabled for benchmark parallelism")
+else()
+    message(WARNING "OpenMP not found: benchmark mode will run sequentially")
+endif()
+
 
 # Target to run the main executable (not built/executed by default)
 add_custom_target(run-main
@@ -45,7 +54,7 @@ add_custom_target(run-main
 # make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1]
 add_custom_target(run-bench
     DEPENDS FaultTolerantQuantumCompiler
-    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler> "$$BENCH_PATH" "$$RERUN_TIMEOUTS"
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler>
     COMMENT "Running FaultTolerantQuantumCompiler with --bench_path"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
