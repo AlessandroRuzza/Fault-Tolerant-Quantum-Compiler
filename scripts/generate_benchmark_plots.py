@@ -33,7 +33,55 @@ DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
 OBSOLETE_PLOT_FILENAMES = {
     "13_heatmap_success_safe_vs_placement.png",
     "23_heatmap_success_safe_vs_mapping_type.png",
+    "28_table_top_gaussian_weight_configs.png",
+    "top_gaussian_weight_configs_readable.html",
 }
+OBSOLETE_PLOT_PREFIXES = (
+    "29_table_top_gaussian_weight_configs_",
+)
+REPORT_PLOTS = [
+    ("00_overview_dashboard.png", "Overview dashboard"),
+    ("01_status_and_exit_codes.png", "Run status and exit codes"),
+    ("02_circuit_summary_bars.png", "Circuit-level summary"),
+    ("03_box_routing_by_circuit.png", "Routing steps by circuit"),
+    ("04_box_elapsed_by_circuit.png", "Duration by circuit"),
+    ("05_box_routing_by_placement.png", "Routing by magic placement"),
+    ("06_box_routing_by_safe_passage.png", "Routing by safe passage"),
+    ("07_box_routing_by_magic_strategy.png", "Routing by magic-aware strategy"),
+    ("08_scatter_elapsed_vs_routing_by_circuit.png", "Duration vs routing"),
+    ("09_scatter_density_vs_routing.png", "Density vs routing"),
+    ("10_scatter_magic_states_vs_routing.png", "Magic state parameter vs routing"),
+    ("11_scatter_border_vs_routing_center_circle.png", "Border distance vs routing"),
+    ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
+    (
+        "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
+        "Success heatmap: safe passage x placement (timeouts excluded)",
+    ),
+    ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
+    (
+        "25_heatmap_timeout_safe_vs_placement.png",
+        "Timeout heatmap: safe passage x placement",
+    ),
+    (
+        "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
+        "Success heatmap: safe passage x mapping type (timeouts excluded)",
+    ),
+    ("24_heatmap_routing_safe_vs_mapping_type.png", "Routing heatmap: safe passage x mapping type"),
+    (
+        "26_heatmap_timeout_safe_vs_mapping_type.png",
+        "Timeout heatmap: safe passage x mapping type",
+    ),
+    ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
+    ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
+    ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
+    ("18_experiment_set_routing_magicaware_homogeneous.png", "Experiment set: magic-aware + homogeneous"),
+    ("19_box_routing_by_gaussian_strategy.png", "Routing by gaussian strategy"),
+    ("20_heatmap_routing_gaussian_strategy_vs_placement.png", "Routing heatmap: gaussian strategy x placement"),
+    ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
+    ("30_heatmap_best_gaussian_weight_profiles.png", "Best gaussian weight profile map"),
+    ("31_heatmap_best_gaussian_weight_value_counts.png", "Best gaussian weight value counts"),
+    ("22_experiment_set_routing_all_mappings.png", "Experiment set: all mappings"),
+]
 STATUS_DISPLAY_LABELS = {
     "ok": "ok",
     "ok_no_routing_metric": "ok (no routing metric)",
@@ -631,8 +679,29 @@ def save_fig(fig, output_dir, filename, generated):
     generated.append(path)
 
 
+def record_skipped_plot(skipped, filename, reason):
+    if skipped is None:
+        return
+    skipped.append({"filename": filename, "reason": reason})
+
+
+def compact_labels(labels, limit=8):
+    labels = [str(label) for label in labels if str(label).strip()]
+    if not labels:
+        return "none"
+    if len(labels) <= limit:
+        return ", ".join(labels)
+    return ", ".join(labels[:limit]) + f", ... (+{len(labels) - limit} more)"
+
+
 def remove_obsolete_plots(output_dir):
-    for filename in OBSOLETE_PLOT_FILENAMES:
+    filenames = set(OBSOLETE_PLOT_FILENAMES)
+    if os.path.isdir(output_dir):
+        for filename in os.listdir(output_dir):
+            if any(filename.startswith(prefix) for prefix in OBSOLETE_PLOT_PREFIXES):
+                filenames.add(filename)
+
+    for filename in filenames:
         path = os.path.join(output_dir, filename)
         if not os.path.exists(path):
             continue
@@ -778,7 +847,18 @@ def plot_status_and_exit(rows, output_dir, generated):
     save_fig(fig, output_dir, "01_status_and_exit_codes.png", generated)
 
 
-def boxplot_by_category(rows, category_key, value_key, title, ylabel, filename, output_dir, generated, min_points=2):
+def boxplot_by_category(
+    rows,
+    category_key,
+    value_key,
+    title,
+    ylabel,
+    filename,
+    output_dir,
+    generated,
+    skipped=None,
+    min_points=2,
+):
     grouped = defaultdict(list)
     for r in rows:
         cat = r.get(category_key, "unknown")
@@ -791,6 +871,15 @@ def boxplot_by_category(rows, category_key, value_key, title, ylabel, filename, 
 
     labels = [k for k in sorted(grouped.keys()) if len(grouped[k]) >= min_points]
     if not labels:
+        if grouped:
+            categories = compact_labels(sorted(grouped.keys()))
+            reason = (
+                f"no category has at least {min_points} valid {value_key} values; "
+                f"available categories: {categories}"
+            )
+        else:
+            reason = f"no rows with valid numeric {value_key}"
+        record_skipped_plot(skipped, filename, reason)
         return
 
     values = [grouped[k] for k in labels]
@@ -803,7 +892,19 @@ def boxplot_by_category(rows, category_key, value_key, title, ylabel, filename, 
     save_fig(fig, output_dir, filename, generated)
 
 
-def scatter_plot(rows, x_key, y_key, color_key, title, xlabel, ylabel, filename, output_dir, generated):
+def scatter_plot(
+    rows,
+    x_key,
+    y_key,
+    color_key,
+    title,
+    xlabel,
+    ylabel,
+    filename,
+    output_dir,
+    generated,
+    skipped=None,
+):
     points = []
     for r in rows:
         x = r.get(x_key)
@@ -817,6 +918,11 @@ def scatter_plot(rows, x_key, y_key, color_key, title, xlabel, ylabel, filename,
         points.append((x, y, str(r.get(color_key, "unknown"))))
 
     if not points:
+        record_skipped_plot(
+            skipped,
+            filename,
+            f"no rows with valid numeric {x_key} and {y_key}",
+        )
         return
 
     labels = sorted({p[2] for p in points})
@@ -841,7 +947,7 @@ def scatter_plot(rows, x_key, y_key, color_key, title, xlabel, ylabel, filename,
     save_fig(fig, output_dir, filename, generated)
 
 
-def plot_gaussian_weight_combinations(rows, output_dir, generated):
+def plot_gaussian_weight_combinations(rows, output_dir, generated, skipped=None):
     gaussian_rows = []
     combo_labels = {}
     for row in rows:
@@ -857,6 +963,11 @@ def plot_gaussian_weight_combinations(rows, output_dir, generated):
         combo_labels[combo_label] = combo
 
     if not gaussian_rows:
+        record_skipped_plot(
+            skipped,
+            "21_box_gaussian_weight_combinations_vs_routing.png",
+            "no gaussian rows with complete gaussian weights and routing_steps",
+        )
         return
 
     ordered_labels = [
@@ -867,6 +978,11 @@ def plot_gaussian_weight_combinations(rows, output_dir, generated):
         for combo_label in ordered_labels
     ]
     if not any(value_groups):
+        record_skipped_plot(
+            skipped,
+            "21_box_gaussian_weight_combinations_vs_routing.png",
+            "gaussian weight combinations were found, but no routing_steps values were plottable",
+        )
         return
 
     display_labels = [
@@ -927,6 +1043,490 @@ def plot_gaussian_weight_combinations(rows, output_dir, generated):
         ax.legend(title="gaussian strategy", fontsize=8)
 
     save_fig(fig, output_dir, "21_box_gaussian_weight_combinations_vs_routing.png", generated)
+
+
+def gaussian_weight_config_label(config, multiline=False, verbose=False):
+    magic_high, magic_low, cnot_high, cnot_low, mapped_weight, base_weight = config
+    separator = "\n" if multiline else " | "
+    if verbose:
+        return separator.join(
+            [
+                f"magic H/L {format_number_label(magic_high)}/{format_number_label(magic_low)}",
+                f"CNOT H/L {format_number_label(cnot_high)}/{format_number_label(cnot_low)}",
+                f"gauss map/base {format_number_label(mapped_weight)}/{format_number_label(base_weight)}",
+            ]
+        )
+    return separator.join(
+        [
+            f"M {format_number_label(magic_high)}/{format_number_label(magic_low)}",
+            f"C {format_number_label(cnot_high)}/{format_number_label(cnot_low)}",
+            f"G {format_number_label(mapped_weight)}/{format_number_label(base_weight)}",
+        ]
+    )
+
+
+def top_gaussian_weight_config_entries(rows, top_n=3):
+    grouped = defaultdict(lambda: defaultdict(list))
+
+    for row in rows:
+        if row.get("mapping_type_norm") != "gaussian":
+            continue
+        if not row.get("success") or row.get("routing_steps_f") is None:
+            continue
+        x_key = requested_x_key(row)
+        combo = gaussian_weight_tuple(row)
+        if x_key is None or combo is None:
+            continue
+        grouped[x_key][combo].append(row)
+
+    entries = []
+    grouped_ranked_entries = []
+    for x_key in sorted(grouped.keys(), key=lambda item: (item[0], item[1], item[2])):
+        config_metrics = []
+        for combo, config_rows in grouped[x_key].items():
+            routing_values = [row["routing_steps_f"] for row in config_rows]
+            duration_values = [
+                row["duration_s_f"]
+                for row in config_rows
+                if row.get("duration_s_f") is not None
+            ]
+            best_routing = min(routing_values)
+            best_rows = [
+                row for row in config_rows
+                if row.get("routing_steps_f") == best_routing
+            ]
+            best_duration_values = [
+                row["duration_s_f"]
+                for row in best_rows
+                if row.get("duration_s_f") is not None
+            ]
+            config_metrics.append(
+                {
+                    "combo": combo,
+                    "best_routing_steps": best_routing,
+                    "mean_routing_steps": float(np.mean(routing_values)),
+                    "median_routing_steps": float(np.median(routing_values)),
+                    "sample_count": len(config_rows),
+                    "best_run_count": len(best_rows),
+                    "best_duration_seconds": min(best_duration_values) if best_duration_values else None,
+                    "mean_duration_seconds": float(np.mean(duration_values)) if duration_values else None,
+                }
+            )
+
+        if not config_metrics:
+            continue
+
+        config_metrics.sort(
+            key=lambda item: (
+                item["best_routing_steps"],
+                item["mean_routing_steps"],
+                item["best_duration_seconds"] if item["best_duration_seconds"] is not None else math.inf,
+                item["combo"],
+            )
+        )
+        best_routing = config_metrics[0]["best_routing_steps"]
+        tied_best_config_count = sum(
+            1 for item in config_metrics
+            if item["best_routing_steps"] == best_routing
+        )
+        ranked_entries = []
+
+        for rank, metric in enumerate(config_metrics[:top_n], start=1):
+            combo = metric["combo"]
+            magic_high, magic_low, cnot_high, cnot_low, mapped_weight, base_weight = combo
+            entry = {
+                "circuit_graph_label": requested_x_label(x_key),
+                "circuit": x_key[0],
+                "graph_x": x_key[1],
+                "graph_y": x_key[2],
+                "rank": rank,
+                "configs_tied_for_best_routing": tied_best_config_count,
+                "best_routing_steps": metric["best_routing_steps"],
+                "mean_routing_steps": metric["mean_routing_steps"],
+                "median_routing_steps": metric["median_routing_steps"],
+                "sample_count": metric["sample_count"],
+                "best_run_count": metric["best_run_count"],
+                "best_duration_seconds": metric["best_duration_seconds"],
+                "mean_duration_seconds": metric["mean_duration_seconds"],
+                "magic_high": magic_high,
+                "magic_low": magic_low,
+                "cnot_high": cnot_high,
+                "cnot_low": cnot_low,
+                "mapped_gaussian_weight": mapped_weight,
+                "base_gaussian_weight": base_weight,
+                "weight_config": gaussian_weight_config_label(combo),
+            }
+            entries.append(entry)
+            ranked_entries.append(entry)
+
+        grouped_ranked_entries.append(
+            {
+                "x_key": x_key,
+                "label": requested_x_label(x_key),
+                "best_routing_steps": best_routing,
+                "configs_tied_for_best_routing": tied_best_config_count,
+                "entries": ranked_entries,
+            }
+        )
+
+    return entries, grouped_ranked_entries
+
+
+def write_top_gaussian_weight_config_table(entries, output_dir, filename):
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, filename)
+    fieldnames = [
+        "circuit_graph_label",
+        "circuit",
+        "graph_x",
+        "graph_y",
+        "rank",
+        "configs_tied_for_best_routing",
+        "best_routing_steps",
+        "mean_routing_steps",
+        "median_routing_steps",
+        "sample_count",
+        "best_run_count",
+        "best_duration_seconds",
+        "mean_duration_seconds",
+        "magic_high",
+        "magic_low",
+        "cnot_high",
+        "cnot_low",
+        "mapped_gaussian_weight",
+        "base_gaussian_weight",
+        "weight_config",
+    ]
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(entries)
+
+    return entries, csv_path
+
+
+def best_gaussian_weight_profile_entries(top_gaussian_weight_entries):
+    best_entries = [
+        entry for entry in top_gaussian_weight_entries
+        if entry.get("rank") == 1
+    ]
+    return sorted(
+        best_entries,
+        key=lambda entry: (
+            entry["circuit"],
+            entry["graph_x"],
+            entry["graph_y"],
+        ),
+    )
+
+
+def write_best_gaussian_weight_profile_table(entries, output_dir, filename):
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, filename)
+    fieldnames = [
+        "circuit_graph_label",
+        "circuit",
+        "graph_x",
+        "graph_y",
+        "best_routing_steps",
+        "mean_routing_steps",
+        "configs_tied_for_best_routing",
+        "sample_count",
+        "magic_high",
+        "magic_low",
+        "cnot_high",
+        "cnot_low",
+        "mapped_gaussian_weight",
+        "base_gaussian_weight",
+        "weight_config",
+    ]
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for entry in entries:
+            writer.writerow({field: entry.get(field, "") for field in fieldnames})
+    return entries, csv_path
+
+
+def plot_best_gaussian_weight_profile_heatmap(entries, output_dir, generated, skipped=None):
+    filename = "30_heatmap_best_gaussian_weight_profiles.png"
+    if not entries:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no ranked gaussian weight configurations available",
+        )
+        return
+
+    weight_columns = [
+        ("magic\nhigh", "magic_high"),
+        ("magic\nlow", "magic_low"),
+        ("CNOT\nhigh", "cnot_high"),
+        ("CNOT\nlow", "cnot_low"),
+        ("gauss\nmapped", "mapped_gaussian_weight"),
+        ("gauss\nbase", "base_gaussian_weight"),
+    ]
+    data = np.array(
+        [
+            [float(entry[field]) for _, field in weight_columns]
+            for entry in entries
+        ],
+        dtype=float,
+    )
+    row_labels = [
+        (
+            f"{entry['circuit']} {entry['graph_x']}x{entry['graph_y']}"
+            f"   r={format_number_label(entry['best_routing_steps'])}"
+            f"   ties={entry['configs_tied_for_best_routing']}"
+        )
+        for entry in entries
+    ]
+
+    fig_height = max(11, 1.8 + len(entries) * 0.31)
+    fig, ax = plt.subplots(figsize=(13.5, fig_height))
+    fig.subplots_adjust(left=0.42, right=0.92, top=0.93, bottom=0.06)
+    image = ax.imshow(data, aspect="auto", cmap="YlGnBu")
+
+    ax.set_title(
+        "Best Gaussian Weight Profile per Circuit x Dimension",
+        fontsize=15,
+        pad=18,
+    )
+    ax.set_xticks(range(len(weight_columns)))
+    ax.set_xticklabels([label for label, _ in weight_columns], fontsize=9)
+    ax.xaxis.tick_top()
+    ax.set_yticks(range(len(entries)))
+    ax.set_yticklabels(row_labels, fontsize=7.2)
+    ax.tick_params(axis="both", length=0)
+    ax.tick_params(axis="x", labeltop=True, labelbottom=False, pad=8)
+    ax.set_xticks(np.arange(-0.5, len(weight_columns), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(entries), 1), minor=True)
+    ax.grid(which="minor", color="white", linewidth=1.2)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    norm = image.norm
+    for row_idx, entry in enumerate(entries):
+        for col_idx, (_, field) in enumerate(weight_columns):
+            value = float(entry[field])
+            text_color = "white" if norm(value) > 0.58 else "#0F172A"
+            ax.text(
+                col_idx,
+                row_idx,
+                format_number_label(value),
+                ha="center",
+                va="center",
+                fontsize=8,
+                color=text_color,
+                fontweight="bold",
+            )
+
+    for row_idx in range(1, len(entries)):
+        if entries[row_idx]["circuit"] != entries[row_idx - 1]["circuit"]:
+            ax.axhline(row_idx - 0.5, color="#0F172A", linewidth=1.1)
+
+    cbar = fig.colorbar(image, ax=ax, fraction=0.035, pad=0.03)
+    cbar.ax.tick_params(labelsize=8)
+    cbar.set_label("weight value", fontsize=9)
+
+    save_fig(fig, output_dir, filename, generated)
+
+
+def gaussian_weight_value_count_entries(best_profile_entries):
+    weight_columns = [
+        ("magic high", "magic_high"),
+        ("magic low", "magic_low"),
+        ("CNOT high", "cnot_high"),
+        ("CNOT low", "cnot_low"),
+        ("gauss mapped", "mapped_gaussian_weight"),
+        ("gauss base", "base_gaussian_weight"),
+    ]
+    values = sorted(
+        {
+            float(entry[field])
+            for entry in best_profile_entries
+            for _, field in weight_columns
+        }
+    )
+    counts = Counter()
+    for entry in best_profile_entries:
+        for label, field in weight_columns:
+            counts[(label, float(entry[field]))] += 1
+
+    total = len(best_profile_entries)
+    entries = []
+    for label, field in weight_columns:
+        for value in values:
+            count = counts[(label, value)]
+            entries.append(
+                {
+                    "weight_parameter": label,
+                    "weight_value": value,
+                    "best_count": count,
+                    "best_percentage": (100.0 * count / total) if total else 0.0,
+                }
+            )
+    return entries
+
+
+def write_gaussian_weight_value_count_table(entries, output_dir, filename):
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, filename)
+    fieldnames = [
+        "weight_parameter",
+        "weight_value",
+        "best_count",
+        "best_percentage",
+    ]
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(entries)
+    return entries, csv_path
+
+
+def plot_gaussian_weight_value_count_heatmap(entries, output_dir, generated, skipped=None):
+    filename = "31_heatmap_best_gaussian_weight_value_counts.png"
+    if not entries:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no best gaussian weight profile rows available",
+        )
+        return
+
+    row_labels = []
+    for entry in entries:
+        label = entry["weight_parameter"]
+        if label not in row_labels:
+            row_labels.append(label)
+
+    values = sorted({float(entry["weight_value"]) for entry in entries})
+    counts_by_pair = {
+        (entry["weight_parameter"], float(entry["weight_value"])): int(entry["best_count"])
+        for entry in entries
+    }
+    matrix = np.array(
+        [
+            [counts_by_pair.get((label, value), 0) for value in values]
+            for label in row_labels
+        ],
+        dtype=float,
+    )
+
+    fig_width = max(9, 1.1 + len(values) * 0.62)
+    fig, ax = plt.subplots(figsize=(fig_width, 4.8))
+    fig.subplots_adjust(left=0.18, right=0.92, top=0.82, bottom=0.16)
+    image = ax.imshow(matrix, aspect="auto", cmap="YlOrRd", vmin=0)
+    total_profiles = int(np.max(np.sum(matrix, axis=1))) if matrix.size else 0
+
+    ax.set_title(
+        f"How Often Each Gaussian Weight Value Is Best (n={total_profiles})",
+        fontsize=14,
+        pad=18,
+    )
+    ax.set_xlabel("weight value")
+    ax.set_ylabel("weight parameter")
+    ax.set_xticks(range(len(values)))
+    ax.set_xticklabels([format_number_label(value) for value in values], fontsize=9)
+    ax.set_yticks(range(len(row_labels)))
+    ax.set_yticklabels(row_labels, fontsize=9)
+    ax.set_xticks(np.arange(-0.5, len(values), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(row_labels), 1), minor=True)
+    ax.grid(which="minor", color="white", linewidth=1.3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    ax.tick_params(axis="both", length=0)
+
+    max_count = float(np.max(matrix)) if matrix.size else 0.0
+    for row_idx, label in enumerate(row_labels):
+        for col_idx, value in enumerate(values):
+            count = counts_by_pair.get((label, value), 0)
+            if count == 0:
+                display = ""
+                text_color = "#64748B"
+            else:
+                display = str(count)
+                text_color = "white" if max_count and count / max_count > 0.55 else "#0F172A"
+            ax.text(
+                col_idx,
+                row_idx,
+                display,
+                ha="center",
+                va="center",
+                fontsize=9,
+                color=text_color,
+                fontweight="bold" if count else "normal",
+            )
+
+    cbar = fig.colorbar(image, ax=ax, fraction=0.045, pad=0.025)
+    cbar.ax.tick_params(labelsize=8)
+    cbar.set_label("best count", fontsize=9)
+
+    save_fig(fig, output_dir, filename, generated)
+
+
+def plot_top_gaussian_weight_config_table(grouped_ranked_entries, output_dir, generated, skipped=None):
+    filename = "28_table_top_gaussian_weight_configs.png"
+    if not grouped_ranked_entries:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no gaussian successful rows with complete weight configurations",
+        )
+        return
+
+    headers = ["circuit x dim", "best\nrouting", "# cfg\nsame best", "1st config", "2nd config", "3rd config"]
+    table_rows = []
+    for group in grouped_ranked_entries:
+        cells = [
+            group["label"],
+            format_number_label(group["best_routing_steps"]),
+            str(group["configs_tied_for_best_routing"]),
+        ]
+        for entry in group["entries"][:3]:
+            cell = (
+                f"routing {format_number_label(entry['best_routing_steps'])}"
+                f" (avg {entry['mean_routing_steps']:.1f}, n={entry['sample_count']})\n"
+                f"{gaussian_weight_config_label((entry['magic_high'], entry['magic_low'], entry['cnot_high'], entry['cnot_low'], entry['mapped_gaussian_weight'], entry['base_gaussian_weight']), multiline=True, verbose=True)}"
+            )
+            cells.append(cell)
+        while len(cells) < len(headers):
+            cells.append("")
+        table_rows.append(cells)
+
+    fig_height = max(9, 1.0 + len(table_rows) * 0.43)
+    fig, ax = plt.subplots(figsize=(22, fig_height))
+    fig.subplots_adjust(top=0.90, bottom=0.02, left=0.01, right=0.99)
+    ax.axis("off")
+    fig.suptitle(
+        "Top Gaussian Weight Configurations by Circuit x Graph Dimensions",
+        fontsize=15,
+        y=0.985,
+    )
+    table = ax.table(
+        cellText=table_rows,
+        colLabels=headers,
+        cellLoc="left",
+        colLoc="left",
+        loc="center",
+        colWidths=[0.22, 0.06, 0.08, 0.21, 0.21, 0.21],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(7.2)
+    table.scale(1.0, 2.25)
+
+    for (row_idx, col_idx), cell in table.get_celld().items():
+        cell.set_edgecolor("#CBD5E1")
+        cell.set_linewidth(0.55)
+        if row_idx == 0:
+            cell.set_facecolor("#E2E8F0")
+            cell.set_text_props(weight="bold", color="#0F172A")
+            continue
+        cell.set_facecolor("#F8FAFC" if row_idx % 2 == 0 else "white")
+        if col_idx in {1, 2}:
+            cell.set_text_props(ha="center")
+
+    save_fig(fig, output_dir, filename, generated)
 
 
 def requested_x_key(row):
@@ -1148,9 +1748,15 @@ def plot_requested_grouped_scatter(
     filename,
     output_dir,
     generated,
+    skipped=None,
 ):
     aggregated = aggregate_series_values(rows, build_series_key)
     if not aggregated[0]:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no successful rows with routing_steps matched the requested mapping/safe-passage/placement filters",
+        )
         return
 
     x_keys_sorted, x_labels, mean_by_pair, count_by_pair = aggregated
@@ -1160,6 +1766,11 @@ def plot_requested_grouped_scatter(
         if any((x_key, series_key) in mean_by_pair for x_key in x_keys_sorted)
     ]
     if not available_series:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "requested series were defined, but none have plottable routing_steps values",
+        )
         return
 
     x_positions = np.arange(len(x_labels), dtype=float)
@@ -1337,7 +1948,7 @@ def requested_series_order_all_mappings():
     return ordered
 
 
-def plot_requested_comparisons(rows_success_with_routing, output_dir, generated):
+def plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped=None):
     plot_requested_grouped_scatter(
         rows_success_with_routing,
         build_series_key_requested_gaussian_vs_homogeneous,
@@ -1346,6 +1957,7 @@ def plot_requested_comparisons(rows_success_with_routing, output_dir, generated)
         "17_experiment_set_routing_gaussian_homogeneous.png",
         output_dir,
         generated,
+        skipped,
     )
     plot_requested_grouped_scatter(
         rows_success_with_routing,
@@ -1355,6 +1967,7 @@ def plot_requested_comparisons(rows_success_with_routing, output_dir, generated)
         "18_experiment_set_routing_magicaware_homogeneous.png",
         output_dir,
         generated,
+        skipped,
     )
     plot_requested_grouped_scatter(
         rows_success_with_routing,
@@ -1364,6 +1977,7 @@ def plot_requested_comparisons(rows_success_with_routing, output_dir, generated)
         "22_experiment_set_routing_all_mappings.png",
         output_dir,
         generated,
+        skipped,
     )
 
 
@@ -1377,12 +1991,18 @@ def make_pair_heatmap(
     filename,
     output_dir,
     generated,
+    skipped=None,
     value_format="{:.2f}",
     subset_transform=None,
 ):
     row_labels = sorted({heatmap_axis_value(r, row_key) for r in rows})
     col_labels = sorted({heatmap_axis_value(r, col_key) for r in rows})
     if not row_labels or not col_labels:
+        record_skipped_plot(
+            skipped,
+            filename,
+            f"no rows available for heatmap axes {row_key} x {col_key}",
+        )
         return
 
     matrix = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
@@ -1608,6 +2228,64 @@ def best_mapping_table_entries_exit0_only(rows):
     return build_best_mapping_entries(exit0_by_group, exit0_with_routing_by_group)
 
 
+def best_gaussian_execution_entries(rows):
+    grouped = defaultdict(list)
+
+    for row in rows:
+        if row.get("mapping_type_norm") != "gaussian":
+            continue
+        if not row.get("success") or row.get("routing_steps_f") is None:
+            continue
+        x_key = requested_x_key(row)
+        if x_key is None:
+            continue
+        grouped[x_key].append(row)
+
+    entries = []
+    for x_key in sorted(grouped.keys(), key=lambda item: (item[0], item[1], item[2])):
+        candidates = grouped[x_key]
+        sorted_candidates = sorted(
+            candidates,
+            key=lambda row: (
+                row["routing_steps_f"],
+                row["duration_s_f"] if row.get("duration_s_f") is not None else math.inf,
+                to_int(row.get("run_id")) if to_int(row.get("run_id")) is not None else math.inf,
+            ),
+        )
+        best = sorted_candidates[0]
+        best_routing_steps = best["routing_steps_f"]
+        tied_best_count = sum(
+            1 for row in candidates if row.get("routing_steps_f") == best_routing_steps
+        )
+
+        entries.append(
+            {
+                "circuit_graph_label": requested_x_label(x_key),
+                "circuit": x_key[0],
+                "graph_x": x_key[1],
+                "graph_y": x_key[2],
+                "run_id": best.get("run_id", ""),
+                "routing_steps": best_routing_steps,
+                "duration_seconds": best.get("duration_s_f"),
+                "tied_best_count": tied_best_count,
+                "safe_passage": best.get("safe_passage_norm", "") or "n/a",
+                "magic_placement": best.get("placement_detail", "") or "n/a",
+                "border_distance_percentage": best.get("border_pct_f"),
+                "number_of_magic_states": best.get("magic_states_f"),
+                "gaussian_strategy": best.get("gaussian_strategy_norm", "") or "n/a",
+                "magic_high": best.get("magic_high_f"),
+                "magic_low": best.get("magic_low_f"),
+                "cnot_high": best.get("cnot_high_f"),
+                "cnot_low": best.get("cnot_low_f"),
+                "mapped_gaussian_weight": best.get("mapped_gaussian_weight_f"),
+                "base_gaussian_weight": best.get("base_gaussian_weight_f"),
+                "routing_strategy": best.get("routing_strategy", "") or "n/a",
+            }
+        )
+
+    return entries
+
+
 def write_best_mapping_table(entries, output_dir, filename):
     os.makedirs(output_dir, exist_ok=True)
     csv_path = os.path.join(output_dir, filename)
@@ -1632,7 +2310,41 @@ def write_best_mapping_table(entries, output_dir, filename):
     return entries, csv_path
 
 
-def write_summary(rows, csv_files, output_dir, generated, distinct_info=None):
+def write_best_gaussian_execution_table(entries, output_dir, filename):
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, filename)
+    fieldnames = [
+        "circuit_graph_label",
+        "circuit",
+        "graph_x",
+        "graph_y",
+        "run_id",
+        "routing_steps",
+        "duration_seconds",
+        "tied_best_count",
+        "safe_passage",
+        "magic_placement",
+        "border_distance_percentage",
+        "number_of_magic_states",
+        "gaussian_strategy",
+        "magic_high",
+        "magic_low",
+        "cnot_high",
+        "cnot_low",
+        "mapped_gaussian_weight",
+        "base_gaussian_weight",
+        "routing_strategy",
+    ]
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(entries)
+
+    return entries, csv_path
+
+
+def write_summary(rows, csv_files, output_dir, generated, skipped=None, distinct_info=None):
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, "summary.txt")
 
@@ -1709,10 +2421,24 @@ def write_summary(rows, csv_files, output_dir, generated, distinct_info=None):
         for p in generated:
             f.write(f"  - {p}\n")
 
+        if skipped:
+            f.write("\nSkipped plots:\n")
+            for item in skipped:
+                f.write(f"  - {item['filename']}: {item['reason']}\n")
+
 
 def write_report_markdown(
     output_dir,
     generated,
+    skipped,
+    top_gaussian_weight_entries,
+    top_gaussian_weight_csv_path,
+    best_gaussian_weight_profile_entries,
+    best_gaussian_weight_profile_csv_path,
+    gaussian_weight_value_count_entries,
+    gaussian_weight_value_count_csv_path,
+    best_gaussian_execution_entries,
+    best_gaussian_execution_csv_path,
     best_mapping_entries,
     best_mapping_csv_path,
     best_mapping_exit0_entries,
@@ -1720,58 +2446,46 @@ def write_report_markdown(
 ):
     report_path = os.path.join(output_dir, "report.md")
     by_name = {os.path.basename(p): p for p in generated}
-
-    ordered = [
-        ("00_overview_dashboard.png", "Overview dashboard"),
-        ("01_status_and_exit_codes.png", "Run status and exit codes"),
-        ("02_circuit_summary_bars.png", "Circuit-level summary"),
-        ("03_box_routing_by_circuit.png", "Routing steps by circuit"),
-        ("04_box_elapsed_by_circuit.png", "Duration by circuit"),
-        ("05_box_routing_by_placement.png", "Routing by magic placement"),
-        ("06_box_routing_by_safe_passage.png", "Routing by safe passage"),
-        ("07_box_routing_by_magic_strategy.png", "Routing by magic-aware strategy"),
-        ("08_scatter_elapsed_vs_routing_by_circuit.png", "Duration vs routing"),
-        ("09_scatter_density_vs_routing.png", "Density vs routing"),
-        ("10_scatter_magic_states_vs_routing.png", "Magic state parameter vs routing"),
-        ("11_scatter_border_vs_routing_center_circle.png", "Border distance vs routing"),
-        ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
-        (
-            "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
-            "Success heatmap: safe passage x placement (timeouts excluded)",
-        ),
-        ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
-        (
-            "25_heatmap_timeout_safe_vs_placement.png",
-            "Timeout heatmap: safe passage x placement",
-        ),
-        (
-            "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
-            "Success heatmap: safe passage x mapping type (timeouts excluded)",
-        ),
-        ("24_heatmap_routing_safe_vs_mapping_type.png", "Routing heatmap: safe passage x mapping type"),
-        (
-            "26_heatmap_timeout_safe_vs_mapping_type.png",
-            "Timeout heatmap: safe passage x mapping type",
-        ),
-        ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
-        ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
-        ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
-        ("18_experiment_set_routing_magicaware_homogeneous.png", "Experiment set: magic-aware + homogeneous"),
-        ("19_box_routing_by_gaussian_strategy.png", "Routing by gaussian strategy"),
-        ("20_heatmap_routing_gaussian_strategy_vs_placement.png", "Routing heatmap: gaussian strategy x placement"),
-        ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
-        ("22_experiment_set_routing_all_mappings.png", "Experiment set: all mappings"),
-    ]
+    skipped_by_name = {item["filename"]: item["reason"] for item in (skipped or [])}
 
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("# Benchmark Charts\n\n")
         f.write("Generated plot set from benchmark CSV files.\n\n")
         f.write("See also `summary.txt` for aggregate metrics.\n\n")
-        for filename, caption in ordered:
+        for filename, caption in REPORT_PLOTS:
             if filename not in by_name:
                 continue
             f.write(f"## {caption}\n\n")
             f.write(f"![{caption}]({filename})\n\n")
+
+        if skipped_by_name:
+            f.write("## Skipped Plots\n\n")
+            for filename, caption in REPORT_PLOTS:
+                if filename not in skipped_by_name:
+                    continue
+                f.write(f"- `{filename}` ({caption}): {skipped_by_name[filename]}\n")
+            f.write("\n")
+
+        if top_gaussian_weight_entries:
+            csv_name = os.path.basename(top_gaussian_weight_csv_path)
+            profile_csv_name = os.path.basename(best_gaussian_weight_profile_csv_path)
+            count_csv_name = os.path.basename(gaussian_weight_value_count_csv_path)
+            f.write("## Top Gaussian Weight Configurations\n\n")
+            f.write(
+                "Top 3 gaussian weight configurations per `circuit x graph-dimensions`. "
+                "Each configuration is ranked by its best observed `routing_steps`, then "
+                "by mean routing steps across the successful runs that used the same "
+                "weight tuple.\n\n"
+            )
+            if best_gaussian_weight_profile_entries:
+                f.write(
+                    f"Readable best-profile CSV export: `{profile_csv_name}`\n\n"
+                )
+            if gaussian_weight_value_count_entries:
+                f.write(
+                    f"Best weight-value count CSV export: `{count_csv_name}`\n\n"
+                )
+            f.write(f"CSV export: `{csv_name}`\n\n")
 
         if best_mapping_entries:
             csv_name = os.path.basename(best_mapping_csv_path)
@@ -1883,6 +2597,7 @@ def main():
     remove_obsolete_plots(output_dir)
 
     generated = []
+    skipped = []
 
     plot_overview_dashboard(rows, output_dir, generated)
     plot_status_and_exit(rows, output_dir, generated)
@@ -1908,6 +2623,7 @@ def main():
         "03_box_routing_by_circuit.png",
         output_dir,
         generated,
+        skipped,
     )
     boxplot_by_category(
         rows,
@@ -1918,6 +2634,7 @@ def main():
         "04_box_elapsed_by_circuit.png",
         output_dir,
         generated,
+        skipped,
     )
     boxplot_by_category(
         rows_success_with_routing,
@@ -1928,6 +2645,7 @@ def main():
         "05_box_routing_by_placement.png",
         output_dir,
         generated,
+        skipped,
     )
     boxplot_by_category(
         rows_success_with_routing,
@@ -1938,6 +2656,7 @@ def main():
         "06_box_routing_by_safe_passage.png",
         output_dir,
         generated,
+        skipped,
     )
     boxplot_by_category(
         rows_magicaware_with_routing,
@@ -1948,6 +2667,7 @@ def main():
         "07_box_routing_by_magic_strategy.png",
         output_dir,
         generated,
+        skipped,
     )
     boxplot_by_category(
         rows_gaussian_with_routing,
@@ -1958,6 +2678,7 @@ def main():
         "19_box_routing_by_gaussian_strategy.png",
         output_dir,
         generated,
+        skipped,
     )
 
     scatter_plot(
@@ -1971,6 +2692,7 @@ def main():
         "08_scatter_elapsed_vs_routing_by_circuit.png",
         output_dir,
         generated,
+        skipped,
     )
     scatter_plot(
         rows_success_with_routing,
@@ -1983,6 +2705,7 @@ def main():
         "09_scatter_density_vs_routing.png",
         output_dir,
         generated,
+        skipped,
     )
     scatter_plot(
         rows_success_with_routing,
@@ -1995,6 +2718,7 @@ def main():
         "10_scatter_magic_states_vs_routing.png",
         output_dir,
         generated,
+        skipped,
     )
 
     center_circle_ok = [
@@ -2012,6 +2736,7 @@ def main():
         "11_scatter_border_vs_routing_center_circle.png",
         output_dir,
         generated,
+        skipped,
     )
 
     scatter_plot(
@@ -2025,6 +2750,7 @@ def main():
         "12_scatter_pressure_vs_elapsed.png",
         output_dir,
         generated,
+        skipped,
     )
 
     make_pair_heatmap(
@@ -2037,6 +2763,7 @@ def main():
         "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
         output_dir,
         generated,
+        skipped,
         value_format="{:.1f}",
         subset_transform=exclude_timeout_rows,
     )
@@ -2050,6 +2777,7 @@ def main():
         "14_heatmap_routing_safe_vs_placement.png",
         output_dir,
         generated,
+        skipped,
     )
     make_pair_heatmap(
         rows,
@@ -2061,6 +2789,7 @@ def main():
         "25_heatmap_timeout_safe_vs_placement.png",
         output_dir,
         generated,
+        skipped,
         value_format="{:.0f}",
     )
     make_pair_heatmap(
@@ -2073,6 +2802,7 @@ def main():
         "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
         output_dir,
         generated,
+        skipped,
         value_format="{:.1f}",
         subset_transform=exclude_timeout_rows,
     )
@@ -2086,6 +2816,7 @@ def main():
         "24_heatmap_routing_safe_vs_mapping_type.png",
         output_dir,
         generated,
+        skipped,
     )
     make_pair_heatmap(
         rows,
@@ -2097,6 +2828,7 @@ def main():
         "26_heatmap_timeout_safe_vs_mapping_type.png",
         output_dir,
         generated,
+        skipped,
         value_format="{:.0f}",
     )
     make_pair_heatmap(
@@ -2109,6 +2841,7 @@ def main():
         "15_heatmap_routing_magic_vs_safe.png",
         output_dir,
         generated,
+        skipped,
     )
     make_pair_heatmap(
         rows_gaussian_with_routing,
@@ -2120,6 +2853,7 @@ def main():
         "20_heatmap_routing_gaussian_strategy_vs_placement.png",
         output_dir,
         generated,
+        skipped,
     )
     make_pair_heatmap(
         rows,
@@ -2131,11 +2865,55 @@ def main():
         "16_heatmap_success_by_grid_xy.png",
         output_dir,
         generated,
+        skipped,
         value_format="{:.0f}",
     )
-    plot_requested_comparisons(rows_success_with_routing, output_dir, generated)
-    plot_gaussian_weight_combinations(rows_gaussian_with_routing, output_dir, generated)
+    plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped)
+    plot_gaussian_weight_combinations(rows_gaussian_with_routing, output_dir, generated, skipped)
+    top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
+        rows,
+        top_n=3,
+    )
+    top_gaussian_weight_entries, top_gaussian_weight_csv_path = write_top_gaussian_weight_config_table(
+        top_gaussian_weight_entries,
+        output_dir,
+        "top_gaussian_weight_configs_by_circuit_dimension.csv",
+    )
+    best_gaussian_weight_profile_rows = best_gaussian_weight_profile_entries(
+        top_gaussian_weight_entries,
+    )
+    best_gaussian_weight_profile_rows, best_gaussian_weight_profile_csv_path = write_best_gaussian_weight_profile_table(
+        best_gaussian_weight_profile_rows,
+        output_dir,
+        "best_gaussian_weight_profile_by_circuit_dimension.csv",
+    )
+    plot_best_gaussian_weight_profile_heatmap(
+        best_gaussian_weight_profile_rows,
+        output_dir,
+        generated,
+        skipped,
+    )
+    gaussian_weight_value_count_rows = gaussian_weight_value_count_entries(
+        best_gaussian_weight_profile_rows,
+    )
+    gaussian_weight_value_count_rows, gaussian_weight_value_count_csv_path = write_gaussian_weight_value_count_table(
+        gaussian_weight_value_count_rows,
+        output_dir,
+        "best_gaussian_weight_value_counts.csv",
+    )
+    plot_gaussian_weight_value_count_heatmap(
+        gaussian_weight_value_count_rows,
+        output_dir,
+        generated,
+        skipped,
+    )
 
+    gaussian_best_entries = best_gaussian_execution_entries(rows)
+    gaussian_best_entries, gaussian_best_csv_path = write_best_gaussian_execution_table(
+        gaussian_best_entries,
+        output_dir,
+        "best_gaussian_execution_by_circuit_dimension.csv",
+    )
     best_mapping_entries = best_mapping_table_entries(rows)
     best_mapping_entries, best_mapping_csv_path = write_best_mapping_table(
         best_mapping_entries,
@@ -2148,18 +2926,35 @@ def main():
         output_dir,
         "best_mapping_by_circuit_dimension_all_families_exit0.csv",
     )
-    write_summary(rows, csv_files, output_dir, generated, distinct_info=distinct_info)
+    write_summary(rows, csv_files, output_dir, generated, skipped, distinct_info=distinct_info)
     write_report_markdown(
         output_dir,
         generated,
+        skipped,
+        top_gaussian_weight_entries,
+        top_gaussian_weight_csv_path,
+        best_gaussian_weight_profile_rows,
+        best_gaussian_weight_profile_csv_path,
+        gaussian_weight_value_count_rows,
+        gaussian_weight_value_count_csv_path,
+        gaussian_best_entries,
+        gaussian_best_csv_path,
         best_mapping_entries,
         best_mapping_csv_path,
         best_mapping_exit0_entries,
         best_mapping_exit0_csv_path,
     )
     print(f"Generated {len(generated)} plots in: {output_dir}")
+    if skipped:
+        print(f"Skipped {len(skipped)} plots:")
+        for item in skipped:
+            print(f"{item['filename']}: {item['reason']}")
     for path in generated:
         print(path)
+    print(best_gaussian_weight_profile_csv_path)
+    print(gaussian_weight_value_count_csv_path)
+    print(top_gaussian_weight_csv_path)
+    print(gaussian_best_csv_path)
     print(best_mapping_csv_path)
     print(best_mapping_exit0_csv_path)
     if distinct_info is not None:
