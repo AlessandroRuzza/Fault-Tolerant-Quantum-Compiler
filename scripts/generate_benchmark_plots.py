@@ -16,9 +16,10 @@ if "MPLCONFIGDIR" not in os.environ:
 os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
 
 def importMatplotlib():
-    global plt, np, Line2D
+    global plt, np, Line2D, TwoSlopeNorm
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib.colors import TwoSlopeNorm
     from matplotlib.lines import Line2D
 
 
@@ -34,6 +35,8 @@ OBSOLETE_PLOT_FILENAMES = {
     "13_heatmap_success_safe_vs_placement.png",
     "23_heatmap_success_safe_vs_mapping_type.png",
     "28_table_top_gaussian_weight_configs.png",
+    "31_heatmap_best_gaussian_weight_value_counts.png",
+    "best_gaussian_weight_value_counts.csv",
     "top_gaussian_weight_configs_readable.html",
 }
 OBSOLETE_PLOT_PREFIXES = (
@@ -79,7 +82,7 @@ REPORT_PLOTS = [
     ("20_heatmap_routing_gaussian_strategy_vs_placement.png", "Routing heatmap: gaussian strategy x placement"),
     ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
     ("30_heatmap_best_gaussian_weight_profiles.png", "Best gaussian weight profile map"),
-    ("31_heatmap_best_gaussian_weight_value_counts.png", "Best gaussian weight value counts"),
+    ("31_heatmap_best_gaussian_relative_weight_gaps.png", "Best gaussian relative weight gaps"),
     ("22_experiment_set_routing_all_mappings.png", "Experiment set: all mappings"),
 ]
 STATUS_DISPLAY_LABELS = {
@@ -1465,6 +1468,183 @@ def plot_gaussian_weight_value_count_heatmap(entries, output_dir, generated, ski
     save_fig(fig, output_dir, filename, generated)
 
 
+def gaussian_relative_weight_gap_entries(best_profile_entries):
+    weight_columns = [
+        ("magic high", "magic_high"),
+        ("magic low", "magic_low"),
+        ("CNOT high", "cnot_high"),
+        ("CNOT low", "cnot_low"),
+        ("gauss mapped", "mapped_gaussian_weight"),
+        ("gauss base", "base_gaussian_weight"),
+    ]
+    entries = []
+
+    for row_label, row_field in weight_columns:
+        for col_label, col_field in weight_columns:
+            gaps = [
+                float(entry[row_field]) - float(entry[col_field])
+                for entry in best_profile_entries
+            ]
+            abs_gaps = [abs(gap) for gap in gaps]
+            total = len(gaps)
+            row_greater = sum(1 for gap in gaps if gap > 0)
+            row_less = sum(1 for gap in gaps if gap < 0)
+            equal = sum(1 for gap in gaps if gap == 0)
+            entries.append(
+                {
+                    "row_weight_parameter": row_label,
+                    "column_weight_parameter": col_label,
+                    "mean_signed_gap": float(np.mean(gaps)) if gaps else 0.0,
+                    "median_signed_gap": statistics.median(gaps) if gaps else 0.0,
+                    "mean_abs_gap": float(np.mean(abs_gaps)) if abs_gaps else 0.0,
+                    "median_abs_gap": statistics.median(abs_gaps) if abs_gaps else 0.0,
+                    "row_greater_count": row_greater,
+                    "row_less_count": row_less,
+                    "equal_count": equal,
+                    "row_greater_percentage": (100.0 * row_greater / total) if total else 0.0,
+                }
+            )
+
+    return entries
+
+
+def write_gaussian_relative_weight_gap_table(entries, output_dir, filename):
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, filename)
+    fieldnames = [
+        "row_weight_parameter",
+        "column_weight_parameter",
+        "mean_signed_gap",
+        "median_signed_gap",
+        "mean_abs_gap",
+        "median_abs_gap",
+        "row_greater_count",
+        "row_less_count",
+        "equal_count",
+        "row_greater_percentage",
+    ]
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(entries)
+
+    return entries, csv_path
+
+
+def plot_gaussian_relative_weight_gap_heatmap(entries, output_dir, generated, skipped=None):
+    filename = "31_heatmap_best_gaussian_relative_weight_gaps.png"
+    if not entries:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no best gaussian weight profile rows available",
+        )
+        return
+
+    labels = []
+    for entry in entries:
+        label = entry["row_weight_parameter"]
+        if label not in labels:
+            labels.append(label)
+
+    by_pair = {
+        (entry["row_weight_parameter"], entry["column_weight_parameter"]): entry
+        for entry in entries
+    }
+    signed = np.array(
+        [
+            [by_pair[(row_label, col_label)]["mean_signed_gap"] for col_label in labels]
+            for row_label in labels
+        ],
+        dtype=float,
+    )
+    absolute = np.array(
+        [
+            [by_pair[(row_label, col_label)]["mean_abs_gap"] for col_label in labels]
+            for row_label in labels
+        ],
+        dtype=float,
+    )
+    total_profiles = max(
+        [
+            by_pair[(label, label)]["equal_count"]
+            for label in labels
+        ],
+        default=0,
+    )
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6.8), constrained_layout=False)
+    fig.subplots_adjust(left=0.13, right=0.94, top=0.76, bottom=0.17, wspace=0.34)
+    fig.suptitle(
+        f"Relative Distances Between Weights in Best Gaussian Configurations (n={total_profiles})",
+        fontsize=15,
+        y=0.96,
+    )
+    fig.text(
+        0.5,
+        0.88,
+        "Each cell compares the row weight with the column weight. The absolute values of the weights are not counted.",
+        ha="center",
+        va="center",
+        fontsize=9,
+        color="#475569",
+    )
+
+    max_signed = float(np.max(np.abs(signed))) if signed.size else 1.0
+    max_abs_gap = float(np.max(absolute)) if absolute.size else 1.0
+    signed_norm = TwoSlopeNorm(vmin=-max_signed, vcenter=0, vmax=max_signed)
+    images = [
+        axes[0].imshow(signed, cmap="RdBu_r", norm=signed_norm),
+        axes[1].imshow(absolute, cmap="YlGnBu", vmin=0, vmax=max_abs_gap),
+    ]
+    titles = ["Mean Signed Gap", "Mean Absolute Distance"]
+    colorbar_labels = ["row - column", "|row - column|"]
+
+    for ax_idx, ax in enumerate(axes):
+        matrix = signed if ax_idx == 0 else absolute
+        ax.set_title(titles[ax_idx], fontsize=12, pad=12)
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=8.5)
+        ax.set_yticks(range(len(labels)))
+        ax.set_yticklabels(labels, fontsize=8.5)
+        ax.set_xticks(np.arange(-0.5, len(labels), 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, len(labels), 1), minor=True)
+        ax.grid(which="minor", color="white", linewidth=1.25)
+        ax.tick_params(axis="both", length=0)
+        ax.tick_params(which="minor", bottom=False, left=False)
+
+        max_value = float(np.max(np.abs(matrix))) if matrix.size else 0.0
+        for row_idx in range(matrix.shape[0]):
+            for col_idx in range(matrix.shape[1]):
+                value = matrix[row_idx, col_idx]
+                if row_idx == col_idx:
+                    text = "-"
+                    color = "#64748B"
+                else:
+                    text = f"{value:+.2f}" if ax_idx == 0 else f"{value:.2f}".rstrip("0").rstrip(".")
+                    color = "white" if max_value and abs(value) / max_value > 0.55 else "#0F172A"
+                ax.text(
+                    col_idx,
+                    row_idx,
+                    text,
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    fontweight="bold" if row_idx != col_idx else "normal",
+                    color=color,
+                )
+
+        cbar = fig.colorbar(images[ax_idx], ax=ax, fraction=0.046, pad=0.035)
+        cbar.ax.tick_params(labelsize=8)
+        cbar.set_label(colorbar_labels[ax_idx], fontsize=9)
+
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, filename)
+    fig.savefig(path, dpi=160, bbox_inches="tight", pad_inches=0.25)
+    plt.close(fig)
+    generated.append(path)
+
+
 def plot_top_gaussian_weight_config_table(grouped_ranked_entries, output_dir, generated, skipped=None):
     filename = "28_table_top_gaussian_weight_configs.png"
     if not grouped_ranked_entries:
@@ -2435,8 +2615,8 @@ def write_report_markdown(
     top_gaussian_weight_csv_path,
     best_gaussian_weight_profile_entries,
     best_gaussian_weight_profile_csv_path,
-    gaussian_weight_value_count_entries,
-    gaussian_weight_value_count_csv_path,
+    gaussian_relative_weight_gap_entries,
+    gaussian_relative_weight_gap_csv_path,
     best_gaussian_execution_entries,
     best_gaussian_execution_csv_path,
     best_mapping_entries,
@@ -2469,7 +2649,7 @@ def write_report_markdown(
         if top_gaussian_weight_entries:
             csv_name = os.path.basename(top_gaussian_weight_csv_path)
             profile_csv_name = os.path.basename(best_gaussian_weight_profile_csv_path)
-            count_csv_name = os.path.basename(gaussian_weight_value_count_csv_path)
+            relative_gap_csv_name = os.path.basename(gaussian_relative_weight_gap_csv_path)
             f.write("## Top Gaussian Weight Configurations\n\n")
             f.write(
                 "Top 3 gaussian weight configurations per `circuit x graph-dimensions`. "
@@ -2481,9 +2661,9 @@ def write_report_markdown(
                 f.write(
                     f"Readable best-profile CSV export: `{profile_csv_name}`\n\n"
                 )
-            if gaussian_weight_value_count_entries:
+            if gaussian_relative_weight_gap_entries:
                 f.write(
-                    f"Best weight-value count CSV export: `{count_csv_name}`\n\n"
+                    f"Relative weight-gap CSV export: `{relative_gap_csv_name}`\n\n"
                 )
             f.write(f"CSV export: `{csv_name}`\n\n")
 
@@ -2893,16 +3073,16 @@ def main():
         generated,
         skipped,
     )
-    gaussian_weight_value_count_rows = gaussian_weight_value_count_entries(
+    gaussian_relative_weight_gap_rows = gaussian_relative_weight_gap_entries(
         best_gaussian_weight_profile_rows,
     )
-    gaussian_weight_value_count_rows, gaussian_weight_value_count_csv_path = write_gaussian_weight_value_count_table(
-        gaussian_weight_value_count_rows,
+    gaussian_relative_weight_gap_rows, gaussian_relative_weight_gap_csv_path = write_gaussian_relative_weight_gap_table(
+        gaussian_relative_weight_gap_rows,
         output_dir,
-        "best_gaussian_weight_value_counts.csv",
+        "best_gaussian_relative_weight_gaps.csv",
     )
-    plot_gaussian_weight_value_count_heatmap(
-        gaussian_weight_value_count_rows,
+    plot_gaussian_relative_weight_gap_heatmap(
+        gaussian_relative_weight_gap_rows,
         output_dir,
         generated,
         skipped,
@@ -2935,8 +3115,8 @@ def main():
         top_gaussian_weight_csv_path,
         best_gaussian_weight_profile_rows,
         best_gaussian_weight_profile_csv_path,
-        gaussian_weight_value_count_rows,
-        gaussian_weight_value_count_csv_path,
+        gaussian_relative_weight_gap_rows,
+        gaussian_relative_weight_gap_csv_path,
         gaussian_best_entries,
         gaussian_best_csv_path,
         best_mapping_entries,
@@ -2952,7 +3132,7 @@ def main():
     for path in generated:
         print(path)
     print(best_gaussian_weight_profile_csv_path)
-    print(gaussian_weight_value_count_csv_path)
+    print(gaussian_relative_weight_gap_csv_path)
     print(top_gaussian_weight_csv_path)
     print(gaussian_best_csv_path)
     print(best_mapping_csv_path)
