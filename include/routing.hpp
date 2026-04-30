@@ -117,6 +117,14 @@ public:
     ) const override;
 };
 
+struct PairIntHash {
+    std::size_t operator()(const std::pair<int,int>& p) const noexcept {
+        std::size_t h1 = std::hash<int>{}(p.first);
+        std::size_t h2 = std::hash<int>{}(p.second);
+        return h1 ^ (h2 + 0x9e3779b9u + (h1 << 6) + (h1 >> 2));
+    }
+};
+
 class QubitRouter {
 private:
     const Mapping& mapping;
@@ -128,6 +136,7 @@ private:
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
 
     mutable std::unordered_set<int> used_nodes_cache;
+    mutable std::unordered_map<std::pair<int,int>, float, PairIntHash> min_gate_route_length_cache;
     std::unordered_set<int> get_used_nodes() const;
     int closestMagicState(const Gate& g) const;
     Routing route_layer(const Layer& layer_gates) const;
