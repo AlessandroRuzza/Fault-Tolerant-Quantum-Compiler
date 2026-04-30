@@ -1,5 +1,5 @@
 {
-  "circuit": "dnn_n16",
+  "circuit": "qft_20",
 
   "type": "gaussian",
   "gaussian_strategy": "coarse",
@@ -22,6 +22,6 @@
   "x": 11,
   "y": 11,
 
-  "routing_strategy": "congestion",
-  "t-routing-mode": "normal_t_routing"
+  "routing_strategy": "boost",
+  "t-routing-mode": "smart_t_routing"
 }
