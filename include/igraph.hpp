@@ -85,7 +85,7 @@ public:
 
     // ------get_magic_states----------
 
-    std::vector<Node> get_magic_states() const { 
+    const std::vector<Node> get_magic_states() const { 
         std::vector<Node> result;
         for (int id : magic_states_ids) {
             result.push_back(get_node(id));
@@ -93,7 +93,7 @@ public:
         return result;
     }
 
-    inline std::vector<int> get_magic_state_ids() const {
+    inline const std::vector<int>& get_magic_state_ids() const {
         return magic_states_ids;
     }
 

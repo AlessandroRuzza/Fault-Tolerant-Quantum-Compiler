@@ -129,26 +129,10 @@ void QubitRouter::precompute_magic_state_order() {
         throw std::runtime_error("No magic states available in graph.");
     }
 
-    std::unordered_set<int> blocked_nodes;
-    blocked_nodes.reserve(circuit.getQubitsVectorSize() + magic_state_ids.size());
-
-    for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
-        if (circuit.getQubit(qubit) == nullptr) {
-            continue;
-        }
-
-        const int mapped_node = mapping.get_mapped_node(qubit);
-        if (mapped_node < 0) {
-            throw std::runtime_error("Qubit " + std::to_string(qubit) + " is not mapped.");
-        }
-
-        blocked_nodes.insert(mapped_node);
-        magic_state_order_cache[mapped_node] = {};
-    }
-
-    if (MAGIC_STOPS_ROUTE) {
-        blocked_nodes.insert(magic_state_ids.begin(), magic_state_ids.end());
-    }
+    std::unordered_set<int> blocked_nodes = get_used_nodes();
+    for(int mapped_node : blocked_nodes)
+        if(!graph.is_magic(mapped_node))
+            magic_state_order_cache[mapped_node] = {};
 
     if (const auto* congestion_strategy = dynamic_cast<const CongestionAwareShortestPath*>(pathStrategy)) {
         congestion_strategy->prepare_for_layer(circuit, mapping, blocked_nodes);
@@ -222,15 +206,18 @@ float QubitRouter::minGateRouteLength(const Gate& g) const {
         }
     }
     const Node& node2 = graph.get_node(target); 
-    return node1.distance(node2);
+
+    if(ORDER_GATES_BY_MANHATTAN)
+        return pathStrategy->find_shortest_path(node1.id, node2.id, get_used_nodes()).size();
+    else
+        return node1.distance(node2);
 }
 
-Routing QubitRouter::route_layer(const Layer& layer_gates) const {
-    Routing routing;
+std::unordered_set<int> QubitRouter::get_used_nodes() const {
+    if(used_nodes_cache.size() > 0) return used_nodes_cache;
+
     std::unordered_set<int> used_nodes;
-    std::unordered_set<int> used_magic_states;
-    
-    // Reserve mapped qubit and magic state nodes so routes do not pass through occupied nodes.
+    // Reserve mapped qubit nodes so routes do not pass through occupied nodes.
     for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
         if (circuit.getQubit(qubit) == nullptr) {
             continue;
@@ -242,15 +229,22 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         used_nodes.insert(node); // Cannot route through qubit nodes.
     }
 
+    // Also reserve magic state nodes
     if(MAGIC_STOPS_ROUTE)
-        for (int magic_state : graph.get_magic_state_ids()) {
-            used_nodes.insert(magic_state);
-        }
+        used_nodes.insert(graph.get_magic_state_ids().begin(), graph.get_magic_state_ids().end());
+    
+    used_nodes_cache = used_nodes;
+    return used_nodes;
+}
 
+Routing QubitRouter::route_layer(const Layer& layer_gates) const {
+    Routing routing;
+    std::unordered_set<int> used_nodes = get_used_nodes();
+    std::unordered_set<int> used_magic_states;
+    
     if (const auto* congestion_strategy = dynamic_cast<const CongestionAwareShortestPath*>(pathStrategy)) {
         congestion_strategy->prepare_for_layer(circuit, mapping, used_nodes);
     }
-
 
     /*** Order Layer Gates by node distance length ******/
     std::vector<Gate> ordered_gates;

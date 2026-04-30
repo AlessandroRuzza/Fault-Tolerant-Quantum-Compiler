@@ -22,6 +22,7 @@ extern const bool PRINT_ROUTING_PROGRESS; // controls routing progress printing
 */
 extern const bool MAGIC_STOPS_ROUTE;
 extern const bool USE_S_GATES;
+extern const bool ORDER_GATES_BY_MANHATTAN;
 
 } 
 
