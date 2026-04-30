@@ -9,6 +9,7 @@
 #include "helpers.hpp"
 
 #include <memory>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
@@ -181,7 +182,12 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         safe_passage_ignore_outer_layers
     );
 
+    const auto mapping_start = std::chrono::steady_clock::now();
     mapping.map();
+    const auto mapping_end = std::chrono::steady_clock::now();
+    const double mapping_time_seconds =
+        std::chrono::duration<double>(mapping_end - mapping_start).count();
+
     for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
         if (circuit.getQubit(qubit) == nullptr) {
             continue;
@@ -227,12 +233,22 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     router.precompute_magic_state_order();
 
+    const auto routing_start = std::chrono::steady_clock::now();
     router.route_circuit();    
+    const auto routing_end = std::chrono::steady_clock::now();
+    const double routing_time_seconds =
+        std::chrono::duration<double>(routing_end - routing_start).count();
+
     if (PRINT_ROUTING) router.print_routing_steps();
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n";
     
     double avg_parallelism = circuit.getNumGates() / router.get_routing_length();
     std::cout << "Average Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
+
+    const double total_time_seconds = mapping_time_seconds + routing_time_seconds;
+    std::cout << "Mapping time: " << mapping_time_seconds << " s\n";
+    std::cout << "Routing time: " << routing_time_seconds << " s\n";
+    std::cout << "Total mapping + routing time: " << total_time_seconds << " s\n\n";
 
     return benchmarkResult{router.get_routing_length(), avg_parallelism};
 }
