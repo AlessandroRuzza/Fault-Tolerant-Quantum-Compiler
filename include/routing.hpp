@@ -127,6 +127,8 @@ private:
     std::vector<Routing> routing_steps;
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
 
+    mutable std::unordered_set<int> used_nodes_cache;
+    std::unordered_set<int> get_used_nodes() const;
     Routing route_layer(const Layer& layer_gates) const;
     float minGateRouteLength(const Gate& g) const;
 
