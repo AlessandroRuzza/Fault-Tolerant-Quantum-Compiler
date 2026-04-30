@@ -274,6 +274,7 @@ void print_usage(const char* executable) {
               << "[--cnot-low <float>=0]\n"
               << "[--mapped-gaussian-weight <float>=0]\n"
               << "[--base-gaussian-weight <float>=0]\n"
+              << "[--size-moltiplier <float> >=0, default=1]\n"
               << "[--routing-strategy [congestion|naive]]\n"
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"
@@ -302,6 +303,7 @@ void apply_config_overrides(
     double& cnot_low,
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
+    double& size_moltiplier,
     std::string& config_path,
     int& x,
     int& y,
@@ -418,6 +420,27 @@ void apply_config_overrides(
     }
     if (!load_non_negative_double_from_config("BASE_GAUSSIAN_WEIGHT", base_gaussian_weight)) {
         load_non_negative_double_from_config("base_gaussian_weight", base_gaussian_weight);
+    }
+
+    const auto load_size_moltiplier_from_config = [&](const char* key) {
+        if (!config_json.contains(key)) {
+            return false;
+        }
+        if (!config_json[key].is_number()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
+        }
+        const double value = config_json[key].get<double>();
+        if (!std::isfinite(value) || value < 0.0) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a finite number >= 0");
+        }
+        size_moltiplier = value;
+        return true;
+    };
+
+    if (!load_size_moltiplier_from_config("SIZE_MOLTIPLIER") &&
+        !load_size_moltiplier_from_config("size_moltiplier") &&
+        !load_size_moltiplier_from_config("SIZE_MULTIPLIER")) {
+        load_size_moltiplier_from_config("size_multiplier");
     }
 
     if (config_json.contains("safe_passage_strategy")) {
@@ -579,6 +602,7 @@ void argument_parsing(
     double& cnot_low,
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
+    double& size_moltiplier,
     int& x,
     int& y,
     std::string& graph_path,
@@ -708,6 +732,17 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --base-gaussian-weight");
             }
             base_gaussian_weight = parse_non_negative_double(argv[++i], "--base-gaussian-weight");
+            continue;
+        }
+
+        if (arg == "--size-moltiplier" || arg == "--size_moltiplier" ||
+            arg == "--size-multiplier" || arg == "--size_multiplier") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --size-moltiplier\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --size-moltiplier");
+            }
+            size_moltiplier = parse_non_negative_double(argv[++i], "--size-moltiplier");
             continue;
         }
 

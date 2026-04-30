@@ -83,6 +83,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double cnot_low = 0.5;
     double mapped_gaussian_weight = 0.8;
     double base_gaussian_weight = 1.0;
+    double size_moltiplier = 1.0;
     std::string config_path = "../config/compiler_config.json";
     std::string graph_path = "";
     std::string magic_state_placement_strategy = "center_circle";
@@ -110,6 +111,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
+        size_moltiplier,
         config_path,
         x,
         y,
@@ -137,6 +139,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
+        size_moltiplier,
         x,
         y,
         graph_path,
@@ -159,6 +162,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "CNOT_LOW: " << cnot_low << std::endl;
     std::cout << "MAPPED_GAUSSIAN_WEIGHT: " << mapped_gaussian_weight << std::endl;
     std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
+    std::cout << "size_moltiplier: " << size_moltiplier << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
     if (number_of_magic_states_multiplier > 0.0) {
@@ -175,7 +179,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         std::cout << "graph dimensions: " << x << "x" << y << std::endl;
     }
 
-    return one_execution(
+    const auto execution_start = std::chrono::steady_clock::now();
+    benchmarkResult result = one_execution(
         path,
         magic_aware_strategy,
         type,
@@ -187,6 +192,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
+        size_moltiplier,
         x,
         y,
         graph_path,
@@ -198,6 +204,17 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         t_routing_mode,
         patience_threshold
     );
+
+    const auto execution_end = std::chrono::steady_clock::now();
+    const std::chrono::duration<double> execution_elapsed = execution_end - execution_start;
+    if (!benchmark_worker_mode_enabled()) {
+        std::cout << "Execution time: "
+                  << std::fixed << std::setprecision(6)
+                  << execution_elapsed.count()
+                  << " seconds\n";
+    }
+
+    return result;
 }
 
 int run_bench_mode(
@@ -554,16 +571,17 @@ int run_bench_mode(
                 {13, plan_field(entry, {"CNOT_LOW", "cnot_low"})},
                 {14, plan_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"})},
                 {15, plan_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"})},
-                {16, plan_field(entry, {"safe_passage_strategy"})},
-                {17, plan_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"})},
-                {18, plan_field(entry, {"border_distance_percentage"})},
-                {19, plan_field(entry, {"number_of_magic_states"})},
-                {20, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
-                {21, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")}
+                {16, plan_field(entry, {"SIZE_MOLTIPLIER", "size_moltiplier", "SIZE_MULTIPLIER", "size_multiplier"})},
+                {17, plan_field(entry, {"safe_passage_strategy"})},
+                {18, plan_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"})},
+                {19, plan_field(entry, {"border_distance_percentage"})},
+                {20, plan_field(entry, {"number_of_magic_states"})},
+                {21, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
+                {22, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")}
             };
 
             for (const auto &[index, expected] : comparisons) {
-                const std::string fallback = (index == 21) ? "normal_t_routing" : "";
+                const std::string fallback = (index == 22) ? "normal_t_routing" : "";
                 if (csv_field(row, index, fallback) != expected) {
                     return false;
                 }
@@ -595,7 +613,7 @@ int run_bench_mode(
         const std::vector<std::vector<std::string>> existing_csv_rows = write_csv::read_data_rows(csv_path);
         for (std::size_t row_index = 0; row_index < existing_csv_rows.size(); ++row_index) {
             const std::vector<std::string> &row = existing_csv_rows[row_index];
-            if (csv_field(row, 24) != "interrupted") {
+            if (csv_field(row, 25) != "interrupted") {
                 continue;
             }
 
@@ -838,6 +856,7 @@ int run_bench_mode(
 
             const std::string mw = get_json_field(plan.entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
             const std::string bw = get_json_field(plan.entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
+            const std::string sm = get_json_field(plan.entry, {"SIZE_MOLTIPLIER", "size_moltiplier", "SIZE_MULTIPLIER", "size_multiplier"});
             const std::string mh = get_json_field(plan.entry, {"MAGIC_HIGH", "magic_high"});
             const std::string ml = get_json_field(plan.entry, {"MAGIC_LOW", "magic_low"});
             const std::string ch = get_json_field(plan.entry, {"CNOT_HIGH", "cnot_high"});
@@ -860,6 +879,7 @@ int run_bench_mode(
                 cl,
                 mw,
                 bw,
+                sm,
                 get_json_field(plan.entry, {"safe_passage_strategy"}),
                 get_json_field(plan.entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
                 get_json_field(plan.entry, {"border_distance_percentage"}),
@@ -889,6 +909,7 @@ int run_bench_mode(
                     << " ml=" << empty_to_dash(ml)
                     << " ch=" << empty_to_dash(ch)
                     << " cl=" << empty_to_dash(cl)
+                    << " sm=" << empty_to_dash(sm)
                     << " timeout_reached=" << (result.timeout_reached ? "true" : "false");
             } else if (result.status == "timeout") {
                 progress

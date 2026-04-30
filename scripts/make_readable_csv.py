@@ -115,6 +115,7 @@ def main() -> None:
         "mapping_type",
         "magic_aware_strategy",
         "gaussian_strategy",
+        "size_moltiplier",
         "safe_passage_strategy",
         "magic_state_placement_strategy",
         "border_distance_percentage",
@@ -151,6 +152,9 @@ def main() -> None:
                     ),
                     "gaussian_strategy": pick_value(
                         row, "gaussian_strategy", "gaussian strategy"
+                    ),
+                    "size_moltiplier": pick_value(
+                        row, "size_moltiplier", "SIZE_MOLTIPLIER", "size_multiplier"
                     ),
                     "safe_passage_strategy": pick_value(
                         row, "safe_passage_strategy", "safe passage strategy", "safe passage startegy"

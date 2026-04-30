@@ -57,7 +57,7 @@ void clear_visualization_outputs() {
 benchmarkResult one_execution(std::string path, std::string magic_aware_strategy, std::string type, 
     std::string gaussian_strategy, std::string safe_passage_strategy, double magic_high, 
     double magic_low, double cnot_high, double cnot_low, double mapped_gaussian_weight, 
-    double base_gaussian_weight, int x, int y, std::string graph_path, 
+    double base_gaussian_weight, double size_moltiplier, int x, int y, std::string graph_path,
     std::string magic_state_placement_strategy, int number_of_magic_states,
     double number_of_magic_states_multiplier,
     double border_distance_percentage, std::string routing_strategy,
@@ -175,6 +175,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
+        size_moltiplier,
         circuit.getNumQubits()*2,
         safe_passage_ignore_outer_layers
     );
