@@ -181,7 +181,7 @@ std::string normalize_t_routing_mode(std::string value) {
 
 void validate_routing_method(const std::string& value, const char* executable) {
     const std::string normalized = normalize_routing_method(value);
-    const std::vector<std::string> valid_methods = {"congestion", "naive"};
+    const std::vector<std::string> valid_methods = {"congestion", "naive", "boost"};
     if (std::find(valid_methods.begin(), valid_methods.end(), normalized) == valid_methods.end()) {
         std::cerr << "Invalid routing method: " << value << "\n";
         print_usage(executable);
@@ -291,7 +291,7 @@ void print_usage(const char* executable) {
               << "[--base-gaussian-weight <float>=0]\n"
               << "[--size-moltiplier <float> >=0, default=1]\n"
               << "[--gaussian-confidence <float> in (0,1), default=0.95]\n"
-              << "[--routing-strategy [congestion|naive]]\n"
+              << "[--routing-strategy [congestion|naive|boost]]\n"
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"
               << "[--x <integer>]\n"
