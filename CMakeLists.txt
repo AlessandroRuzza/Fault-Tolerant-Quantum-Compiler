@@ -23,15 +23,20 @@ if(DEFINED ENV{mkBoostPrefix})
 endif()
 find_package(Boost QUIET)
 if(Boost_FOUND)
-    target_include_directories(FaultTolerantQuantumCompiler PRIVATE ${Boost_INCLUDE_DIRS})
+    target_include_directories(FaultTolerantQuantumCompiler SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
     message(STATUS "Found Boost: ${Boost_INCLUDE_DIRS}")
 elseif(DEFINED ENV{mkBoostInc})
     # Fallback: use the header path directly when find_package still fails.
-    target_include_directories(FaultTolerantQuantumCompiler PRIVATE "$ENV{mkBoostInc}")
+    target_include_directories(FaultTolerantQuantumCompiler SYSTEM PRIVATE "$ENV{mkBoostInc}")
     message(STATUS "Using Boost headers from mkBoostInc: $ENV{mkBoostInc}")
 else()
     message(WARNING "Boost not found: Boost_QubitRouter (RRR router) will not compile. Load the boost/1.76.0 module (requires gcc-glibc/11.2.0).")
 endif()
+
+# Silence "#pragma message: This header is deprecated" notes from Boost 1.76
+# internals (boost/detail/iterator.hpp etc.).  BOOST_ALLOW_DEPRECATED_HEADERS
+# makes BOOST_HEADER_DEPRECATED(...) expand to nothing instead of the pragma.
+target_compile_definitions(FaultTolerantQuantumCompiler PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
 # ------JSON and Main-------------
 
