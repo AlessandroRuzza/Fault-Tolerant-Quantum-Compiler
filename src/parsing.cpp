@@ -130,6 +130,21 @@ double parse_non_negative_double(const std::string& value, const char* flag_name
     return parsed_value;
 }
 
+double parse_gaussian_confidence(const std::string& value, const char* flag_name) {
+    double parsed_value = 0.0;
+    try {
+        parsed_value = std::stod(value);
+    } catch (const std::exception&) {
+        throw std::runtime_error("Invalid floating-point value for " + std::string(flag_name) + ": " + value);
+    }
+
+    if (!std::isfinite(parsed_value) || parsed_value <= 0.0 || parsed_value >= 1.0) {
+        throw std::runtime_error(std::string(flag_name) + " must be a finite number in (0, 1)");
+    }
+
+    return parsed_value;
+}
+
 double parse_percentage_0_100(const std::string& value, const char* flag_name) {
     const double parsed_value = parse_non_negative_double(value, flag_name);
     if (parsed_value > 100.0) {
@@ -275,6 +290,7 @@ void print_usage(const char* executable) {
               << "[--mapped-gaussian-weight <float>=0]\n"
               << "[--base-gaussian-weight <float>=0]\n"
               << "[--size-moltiplier <float> >=0, default=1]\n"
+              << "[--gaussian-confidence <float> in (0,1), default=0.95]\n"
               << "[--routing-strategy [congestion|naive]]\n"
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"
@@ -304,6 +320,7 @@ void apply_config_overrides(
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
     double& size_moltiplier,
+    double& gaussian_confidence,
     std::string& config_path,
     int& x,
     int& y,
@@ -441,6 +458,25 @@ void apply_config_overrides(
         !load_size_moltiplier_from_config("size_moltiplier") &&
         !load_size_moltiplier_from_config("SIZE_MULTIPLIER")) {
         load_size_moltiplier_from_config("size_multiplier");
+    }
+
+    const auto load_gaussian_confidence_from_config = [&](const char* key) {
+        if (!config_json.contains(key)) {
+            return false;
+        }
+        if (!config_json[key].is_number()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
+        }
+        const double value = config_json[key].get<double>();
+        if (!std::isfinite(value) || value <= 0.0 || value >= 1.0) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a finite number in (0, 1)");
+        }
+        gaussian_confidence = value;
+        return true;
+    };
+
+    if (!load_gaussian_confidence_from_config("GAUSSIAN_CONFIDENCE")) {
+        load_gaussian_confidence_from_config("gaussian_confidence");
     }
 
     if (config_json.contains("safe_passage_strategy")) {
@@ -603,6 +639,7 @@ void argument_parsing(
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
     double& size_moltiplier,
+    double& gaussian_confidence,
     int& x,
     int& y,
     std::string& graph_path,
@@ -743,6 +780,16 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --size-moltiplier");
             }
             size_moltiplier = parse_non_negative_double(argv[++i], "--size-moltiplier");
+            continue;
+        }
+
+        if (arg == "--gaussian-confidence" || arg == "--gaussian_confidence") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --gaussian-confidence\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --gaussian-confidence");
+            }
+            gaussian_confidence = parse_gaussian_confidence(argv[++i], "--gaussian-confidence");
             continue;
         }
 

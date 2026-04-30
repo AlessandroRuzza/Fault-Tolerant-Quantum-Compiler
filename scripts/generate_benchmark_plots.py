@@ -179,6 +179,7 @@ DISTINCT_NUMERIC_FIELDS = {
     "cnot_low",
     "mapped_gaussian_weight",
     "base_gaussian_weight",
+    "gaussian_confidence",
     "border_distance_percentage",
     "number_of_magic_states",
     "routing_steps",
