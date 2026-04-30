@@ -185,6 +185,7 @@ void QubitRouter::precompute_magic_state_order() {
     }
 }
 
+// TODO: cambia da Manhattan distance a shortest path (usando pathStrategy->find_shortest_path(...); )
 float QubitRouter::minGateRouteLength(const Gate& g) const {
     if (g.qubits.empty()) {
         throw std::runtime_error("Gate without qubits found while computing route length.");

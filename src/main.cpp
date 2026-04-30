@@ -907,8 +907,8 @@ int run_bench_mode(
             if (result.status == "success") {
                 progress
                     << "[" << (plan.index + 1) << "/" << total_cases << "] OK"
-                    << " #" << run_id
-                    << " " << empty_to_dash(plan.case_id)
+                    << " run#" << run_id
+                    << " id=" << empty_to_dash(plan.case_id)
                     << " routing_steps=" << empty_to_dash(routing_steps)
                     << " duration=" << duration_short_ss.str()
                     << " mw=" << empty_to_dash(mw)
