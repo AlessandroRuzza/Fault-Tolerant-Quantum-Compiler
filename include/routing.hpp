@@ -125,7 +125,16 @@ struct PairIntHash {
     }
 };
 
-class QubitRouter {
+class IQubitRouter {
+public:
+    virtual ~IQubitRouter() = default;
+    virtual void route_circuit() = 0;
+    virtual int  get_routing_length() const = 0;
+    virtual void print_routing_steps() const = 0;
+    virtual void reset() = 0;
+};
+
+class QubitRouter : public IQubitRouter {
 private:
     const Mapping& mapping;
     LayeredCircuit& circuit;
@@ -153,31 +162,17 @@ public:
         circuit(c),
         graph(g),
         pathStrategy(p),
-        tGateRoutingStrategy(t) {}
-    /**
-     * Routes the whole circuit, returning a vector of mappings (gate-Path).
-     * @attention this will modify the layering in the internal LayeredCircuit.
-     * @return A vector of Routing maps.
-     */
-    void route_circuit();
-    inline const std::vector<Routing>& get_routing() const {
-        return routing_steps;
-    }
-    inline const Routing& get_route_step(int i) const {
-        return routing_steps[i];
-    }
-    inline int get_routing_length() const {
-        return routing_steps.size();
-    }
-    inline void reset(){
-        circuit.reset();
-        routing_steps.clear();
-    }
-
-    // Precompute the order of magic states to be used for routing each gate, based on the mapping's strategy.
+        tGateRoutingStrategy(t) {
+            precompute_magic_state_order();
+        }
+    void route_circuit() override;
     void precompute_magic_state_order();
+    inline int get_routing_length() const override { return routing_steps.size(); }
+    void print_routing_steps() const override;
+    inline void reset() override { circuit.reset(); routing_steps.clear(); }
 
-    void print_routing_steps() const;
+    inline const std::vector<Routing>& get_routing() const { return routing_steps; }
+    inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
     void print_routing(int i) const;
 
 };
