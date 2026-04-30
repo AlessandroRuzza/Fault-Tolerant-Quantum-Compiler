@@ -208,28 +208,41 @@ float QubitRouter::minGateRouteLength(const Gate& g) const {
     }
     if(g.name == "h") return 0;
 
-    const int mapped_q0 = mapping.get_mapped_node(g.qubits[0]);
+    const int q0 = g.qubits[0];
+    const int q1 = g.qubits.size() > 1 ? g.qubits[1] : -1;
+    const auto cache_key = std::make_pair(q0, q1);
+
+    const auto cache_it = min_gate_route_length_cache.find(cache_key);
+    if (cache_it != min_gate_route_length_cache.end()) {
+        return cache_it->second;
+    }
+
+    const int mapped_q0 = mapping.get_mapped_node(q0);
     if (mapped_q0 < 0) {
-        throw std::runtime_error("Qubit " + std::to_string(g.qubits[0]) + " is not mapped.");
+        throw std::runtime_error("Qubit " + std::to_string(q0) + " is not mapped.");
     }
     int target;
     if(g.qubits.size() == 2){
-        target = mapping.get_mapped_node(g.qubits[1]);
+        target = mapping.get_mapped_node(q1);
         if (target < 0) {
-            throw std::runtime_error("Qubit " + std::to_string(g.qubits[1]) + " is not mapped.");
+            throw std::runtime_error("Qubit " + std::to_string(q1) + " is not mapped.");
         }
     }
     else { // target = closest magic state
         target = closestMagicState(g);
     }
 
+    float result;
     if(ORDER_GATES_BY_MANHATTAN){
         const Node& node1 = graph.get_node(mapped_q0);
-        const Node& node2 = graph.get_node(target); 
-        return node1.distance(node2);
+        const Node& node2 = graph.get_node(target);
+        result = node1.distance(node2);
     }
     else
-        return pathStrategy->find_shortest_path(mapped_q0, target, get_used_nodes()).size();
+        result = static_cast<float>(pathStrategy->find_shortest_path(mapped_q0, target, get_used_nodes()).size());
+
+    min_gate_route_length_cache[cache_key] = result;
+    return result;
 }
 
 std::unordered_set<int> QubitRouter::get_used_nodes() const {
@@ -257,6 +270,7 @@ std::unordered_set<int> QubitRouter::get_used_nodes() const {
 }
 
 Routing QubitRouter::route_layer(const Layer& layer_gates) const {
+    // min_gate_route_length_cache.clear();
     Routing routing;
     std::unordered_set<int> used_nodes = get_used_nodes();
     std::unordered_set<int> used_magic_states;
