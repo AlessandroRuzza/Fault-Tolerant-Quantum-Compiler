@@ -53,15 +53,11 @@ Gaussian::Gaussian(int mean_x, int mean_y, double sigma_x, double sigma_y, int s
 	  invTwoSigmaYSq(compute_inv_two_sigma_sq(sigmaY, "sigma_y")),
 	  normFactor(compute_norm_factor(mean_x, mean_y, size_x, size_y, invTwoSigmaXSq, invTwoSigmaYSq)),
 	  inverse(inverse) {
-	if (inverse && size_x <= 1) {
-		throw std::invalid_argument("inverse gaussian requires size > 1");
-	}
 }
 
 double Gaussian::gaussian_at(int x, int y) const {
 	if (x < 0 || x >= size_x || y < 0 || y >= size_y) {
-		std::cerr << "Error: Coordinates (" << x << ", " << y << ") are out of bounds for size (" << size_x << ", " << size_y << ")\n";
-		throw std::out_of_range("x, y must be in [0, size)");
+		return 0.0;
 	}
 
 	const double dx = static_cast<double>(x - mean_x);

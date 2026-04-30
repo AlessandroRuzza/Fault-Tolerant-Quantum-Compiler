@@ -106,6 +106,7 @@ private:
     double cnotLow;
     double mappedGaussianWeight;
     double baseGaussianWeight;
+    double sizeMoltiplier;
     int T_lower_bound;
     int T_upper_bound;
     int CNOT_threshold;
@@ -128,6 +129,7 @@ public:
         double cnot_low,
         double mapped_gaussian_weight,
         double base_gaussian_weight,
+        double size_moltiplier,
         int maximum_iterations,
         int safe_passage_ignore_outer_layers
     ) :
@@ -139,6 +141,7 @@ public:
     cnotLow(cnot_low),
     mappedGaussianWeight(mapped_gaussian_weight),
     baseGaussianWeight(base_gaussian_weight),
+    sizeMoltiplier(size_moltiplier),
     maximum_iterations(maximum_iterations),
     safe_passage_ignore_outer_layers(safe_passage_ignore_outer_layers),
     farthest_from_magic_selector(graph)  {
@@ -241,6 +244,7 @@ public:
     inline double getCnotLow() const { return cnotLow; }
     inline double getMappedGaussianWeight() const { return mappedGaussianWeight; }
     inline double getBaseGaussianWeight() const { return baseGaussianWeight; }
+    inline double getSizeMoltiplier() const { return sizeMoltiplier; }
 
 
     // returns -1 if qubit is not mapped
@@ -432,6 +436,7 @@ private:
         validate_non_negative_finite(cnotLow, "CNOT_LOW");
         validate_non_negative_finite(mappedGaussianWeight, "MAPPED_GAUSSIAN_WEIGHT");
         validate_non_negative_finite(baseGaussianWeight, "BASE_GAUSSIAN_WEIGHT");
+        validate_non_negative_finite(sizeMoltiplier, "SIZE_MOLTIPLIER");
 
         if (magicHigh < magicLow) {
             throw std::invalid_argument("MAGIC_HIGH must be >= MAGIC_LOW");

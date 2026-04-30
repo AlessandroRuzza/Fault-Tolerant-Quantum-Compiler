@@ -18,6 +18,7 @@ IDENTITY_KEYS = (
     "mapping_type",
     "magic_aware_strategy",
     "gaussian_strategy",
+    "size_moltiplier",
     "safe_passage_strategy",
     "magic_state_placement_strategy",
     "border_distance_percentage",

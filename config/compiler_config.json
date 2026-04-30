@@ -15,6 +15,8 @@
   "CNOT_LOW": 0.6,
   "MAPPED_GAUSSIAN_WEIGHT": 1.2,
   "BASE_GAUSSIAN_WEIGHT": 1.4,
+  "SIZE_MOLTIPLIER": 1.0,
+
   
   "x": 11,
   "y": 11,

@@ -91,7 +91,12 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
 
     const int mapped_node_id = map_qubit_to_node(qubit->getQubitID(), best_node.id, 0);
     const Node& mapped_node = graph.get_node(mapped_node_id);
-    mapped_gaussians.push_back(Gaussians::mapped_gaussian(graph, mapped_node, mappedGaussianWeight));
+    mapped_gaussians.push_back(Gaussians::mapped_gaussian(
+        graph,
+        mapped_node,
+        mappedGaussianWeight,
+        sizeMoltiplier
+    ));
 
     (*iterations)++;
 
@@ -104,10 +109,10 @@ void Mapping::gaussian_mapping() {
     std::vector<Gaussian> mapped_gaussians;
     std::vector<Gaussian> magic_gaussians;
 
-    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight);
+    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight, sizeMoltiplier);
     
     for (int node_id : graph.get_magic_state_ids()) {
-        magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id));
+        magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id, sizeMoltiplier));
     }
     
     int total_qubits = circuit.getNumQubits();
@@ -185,7 +190,13 @@ void update_gaussians_coarse(
         for (int i : highCnotQubits) {
             int second_qubit_mapped_node = mapping.get_mapped_node(i);
             if (second_qubit_mapped_node != -1){
-                cnot_gaussians.push_back(Gaussians::cnot_gaussian(graph, second_qubit_mapped_node, cnot_high, false));
+                cnot_gaussians.push_back(Gaussians::cnot_gaussian(
+                    graph,
+                    second_qubit_mapped_node,
+                    cnot_high,
+                    false,
+                    mapping.getSizeMoltiplier()
+                ));
             }
         }
 
@@ -299,7 +310,13 @@ void update_gaussians_fine(
 
         const int mapped_node = mapping.get_mapped_node(q_id);
         if (mapped_node != -1) {
-            cnot_gaussians.push_back(Gaussians::cnot_gaussian(graph, mapped_node, weight, inverse));
+            cnot_gaussians.push_back(Gaussians::cnot_gaussian(
+                graph,
+                mapped_node,
+                weight,
+                inverse,
+                mapping.getSizeMoltiplier()
+            ));
         }
 
     }

@@ -12,6 +12,14 @@ namespace write_csv {
 inline constexpr const char *kBenchmarkRunsCsvHeader =
     "run_id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
     "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV4 =
+    "run_id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
     "mapped_gaussian_weight,base_gaussian_weight,"
     "safe_passage_strategy,magic_state_placement_strategy,"
     "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,routing_steps,timeout_reached,"
@@ -231,7 +239,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV3 ||
+        (first_line == kBenchmarkRunsCsvHeaderV4 ||
+         first_line == kBenchmarkRunsCsvHeaderV3 ||
          first_line == kBenchmarkRunsCsvHeaderV2 ||
          first_line == kBenchmarkRunsCsvHeaderV1 ||
          first_line == kPreviousBenchmarkRunsCsvHeader ||
@@ -252,13 +261,14 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v4 = (first_line == kBenchmarkRunsCsvHeaderV4);
             const bool from_v3 = (first_line == kBenchmarkRunsCsvHeaderV3);
             const bool from_v2 = (first_line == kBenchmarkRunsCsvHeaderV2);
             const bool from_v1 = (first_line == kBenchmarkRunsCsvHeaderV1);
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v3) {
+            if (from_v4) {
                 migrated = {
                     at_or_empty(parsed, 0),   // run_id
                     at_or_empty(parsed, 1),   // run_date
@@ -276,6 +286,40 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 13),  // cnot_low
                     at_or_empty(parsed, 14),  // mapped_gaussian_weight
                     at_or_empty(parsed, 15),  // base_gaussian_weight
+                    "",                       // size_moltiplier
+                    at_or_empty(parsed, 16),  // safe_passage_strategy
+                    at_or_empty(parsed, 17),  // magic_state_placement_strategy
+                    at_or_empty(parsed, 18),  // border_distance_percentage
+                    at_or_empty(parsed, 19),  // number_of_magic_states
+                    at_or_empty(parsed, 20),  // routing_strategy
+                    at_or_empty(parsed, 21),  // t_routing_mode
+                    at_or_empty(parsed, 22),  // routing_steps
+                    at_or_empty(parsed, 23),  // timeout_reached
+                    at_or_empty(parsed, 24),  // status
+                    at_or_empty(parsed, 25),  // exit_code
+                    at_or_empty(parsed, 26),  // duration_seconds
+                    at_or_empty(parsed, 27),  // log_file
+                    at_or_empty(parsed, 28)   // error_excerpt
+                };
+            } else if (from_v3) {
+                migrated = {
+                    at_or_empty(parsed, 0),   // run_id
+                    at_or_empty(parsed, 1),   // run_date
+                    at_or_empty(parsed, 2),   // run_datetime
+                    at_or_empty(parsed, 3),   // circuit
+                    at_or_empty(parsed, 4),   // graph_x
+                    at_or_empty(parsed, 5),   // graph_y
+                    at_or_empty(parsed, 6),   // circuit_graph_label
+                    at_or_empty(parsed, 7),   // mapping_type
+                    at_or_empty(parsed, 8),   // magic_aware_strategy
+                    at_or_empty(parsed, 9),   // gaussian_strategy
+                    at_or_empty(parsed, 10),  // magic_high
+                    at_or_empty(parsed, 11),  // magic_low
+                    at_or_empty(parsed, 12),  // cnot_high
+                    at_or_empty(parsed, 13),  // cnot_low
+                    at_or_empty(parsed, 14),  // mapped_gaussian_weight
+                    at_or_empty(parsed, 15),  // base_gaussian_weight
+                    "",                       // size_moltiplier
                     at_or_empty(parsed, 16),  // safe_passage_strategy
                     at_or_empty(parsed, 17),  // magic_state_placement_strategy
                     at_or_empty(parsed, 18),  // border_distance_percentage
@@ -308,6 +352,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     "",                       // cnot_low
                     at_or_empty(parsed, 10),  // mapped_gaussian_weight
                     at_or_empty(parsed, 11),  // base_gaussian_weight
+                    "",                       // size_moltiplier
                     at_or_empty(parsed, 12),  // safe_passage_strategy
                     at_or_empty(parsed, 13),  // magic_state_placement_strategy
                     at_or_empty(parsed, 14),  // border_distance_percentage
@@ -340,6 +385,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     "",                       // cnot_low
                     "",                       // mapped_gaussian_weight
                     "",                       // base_gaussian_weight
+                    "",                       // size_moltiplier
                     at_or_empty(parsed, 10),  // safe_passage_strategy
                     at_or_empty(parsed, 11),  // magic_state_placement_strategy
                     at_or_empty(parsed, 12),  // border_distance_percentage
@@ -372,6 +418,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     "",                       // cnot_low
                     "",                       // mapped_gaussian_weight
                     "",                       // base_gaussian_weight
+                    "",                       // size_moltiplier
                     at_or_empty(parsed, 14),  // safe_passage_strategy
                     at_or_empty(parsed, 15),  // magic_state_placement_strategy
                     at_or_empty(parsed, 16),  // border_distance_percentage
