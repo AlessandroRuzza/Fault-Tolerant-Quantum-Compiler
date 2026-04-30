@@ -162,7 +162,7 @@ bool Mapping::_3x3_occupied(const Node& node, const std::vector<Node>& occupied_
 }
 
 
-bool Mapping::safe_connectivity(const Node& node, const Qubit q, const std::vector<Node>& occupied_nodes){
+bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vector<Node>& occupied_nodes){
     // Impossible mapping
     for (const Node& blocked_node : occupied_nodes) {
         if (blocked_node.id == node.id) {
