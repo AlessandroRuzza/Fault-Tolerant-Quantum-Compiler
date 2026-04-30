@@ -169,7 +169,39 @@ void QubitRouter::precompute_magic_state_order() {
     }
 }
 
-// TODO: cambia da Manhattan distance a shortest path (usando pathStrategy->find_shortest_path(...); )
+int QubitRouter::closestMagicState(const Gate& gate) const {
+    const int start_node = mapping.get_mapped_node(gate.qubits[0]);
+    int best = -1;
+
+    if(ORDER_GATES_BY_MANHATTAN){
+        float minDist = INT32_MAX;
+        for(int m : graph.get_magic_state_ids()){
+            float dist = graph.get_node(start_node).distance(graph.get_node(m));
+            if(dist < minDist){
+                minDist = dist;
+                best = m; 
+            }
+        }
+    }
+    else{
+        Path path = tGateRoutingStrategy->find_t_gate_path(
+                gate,
+                mapping,
+                graph,
+                *pathStrategy,
+                get_used_nodes(),
+                {},
+                magic_state_order_cache
+            );
+        if (!path.empty()) {
+            best = path.back();
+        }
+    }
+
+    if(best < 0) throw std::runtime_error("No magic states available in graph.");
+    return best;
+}
+
 float QubitRouter::minGateRouteLength(const Gate& g) const {
     if (g.qubits.empty()) {
         throw std::runtime_error("Gate without qubits found while computing route length.");
@@ -180,7 +212,6 @@ float QubitRouter::minGateRouteLength(const Gate& g) const {
     if (mapped_q0 < 0) {
         throw std::runtime_error("Qubit " + std::to_string(g.qubits[0]) + " is not mapped.");
     }
-    const Node& node1 = graph.get_node(mapped_q0);
     int target;
     if(g.qubits.size() == 2){
         target = mapping.get_mapped_node(g.qubits[1]);
@@ -189,28 +220,16 @@ float QubitRouter::minGateRouteLength(const Gate& g) const {
         }
     }
     else { // target = closest magic state
-        // TODO(static-magic-ranking): once the cache exists, use the first cached
-        // magic-state candidate for the mapped node instead of geometric distance.
-        const auto& magic_ids = graph.get_magic_state_ids();
-        if (magic_ids.empty()) {
-            throw std::runtime_error("No magic states available in graph.");
-        }
-        float minDist = INT32_MAX;
-        target = magic_ids.front();
-        for(int m : magic_ids){
-            float dist = node1.distance(graph.get_node(m));
-            if(dist < minDist){
-                minDist = dist;
-                target = m; 
-            }
-        }
+        target = closestMagicState(g);
     }
-    const Node& node2 = graph.get_node(target); 
 
-    if(ORDER_GATES_BY_MANHATTAN)
+    if(ORDER_GATES_BY_MANHATTAN){
+        const Node& node1 = graph.get_node(mapped_q0);
+        const Node& node2 = graph.get_node(target); 
         return node1.distance(node2);
+    }
     else
-        return pathStrategy->find_shortest_path(node1.id, node2.id, get_used_nodes()).size();
+        return pathStrategy->find_shortest_path(mapped_q0, target, get_used_nodes()).size();
 }
 
 std::unordered_set<int> QubitRouter::get_used_nodes() const {

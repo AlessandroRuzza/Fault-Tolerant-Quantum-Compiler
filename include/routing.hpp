@@ -129,6 +129,7 @@ private:
 
     mutable std::unordered_set<int> used_nodes_cache;
     std::unordered_set<int> get_used_nodes() const;
+    int closestMagicState(const Gate& g) const;
     Routing route_layer(const Layer& layer_gates) const;
     float minGateRouteLength(const Gate& g) const;
 
