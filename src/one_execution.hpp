@@ -203,7 +203,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     graph.print_rectangular();
 
     std::cout << "------- LAYERING ---------" << std::endl;
-    LayeredCircuit layeredCircuit = LayeredCircuit(circuit, 2); //Lookahead only 2 layers
+    LayeredCircuit layeredCircuit = LayeredCircuit(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
     if (PRINT_LAYER) layeredCircuit.print_layered();
 
 
@@ -247,7 +247,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     if (PRINT_ROUTING) routerPtr->print_routing_steps();
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << routerPtr->get_routing_length() << "\n";
 
-    double avg_parallelism = circuit.getNumGates() / routerPtr->get_routing_length();
+    double avg_parallelism = double(circuit.getNumGates()) / routerPtr->get_routing_length();
     std::cout << "Average Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
 
     const double total_time_seconds = mapping_time_seconds + routing_time_seconds;

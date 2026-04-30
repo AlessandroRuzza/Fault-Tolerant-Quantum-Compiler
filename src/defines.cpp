@@ -22,5 +22,6 @@ const bool PRINT_ROUTING_PROGRESS = false;
 const bool MAGIC_STOPS_ROUTE = true;
 const bool USE_S_GATES = false;
 const bool ORDER_GATES_BY_MANHATTAN = false;
+const int LAYERING_LOOKAHEAD = 5;
 
 }
