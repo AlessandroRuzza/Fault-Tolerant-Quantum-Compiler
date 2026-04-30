@@ -221,9 +221,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     } else {
         tGateRoutingStrategyPtr = std::make_unique<NormalTGateRouting>();
     }
-    // NaiveShortestPath pathStrat(graph);
-    // QubitRouter router(mapping, layeredCircuit, graph, &pathStrat);
-    QubitRouter router(
+    std::unique_ptr<IQubitRouter> routerPtr = std::make_unique<QubitRouter>(
         mapping,
         layeredCircuit,
         graph,
@@ -231,18 +229,16 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         tGateRoutingStrategyPtr.get()
     );
 
-    router.precompute_magic_state_order();
-
     const auto routing_start = std::chrono::steady_clock::now();
-    router.route_circuit();    
+    routerPtr->route_circuit();
     const auto routing_end = std::chrono::steady_clock::now();
     const double routing_time_seconds =
         std::chrono::duration<double>(routing_end - routing_start).count();
 
-    if (PRINT_ROUTING) router.print_routing_steps();
-    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << router.get_routing_length() << "\n";
-    
-    double avg_parallelism = circuit.getNumGates() / router.get_routing_length();
+    if (PRINT_ROUTING) routerPtr->print_routing_steps();
+    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << routerPtr->get_routing_length() << "\n";
+
+    double avg_parallelism = circuit.getNumGates() / routerPtr->get_routing_length();
     std::cout << "Average Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
 
     const double total_time_seconds = mapping_time_seconds + routing_time_seconds;
@@ -250,5 +246,5 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Routing time: " << routing_time_seconds << " s\n";
     std::cout << "Total mapping + routing time: " << total_time_seconds << " s\n\n";
 
-    return benchmarkResult{router.get_routing_length(), avg_parallelism};
+    return benchmarkResult{routerPtr->get_routing_length(), avg_parallelism};
 }
