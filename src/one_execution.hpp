@@ -4,6 +4,7 @@
 #include "maxHeap.hpp"
 #include "mapping.hpp"
 #include "routing.hpp"
+#include "boost_router.hpp"
 #include "defines.hpp"
 #include "compute_dimensions.hpp"
 #include "helpers.hpp"
@@ -207,27 +208,35 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
 
     std::cout << "------- ROUTING ---------" << std::endl;
-    constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
-    constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
+    // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr
+    // (QubitRouter holds raw pointers into them).
     std::unique_ptr<IPathStrategy> pathStrategyPtr;
-    if (routing_strategy == "naive") {
-        pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
-    } else { // default to congestion-aware
-        pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
-    }
     std::unique_ptr<ITGateRoutingStrategy> tGateRoutingStrategyPtr;
-    if (t_routing_mode == "smart_t_routing") {
-        tGateRoutingStrategyPtr = std::make_unique<SmartTGateRouting>(patience_threshold);
+    std::unique_ptr<IQubitRouter> routerPtr;
+
+    if (routing_strategy == "boost") {
+        routerPtr = std::make_unique<Boost_QubitRouter>(mapping, layeredCircuit, graph);
     } else {
-        tGateRoutingStrategyPtr = std::make_unique<NormalTGateRouting>();
+        constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
+        constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
+        if (routing_strategy == "naive") {
+            pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
+        } else { // default to congestion-aware
+            pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
+        }
+        if (t_routing_mode == "smart_t_routing") {
+            tGateRoutingStrategyPtr = std::make_unique<SmartTGateRouting>(patience_threshold);
+        } else {
+            tGateRoutingStrategyPtr = std::make_unique<NormalTGateRouting>();
+        }
+        routerPtr = std::make_unique<QubitRouter>(
+            mapping,
+            layeredCircuit,
+            graph,
+            pathStrategyPtr.get(),
+            tGateRoutingStrategyPtr.get()
+        );
     }
-    std::unique_ptr<IQubitRouter> routerPtr = std::make_unique<QubitRouter>(
-        mapping,
-        layeredCircuit,
-        graph,
-        pathStrategyPtr.get(),
-        tGateRoutingStrategyPtr.get()
-    );
 
     const auto routing_start = std::chrono::steady_clock::now();
     routerPtr->route_circuit();
