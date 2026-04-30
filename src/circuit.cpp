@@ -137,11 +137,11 @@ void Circuit::parse_qasm_file(const std::string &path) {
                         " qubits. Please decompose it into single- and two-qubit gates before routing.");
                 }
 
-                if (lname == "tdg") {
+                if (lname == "tdg" || lname == "t") {
                     add_TGates(gate, 1, globalID);
-                } else if (lname == "cx" || lname == "cnot") {
+                } else if (lname == "cx" || lname == "cphase" || lname == "cz" || lname == "cnot") {
                     addGate(gate, "cx", globalID++);
-                }
+                } 
             }
         }
         else{
