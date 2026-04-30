@@ -208,9 +208,9 @@ float QubitRouter::minGateRouteLength(const Gate& g) const {
     const Node& node2 = graph.get_node(target); 
 
     if(ORDER_GATES_BY_MANHATTAN)
-        return pathStrategy->find_shortest_path(node1.id, node2.id, get_used_nodes()).size();
-    else
         return node1.distance(node2);
+    else
+        return pathStrategy->find_shortest_path(node1.id, node2.id, get_used_nodes()).size();
 }
 
 std::unordered_set<int> QubitRouter::get_used_nodes() const {
