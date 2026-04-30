@@ -6,12 +6,15 @@
 #include "gaussian_images.hpp"
 #include "gaussians.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <sstream>
+#include <unordered_set>
 
 void update_weight(std::vector<Gaussian>& gaussians, double new_weight);
 void update_inverse(std::vector<Gaussian>& gaussians, bool inverse);
@@ -339,30 +342,29 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
         throw std::runtime_error("Graph has no nodes");
     }
 
-    Node best_node = nodes.front();
-    double best_score = -std::numeric_limits<double>::infinity();
     const std::vector<int> magic_ids = graph.get_magic_state_ids();
-    bool found_candidate = false;
+    const std::unordered_set<int> magic_id_set(magic_ids.begin(), magic_ids.end());
+    const std::vector<Node> occupied_nodes = graph.get_occupied_nodes();
 
-    for (const Node& node : graph.get_nodes()) {
-        
+    struct CandidateScore {
+        const Node* node = nullptr;
+        double score = 0.0;
+        std::size_t order = 0;
+    };
 
+    std::vector<CandidateScore> candidates;
+    candidates.reserve(nodes.size());
+
+    for (std::size_t order = 0; order < nodes.size(); ++order) {
+        const Node& node = nodes[order];
         if (node.occupied) {
             continue;
         }
-        if (std::find(magic_ids.begin(), magic_ids.end(), node.id) != magic_ids.end()) {
+        if (magic_id_set.find(node.id) != magic_id_set.end()) {
             continue;
         }
-
-        bool is_safe = check_safe_passage(node, qubit);
-        if (!is_safe) {
-            continue;
-        }
-        found_candidate = true;
-
 
         double score = 0.0;
-
         for (const Gaussian& g : mapped_gaussians) {
             score += g.gaussian_at(node.coordX, node.coordY);
         }
@@ -375,17 +377,29 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
 
         score += baseline_gaussian.gaussian_at(node.coordX, node.coordY);
 
-        if (score > best_score) {
-            best_score = score;
-            best_node = node;
+        if (std::isfinite(score)) {
+            candidates.push_back(CandidateScore{&node, score, order});
         }
     }
 
-    if (!found_candidate) {
-        throw std::runtime_error("No valid free non-magic node with safe passage was found.");
+    std::stable_sort(candidates.begin(), candidates.end(), [](const CandidateScore& a, const CandidateScore& b) {
+        if (a.score != b.score) {
+            return a.score > b.score;
+        }
+        return a.order < b.order;
+    });
+
+    for (const CandidateScore& candidate : candidates) {
+        if (check_safe_passage(*candidate.node, qubit, occupied_nodes)) {
+            return *candidate.node;
+        }
     }
 
-    return best_node;
+    if (candidates.empty()) {
+        throw std::runtime_error("No valid free non-magic node was found.");
+    }
+
+    throw std::runtime_error("No valid free non-magic node with safe passage was found.");
 }
 
 

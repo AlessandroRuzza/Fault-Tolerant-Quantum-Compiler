@@ -1,0 +1,32 @@
+
+{
+    "circuit": ["qft_20", "continuous_3_17_13", "dnn_n16", "example", "adder_n64_transpiled", "bb84_n8", "ghz_state_n23", "ghz_n255", "qaoa_n6", "wstate_n27"],
+
+    "type": "gaussian",
+    "gaussian_strategy": "coarse",
+    "magic_aware_strategy": "center",
+    "safe_passage_strategy": ["connectivity", "cube"],
+    "MagicStatePlacementStrategy": "center_circle",
+    "number_of_magic_states": 0.9,
+    "border_distance_percentage": 5.0,
+
+    "MAGIC_HIGH": 1.6,
+    "MAGIC_LOW": 0.6,
+    "CNOT_HIGH": 1.6,
+    "CNOT_LOW": 0.6,
+    "MAPPED_GAUSSIAN_WEIGHT": 1.2,
+    "BASE_GAUSSIAN_WEIGHT": 1.4,
+    "SIZE_MOLTIPLIER": [0.3, 0.5, 0.7, 1.0],
+    "GAUSSIAN_CONFIDENCE": [0.66, 0.8, 0.95, 0.99],
+
+    
+    "x": 11,
+    "y": 11,
+
+    "routing_strategy": "congestion",
+    "t-routing-mode": "normal_t_routing",
+
+    "timeout": 1200,
+    "timeout_reached": false
+}
+

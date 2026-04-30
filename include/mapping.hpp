@@ -199,19 +199,23 @@ public:
     }
 
 
-    inline bool check_safe_passage(const Node& node, const Qubit q) {
+    inline bool check_safe_passage(const Node& node, const Qubit& q, const std::vector<Node>& occupied_nodes) {
         switch (safePassageStrategy) {
             case SafePassageStrategy::PASSAGE:
-                return safe_passage(node, graph.get_occupied_nodes());
+                return safe_passage(node, occupied_nodes);
             case SafePassageStrategy::PASSAGE_NO_SUBGRAPHS:
-                return safe_passage_no_subgraphs(node, graph.get_occupied_nodes());
+                return safe_passage_no_subgraphs(node, occupied_nodes);
             case SafePassageStrategy::CUBE:
-                return _3x3_occupied(node, graph.get_occupied_nodes());
+                return _3x3_occupied(node, occupied_nodes);
             case SafePassageStrategy::CONNECTIVITY:
-                return safe_connectivity(node, q, graph.get_occupied_nodes());
+                return safe_connectivity(node, q, occupied_nodes);
             default:
                 throw std::runtime_error("Invalid safe passage strategy");
         }
+    }
+
+    inline bool check_safe_passage(const Node& node, const Qubit& q) {
+        return check_safe_passage(node, q, graph.get_occupied_nodes());
     }
 
 
@@ -298,7 +302,7 @@ public:
 
     bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes);
     bool safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes);
-    bool safe_connectivity(const Node& node, const Qubit q, const std::vector<Node>& occupied_nodes);
+    bool safe_connectivity(const Node& node, const Qubit& q, const std::vector<Node>& occupied_nodes);
 private:
 
     void one_iteration_magic_aware_mapping(Qubit* qubit, int* iterations);
