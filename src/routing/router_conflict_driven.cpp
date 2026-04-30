@@ -80,8 +80,19 @@ static Path reconstruct_path(int start, int end, const std::vector<int>& pred, i
     return path;
 }
 
-Path Boost_QubitRouter::dijkstra_path(int start, int end) const {
+void Boost_QubitRouter::set_in_edge_weights(int node, float w) const {
+    auto weight_map = boost::get(boost::edge_weight, bgraph);
+    for (auto [ei, ei_end] = boost::in_edges(node, bgraph); ei != ei_end; ++ei)
+        boost::put(weight_map, *ei, w);
+}
+
+Path Boost_QubitRouter::dijkstra_path(int start, int end, float end_node_congestion) const {
     if (start == end) return {start};
+
+    // Temporarily unblock the end node so Dijkstra can reach it.
+    // (end may be a mapped qubit node that is normally hard-blocked to prevent
+    //  other routes passing through it, but it is a valid destination here.)
+    set_in_edge_weights(end, 1.0f + congestion_penalty * end_node_congestion);
 
     std::vector<float> dist(num_nodes, std::numeric_limits<float>::max());
     std::vector<int>   pred(num_nodes);
@@ -96,6 +107,9 @@ Path Boost_QubitRouter::dijkstra_path(int start, int end) const {
             boost::make_iterator_property_map(dist.begin(), boost::get(boost::vertex_index, bgraph))
         )
     );
+
+    // Restore hard-block on the end node.
+    set_in_edge_weights(end, HARD_BLOCK_WEIGHT);
 
     if (dist[end] >= 0.5f * HARD_BLOCK_WEIGHT) return {};
     return reconstruct_path(start, end, pred, num_nodes);
@@ -218,7 +232,7 @@ Routing Boost_QubitRouter::route_layer_rrr(const Layer& layer_gates) const {
                     used_magic_states.insert(gr.end_node);
                 }
             } else {
-                gr.path = dijkstra_path(gr.start_node, gr.end_node);
+                gr.path = dijkstra_path(gr.start_node, gr.end_node, node_congestion[gr.end_node]);
             }
         }
 

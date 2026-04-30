@@ -8,14 +8,14 @@
 #include <boost/graph/graph_traits.hpp>
 
 /*
- * Directed graph: edge u→v carries the cost of *entering* v.
- * This lets us encode per-node costs directionally (congestion, hard-blocks)
- * without a symmetric undirected weight assumption.
+ * Bidirectional graph: edge u→v carries the cost of *entering* v.
+ * bidirectionalS (vs directedS) gives O(in-degree) in-edge access, which is
+ * needed to temporarily unblock a destination node before each Dijkstra call.
  */
 using BGraph = boost::adjacency_list<
     boost::vecS,
     boost::vecS,
-    boost::directedS,
+    boost::bidirectionalS,
     boost::no_property,
     boost::property<boost::edge_weight_t, float>
 >;
@@ -56,9 +56,16 @@ private:
         const std::unordered_set<int>& hard_blocked
     ) const;
 
-    // Dijkstra from start to end; returns empty path if unreachable.
-    // Weights must already be set via update_edge_weights.
-    Path dijkstra_path(int start, int end) const;
+    // Set the weight of every in-edge of node to w (O(in-degree)).
+    // Used to temporarily unblock a destination node before Dijkstra,
+    // then restore it to HARD_BLOCK_WEIGHT afterwards.
+    void set_in_edge_weights(int node, float w) const;
+
+    // Dijkstra from start to end.
+    // end_node_congestion: the congestion cost to use for entering `end`
+    // (caller supplies this so the destination is reachable even when it is
+    //  normally hard-blocked, e.g. a mapped qubit node for a 2-qubit gate).
+    Path dijkstra_path(int start, int end, float end_node_congestion = 0.0f) const;
 
     // Dijkstra from start; returns the path to the closest magic state
     // that is not in used_magic_states (empty if none reachable).
