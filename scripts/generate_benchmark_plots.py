@@ -5,6 +5,7 @@ import csv
 import glob
 import math
 import os
+import re
 import statistics
 import warnings
 from collections import Counter, defaultdict
@@ -29,6 +30,9 @@ REQUESTED_SAFE_PASSAGES = {"passage", "cube"}
 REQUESTED_PLACEMENT_VARIANTS = ("right_row", "center_circle_0", "center_circle_5")
 REQUESTED_GAUSSIAN_STRATEGIES = {"coarse", "fine"}
 REQUESTED_MAGIC_AWARE_STRATEGIES = {"center", "distance", "random"}
+RUNTIME_CURVE_MAPPING_TYPES = ("gaussian", "magic_aware", "homogeneous")
+RUNTIME_CURVE_SAFE_PASSAGES = ("cube", "connectivity")
+RUNTIME_CURVE_STATUSES = SUCCESS_STATUSES | TIMEOUT_STATUSES
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
 DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
 OBSOLETE_PLOT_FILENAMES = {
@@ -36,6 +40,10 @@ OBSOLETE_PLOT_FILENAMES = {
     "23_heatmap_success_safe_vs_mapping_type.png",
     "28_table_top_gaussian_weight_configs.png",
     "31_heatmap_best_gaussian_weight_value_counts.png",
+    "32_runtime_vs_qubits_plus_gates_with_timeouts.png",
+    "33_runtime_vs_qubits_with_timeouts.png",
+    "34_runtime_vs_gates_with_timeouts.png",
+    "35_runtime_vs_graph_nodes_with_timeouts.png",
     "best_gaussian_weight_value_counts.csv",
     "top_gaussian_weight_configs_readable.html",
 }
@@ -52,6 +60,38 @@ REPORT_PLOTS = [
     ("06_box_routing_by_safe_passage.png", "Routing by safe passage"),
     ("07_box_routing_by_magic_strategy.png", "Routing by magic-aware strategy"),
     ("08_scatter_elapsed_vs_routing_by_circuit.png", "Duration vs routing"),
+    (
+        "32_runtime_vs_qubits_plus_gates_cube_with_timeouts.png",
+        "Duration vs qubits plus gates: cube median points",
+    ),
+    (
+        "32_runtime_vs_qubits_plus_gates_connectivity_with_timeouts.png",
+        "Duration vs qubits plus gates: connectivity median points",
+    ),
+    (
+        "33_runtime_vs_qubits_cube_with_timeouts.png",
+        "Duration vs qubits: cube median points",
+    ),
+    (
+        "33_runtime_vs_qubits_connectivity_with_timeouts.png",
+        "Duration vs qubits: connectivity median points",
+    ),
+    (
+        "34_runtime_vs_gates_cube_with_timeouts.png",
+        "Duration vs gates: cube median points",
+    ),
+    (
+        "34_runtime_vs_gates_connectivity_with_timeouts.png",
+        "Duration vs gates: connectivity median points",
+    ),
+    (
+        "35_runtime_vs_graph_nodes_cube_with_timeouts.png",
+        "Duration vs graph size: cube median points",
+    ),
+    (
+        "35_runtime_vs_graph_nodes_connectivity_with_timeouts.png",
+        "Duration vs graph size: connectivity median points",
+    ),
     ("09_scatter_density_vs_routing.png", "Density vs routing"),
     ("10_scatter_magic_states_vs_routing.png", "Magic state parameter vs routing"),
     ("11_scatter_border_vs_routing_center_circle.png", "Border distance vs routing"),
@@ -2253,6 +2293,538 @@ def heatmap_axis_value(row, key):
     return text or "unknown"
 
 
+def project_root():
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+
+
+def add_candidate_path(paths, path):
+    normalized = os.path.abspath(os.path.expanduser(path))
+    if normalized not in paths:
+        paths.append(normalized)
+
+
+def resolve_qasm_path(circuit_value):
+    circuit = normalize_csv_text(circuit_value)
+    if not circuit:
+        return None
+
+    root = project_root()
+    candidates = []
+    add_candidate_path(candidates, circuit)
+    if os.path.splitext(circuit)[1] == "":
+        add_candidate_path(candidates, circuit + ".qasm")
+
+    basename = os.path.basename(circuit)
+    stem, ext = os.path.splitext(basename)
+    qasm_filename = basename if ext else stem + ".qasm"
+    qasm_stem = stem if ext else basename
+
+    add_candidate_path(candidates, os.path.join(root, "qasms", qasm_filename))
+    add_candidate_path(candidates, os.path.join(root, "universal_set_qasms", qasm_filename))
+    add_candidate_path(
+        candidates,
+        os.path.join(root, "universal_set_qasms", f"{qasm_stem}_universal.qasm"),
+    )
+
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def resolve_universal_qasm_path(circuit_value):
+    circuit = normalize_csv_text(circuit_value)
+    if not circuit:
+        return None
+
+    root = project_root()
+    basename = os.path.basename(circuit)
+    stem, ext = os.path.splitext(basename)
+    qasm_filename = basename if ext else stem + ".qasm"
+    qasm_stem = stem if ext else basename
+
+    candidates = []
+    add_candidate_path(candidates, os.path.join(root, "universal_set_qasms", f"{qasm_stem}_universal.qasm"))
+    add_candidate_path(candidates, os.path.join(root, "universal_set_qasms", qasm_filename))
+
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def parse_qasm_qubits_and_gates(path):
+    qubits = 0
+    gates = 0
+    in_gate_definition = False
+    brace_depth = 0
+    qreg_re = re.compile(r"^qreg\s+[A-Za-z_]\w*\s*\[\s*(\d+)\s*\]\s*;")
+    operation_re = re.compile(r"^[A-Za-z_]\w*(?:\([^)]*\))?\s+[^;]+;")
+
+    with open(path, "r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.split("//", 1)[0].strip()
+            if not line:
+                continue
+
+            if in_gate_definition:
+                brace_depth += line.count("{") - line.count("}")
+                if brace_depth <= 0:
+                    in_gate_definition = False
+                    brace_depth = 0
+                continue
+
+            if re.match(r"^gate\b", line):
+                brace_depth = line.count("{") - line.count("}")
+                in_gate_definition = brace_depth > 0
+                continue
+
+            qreg_match = qreg_re.match(line)
+            if qreg_match:
+                qubits += int(qreg_match.group(1))
+                continue
+
+            if line.startswith(("OPENQASM", "include", "creg", "barrier", "measure")):
+                continue
+
+            if operation_re.match(line):
+                gates += 1
+
+    if qubits <= 0:
+        raise ValueError(f"Unable to determine qubit count for {path}")
+    return qubits, gates
+
+
+def qasm_metrics_for_circuit(circuit, cache):
+    circuit_name = os.path.splitext(os.path.basename(normalize_csv_text(circuit)))[0]
+    if not circuit_name:
+        return None
+    if circuit_name in cache:
+        return cache[circuit_name]
+
+    qasm_path = resolve_qasm_path(circuit)
+    if qasm_path is None:
+        qasm_path = resolve_qasm_path(circuit_name)
+    if qasm_path is None:
+        cache[circuit_name] = None
+        return None
+
+    qubits, _ = parse_qasm_qubits_and_gates(qasm_path)
+    universal_qasm_path = resolve_universal_qasm_path(circuit)
+    if universal_qasm_path is None:
+        universal_qasm_path = resolve_universal_qasm_path(circuit_name)
+
+    gates = None
+    gate_count_source = ""
+    if universal_qasm_path is not None:
+        _, gates = parse_qasm_qubits_and_gates(universal_qasm_path)
+        gate_count_source = os.path.relpath(universal_qasm_path, project_root())
+
+    cache[circuit_name] = {
+        "qubits": qubits,
+        "gates": gates,
+        "gate_count_source": gate_count_source,
+    }
+    return cache[circuit_name]
+
+
+def runtime_curve_display_name(mapping_type):
+    names = {
+        "gaussian": "Gaussian",
+        "magic_aware": "Magic-aware",
+        "homogeneous": "Homogeneous",
+    }
+    return names.get(mapping_type, str(mapping_type))
+
+
+def graph_node_count(row):
+    total_nodes = row.get("total_nodes_i")
+    if total_nodes is not None and total_nodes > 0:
+        return total_nodes
+    x_i = row.get("x_i")
+    y_i = row.get("y_i")
+    if x_i is None or y_i is None:
+        return None
+    if x_i <= 0 or y_i <= 0:
+        return None
+    return x_i * y_i
+
+
+def aggregate_runtime_qubits_plus_gates(rows):
+    qasm_cache = {}
+    grouped = defaultdict(list)
+
+    for row in rows:
+        mapping_type = row.get("mapping_type_norm")
+        safe_passage = row.get("safe_passage_norm")
+        status = normalize_text(row.get("status"))
+        duration = row.get("duration_s_f")
+        if mapping_type not in RUNTIME_CURVE_MAPPING_TYPES:
+            continue
+        if safe_passage not in RUNTIME_CURVE_SAFE_PASSAGES:
+            continue
+        if status not in RUNTIME_CURVE_STATUSES:
+            continue
+        if duration is None:
+            continue
+
+        circuit = row.get("circuit") or row.get("circuit_name")
+        metrics = qasm_metrics_for_circuit(circuit, qasm_cache)
+        if metrics is None:
+            continue
+        qubits = metrics["qubits"]
+        gates = metrics["gates"]
+        gate_count_source = metrics["gate_count_source"]
+        graph_nodes = graph_node_count(row)
+        if graph_nodes is None:
+            continue
+        graph_x = row.get("x_i")
+        graph_y = row.get("y_i")
+        circuit_name = os.path.splitext(os.path.basename(normalize_csv_text(circuit)))[0]
+        grouped[
+            (
+                mapping_type,
+                safe_passage,
+                circuit_name,
+                qubits,
+                gates,
+                gate_count_source,
+                graph_x,
+                graph_y,
+                graph_nodes,
+            )
+        ].append(row)
+
+    aggregate = []
+    for (
+        mapping_type,
+        safe_passage,
+        circuit_name,
+        qubits,
+        gates,
+        gate_count_source,
+        graph_x,
+        graph_y,
+        graph_nodes,
+    ), group_rows in grouped.items():
+        durations = [row["duration_s_f"] for row in group_rows if row.get("duration_s_f") is not None]
+        if not durations:
+            continue
+        statuses = [normalize_text(row.get("status")) for row in group_rows]
+        aggregate.append(
+            {
+                "curve": f"{runtime_curve_display_name(mapping_type)} + {safe_passage}",
+                "mapping_type": mapping_type,
+                "safe_passage_strategy": safe_passage,
+                "circuit": circuit_name,
+                "qubits": qubits,
+                "gates": gates,
+                "qubits_plus_gates": qubits + gates if gates is not None else None,
+                "gate_count_source": gate_count_source,
+                "graph_x": graph_x,
+                "graph_y": graph_y,
+                "graph_nodes": graph_nodes,
+                "duration_seconds_median": statistics.median(durations),
+                "duration_seconds_min": min(durations),
+                "duration_seconds_max": max(durations),
+                "sample_count": len(group_rows),
+                "success_count": sum(status in SUCCESS_STATUSES for status in statuses),
+                "timeout_count": sum(status in TIMEOUT_STATUSES for status in statuses),
+            }
+        )
+
+    aggregate.sort(
+        key=lambda row: (
+            row["qubits_plus_gates"] if row["qubits_plus_gates"] is not None else math.inf,
+            row["graph_nodes"],
+            row["mapping_type"],
+            row["safe_passage_strategy"],
+            row["circuit"],
+        )
+    )
+    return aggregate
+
+
+def write_runtime_qubits_plus_gates_csv(entries, output_dir):
+    csv_path = os.path.join(output_dir, "32_runtime_vs_qubits_plus_gates_with_timeouts.csv")
+    fieldnames = [
+        "curve",
+        "mapping_type",
+        "safe_passage_strategy",
+        "circuit",
+        "qubits",
+        "gates",
+        "qubits_plus_gates",
+        "gate_count_source",
+        "graph_x",
+        "graph_y",
+        "graph_nodes",
+        "duration_seconds_median",
+        "duration_seconds_min",
+        "duration_seconds_max",
+        "sample_count",
+        "success_count",
+        "timeout_count",
+    ]
+    os.makedirs(output_dir, exist_ok=True)
+    with open(csv_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(entries)
+    return csv_path
+
+
+def collapse_runtime_entries_by_x(entries, x_key):
+    grouped = defaultdict(list)
+    for entry in entries:
+        x_value = entry.get(x_key)
+        if x_value is None:
+            continue
+        grouped[(entry["mapping_type"], entry["safe_passage_strategy"], x_value)].append(entry)
+
+    collapsed = []
+    for (mapping_type, safe_passage, x_value), group_entries in grouped.items():
+        durations = [entry["duration_seconds_median"] for entry in group_entries]
+        collapsed.append(
+            {
+                x_key: x_value,
+                "mapping_type": mapping_type,
+                "safe_passage_strategy": safe_passage,
+                "duration_seconds_median": statistics.median(durations),
+                "timeout_count": sum(entry["timeout_count"] for entry in group_entries),
+            }
+        )
+    return collapsed
+
+
+def plot_runtime_entries(
+    entries,
+    output_dir,
+    generated,
+    filename,
+    x_key,
+    x_label,
+    title,
+    collapse_same_x=False,
+    connect_points=False,
+    jitter_duplicate_x=False,
+    safe_passage_filter=None,
+):
+    if safe_passage_filter is None:
+        safe_passages = RUNTIME_CURVE_SAFE_PASSAGES
+    else:
+        safe_passages = (safe_passage_filter,)
+
+    plot_entries = [
+        entry
+        for entry in entries
+        if entry.get("safe_passage_strategy") in safe_passages
+    ]
+    plot_entries = collapse_runtime_entries_by_x(plot_entries, x_key) if collapse_same_x else plot_entries
+    colors = {
+        "gaussian": "#D55E00",
+        "magic_aware": "#0072B2",
+        "homogeneous": "#009E73",
+    }
+    linestyles = {"cube": "-", "connectivity": "--"}
+    markers = {"cube": "o", "connectivity": "s"}
+
+    fig, ax = plt.subplots(figsize=(13, 7.5))
+    legend_handles = []
+    timeout_points = []
+    series_pairs = [
+        (mapping_type, safe_passage)
+        for mapping_type in RUNTIME_CURVE_MAPPING_TYPES
+        for safe_passage in safe_passages
+    ]
+    series_center = (len(series_pairs) - 1) / 2.0
+
+    for series_index, (mapping_type, safe_passage) in enumerate(series_pairs):
+        points = [
+            entry
+            for entry in plot_entries
+            if entry["mapping_type"] == mapping_type
+            and entry["safe_passage_strategy"] == safe_passage
+            and entry.get(x_key) is not None
+            and entry.get(x_key) > 0
+        ]
+        if not points:
+            continue
+        points.sort(key=lambda entry: (entry[x_key], entry.get("circuit", "")))
+
+        x_values = [entry[x_key] for entry in points]
+        if jitter_duplicate_x:
+            grouped_indices = defaultdict(list)
+            for idx, x_value in enumerate(x_values):
+                grouped_indices[x_value].append(idx)
+            series_shift = (series_index - series_center) * 0.018
+            jittered = list(x_values)
+            for x_value, indices in grouped_indices.items():
+                count = len(indices)
+                for position, idx in enumerate(indices):
+                    within_shift = 0.0
+                    if count > 1:
+                        within_shift = (position - (count - 1) / 2.0) * 0.012
+                    jittered[idx] = x_value * math.exp(series_shift + within_shift)
+            x_values = jittered
+
+        y_values = [entry["duration_seconds_median"] for entry in points]
+        color = colors[mapping_type]
+        linestyle = linestyles[safe_passage] if connect_points else "None"
+        marker = markers[safe_passage]
+        if safe_passage_filter is None:
+            label = f"{runtime_curve_display_name(mapping_type)} / {safe_passage}"
+        else:
+            label = runtime_curve_display_name(mapping_type)
+
+        ax.plot(
+            x_values,
+            y_values,
+            color=color,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=5,
+            linewidth=1.9 if connect_points else 0,
+            alpha=0.92,
+            label=label,
+        )
+        legend_handles.append(
+            Line2D(
+                [0],
+                [0],
+                color=color,
+                linestyle=linestyles[safe_passage] if connect_points else "None",
+                marker=marker,
+                label=label,
+            )
+        )
+
+        for entry, x_value in zip(points, x_values):
+            if entry["timeout_count"] > 0:
+                timeout_points.append((entry, color, x_value))
+
+    for entry, color, x_value in timeout_points:
+        ax.scatter(
+            [x_value],
+            [entry["duration_seconds_median"]],
+            marker="X",
+            s=78,
+            color=color,
+            edgecolor="black",
+            linewidth=0.6,
+            zorder=5,
+        )
+
+    timeout_y_values = [
+        entry["duration_seconds_median"]
+        for entry in plot_entries
+        if entry["timeout_count"] > 0 and entry["duration_seconds_median"] > 0
+    ]
+    if timeout_y_values:
+        timeout_level = statistics.median(timeout_y_values)
+        ax.axhline(timeout_level, color="#777777", linestyle=":", linewidth=1.2)
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel("execution time (seconds)")
+    ax.set_title(title)
+    ax.grid(True, which="both", linestyle=":", linewidth=0.65, alpha=0.7)
+
+    if timeout_points:
+        timeout_label = "group includes timeout" if collapse_same_x else "point includes timeout"
+        legend_handles.append(
+            Line2D(
+                [0],
+                [0],
+                color="#333333",
+                linestyle="",
+                marker="X",
+                markersize=8,
+                label=timeout_label,
+            )
+        )
+    ax.legend(handles=legend_handles, loc="best", fontsize=9, ncols=2, frameon=True)
+
+    save_fig(fig, output_dir, filename, generated)
+
+
+def plot_runtime_qubits_plus_gates(rows, output_dir, generated, skipped=None):
+    filename = "32_runtime_vs_qubits_plus_gates_cube_with_timeouts.png"
+    entries = aggregate_runtime_qubits_plus_gates(rows)
+    if not entries:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no rows matched gaussian/magic-aware/homogeneous with cube/connectivity and duration data",
+        )
+        return None
+
+    write_runtime_qubits_plus_gates_csv(entries, output_dir)
+    runtime_plot_specs = [
+        (
+            "32_runtime_vs_qubits_plus_gates",
+            "qubits_plus_gates",
+            "#qubits + #gates",
+            "Median execution time vs #qubits + #gates",
+            False,
+            False,
+            True,
+        ),
+        (
+            "33_runtime_vs_qubits",
+            "qubits",
+            "#qubits",
+            "Median execution time vs #qubits",
+            False,
+            False,
+            True,
+        ),
+        (
+            "34_runtime_vs_gates",
+            "gates",
+            "#gates",
+            "Median execution time vs #gates",
+            False,
+            False,
+            True,
+        ),
+        (
+            "35_runtime_vs_graph_nodes",
+            "graph_nodes",
+            "graph size (#nodes = graph_x * graph_y)",
+            "Median execution time vs graph size",
+            False,
+            False,
+            True,
+        ),
+    ]
+    for (
+        basename,
+        x_key,
+        x_label,
+        title,
+        connect_points,
+        jitter_duplicate_x,
+        collapse_same_x,
+    ) in runtime_plot_specs:
+        for safe_passage in RUNTIME_CURVE_SAFE_PASSAGES:
+            plot_runtime_entries(
+                entries,
+                output_dir,
+                generated,
+                f"{basename}_{safe_passage}_with_timeouts.png",
+                x_key,
+                x_label,
+                f"{title}: gaussian, magic-aware, homogeneous ({safe_passage})",
+                collapse_same_x=collapse_same_x,
+                connect_points=connect_points,
+                jitter_duplicate_x=jitter_duplicate_x,
+                safe_passage_filter=safe_passage,
+            )
+    return entries
+
+
 def plot_summary_tables(rows, output_dir, generated):
     circuits = sorted({r["circuit_name"] for r in rows})
     fig, axs = plt.subplots(1, 2, figsize=(16, 6))
@@ -2932,6 +3504,8 @@ def main():
         generated,
         skipped,
     )
+
+    plot_runtime_qubits_plus_gates(rows, output_dir, generated, skipped)
 
     make_pair_heatmap(
         rows,
