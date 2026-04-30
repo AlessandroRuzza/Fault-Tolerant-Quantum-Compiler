@@ -1,14 +1,12 @@
 #include "boost_router.hpp"
 
-#include <boost/graph/dijkstra_shortest_paths.hpp>
-
 #include <numeric>
 #include <limits>
 #include <map>
 #include <iomanip>
 #include <algorithm>
 
-static constexpr float HARD_BLOCK_WEIGHT = 1e9f;
+static constexpr float HARD_BLOCK_WEIGHT = 1e9f; 
 
 // ---------------------------------------------------------------------------
 // Construction
@@ -316,7 +314,7 @@ void Boost_QubitRouter::route_circuit() {
                 "RRR routing made no progress at layer " +
                 std::to_string(routing_steps.size() + 1) + "."
             );
-        }
+        } 
 
         routing_steps.emplace_back(route);
 
