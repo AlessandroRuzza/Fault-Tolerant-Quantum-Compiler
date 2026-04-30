@@ -19,6 +19,7 @@ IDENTITY_KEYS = (
     "magic_aware_strategy",
     "gaussian_strategy",
     "size_moltiplier",
+    "gaussian_confidence",
     "safe_passage_strategy",
     "magic_state_placement_strategy",
     "border_distance_percentage",

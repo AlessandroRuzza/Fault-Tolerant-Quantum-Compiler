@@ -107,6 +107,7 @@ private:
     double mappedGaussianWeight;
     double baseGaussianWeight;
     double sizeMoltiplier;
+    double gaussianConfidence;
     int T_lower_bound;
     int T_upper_bound;
     int CNOT_threshold;
@@ -130,6 +131,7 @@ public:
         double mapped_gaussian_weight,
         double base_gaussian_weight,
         double size_moltiplier,
+        double gaussian_confidence,
         int maximum_iterations,
         int safe_passage_ignore_outer_layers
     ) :
@@ -142,6 +144,7 @@ public:
     mappedGaussianWeight(mapped_gaussian_weight),
     baseGaussianWeight(base_gaussian_weight),
     sizeMoltiplier(size_moltiplier),
+    gaussianConfidence(gaussian_confidence),
     maximum_iterations(maximum_iterations),
     safe_passage_ignore_outer_layers(safe_passage_ignore_outer_layers),
     farthest_from_magic_selector(graph)  {
@@ -245,6 +248,7 @@ public:
     inline double getMappedGaussianWeight() const { return mappedGaussianWeight; }
     inline double getBaseGaussianWeight() const { return baseGaussianWeight; }
     inline double getSizeMoltiplier() const { return sizeMoltiplier; }
+    inline double getGaussianConfidence() const { return gaussianConfidence; }
 
 
     // returns -1 if qubit is not mapped
@@ -429,6 +433,12 @@ private:
         }
     }
 
+    inline void validate_gaussian_confidence(double value) {
+        if (!std::isfinite(value) || value <= 0.0 || value >= 1.0) {
+            throw std::invalid_argument("GAUSSIAN_CONFIDENCE must be a finite number in (0, 1)");
+        }
+    }
+
     inline void validate_gaussian_weights() {
         validate_non_negative_finite(magicHigh, "MAGIC_HIGH");
         validate_non_negative_finite(magicLow, "MAGIC_LOW");
@@ -437,6 +447,7 @@ private:
         validate_non_negative_finite(mappedGaussianWeight, "MAPPED_GAUSSIAN_WEIGHT");
         validate_non_negative_finite(baseGaussianWeight, "BASE_GAUSSIAN_WEIGHT");
         validate_non_negative_finite(sizeMoltiplier, "SIZE_MOLTIPLIER");
+        validate_gaussian_confidence(gaussianConfidence);
 
         if (magicHigh < magicLow) {
             throw std::invalid_argument("MAGIC_HIGH must be >= MAGIC_LOW");
