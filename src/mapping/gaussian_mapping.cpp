@@ -392,6 +392,11 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
     for (const CandidateScore& candidate : candidates) {
         if (check_safe_passage(*candidate.node, qubit, occupied_nodes)) {
             return *candidate.node;
+        } else {
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "tried to map qubit " << qubit.getQubitID() << " into node " << candidate.node->id
+                << " but did not pass safe passage" << std::endl; 
+            }
         }
     }
 

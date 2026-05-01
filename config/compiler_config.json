@@ -4,10 +4,10 @@
   "type": "gaussian",
   "gaussian_strategy": "coarse",
   "magic_aware_strategy": "center",
-  "safe_passage_strategy": "connectivity",
+  "safe_passage_strategy": "cube",
   "MagicStatePlacementStrategy": "center_circle",
   "number_of_magic_states": 0.9,
-  "border_distance_percentage": 5.0,
+  "border_distance_percentage": 20.0,
 
   "MAGIC_HIGH": 1.6,
   "MAGIC_LOW": 0.6,
@@ -19,9 +19,10 @@
   "GAUSSIAN_CONFIDENCE": 0.66,
 
   
-  "x": 11,
-  "y": 11,
+  "x": -1,
+  "y": -1,
 
   "routing_strategy": "boost",
   "t-routing-mode": "smart_t_routing"
 }
+

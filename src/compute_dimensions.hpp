@@ -6,14 +6,22 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
 {
 
     float dimension = (num_qubits + number_of_magic_states) * 3.5;
-    
-    if (safe_passage_strategy == "cube"){
-        //return dimension;
+
+    if (safe_passage_strategy == "cube") {
+        double border = std::ceil((border_distance_percentage/100)*std::round(std::sqrt(dimension)));
+        dimension = static_cast<int>(std::round(std::sqrt(dimension)));
+        if (border < 3) {
+            dimension += 3;
+        }
+        std::cout << "border: " << border << std::endl;
+        return dimension;
     }
+    
 
     else if (
         safe_passage_strategy == "passage" ||
-        safe_passage_strategy == "passage_no_subgraphs"
+        safe_passage_strategy == "passage_no_subgraphs" ||
+        safe_passage_strategy == "connectivity"
     ) {
         if (type == "homogeneous") {
             dimension = dimension * 0.7;
@@ -24,5 +32,9 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
         }
     }
 
-    return static_cast<int>(std::round(std::sqrt(dimension) * (1.1 + border_distance_percentage/100.0)));
+    return static_cast<int>(std::round(std::sqrt(dimension)));
+
+
+
+    //
 }
