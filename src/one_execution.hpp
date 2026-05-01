@@ -4,7 +4,15 @@
 #include "maxHeap.hpp"
 #include "mapping.hpp"
 #include "routing.hpp"
+
+#ifndef FTOQC_HAS_BOOST_ROUTER
+#define FTOQC_HAS_BOOST_ROUTER 0
+#endif
+
+#if FTOQC_HAS_BOOST_ROUTER
 #include "boost_router.hpp"
+#endif
+
 #include "defines.hpp"
 #include "compute_dimensions.hpp"
 #include "helpers.hpp"
@@ -225,7 +233,13 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::unique_ptr<IQubitRouter> routerPtr;
 
     if (routing_strategy == "boost") {
+#if FTOQC_HAS_BOOST_ROUTER
         routerPtr = std::make_unique<Boost_QubitRouter>(mapping, layeredCircuit, graph);
+#else
+        throw std::runtime_error(
+            "Routing strategy 'boost' requires Boost support, but this binary was built without Boost."
+        );
+#endif
     } else {
         constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
         constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
@@ -266,7 +280,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Total mapping + routing time: " << total_time_seconds << " s\n\n";
 
     return benchmarkResult{
-        router.get_routing_length(),
+        routerPtr->get_routing_length(),
         avg_parallelism,
         resolved_graph_x,
         resolved_graph_y

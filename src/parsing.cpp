@@ -15,6 +15,10 @@
 
 #include <nlohmann/json.hpp>
 
+#ifndef FTOQC_HAS_BOOST_ROUTER
+#define FTOQC_HAS_BOOST_ROUTER 0
+#endif
+
 namespace {
 
 using json = nlohmann::json;
@@ -187,6 +191,14 @@ void validate_routing_method(const std::string& value, const char* executable) {
         print_usage(executable);
         throw std::runtime_error("Invalid routing method: " + value);
     }
+
+#if !FTOQC_HAS_BOOST_ROUTER
+    if (normalized == "boost") {
+        std::cerr << "Routing method 'boost' requires Boost support, but this binary was built without Boost.\n";
+        print_usage(executable);
+        throw std::runtime_error("Routing method 'boost' requires Boost support");
+    }
+#endif
 }
 
 void validate_t_routing_mode(const std::string& value, const char* executable) {
@@ -291,7 +303,11 @@ void print_usage(const char* executable) {
               << "[--base-gaussian-weight <float>=0]\n"
               << "[--size-moltiplier <float> >=0, default=1]\n"
               << "[--gaussian-confidence <float> in (0,1), default=0.95]\n"
+#if FTOQC_HAS_BOOST_ROUTER
               << "[--routing-strategy [congestion|naive|boost]]\n"
+#else
+              << "[--routing-strategy [congestion|naive]] (boost unavailable in this build)\n"
+#endif
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"
               << "[--x <integer>]\n"
