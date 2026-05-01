@@ -32,7 +32,7 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
         }
     }
 
-    return static_cast<int>(std::round(std::sqrt(dimension)));
+    return static_cast<int>(std::round(std::sqrt(dimension) * (1.1 + border_distance_percentage/100.0)));
 
 
 

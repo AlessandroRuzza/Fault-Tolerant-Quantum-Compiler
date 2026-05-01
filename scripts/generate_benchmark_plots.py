@@ -33,6 +33,16 @@ REQUESTED_MAGIC_AWARE_STRATEGIES = {"center", "distance", "random"}
 RUNTIME_CURVE_MAPPING_TYPES = ("gaussian", "magic_aware", "homogeneous")
 RUNTIME_CURVE_SAFE_PASSAGES = ("cube", "connectivity")
 RUNTIME_CURVE_STATUSES = SUCCESS_STATUSES | TIMEOUT_STATUSES
+RUNTIME_GROUPED_X_SPECS = (
+    ("qubits", "#qubits", "qubits"),
+    ("gates", "#gates", "gates"),
+    ("graph_nodes", "graph size (#nodes = graph_x * graph_y)", "graph_nodes"),
+)
+RUNTIME_GROUPED_FACTOR_SPECS = (
+    ("size_moltiplier_f", "size_moltiplier", "size multiplier", "size_moltiplier"),
+    ("gaussian_confidence_f", "gaussian_confidence", "gaussian confidence", "gaussian_confidence"),
+    ("safe_passage_norm", "safe_passage_strategy", "safe passage strategy", "safe_passage_strategy"),
+)
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
 DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
 OBSOLETE_PLOT_FILENAMES = {
@@ -91,6 +101,19 @@ REPORT_PLOTS = [
     (
         "35_runtime_vs_graph_nodes_connectivity_with_timeouts.png",
         "Duration vs graph size: connectivity median points",
+    ),
+    ("36_runtime_vs_qubits_by_size_moltiplier.png", "Duration vs qubits by size multiplier"),
+    ("37_runtime_vs_qubits_by_gaussian_confidence.png", "Duration vs qubits by gaussian confidence"),
+    ("38_runtime_vs_qubits_by_safe_passage_strategy.png", "Duration vs qubits by safe passage"),
+    ("39_runtime_vs_gates_by_size_moltiplier.png", "Duration vs gates by size multiplier"),
+    ("40_runtime_vs_gates_by_gaussian_confidence.png", "Duration vs gates by gaussian confidence"),
+    ("41_runtime_vs_gates_by_safe_passage_strategy.png", "Duration vs gates by safe passage"),
+    ("42_runtime_vs_graph_nodes_by_size_moltiplier.png", "Duration vs graph size by size multiplier"),
+    ("43_runtime_vs_graph_nodes_by_gaussian_confidence.png", "Duration vs graph size by gaussian confidence"),
+    ("44_runtime_vs_graph_nodes_by_safe_passage_strategy.png", "Duration vs graph size by safe passage"),
+    (
+        "45_heatmap_routing_safe_passage_vs_gaussian_confidence.png",
+        "Routing heatmap: safe passage x gaussian confidence",
     ),
     ("09_scatter_density_vs_routing.png", "Density vs routing"),
     ("10_scatter_magic_states_vs_routing.png", "Magic state parameter vs routing"),
@@ -675,6 +698,12 @@ def prepare_rows_for_analysis(raw_rows):
         row["cnot_low_f"] = to_float(row.get("cnot_low"))
         row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
         row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
+        row["size_moltiplier_f"] = to_float(row.get("size_moltiplier"))
+        row["gaussian_confidence_f"] = to_float(row.get("gaussian_confidence"))
+        if row["gaussian_confidence_f"] is not None:
+            row["gaussian_confidence_label"] = format_number_label(row["gaussian_confidence_f"])
+        else:
+            row["gaussian_confidence_label"] = ""
         duration_seconds = to_float(row.get("duration_seconds"))
         elapsed_ms = to_float(row.get("elapsed_ms"))
         if duration_seconds is not None:
@@ -2261,7 +2290,12 @@ def make_pair_heatmap(
             sample_count = count_matrix[i, j]
             metric_text = "-" if np.isnan(val) else value_format.format(val)
             text = f"{metric_text}\nn={sample_count}"
-            color = "white" if not np.isnan(val) else "#999999"
+            if np.isnan(val):
+                color = "#999999"
+            else:
+                red, green, blue, _ = im.cmap(im.norm(val))
+                luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                color = "white" if luminance < 0.45 else "#111111"
             ax.text(j, i, text, ha="center", va="center", color=color, fontsize=7, linespacing=0.9)
 
     save_fig(fig, output_dir, filename, generated)
@@ -2272,6 +2306,13 @@ def mean_of(values):
     if not values:
         return None
     return float(np.mean(values))
+
+
+def median_of(values):
+    values = non_empty(values)
+    if not values:
+        return None
+    return float(np.median(values))
 
 
 def success_rate(subset):
@@ -2824,6 +2865,378 @@ def plot_runtime_qubits_plus_gates(rows, output_dir, generated, skipped=None):
                 safe_passage_filter=safe_passage,
             )
     return entries
+
+
+def runtime_group_value(row, factor_key):
+    value = row.get(factor_key)
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+
+    if factor_key.endswith("_f"):
+        return format_number_label(value), float(value)
+
+    text = str(value).strip()
+    if not text:
+        return None
+    return text, text
+
+
+def runtime_measurement_entries(rows):
+    qasm_cache = {}
+    entries = []
+
+    for row in rows:
+        status = normalize_text(row.get("status"))
+        duration = row.get("duration_s_f")
+        if status not in RUNTIME_CURVE_STATUSES:
+            continue
+        if duration is None or duration <= 0:
+            continue
+
+        circuit = row.get("circuit") or row.get("circuit_name")
+        metrics = qasm_metrics_for_circuit(circuit, qasm_cache)
+        if metrics is None:
+            continue
+
+        graph_nodes = graph_node_count(row)
+        if graph_nodes is None:
+            continue
+
+        entry = {
+            "circuit": os.path.splitext(os.path.basename(normalize_csv_text(circuit)))[0],
+            "mapping_type": row.get("mapping_type_norm"),
+            "qubits": metrics["qubits"],
+            "gates": metrics["gates"],
+            "graph_nodes": graph_nodes,
+            "duration_seconds": duration,
+            "status": status,
+        }
+
+        for factor_key, _, _, _ in RUNTIME_GROUPED_FACTOR_SPECS:
+            group_value = runtime_group_value(row, factor_key)
+            if group_value is None:
+                continue
+            entry[f"{factor_key}_label"] = group_value[0]
+            entry[f"{factor_key}_sort"] = group_value[1]
+
+        entries.append(entry)
+
+    return entries
+
+
+def aggregate_runtime_grouped(entries, x_key, factor_key, exclude_mapping_types=None):
+    if exclude_mapping_types is None:
+        exclude_mapping_types = set()
+
+    grouped = defaultdict(list)
+    for entry in entries:
+        if entry.get("mapping_type") in exclude_mapping_types:
+            continue
+        x_value = entry.get(x_key)
+        group_label = entry.get(f"{factor_key}_label")
+        group_sort = entry.get(f"{factor_key}_sort")
+        if x_value is None or group_label is None:
+            continue
+        if isinstance(x_value, float) and math.isnan(x_value):
+            continue
+        if x_value <= 0:
+            continue
+        grouped[(group_label, group_sort, x_value)].append(entry)
+
+    aggregate = []
+    for (group_label, group_sort, x_value), group_entries in grouped.items():
+        durations = [entry["duration_seconds"] for entry in group_entries]
+        aggregate.append(
+            {
+                "group_label": group_label,
+                "group_sort": group_sort,
+                "x_value": x_value,
+                "duration_seconds_median": statistics.median(durations),
+                "duration_seconds_min": min(durations),
+                "duration_seconds_max": max(durations),
+                "sample_count": len(group_entries),
+                "success_count": sum(entry["status"] in SUCCESS_STATUSES for entry in group_entries),
+                "timeout_count": sum(entry["status"] in TIMEOUT_STATUSES for entry in group_entries),
+            }
+        )
+
+    aggregate.sort(key=lambda item: (str(type(item["group_sort"])), item["group_sort"], item["x_value"]))
+    return aggregate
+
+
+def aggregate_homogeneous_baseline(entries, x_key):
+    grouped = defaultdict(list)
+    for entry in entries:
+        if entry.get("mapping_type") != "homogeneous":
+            continue
+        x_value = entry.get(x_key)
+        if x_value is None:
+            continue
+        if isinstance(x_value, float) and math.isnan(x_value):
+            continue
+        if x_value <= 0:
+            continue
+        grouped[x_value].append(entry)
+
+    aggregate = []
+    for x_value, group_entries in grouped.items():
+        durations = [entry["duration_seconds"] for entry in group_entries]
+        aggregate.append(
+            {
+                "x_value": x_value,
+                "duration_seconds_median": statistics.median(durations),
+                "duration_seconds_min": min(durations),
+                "duration_seconds_max": max(durations),
+                "sample_count": len(group_entries),
+                "success_count": sum(entry["status"] in SUCCESS_STATUSES for entry in group_entries),
+                "timeout_count": sum(entry["status"] in TIMEOUT_STATUSES for entry in group_entries),
+            }
+        )
+
+    aggregate.sort(key=lambda item: item["x_value"])
+    return aggregate
+
+
+def runtime_group_sort_key(value):
+    if isinstance(value, (int, float)):
+        return (0, float(value))
+    return (1, str(value))
+
+
+def write_runtime_grouped_factors_csv(all_entries, output_dir):
+    csv_path = os.path.join(output_dir, "36_runtime_grouped_factors.csv")
+    fieldnames = [
+        "plot_filename",
+        "series_type",
+        "x_axis",
+        "group_by",
+        "group_value",
+        "x_value",
+        "duration_seconds_median",
+        "duration_seconds_min",
+        "duration_seconds_max",
+        "sample_count",
+        "success_count",
+        "timeout_count",
+    ]
+    os.makedirs(output_dir, exist_ok=True)
+    with open(csv_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(all_entries)
+    return csv_path
+
+
+def plot_runtime_grouped_entries(
+    aggregate,
+    output_dir,
+    generated,
+    filename,
+    x_label,
+    group_label,
+    title,
+    skipped=None,
+    baseline=None,
+):
+    if baseline is None:
+        baseline = []
+
+    plot_entries = [
+        entry
+        for entry in aggregate
+        if entry["x_value"] > 0 and entry["duration_seconds_median"] > 0
+    ]
+    baseline_entries = [
+        entry
+        for entry in baseline
+        if entry["x_value"] > 0 and entry["duration_seconds_median"] > 0
+    ]
+
+    if not plot_entries and not baseline_entries:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no rows with positive x values and duration_seconds for this grouping",
+        )
+        return
+
+    groups = sorted(
+        {entry["group_label"] for entry in plot_entries},
+        key=lambda label: runtime_group_sort_key(
+            next(entry["group_sort"] for entry in plot_entries if entry["group_label"] == label)
+        ),
+    )
+    colors = category_color_map(groups)
+
+    fig, ax = plt.subplots(figsize=(12, 7))
+    for group in groups:
+        points = [entry for entry in plot_entries if entry["group_label"] == group]
+        points.sort(key=lambda item: item["x_value"])
+        sample_count = sum(entry["sample_count"] for entry in points)
+        ax.plot(
+            [entry["x_value"] for entry in points],
+            [entry["duration_seconds_median"] for entry in points],
+            marker="o",
+            linewidth=1.8,
+            markersize=5,
+            alpha=0.9,
+            color=colors[group],
+            label=legend_label_with_sample_count(group, sample_count),
+        )
+
+        timeout_points = [entry for entry in points if entry["timeout_count"] > 0]
+        if timeout_points:
+            ax.scatter(
+                [entry["x_value"] for entry in timeout_points],
+                [entry["duration_seconds_median"] for entry in timeout_points],
+                marker="X",
+                s=82,
+                color=colors[group],
+                edgecolor="black",
+                linewidth=0.6,
+                zorder=5,
+            )
+
+    if baseline_entries:
+        baseline_entries.sort(key=lambda item: item["x_value"])
+        baseline_sample_count = sum(entry["sample_count"] for entry in baseline_entries)
+        ax.plot(
+            [entry["x_value"] for entry in baseline_entries],
+            [entry["duration_seconds_median"] for entry in baseline_entries],
+            color="#111111",
+            linestyle="--",
+            marker="D",
+            linewidth=2.2,
+            markersize=5,
+            alpha=0.95,
+            label=legend_label_with_sample_count("Homogeneous baseline", baseline_sample_count),
+            zorder=6,
+        )
+
+        timeout_points = [entry for entry in baseline_entries if entry["timeout_count"] > 0]
+        if timeout_points:
+            ax.scatter(
+                [entry["x_value"] for entry in timeout_points],
+                [entry["duration_seconds_median"] for entry in timeout_points],
+                marker="X",
+                s=88,
+                color="#111111",
+                edgecolor="white",
+                linewidth=0.6,
+                zorder=7,
+            )
+
+    if any(entry["timeout_count"] > 0 for entry in plot_entries + baseline_entries):
+        ax.scatter([], [], marker="X", s=82, color="#333333", label="point includes timeout")
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel("execution time (seconds)")
+    ax.set_title(f"{title} grouped by {group_label}")
+    ax.grid(True, which="both", linestyle=":", linewidth=0.65, alpha=0.7)
+    ax.legend(fontsize=8, frameon=True)
+    save_fig(fig, output_dir, filename, generated)
+
+
+def plot_runtime_grouped_factors(rows, output_dir, generated, skipped=None):
+    entries = runtime_measurement_entries(rows)
+    if not entries:
+        record_skipped_plot(
+            skipped,
+            "36_runtime_vs_qubits_by_size_moltiplier.png",
+            "no rows with duration data and resolvable QASM metrics",
+        )
+        return None
+
+    csv_entries = []
+    plot_index = 36
+    for x_key, x_label, x_slug in RUNTIME_GROUPED_X_SPECS:
+        baseline = aggregate_homogeneous_baseline(entries, x_key)
+        for factor_key, factor_csv_name, factor_label, factor_slug in RUNTIME_GROUPED_FACTOR_SPECS:
+            filename = f"{plot_index:02d}_runtime_vs_{x_slug}_by_{factor_slug}.png"
+            aggregate = aggregate_runtime_grouped(
+                entries,
+                x_key,
+                factor_key,
+                exclude_mapping_types={"homogeneous"},
+            )
+            for aggregate_entry in aggregate:
+                csv_entries.append(
+                    {
+                        "plot_filename": filename,
+                        "series_type": "grouped_factor",
+                        "x_axis": x_key,
+                        "group_by": factor_csv_name,
+                        "group_value": aggregate_entry["group_label"],
+                        "x_value": aggregate_entry["x_value"],
+                        "duration_seconds_median": aggregate_entry["duration_seconds_median"],
+                        "duration_seconds_min": aggregate_entry["duration_seconds_min"],
+                        "duration_seconds_max": aggregate_entry["duration_seconds_max"],
+                        "sample_count": aggregate_entry["sample_count"],
+                        "success_count": aggregate_entry["success_count"],
+                        "timeout_count": aggregate_entry["timeout_count"],
+                    }
+                )
+            for baseline_entry in baseline:
+                csv_entries.append(
+                    {
+                        "plot_filename": filename,
+                        "series_type": "homogeneous_baseline",
+                        "x_axis": x_key,
+                        "group_by": factor_csv_name,
+                        "group_value": "homogeneous",
+                        "x_value": baseline_entry["x_value"],
+                        "duration_seconds_median": baseline_entry["duration_seconds_median"],
+                        "duration_seconds_min": baseline_entry["duration_seconds_min"],
+                        "duration_seconds_max": baseline_entry["duration_seconds_max"],
+                        "sample_count": baseline_entry["sample_count"],
+                        "success_count": baseline_entry["success_count"],
+                        "timeout_count": baseline_entry["timeout_count"],
+                    }
+                )
+            plot_runtime_grouped_entries(
+                aggregate,
+                output_dir,
+                generated,
+                filename,
+                x_label,
+                factor_label,
+                f"Median execution time vs {x_label}",
+                skipped,
+                baseline,
+            )
+            plot_index += 1
+
+    return write_runtime_grouped_factors_csv(csv_entries, output_dir)
+
+
+def plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, generated, skipped=None):
+    heatmap_rows = [
+        row
+        for row in rows
+        if row.get("mapping_type_norm") == "gaussian"
+        and row.get("safe_passage_norm") in {"connectivity", "cube"}
+        and row.get("gaussian_confidence_label")
+        and row.get("success")
+        and row.get("routing_steps_f") is not None
+    ]
+
+    make_pair_heatmap(
+        heatmap_rows,
+        "safe_passage_norm",
+        "gaussian_confidence_label",
+        lambda subset: median_of([r["routing_steps_f"] for r in subset]),
+        "Median Routing Steps by Safe Passage and Gaussian Confidence",
+        "median routing steps",
+        "45_heatmap_routing_safe_passage_vs_gaussian_confidence.png",
+        output_dir,
+        generated,
+        skipped,
+        value_format="{:.0f}",
+    )
 
 
 def plot_summary_tables(rows, output_dir, generated):
@@ -3507,6 +3920,8 @@ def main():
     )
 
     plot_runtime_qubits_plus_gates(rows, output_dir, generated, skipped)
+    runtime_grouped_factors_csv_path = plot_runtime_grouped_factors(rows, output_dir, generated, skipped)
+    plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, generated, skipped)
 
     make_pair_heatmap(
         rows,
@@ -3712,6 +4127,8 @@ def main():
     print(gaussian_best_csv_path)
     print(best_mapping_csv_path)
     print(best_mapping_exit0_csv_path)
+    if runtime_grouped_factors_csv_path is not None:
+        print(runtime_grouped_factors_csv_path)
     if distinct_info is not None:
         print(
             "Repeated configurations found: "
