@@ -20,13 +20,13 @@
     "GAUSSIAN_CONFIDENCE": [0.66, 0.8, 0.95, 0.99],
 
     
-    "x": 11,
-    "y": 11,
+    "x": -1,
+    "y": -1,
 
     "routing_strategy": "congestion",
     "t-routing-mode": "normal_t_routing",
 
-    "timeout": 1200,
+    "timeout": 2400,
     "timeout_reached": false
 }
 

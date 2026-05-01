@@ -22,6 +22,8 @@ using namespace std;
 struct benchmarkResult {
     int routing_steps = 0;
     double avg_parallelism = 1;
+    int resolved_graph_x = -1;
+    int resolved_graph_y = -1;
 };
 
 namespace {
@@ -85,10 +87,18 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     if (PRINT_CIRCUIT) circuit.print_qubit_heap();
 
-    std::cout << "Setting up circuit with " << circuit.getNumQubits() << " qubits." << std::endl;
+    int qubitsNumber = circuit.getNumQubits();
+
+    if (qubitsNumber == 0){
+        std::cout << "no routable gates\n";
+        return benchmarkResult{0, 0};
+    }
+
+
+    std::cout << "Setting up circuit with " << qubitsNumber << " qubits." << std::endl;
 
     if (number_of_magic_states_multiplier > 0.0) {
-        number_of_magic_states = static_cast<int>(std::round(static_cast<double>(circuit.getNumQubits()) * number_of_magic_states_multiplier));
+        number_of_magic_states = static_cast<int>(std::round(static_cast<double>(qubitsNumber) * number_of_magic_states_multiplier));
         if (!std::isfinite(number_of_magic_states) || number_of_magic_states <= 0.0) {
             throw std::runtime_error("Resolved number_of_magic_states must be > 0");
         }
@@ -100,7 +110,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
         std::cout
             << "Resolved number_of_magic_states from multiplier: "
-            << circuit.getNumQubits() << " * " << number_of_magic_states_multiplier
+            << qubitsNumber << " * " << number_of_magic_states_multiplier
             << " -> " << number_of_magic_states << "\n";
     }
 
@@ -255,5 +265,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Routing time: " << routing_time_seconds << " s\n";
     std::cout << "Total mapping + routing time: " << total_time_seconds << " s\n\n";
 
-    return benchmarkResult{routerPtr->get_routing_length(), avg_parallelism};
+    return benchmarkResult{
+        router.get_routing_length(),
+        avg_parallelism,
+        resolved_graph_x,
+        resolved_graph_y
+    };
 }
