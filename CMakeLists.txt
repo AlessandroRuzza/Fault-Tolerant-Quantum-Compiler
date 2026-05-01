@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 OLD)
+endif()
+
 project(FaultTolerantQuantumCompiler CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -10,33 +14,45 @@ include_directories(include)
 
 file(GLOB_RECURSE ALL_SRC_FILES CONFIGURE_DEPENDS src/*.cpp)
 
-add_executable(FaultTolerantQuantumCompiler ${ALL_SRC_FILES})
-add_definitions(-DPROJECT_ROOT="${CMAKE_SOURCE_DIR}")
-
-find_package(OpenMP QUIET)
-
 # ------Boost (header-only Graph library)-------------
 # The cluster module system exposes Boost via $mkBoostPrefix rather than BOOST_ROOT,
 # so seed BOOST_ROOT from it before calling find_package.
 if(DEFINED ENV{mkBoostPrefix})
     set(Boost_ROOT "$ENV{mkBoostPrefix}" CACHE PATH "Boost root from mkBoostPrefix")
 endif()
+
+set(FTOQC_HAS_BOOST_ROUTER OFF)
 find_package(Boost QUIET)
 if(Boost_FOUND)
-    target_include_directories(FaultTolerantQuantumCompiler SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
+    set(FTOQC_HAS_BOOST_ROUTER ON)
     message(STATUS "Found Boost: ${Boost_INCLUDE_DIRS}")
-elseif(DEFINED ENV{mkBoostInc})
+elseif(DEFINED ENV{mkBoostInc} AND EXISTS "$ENV{mkBoostInc}/boost/graph/adjacency_list.hpp")
     # Fallback: use the header path directly when find_package still fails.
-    target_include_directories(FaultTolerantQuantumCompiler SYSTEM PRIVATE "$ENV{mkBoostInc}")
+    set(FTOQC_HAS_BOOST_ROUTER ON)
+    set(Boost_INCLUDE_DIRS "$ENV{mkBoostInc}")
     message(STATUS "Using Boost headers from mkBoostInc: $ENV{mkBoostInc}")
 else()
-    message(WARNING "Boost not found: Boost_QubitRouter (RRR router) will not compile. Load the boost/1.76.0 module (requires gcc-glibc/11.2.0).")
+    list(REMOVE_ITEM ALL_SRC_FILES "${CMAKE_SOURCE_DIR}/src/routing/router_conflict_driven.cpp")
+    message(STATUS "Boost not found: Boost_QubitRouter (RRR router) is disabled. Non-boost routing strategies will still compile.")
 endif()
 
-# Silence "#pragma message: This header is deprecated" notes from Boost 1.76
-# internals (boost/detail/iterator.hpp etc.).  BOOST_ALLOW_DEPRECATED_HEADERS
-# makes BOOST_HEADER_DEPRECATED(...) expand to nothing instead of the pragma.
-target_compile_definitions(FaultTolerantQuantumCompiler PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
+add_executable(FaultTolerantQuantumCompiler ${ALL_SRC_FILES})
+add_definitions(-DPROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+
+find_package(OpenMP QUIET)
+
+if(FTOQC_HAS_BOOST_ROUTER)
+    target_include_directories(FaultTolerantQuantumCompiler SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
+    # Silence "#pragma message: This header is deprecated" notes from Boost 1.76
+    # internals (boost/detail/iterator.hpp etc.). BOOST_ALLOW_DEPRECATED_HEADERS
+    # makes BOOST_HEADER_DEPRECATED(...) expand to nothing instead of the pragma.
+    target_compile_definitions(FaultTolerantQuantumCompiler PRIVATE
+        FTOQC_HAS_BOOST_ROUTER=1
+        BOOST_ALLOW_DEPRECATED_HEADERS
+    )
+else()
+    target_compile_definitions(FaultTolerantQuantumCompiler PRIVATE FTOQC_HAS_BOOST_ROUTER=0)
+endif()
 
 # ------JSON and Main-------------
 
