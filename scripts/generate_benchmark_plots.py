@@ -115,6 +115,10 @@ REPORT_PLOTS = [
         "45_heatmap_routing_safe_passage_vs_gaussian_confidence.png",
         "Routing heatmap: safe passage x gaussian confidence",
     ),
+    (
+        "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier.png",
+        "Routing heatmap: gaussian confidence x size multiplier",
+    ),
     ("09_scatter_density_vs_routing.png", "Density vs routing"),
     ("10_scatter_magic_states_vs_routing.png", "Magic state parameter vs routing"),
     ("11_scatter_border_vs_routing_center_circle.png", "Border distance vs routing"),
@@ -699,6 +703,10 @@ def prepare_rows_for_analysis(raw_rows):
         row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
         row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
         row["size_moltiplier_f"] = to_float(row.get("size_moltiplier"))
+        if row["size_moltiplier_f"] is not None:
+            row["size_moltiplier_label"] = format_number_label(row["size_moltiplier_f"])
+        else:
+            row["size_moltiplier_label"] = ""
         row["gaussian_confidence_f"] = to_float(row.get("gaussian_confidence"))
         if row["gaussian_confidence_f"] is not None:
             row["gaussian_confidence_label"] = format_number_label(row["gaussian_confidence_f"])
@@ -3239,6 +3247,32 @@ def plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, gene
     )
 
 
+def plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, generated, skipped=None):
+    heatmap_rows = [
+        row
+        for row in rows
+        if row.get("mapping_type_norm") == "gaussian"
+        and row.get("gaussian_confidence_label")
+        and row.get("size_moltiplier_label")
+        and row.get("success")
+        and row.get("routing_steps_f") is not None
+    ]
+
+    make_pair_heatmap(
+        heatmap_rows,
+        "gaussian_confidence_label",
+        "size_moltiplier_label",
+        lambda subset: median_of([r["routing_steps_f"] for r in subset]),
+        "Median Routing Steps by Gaussian Confidence and Size Multiplier",
+        "median routing steps",
+        "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier.png",
+        output_dir,
+        generated,
+        skipped,
+        value_format="{:.0f}",
+    )
+
+
 def plot_summary_tables(rows, output_dir, generated):
     circuits = sorted({r["circuit_name"] for r in rows})
     fig, axs = plt.subplots(1, 2, figsize=(16, 6))
@@ -3922,6 +3956,7 @@ def main():
     plot_runtime_qubits_plus_gates(rows, output_dir, generated, skipped)
     runtime_grouped_factors_csv_path = plot_runtime_grouped_factors(rows, output_dir, generated, skipped)
     plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, generated, skipped)
+    plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, generated, skipped)
 
     make_pair_heatmap(
         rows,
