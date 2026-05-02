@@ -32,29 +32,59 @@
 
   "configs_circuit" : [
     {
-      "circuit": "continuous_3_17_13",
+      "circuit": "adder_n4",
       "x": 5,
       "y": 5
     },
     {
-      "circuit": "example",
+      "circuit": "toffoli_n3",
       "x": 5,
       "y": 5
     },
     {
-      "circuit": "bb84_n8",
-      "x": 6,
-      "y": 6
+      "circuit": "fredkin_n3",
+      "x": 5,
+      "y": 5
     },
     {
-      "circuit": "qaoa_n6",
-      "x": 6,
-      "y": 6
+      "circuit": "qft_n18",
+      "x": 12,
+      "y": 12
     },
     {
-      "circuit": "parallel",
+      "circuit": "ising_n26",
+      "x": 12,
+      "y": 12
+    },
+    {
+      "circuit": "bwt_n21",
+      "x": 14,
+      "y": 14
+    },
+    {
+      "circuit": "factor247_n15",
+      "x": 15,
+      "y": 15
+    },
+    {
+      "circuit": "hhl_n10",
+      "x": 10,
+      "y": 10
+    },
+    {
+      "circuit": "vqe_uccsd_n8",
       "x": 8,
       "y": 8
+    },
+    {
+      "circuit": "vqe_n24",
+      "x": 14,
+      "y": 14
+    },
+    {
+      "circuit": "qaoa_n6_transpiled",
+      "x": 6,
+      "y": 6
     },
     {
       "circuit": "bigadder_n18_transpiled",
@@ -65,11 +95,6 @@
       "circuit": "dnn_n16",
       "x": 10,
       "y": 10
-    },
-    {
-      "circuit": "ghz_state_n23",
-      "x": 13,
-      "y": 13
     },
     {
       "circuit": "wstate_n27",

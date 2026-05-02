@@ -1,5 +1,6 @@
 #include "circuit.hpp"
 #include <sstream>
+#include <unordered_map>
 
 static std::string trim(const std::string &s) {
     size_t a = s.find_first_not_of(" \t\r\n");
@@ -70,6 +71,8 @@ void Circuit::parse_qasm_file(const std::string &path) {
     std::regex qubit_re(R"((?:([a-zA-Z_]\w*)\s*\[\s*(\d+)\s*\]))");
 
     int globalID = 0;
+    std::unordered_map<std::string, unsigned> qreg_offsets;
+    unsigned total_declared_qubits = 0;
     while (std::getline(ifs, line)) {
         auto s = trim(line);
         
@@ -80,11 +83,14 @@ void Circuit::parse_qasm_file(const std::string &path) {
         if (s.rfind("include", 0) == 0) continue;
         if (s.rfind("qreg", 0) == 0) {
             // Extract the number of qubits declared
-            std::regex qreg_re(R"(^\s*qreg\s+[a-zA-Z_]\w*\s*\[\s*(\d+)\s*\];)");
+            std::regex qreg_re(R"(^\s*qreg\s+([a-zA-Z_]\w*)\s*\[\s*(\d+)\s*\];)");
             std::smatch m;
             if (std::regex_search(s, m, qreg_re)) {
-                int num_qubits = static_cast<int>(std::stoul(m[1].str()));
-                setupCircuit(num_qubits);
+                const std::string qreg_name = m[1].str();
+                int num_qubits = static_cast<int>(std::stoul(m[2].str()));
+                qreg_offsets[qreg_name] = total_declared_qubits;
+                total_declared_qubits += static_cast<unsigned>(num_qubits);
+                setupCircuit(static_cast<int>(total_declared_qubits));
             }
             continue;
         }
@@ -104,8 +110,12 @@ void Circuit::parse_qasm_file(const std::string &path) {
             auto end = std::sregex_iterator();
             for (auto it = begin; it != end; ++it) {
                 std::smatch qm = *it;
-                // qm[1] is register name (ignored for now), qm[2] is index
+                const std::string qreg_name = qm[1].str();
                 unsigned idx = static_cast<unsigned>(std::stoul(qm[2].str()));
+                const auto offset_it = qreg_offsets.find(qreg_name);
+                if (offset_it != qreg_offsets.end()) {
+                    idx += offset_it->second;
+                }
                 gate.qubits.push_back(idx);
             }
 

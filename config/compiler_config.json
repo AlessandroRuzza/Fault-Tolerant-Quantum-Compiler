@@ -22,7 +22,7 @@
   "x": -1,
   "y": -1,
 
-  "routing_strategy": "congestion",
+  "routing_strategy": "boost",
   "t-routing-mode": "smart_t_routing"
 }
 

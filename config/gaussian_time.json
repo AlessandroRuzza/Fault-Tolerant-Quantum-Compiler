@@ -1,6 +1,6 @@
 [
 {
-    "circuit": ["qft_20", "continuous_3_17_13", "dnn_n16", "example", "adder_n64_transpiled", "bb84_n8", "ghz_state_n23", "ghz_n255", "qaoa_n6", "wstate_n27"],
+    "circuit": ["qft_20", "dnn_n16", "adder_n64_transpiled", "ghz_n255", "qaoa_n6_transpiled", "wstate_n27", "adder_n4", "toffoli_n3", "fredkin_n3", "qft_n18", "ising_n26", "bwt_n21", "factor247_n15", "hhl_n10", "vqe_uccsd_n8", "vqe_n24"],
 
     "type": "gaussian",
     "gaussian_strategy": "coarse",
@@ -30,7 +30,7 @@
     "timeout_reached": false
 },
 {
-    "circuit": ["qft_20", "continuous_3_17_13", "dnn_n16", "example", "adder_n64_transpiled", "bb84_n8", "ghz_state_n23", "ghz_n255", "qaoa_n6", "wstate_n27"],
+    "circuit": ["qft_20", "dnn_n16", "adder_n64_transpiled", "ghz_n255", "qaoa_n6_transpiled", "wstate_n27", "adder_n4", "toffoli_n3", "fredkin_n3", "qft_n18", "ising_n26", "bwt_n21", "factor247_n15", "hhl_n10", "vqe_uccsd_n8", "vqe_n24"],
 
     "type": "homogeneous",
     "gaussian_strategy": "coarse",
