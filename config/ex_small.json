@@ -1,5 +1,5 @@
 {
-  "circuit": ["qft_20", "example"],
+  "circuit": ["qft_20", "adder_n4", "toffoli_n3", "fredkin_n3", "qaoa_n6_transpiled", "qft_n18", "dnn_n16", "ising_n26", "bwt_n21", "factor247_n15", "hhl_n10", "vqe_uccsd_n8", "vqe_n24"],
   "safe_passage_strategy": ["cube", "passage", "passage_no_subgraphs", "connectivity"],
   "MagicStatePlacementStrategy": ["center_circle", "right_row"],
   "border_distance_percentage": [0.0, 5.0],

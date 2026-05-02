@@ -32,27 +32,57 @@
 
   "configs_circuit" : [
     {
-      "circuit": "continuous_3_17_13",
+      "circuit": "adder_n4",
       "x": 100,
       "y": 100
     },
     {
-      "circuit": "example",
+      "circuit": "toffoli_n3",
       "x": 100,
       "y": 100
     },
     {
-      "circuit": "bb84_n8",
+      "circuit": "fredkin_n3",
       "x": 100,
       "y": 100
     },
     {
-      "circuit": "qaoa_n6",
+      "circuit": "qft_n18",
       "x": 100,
       "y": 100
     },
     {
-      "circuit": "parallel",
+      "circuit": "ising_n26",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "circuit": "bwt_n21",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "circuit": "factor247_n15",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "circuit": "hhl_n10",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "circuit": "vqe_uccsd_n8",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "circuit": "vqe_n24",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "circuit": "qaoa_n6_transpiled",
       "x": 100,
       "y": 100
     },
@@ -63,11 +93,6 @@
     },
     {
       "circuit": "dnn_n16",
-      "x": 100,
-      "y": 100
-    },
-    {
-      "circuit": "ghz_state_n23",
       "x": 100,
       "y": 100
     },
