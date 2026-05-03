@@ -1,0 +1,51 @@
+circuit_graph_label,circuit,graph_x,graph_y,best_mapping,safe_passage,magic_placement,routing_steps
+adder_n64_transpiled-19x19,adder_n64_transpiled,19,19,magic-aware (center),passage_no_subgraphs,center_circle(5%),255.0
+bb84_n8-6x6,bb84_n8,6,6,gaussian (coarse),connectivity,center_circle(5%),15.0
+bb84_n8-6x6,bb84_n8,6,6,gaussian (coarse),passage,center_circle(5%),15.0
+bb84_n8-6x6,bb84_n8,6,6,gaussian (coarse),passage_no_subgraphs,center_circle(5%),15.0
+bb84_n8-6x6,bb84_n8,6,6,magic-aware (center),connectivity,center_circle(5%),15.0
+bigadder_n18_transpiled-7x7,bigadder_n18_transpiled,7,7,gaussian (coarse),connectivity,center_circle(5%),161.0
+bigadder_n18_transpiled-7x7,bigadder_n18_transpiled,7,7,gaussian (coarse),passage,center_circle(5%),161.0
+bigadder_n18_transpiled-7x7,bigadder_n18_transpiled,7,7,gaussian (coarse),passage_no_subgraphs,center_circle(5%),161.0
+bigadder_n18_transpiled-7x7,bigadder_n18_transpiled,7,7,homogeneous,passage_no_subgraphs,center_circle(5%),161.0
+bigadder_n18_transpiled-7x7,bigadder_n18_transpiled,7,7,magic-aware (center),connectivity,center_circle(5%),161.0
+bigadder_n18_transpiled-7x7,bigadder_n18_transpiled,7,7,magic-aware (center),passage,center_circle(5%),161.0
+bigadder_n18_transpiled-7x7,bigadder_n18_transpiled,7,7,magic-aware (center),passage_no_subgraphs,center_circle(5%),161.0
+cat_n130-32x32,cat_n130,32,32,gaussian (coarse),cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,homogeneous,connectivity,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,homogeneous,cube,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,homogeneous,passage,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,homogeneous,passage_no_subgraphs,center_circle(5%),130.0
+cat_n130-32x32,cat_n130,32,32,magic-aware (center),cube,center_circle(5%),130.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),connectivity,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),cube,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),passage,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,gaussian (coarse),passage_no_subgraphs,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,homogeneous,connectivity,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,homogeneous,passage,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,homogeneous,passage_no_subgraphs,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (center),connectivity,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (center),cube,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (center),passage,center_circle(5%),19.0
+continuous_3_17_13-5x5,continuous_3_17_13,5,5,magic-aware (center),passage_no_subgraphs,center_circle(5%),19.0
+dnn_n16-10x10,dnn_n16,10,10,gaussian (coarse),connectivity,center_circle(5%),48.0
+dnn_n16-10x10,dnn_n16,10,10,gaussian (coarse),passage,center_circle(5%),48.0
+dnn_n16-10x10,dnn_n16,10,10,gaussian (coarse),passage_no_subgraphs,center_circle(5%),48.0
+dnn_n16-10x10,dnn_n16,10,10,homogeneous,passage_no_subgraphs,center_circle(5%),48.0
+example-5x5,example,5,5,gaussian (coarse),connectivity,center_circle(5%),51.0
+example-5x5,example,5,5,gaussian (coarse),passage,center_circle(5%),51.0
+example-5x5,example,5,5,gaussian (coarse),passage_no_subgraphs,center_circle(5%),51.0
+example-5x5,example,5,5,homogeneous,connectivity,center_circle(5%),51.0
+example-5x5,example,5,5,homogeneous,passage_no_subgraphs,center_circle(5%),51.0
+example-5x5,example,5,5,magic-aware (center),connectivity,center_circle(5%),51.0
+example-5x5,example,5,5,magic-aware (center),passage_no_subgraphs,center_circle(5%),51.0
+ghz_state_n23-13x13,ghz_state_n23,13,13,gaussian (coarse),connectivity,center_circle(5%),23.0
+ghz_state_n23-13x13,ghz_state_n23,13,13,gaussian (coarse),passage,center_circle(5%),23.0
+ghz_state_n23-13x13,ghz_state_n23,13,13,gaussian (coarse),passage_no_subgraphs,center_circle(5%),23.0
+ghz_state_n23-13x13,ghz_state_n23,13,13,homogeneous,connectivity,center_circle(5%),23.0
+ghz_state_n23-13x13,ghz_state_n23,13,13,homogeneous,passage_no_subgraphs,center_circle(5%),23.0
+ghz_state_n23-13x13,ghz_state_n23,13,13,magic-aware (center),connectivity,center_circle(5%),23.0
+parallel-8x8,parallel,8,8,homogeneous,passage_no_subgraphs,center_circle(5%),70.0
+qaoa_n6-6x6,qaoa_n6,6,6,gaussian (coarse),passage,center_circle(5%),34.0
+qaoa_n6-6x6,qaoa_n6,6,6,gaussian (coarse),passage_no_subgraphs,center_circle(5%),34.0
+qft_20-13x13,qft_20,13,13,magic-aware (center),connectivity,center_circle(5%),161.0
