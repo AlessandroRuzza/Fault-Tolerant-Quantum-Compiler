@@ -62,9 +62,9 @@ config/__bench_*.json
 
 # Exclude output files except for .csv (raw results)
 benchmarks/logs/
-benchmarks/old*/
 benchmarks/results/*
 !*.csv
+merged_distinct*
 
 # Temp Ale log files
 *.ans
@@ -74,3 +74,5 @@ scripts/__pycache__/
 QASMBench-master/
 *.png
 src/defines.cpp
+src/defines.h
+
