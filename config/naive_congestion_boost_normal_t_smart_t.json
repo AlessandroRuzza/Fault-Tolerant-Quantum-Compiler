@@ -23,14 +23,14 @@
   "configs": [
     {
       "type": "gaussian",
-      "gaussian_strategy": ["coarse", "fine"]
+      "gaussian_strategy": "coarse"
     },
     {
       "type": "homogeneous"
     },
     {
       "type": "magic_aware",
-      "magic_aware_strategy": ["center", "distance", "random"]
+      "magic_aware_strategy": ["center", "distance"]
     }
   ]
 }

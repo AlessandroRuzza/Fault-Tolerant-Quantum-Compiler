@@ -146,6 +146,7 @@ REPORT_PLOTS = [
     ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
     ("18_experiment_set_routing_magicaware_homogeneous.png", "Experiment set: magic-aware + homogeneous"),
     ("19_box_routing_by_gaussian_strategy.png", "Routing by gaussian strategy"),
+    ("47_box_elapsed_by_gaussian_strategy.png", "Duration by gaussian strategy"),
     ("20_heatmap_routing_gaussian_strategy_vs_placement.png", "Routing heatmap: gaussian strategy x placement"),
     ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
     ("30_heatmap_best_gaussian_weight_profiles.png", "Best gaussian weight profile map"),
@@ -970,6 +971,96 @@ def boxplot_by_category(
     ax.set_title(title)
     ax.set_ylabel(ylabel)
     ax.tick_params(axis="x", rotation=35)
+    save_fig(fig, output_dir, filename, generated)
+
+
+def plot_elapsed_by_gaussian_strategy(rows, output_dir, generated, skipped=None):
+    filename = "47_box_elapsed_by_gaussian_strategy.png"
+    strategy_order = ("coarse", "fine")
+    grouped = {strategy: [] for strategy in strategy_order}
+    status_counts = {
+        strategy: {"success": 0, "timeout": 0, "failed": 0, "other": 0}
+        for strategy in strategy_order
+    }
+
+    for row in rows:
+        if row.get("mapping_type_norm") != "gaussian":
+            continue
+        strategy = row.get("gaussian_strategy_norm")
+        if strategy not in grouped:
+            continue
+
+        status = normalize_text(row.get("status"))
+        if status in status_counts[strategy]:
+            status_counts[strategy][status] += 1
+        else:
+            status_counts[strategy]["other"] += 1
+
+        duration = row.get("duration_s_f")
+        if not row.get("success") or duration is None or duration <= 0:
+            continue
+        grouped[strategy].append(duration)
+
+    labels = [strategy for strategy in strategy_order if grouped[strategy]]
+    if not labels:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no successful gaussian coarse/fine rows with positive duration_seconds",
+        )
+        return
+
+    values = [grouped[strategy] for strategy in labels]
+    display_labels = []
+    for strategy in labels:
+        durations = grouped[strategy]
+        median = statistics.median(durations)
+        display_labels.append(f"{strategy}\n(n={len(durations)}, median={median:.3g}s)")
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+    box = ax.boxplot(
+        values,
+        tick_labels=display_labels,
+        showmeans=True,
+        patch_artist=True,
+        meanprops={
+            "marker": "o",
+            "markerfacecolor": "#2A9D8F",
+            "markeredgecolor": "#1B625A",
+            "markersize": 6,
+        },
+        medianprops={"color": "#E76F51", "linewidth": 1.8},
+        boxprops={"linewidth": 1.4},
+        whiskerprops={"linewidth": 1.4},
+        capprops={"linewidth": 1.4},
+    )
+    colors = category_color_map(labels)
+    for patch, strategy in zip(box["boxes"], labels):
+        patch.set_facecolor(colors[strategy])
+        patch.set_alpha(0.45)
+
+    summary_lines = []
+    for strategy in labels:
+        counts = status_counts[strategy]
+        summary_lines.append(
+            f"{strategy}: success={counts['success']}, "
+            f"timeout={counts['timeout']}, failed={counts['failed']}"
+        )
+    ax.text(
+        0.02,
+        0.98,
+        "\n".join(summary_lines),
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=10,
+        bbox={"facecolor": "white", "edgecolor": "#CCCCCC", "alpha": 0.85},
+    )
+
+    ax.set_title("Execution Time by Gaussian Strategy (Successful Gaussian Runs Only)")
+    ax.set_ylabel("execution time (seconds, log scale)")
+    ax.set_yscale("log")
+    ax.grid(True, axis="y", alpha=0.35)
     save_fig(fig, output_dir, filename, generated)
 
 
@@ -3880,6 +3971,7 @@ def main():
         generated,
         skipped,
     )
+    plot_elapsed_by_gaussian_strategy(rows, output_dir, generated, skipped)
 
     scatter_plot(
         rows_success_with_routing,

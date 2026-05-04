@@ -325,13 +325,20 @@ private:
 
     inline void set_thresholds() {
         int total_qubits = circuit.getNumQubits();
+        const double t_mean = circuit.getTMean();
+        const double t_std = circuit.getTStd();
+        const double cnot_mean = circuit.getCNOTMean();
+
         std::cout << "\n\ntotal_qubits:" << total_qubits << "\n";
-        std::cout << "T gates per qubit - Mean: " << circuit.getTMean() << ", Std: " << circuit.getTStd() << "\n";
+        std::cout << "T gates per qubit - Mean: " << t_mean << ", Std: " << t_std << "\n";
 
-        T_lower_bound = static_cast<int>(circuit.getTMean() - circuit.getTStd());
-        T_upper_bound = static_cast<int>(circuit.getTMean() + circuit.getTStd());
+        T_lower_bound = static_cast<int>(std::floor(t_mean - t_std));
+        T_upper_bound = static_cast<int>(std::ceil(t_mean + t_std));
 
-        CNOT_threshold = static_cast<int>(circuit.getCNOTMean());
+        CNOT_threshold = static_cast<int>(std::ceil(cnot_mean));
+        if (CNOT_threshold < 1) {
+            CNOT_threshold = 1;
+        }
 
         std::cout << "T_count lower bound: " << T_lower_bound << "\n";
         std::cout << "T_count upper bound: " << T_upper_bound << "\n";

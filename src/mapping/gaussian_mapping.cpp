@@ -49,6 +49,12 @@ Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector
 void update_weight(std::vector<Gaussian>& gaussians, double new_weight);
 void update_inverse(std::vector<Gaussian>& gaussians, bool inverse);
 
+namespace {
+double interpolate_weight(double low, double high, double ratio) {
+    return low + (high - low) * std::clamp(ratio, 0.0, 1.0);
+}
+} // namespace
+
 
 
 
@@ -261,25 +267,26 @@ void update_gaussians_fine(
     // tutto uguale per CNOT
 
 
-    const int T_mean = circuit.getTMean();
-    const int T_std = circuit.getTStd();
-    const int CNOT_mean = circuit.getCNOTMean();
-    const int CNOT_std = circuit.getCNOTStd();
+    const double T_mean = circuit.getTMean();
+    const double T_std = circuit.getTStd();
+    const double CNOT_mean = circuit.getCNOTMean();
+    const double CNOT_std = circuit.getCNOTStd();
+    const double t_count = static_cast<double>(qubit->getTCount());
 
-    if (qubit->getTCount() == T_mean) {
+    if (t_count == T_mean || T_std <= 0.0) {
         update_weight(magic_gaussians, 0);
-    } else if (qubit->getTCount() < T_mean - T_std) {
+    } else if (t_count < T_mean - T_std) {
         update_weight(magic_gaussians, magic_high);
         update_inverse(magic_gaussians, true);
-    } else if (qubit->getTCount() > T_mean + T_std) {
+    } else if (t_count > T_mean + T_std) {
         update_weight(magic_gaussians, magic_high);
         update_inverse(magic_gaussians, false);
-    } else if (qubit->getTCount() >= T_mean - T_std && qubit->getTCount() <= T_mean) {
-        double weight = magic_low + (magic_high - magic_low) * (qubit->getTCount() - (T_mean - T_std)) / (T_std);
+    } else if (t_count >= T_mean - T_std && t_count <= T_mean) {
+        double weight = interpolate_weight(magic_low, magic_high, (t_count - (T_mean - T_std)) / T_std);
         update_weight(magic_gaussians, weight);
         update_inverse(magic_gaussians, true);
-    } else if (qubit->getTCount() > T_mean && qubit->getTCount() <= T_mean + T_std) {
-        double weight = magic_low + (magic_high - magic_low) * ((qubit->getTCount() - T_mean) / (T_std));
+    } else if (t_count > T_mean && t_count <= T_mean + T_std) {
+        double weight = interpolate_weight(magic_low, magic_high, (t_count - T_mean) / T_std);
         update_weight(magic_gaussians, weight);
         update_inverse(magic_gaussians, false);
     }
@@ -287,34 +294,35 @@ void update_gaussians_fine(
     std::vector<int> high_cnot_qubits = qubit->highCnotQubits(CNOT_threshold);
 
     for (int q_id : high_cnot_qubits){
+        const double cnot_count = static_cast<double>(circuit.getCNOTCount(qubit->getQubitID(), q_id));
         double weight = 0.0;
-        bool inverse;
+        bool inverse = false;
 
-        if (circuit.getCNOTCount(qubit->getQubitID(), q_id) == CNOT_mean) {
+        if (cnot_count == CNOT_mean || CNOT_std <= 0.0) {
             weight = 0.0;
             inverse = false;
-        } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) < CNOT_mean - CNOT_std) {
+        } else if (cnot_count < CNOT_mean - CNOT_std) {
             weight = cnot_high;
             inverse = true;
-        } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) > CNOT_mean + CNOT_std) {
+        } else if (cnot_count > CNOT_mean + CNOT_std) {
             weight = cnot_high;
             inverse = false;
 
-        } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) >= CNOT_mean - CNOT_std && 
-                   circuit.getCNOTCount(qubit->getQubitID(), q_id) <= CNOT_mean) {
+        } else if (cnot_count >= CNOT_mean - CNOT_std && 
+                   cnot_count <= CNOT_mean) {
 
-            weight = cnot_low + (cnot_high - cnot_low) * (qubit->getMaxCNOTCount() - (CNOT_mean - CNOT_std)) / (CNOT_std);
+            weight = interpolate_weight(cnot_low, cnot_high, (cnot_count - (CNOT_mean - CNOT_std)) / CNOT_std);
             inverse = true;
 
-        } else if (circuit.getCNOTCount(qubit->getQubitID(), q_id) > CNOT_mean && 
-                   circuit.getCNOTCount(qubit->getQubitID(), q_id) <= CNOT_mean + CNOT_std) {
+        } else if (cnot_count > CNOT_mean && 
+                   cnot_count <= CNOT_mean + CNOT_std) {
 
-            weight = cnot_low + (cnot_high - cnot_low) * ((qubit->getMaxCNOTCount() - CNOT_mean) / (CNOT_std));
+            weight = interpolate_weight(cnot_low, cnot_high, (cnot_count - CNOT_mean) / CNOT_std);
             inverse = false;
         }
 
         const int mapped_node = mapping.get_mapped_node(q_id);
-        if (mapped_node != -1) {
+        if (mapped_node != -1 && weight > 0.0) {
             cnot_gaussians.push_back(Gaussians::cnot_gaussian(
                 graph,
                 mapped_node,
