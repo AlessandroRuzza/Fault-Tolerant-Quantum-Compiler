@@ -347,7 +347,7 @@ int run_bench_mode(
     const std::string csv_file_name = sanitize_filename(bench_name) + "_runs.csv";
     const std::filesystem::path csv_path = results_dir / csv_file_name;
     write_csv::ensure_initialized(csv_path, write_csv::kBenchmarkRunsCsvHeader);
-    int next_run_id = write_csv::read_max_run_id(csv_path) + 1;
+    int next_execution_id = write_csv::read_max_execution_id(csv_path) + 1;
 
     auto persist_expanded = [&]() {
         std::ofstream out(expanded_path);
@@ -455,13 +455,12 @@ int run_bench_mode(
         bool rerun_timeout_case = false;
         bool replace_interrupted_csv_row = false;
         std::size_t replacement_csv_data_row = 0;
-        int replacement_run_id = 0;
     };
 
     struct BenchCaseResult {
         bool completed = false;
         std::size_t index = 0;
-        int run_id = 0;
+        int execution_id = 0;
         std::string case_id;
         std::string status = "failed";
         int exit_code = 1;
@@ -578,7 +577,6 @@ int run_bench_mode(
 
         struct InterruptedCsvRow {
             std::size_t data_row_index = 0;
-            int run_id = 0;
             std::vector<std::string> row;
             bool used = false;
         };
@@ -591,14 +589,7 @@ int run_bench_mode(
                 continue;
             }
 
-            int interrupted_run_id = 0;
-            try {
-                interrupted_run_id = std::stoi(write_csv::at_or_empty(row, 0));
-            } catch (const std::exception &) {
-                continue;
-            }
-
-            interrupted_csv_rows.push_back({row_index, interrupted_run_id, row, false});
+            interrupted_csv_rows.push_back({row_index, row, false});
         }
 
         if (!interrupted_csv_rows.empty()) {
@@ -665,7 +656,6 @@ int run_bench_mode(
                 interrupted_row.used = true;
                 plan.replace_interrupted_csv_row = true;
                 plan.replacement_csv_data_row = interrupted_row.data_row_index;
-                plan.replacement_run_id = interrupted_row.run_id;
                 ++reusable_interrupted_rows;
                 break;
             }
@@ -687,11 +677,11 @@ int run_bench_mode(
 #endif
         }
 
-        const auto execute_case = [&](const BenchCasePlan &plan, int run_id) {
+        const auto execute_case = [&](const BenchCasePlan &plan, int execution_id) {
             BenchCaseResult result;
             result.completed = true;
             result.index = plan.index;
-            result.run_id = run_id;
+            result.execution_id = execution_id;
             result.case_id = plan.case_id;
             result.status = "success";
             result.exit_code = 0;
@@ -702,15 +692,15 @@ int run_bench_mode(
             const std::string run_datetime = format_now_datetime(start_tp);
 
             const std::string log_file_name =
-                "run_" + std::to_string(run_id) + "_" +
+                "run_" + std::to_string(execution_id) + "_" +
                 sanitize_filename(plan.case_id.empty() ? std::to_string(plan.index + 1) : plan.case_id) + ".log";
             const std::filesystem::path log_path = logs_dir / log_file_name;
             const std::filesystem::path temp_config_path =
                 expanded_path.parent_path() /
-                ("__bench_runtime_config_" + std::to_string(run_id) + ".json");
+                ("__bench_runtime_config_" + std::to_string(execution_id) + ".json");
             const std::filesystem::path temp_result_path =
                 expanded_path.parent_path() /
-                ("__bench_runtime_result_" + std::to_string(run_id) + ".json");
+                ("__bench_runtime_result_" + std::to_string(execution_id) + ".json");
 
             const auto cleanup_temp = [&]() {
                 std::error_code ec;
@@ -855,7 +845,7 @@ int run_bench_mode(
             const std::string cl = get_json_field(plan.entry, {"CNOT_LOW", "cnot_low"});
 
             result.csv_row = {
-                std::to_string(run_id),
+                plan.case_id.empty() ? std::to_string(plan.index + 1) : plan.case_id,
                 run_date,
                 run_datetime,
                 circuit,
@@ -892,7 +882,7 @@ int run_bench_mode(
             if (result.status == "success") {
                 progress
                     << "[" << (plan.index + 1) << "/" << total_cases << "] OK"
-                    << " run#" << run_id
+                    << " run#" << execution_id
                     << " id=" << empty_to_dash(plan.case_id)
                     << " routing_steps=" << empty_to_dash(routing_steps)
                     << " duration=" << duration_short_ss.str()
@@ -908,20 +898,20 @@ int run_bench_mode(
             } else if (result.status == "timeout") {
                 progress
                     << "[" << (plan.index + 1) << "/" << total_cases << "] TIMEOUT"
-                    << " #" << run_id
+                    << " #" << execution_id
                     << " " << empty_to_dash(plan.case_id)
                     << " duration=" << duration_short_ss.str()
                     << " timeout_reached=true";
             } else if (result.status == "interrupted") {
                 progress
                     << "[" << (plan.index + 1) << "/" << total_cases << "] INTERRUPTED"
-                    << " #" << run_id
+                    << " #" << execution_id
                     << " " << empty_to_dash(plan.case_id)
                     << " duration=" << duration_short_ss.str();
             } else {
                 progress
                     << "[" << (plan.index + 1) << "/" << total_cases << "] FAIL"
-                    << " #" << run_id
+                    << " #" << execution_id
                     << " " << empty_to_dash(plan.case_id)
                     << " duration=" << duration_short_ss.str()
                     << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120));
@@ -932,7 +922,7 @@ int run_bench_mode(
             return result;
         };
 
-        std::atomic<int> next_run_id_counter(next_run_id);
+        std::atomic<int> next_execution_id_counter(next_execution_id);
         std::atomic<bool> fatal_error(false);
         std::string fatal_error_message;
 
@@ -946,10 +936,8 @@ int run_bench_mode(
 
             const std::size_t plan_index = runnable_indices[static_cast<std::size_t>(runnable_idx)];
             const BenchCasePlan &plan = plans[plan_index];
-            const int run_id = plan.replace_interrupted_csv_row ?
-                plan.replacement_run_id :
-                next_run_id_counter.fetch_add(1);
-            BenchCaseResult result = execute_case(plan, run_id);
+            const int execution_id = next_execution_id_counter.fetch_add(1);
+            BenchCaseResult result = execute_case(plan, execution_id);
             results[plan.index] = result;
 
 #pragma omp critical(bench_commit)

@@ -184,6 +184,7 @@ DISTINCT_IGNORED_COLUMNS = {
     "duration_seconds",
     "elapsed_ms",
     "error_excerpt",
+    "id",
     "run_id",
     "run_date",
     "run_datetime",
@@ -531,7 +532,10 @@ def load_raw_rows_from_files(files):
                 normalized_fieldnames.append(normalized)
                 normalized_to_original[normalized] = fieldname
 
-            if "run_id" not in normalized_fieldnames or "status" not in normalized_fieldnames:
+            if (
+                "status" not in normalized_fieldnames
+                or ("run_id" not in normalized_fieldnames and "id" not in normalized_fieldnames)
+            ):
                 continue
 
             accepted_files.append(path)
@@ -552,6 +556,8 @@ def load_raw_rows_from_files(files):
                     fieldname: raw.get(normalized_to_original[fieldname], "")
                     for fieldname in normalized_fieldnames
                 }
+                if "run_id" not in row and "id" in row:
+                    row["run_id"] = row.get("id", "")
                 row["source_csv"] = path
                 row["source_csv_name"] = os.path.basename(path)
                 row["_merge_order"] = len(rows)
