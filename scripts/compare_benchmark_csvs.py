@@ -114,7 +114,7 @@ def identity_key(row: dict[str, str]) -> tuple[str, ...]:
 
 
 def sort_key(row: dict[str, str]) -> tuple[int, int]:
-    run_id = to_int(row.get("run_id"))
+    run_id = to_int(row.get("run_id") or row.get("id"))
     row_index = to_int(row.get("_row_index"))
     return (
         run_id if run_id is not None else 10**12,

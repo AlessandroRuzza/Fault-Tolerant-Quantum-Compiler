@@ -10,6 +10,14 @@
 namespace write_csv {
 
 inline constexpr const char *kBenchmarkRunsCsvHeader =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV6 =
     "run_id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
     "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
     "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
@@ -139,6 +147,53 @@ inline std::string render_row(const std::vector<std::string> &columns) {
     return row;
 }
 
+inline std::string config_id_from_log_file(const std::string &log_file, const std::string &fallback) {
+    const std::string filename = std::filesystem::path(log_file).filename().string();
+    const std::string prefix = "run_";
+    const std::string suffix = ".log";
+
+    if (filename.rfind(prefix, 0) != 0 ||
+        filename.size() <= prefix.size() + suffix.size() ||
+        filename.substr(filename.size() - suffix.size()) != suffix) {
+        return fallback;
+    }
+
+    const std::string body = filename.substr(prefix.size(), filename.size() - prefix.size() - suffix.size());
+    const std::size_t separator = body.find('_');
+    if (separator == std::string::npos || separator + 1 >= body.size()) {
+        return fallback;
+    }
+
+    return body.substr(separator + 1);
+}
+
+inline int execution_id_from_log_file(const std::string &log_file, int fallback) {
+    const std::string filename = std::filesystem::path(log_file).filename().string();
+    const std::string prefix = "run_";
+    const std::string suffix = ".log";
+
+    if (filename.rfind(prefix, 0) != 0 ||
+        filename.size() <= prefix.size() + suffix.size() ||
+        filename.substr(filename.size() - suffix.size()) != suffix) {
+        return fallback;
+    }
+
+    const std::string body = filename.substr(prefix.size(), filename.size() - prefix.size() - suffix.size());
+    const std::size_t separator = body.find('_');
+    const std::string token = separator == std::string::npos ? body : body.substr(0, separator);
+    if (token.empty()) {
+        return fallback;
+    }
+
+    try {
+        std::size_t consumed = 0;
+        const int value = std::stoi(token, &consumed);
+        return consumed == token.size() ? value : fallback;
+    } catch (const std::exception &) {
+        return fallback;
+    }
+}
+
 inline void append_row(const std::filesystem::path &csv_path, const std::vector<std::string> &columns) {
     std::ofstream out(csv_path, std::ios::app);
     if (!out.is_open()) {
@@ -207,7 +262,7 @@ inline std::vector<std::vector<std::string>> read_data_rows(const std::filesyste
         }
         if (first_line) {
             first_line = false;
-            if (line.rfind("run_id,", 0) == 0) {
+            if (line.rfind("run_id,", 0) == 0 || line.rfind("id,", 0) == 0) {
                 continue;
             }
         }
@@ -247,7 +302,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV5 ||
+        (first_line == kBenchmarkRunsCsvHeaderV6 ||
+         first_line == kBenchmarkRunsCsvHeaderV5 ||
          first_line == kBenchmarkRunsCsvHeaderV4 ||
          first_line == kBenchmarkRunsCsvHeaderV3 ||
          first_line == kBenchmarkRunsCsvHeaderV2 ||
@@ -270,6 +326,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v6 = (first_line == kBenchmarkRunsCsvHeaderV6);
             const bool from_v5 = (first_line == kBenchmarkRunsCsvHeaderV5);
             const bool from_v4 = (first_line == kBenchmarkRunsCsvHeaderV4);
             const bool from_v3 = (first_line == kBenchmarkRunsCsvHeaderV3);
@@ -278,9 +335,43 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v5) {
+            if (from_v6) {
                 migrated = {
-                    at_or_empty(parsed, 0),   // run_id
+                    config_id_from_log_file(at_or_empty(parsed, 29), at_or_empty(parsed, 0)), // id
+                    at_or_empty(parsed, 1),   // run_date
+                    at_or_empty(parsed, 2),   // run_datetime
+                    at_or_empty(parsed, 3),   // circuit
+                    at_or_empty(parsed, 4),   // graph_x
+                    at_or_empty(parsed, 5),   // graph_y
+                    at_or_empty(parsed, 6),   // circuit_graph_label
+                    at_or_empty(parsed, 7),   // mapping_type
+                    at_or_empty(parsed, 8),   // magic_aware_strategy
+                    at_or_empty(parsed, 9),   // gaussian_strategy
+                    at_or_empty(parsed, 10),  // magic_high
+                    at_or_empty(parsed, 11),  // magic_low
+                    at_or_empty(parsed, 12),  // cnot_high
+                    at_or_empty(parsed, 13),  // cnot_low
+                    at_or_empty(parsed, 14),  // mapped_gaussian_weight
+                    at_or_empty(parsed, 15),  // base_gaussian_weight
+                    at_or_empty(parsed, 16),  // size_moltiplier
+                    at_or_empty(parsed, 17),  // gaussian_confidence
+                    at_or_empty(parsed, 18),  // safe_passage_strategy
+                    at_or_empty(parsed, 19),  // magic_state_placement_strategy
+                    at_or_empty(parsed, 20),  // border_distance_percentage
+                    at_or_empty(parsed, 21),  // number_of_magic_states
+                    at_or_empty(parsed, 22),  // routing_strategy
+                    at_or_empty(parsed, 23),  // t_routing_mode
+                    at_or_empty(parsed, 24),  // routing_steps
+                    at_or_empty(parsed, 25),  // timeout_reached
+                    at_or_empty(parsed, 26),  // status
+                    at_or_empty(parsed, 27),  // exit_code
+                    at_or_empty(parsed, 28),  // duration_seconds
+                    at_or_empty(parsed, 29),  // log_file
+                    at_or_empty(parsed, 30)   // error_excerpt
+                };
+            } else if (from_v5) {
+                migrated = {
+                    at_or_empty(parsed, 0),   // id
                     at_or_empty(parsed, 1),   // run_date
                     at_or_empty(parsed, 2),   // run_datetime
                     at_or_empty(parsed, 3),   // circuit
@@ -314,7 +405,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 };
             } else if (from_v4) {
                 migrated = {
-                    at_or_empty(parsed, 0),   // run_id
+                    at_or_empty(parsed, 0),   // id
                     at_or_empty(parsed, 1),   // run_date
                     at_or_empty(parsed, 2),   // run_datetime
                     at_or_empty(parsed, 3),   // circuit
@@ -348,7 +439,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 };
             } else if (from_v3) {
                 migrated = {
-                    at_or_empty(parsed, 0),   // run_id
+                    at_or_empty(parsed, 0),   // id
                     at_or_empty(parsed, 1),   // run_date
                     at_or_empty(parsed, 2),   // run_datetime
                     at_or_empty(parsed, 3),   // circuit
@@ -382,7 +473,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 };
             } else if (from_v2) {
                 migrated = {
-                    at_or_empty(parsed, 0),   // run_id
+                    at_or_empty(parsed, 0),   // id
                     at_or_empty(parsed, 1),   // run_date
                     at_or_empty(parsed, 2),   // run_datetime
                     at_or_empty(parsed, 3),   // circuit
@@ -416,7 +507,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 };
             } else if (from_v1) {
                 migrated = {
-                    at_or_empty(parsed, 0),   // run_id
+                    at_or_empty(parsed, 0),   // id
                     at_or_empty(parsed, 1),   // run_date
                     at_or_empty(parsed, 2),   // run_datetime
                     at_or_empty(parsed, 3),   // circuit
@@ -449,8 +540,9 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 21)   // error_excerpt
                 };
             } else {
+                const std::string legacy_case_id = at_or_empty(parsed, 5);
                 migrated = {
-                    at_or_empty(parsed, 0),   // run_id
+                    legacy_case_id.empty() ? at_or_empty(parsed, 0) : legacy_case_id, // id
                     at_or_empty(parsed, 1),   // run_date
                     at_or_empty(parsed, 2),   // run_datetime
                     at_or_empty(parsed, 6),   // circuit
@@ -484,13 +576,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 };
             }
 
-            for (std::size_t i = 0; i < migrated.size(); ++i) {
-                if (i != 0) {
-                    out << ',';
-                }
-                out << escape(migrated[i]);
+            if (!migrated.empty()) {
+                migrated[0] = config_id_from_log_file(at_or_empty(migrated, 29), migrated[0]);
             }
-            out << '\n';
+
+            out << render_row(migrated) << '\n';
         }
         return;
     }
@@ -501,7 +591,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     );
 }
 
-inline int read_max_run_id(const std::filesystem::path &csv_path) {
+inline int read_max_execution_id(const std::filesystem::path &csv_path) {
     if (!std::filesystem::exists(csv_path)) {
         return 0;
     }
@@ -520,19 +610,28 @@ inline int read_max_run_id(const std::filesystem::path &csv_path) {
         }
         if (first_line) {
             first_line = false;
-            if (line.rfind("run_id,", 0) == 0) {
+            if (line.rfind("run_id,", 0) == 0 || line.rfind("id,", 0) == 0) {
                 continue;
             }
         }
 
-        const std::size_t comma_pos = line.find(',');
-        const std::string run_id_token = (comma_pos == std::string::npos) ? line : line.substr(0, comma_pos);
+        const std::vector<std::string> parsed = parse_row(line);
+        const std::string run_id_token = at_or_empty(parsed, 0);
+        int fallback_id = 0;
         try {
-            max_run_id = std::max(max_run_id, std::stoi(run_id_token));
+            fallback_id = std::stoi(run_id_token);
         } catch (const std::exception &) {
         }
+        max_run_id = std::max(
+            max_run_id,
+            execution_id_from_log_file(at_or_empty(parsed, 29), fallback_id)
+        );
     }
     return max_run_id;
+}
+
+inline int read_max_run_id(const std::filesystem::path &csv_path) {
+    return read_max_execution_id(csv_path);
 }
 
 } // namespace write_csv
