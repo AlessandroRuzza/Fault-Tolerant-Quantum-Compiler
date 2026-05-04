@@ -25,6 +25,8 @@ extern const bool USE_S_GATES;
 extern const bool ORDER_GATES_BY_MANHATTAN;
 extern const int LAYERING_LOOKAHEAD;
 
+extern const bool WRITE_UNIVERSAL_QASM;
+
 } 
 
 // Keep existing unqualified names to avoid touching all call sites.
