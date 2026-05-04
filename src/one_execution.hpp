@@ -124,7 +124,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     std::filesystem::path original_name = std::filesystem::path(path).stem();
     std::string output_path = "universal_set_qasms/" + original_name.string() + "_universal.qasm";
-    if (benchmark_artifacts_enabled()) {
+    if (benchmark_artifacts_enabled() || WRITE_UNIVERSAL_QASM) {
         circuit.write_qasm_file(output_path);
     }
 
