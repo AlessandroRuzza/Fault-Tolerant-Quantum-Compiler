@@ -24,6 +24,13 @@
     {
       "type": "gaussian",
       "gaussian_strategy": ["coarse", "fine"]
+    },
+    {
+      "type": "homogeneous"
+    },
+    {
+      "type": "magic_aware",
+      "magic_aware_strategy": ["center", "distance", "random"]
     }
   ]
 }
