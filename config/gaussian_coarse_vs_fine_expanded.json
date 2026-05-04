@@ -1914,7 +1914,7 @@
     "safe_passage_strategy": "cube",
     "t-routing-mode": "normal_t_routing",
     "timeout": 600,
-    "timeout_reached": true,
+    "timeout_reached": false,
     "type": "gaussian",
     "x": -1,
     "y": -1
