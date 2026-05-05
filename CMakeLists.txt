@@ -80,6 +80,7 @@ else()
     message(WARNING "OpenMP not found: benchmark mode will run sequentially")
 endif()
 
+# -------- TARGETS --------------
 
 # Target to run the main executable (not built/executed by default)
 add_custom_target(run-main
@@ -103,6 +104,21 @@ add_custom_target(run-bench
     COMMENT "Running FaultTolerantQuantumCompiler with --bench_path"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+
+# make run-wisq QASM=QASM="<file1> [file2 ...]" [OUTPUT=<csv>] [MR_TIMEOUT=<secs>]
+add_custom_target(run-wisq
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-wisq.sh
+    COMMENT "Running wisq (usage: make run-wisq QASM=\"<name> [name2 ...]\")"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+# make run-wisq-all [OUTPUT=<csv>] [MR_TIMEOUT=<secs>]
+add_custom_target(run-wisq-all
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-wisq-all.sh
+    COMMENT "Running wisq on all QASMs in universal_set_qasms/"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 
 # ------Eigen-------------
 

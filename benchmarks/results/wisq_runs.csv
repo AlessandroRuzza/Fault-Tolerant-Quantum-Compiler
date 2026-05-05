@@ -1,2 +1,0 @@
-tool,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,routing_steps,timeout_reached,status,exit_code,duration_seconds
-wisq,2026-05-04,2026-05-04 12:25:38,example,7,7,example-7x7,21,false,success,0,38.687845
