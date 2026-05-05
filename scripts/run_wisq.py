@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -90,7 +91,13 @@ def run_one(qasm_path: Path, mr_timeout: int, extra: list[str]) -> dict:
         "--mr_timeout", str(mr_timeout),
         *extra,
     ]
-    print(f"running: {' '.join(cmd)}", file=sys.stderr)
+    def _rel(p: str) -> str:
+        try:
+            return os.path.relpath(p)
+        except ValueError:
+            return p
+
+    print(f"running: {' '.join(_rel(c) for c in cmd)}", file=sys.stderr)
 
     t0 = time.perf_counter()
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -140,8 +147,11 @@ def run_one(qasm_path: Path, mr_timeout: int, extra: list[str]) -> dict:
 
 def write_row(row: dict, out_file: Path | None, first: bool, append: bool) -> None:
     if out_file:
-        write_header = first and (not append or not out_file.exists())
-        with out_file.open("a" if (append or not first) else "w", newline="") as f:
+        file_exists = out_file.exists()
+        write_header = not file_exists if append else first
+        mode = "a" if file_exists and (append or not first) else "w"
+
+        with out_file.open(mode, newline="") as f:
             writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
             if write_header:
                 writer.writeheader()
