@@ -156,7 +156,7 @@ std::unordered_set<int> Boost_QubitRouter::get_blocked_nodes() const {
         if (circuit.getQubit(qubit) == nullptr) continue;
         const int node = mapping.get_mapped_node(qubit);
         if (node >= 0) blocked.insert(node);
-    }
+    }    
     return blocked;
 }
 
