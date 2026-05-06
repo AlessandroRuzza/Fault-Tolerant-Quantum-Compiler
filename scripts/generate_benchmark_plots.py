@@ -43,11 +43,62 @@ RUNTIME_GROUPED_FACTOR_SPECS = (
     ("gaussian_confidence_f", "gaussian_confidence", "gaussian confidence", "gaussian_confidence"),
     ("safe_passage_norm", "safe_passage_strategy", "safe passage strategy", "safe_passage_strategy"),
 )
+HEATMAP_AXIS_SPECS = {
+    "type": ("mapping_type_norm", "type"),
+    "safe_passage": ("safe_passage_norm", "safe passage"),
+    "placement_border": ("placement_detail", "magic placement x border distance"),
+    "n_magic_states": ("magic_states_label", "n magic states"),
+    "gaussian_strategy": ("gaussian_strategy_norm", "gaussian strategy"),
+    "mapping_strategy": ("magic_aware_strategy_norm", "mapping strategy"),
+    "routing_strategy": ("routing_strategy_norm", "routing strategy"),
+    "t_routing_mode": ("t_routing_mode_norm", "t routing mode"),
+}
+HEATMAP_METRIC_SPECS = (
+    ("success_rate", "success", "Success heatmap", "all runs", "success rate (%)", "{:.1f}"),
+    ("routing_steps", "routing_steps", "Routing heatmap", "success only", "mean routing steps", "{:.2f}"),
+    ("execution_time", "execution_time", "Execution-time heatmap", "success only", "mean duration (s)", "{:.2f}"),
+)
+AXIS_BARPLOT_METRIC_SPECS = (
+    ("success_rate", "success", "Success Rate by", "all runs", "success rate (%)", "{:.1f}", "#2A9D8F"),
+    ("routing_steps", "routing_steps", "Routing Steps by", "success only", "routing steps", "{:.2f}", "#577590"),
+    ("execution_time", "execution_time", "Execution Time by", "success only", "duration (s)", "{:.2f}", "#E76F51"),
+)
+HEATMAP_PAIR_GROUPS = (
+    ("type", ("safe_passage", "placement_border", "n_magic_states")),
+    ("gaussian_strategy", ("safe_passage", "placement_border", "n_magic_states")),
+    ("mapping_strategy", ("safe_passage", "placement_border", "n_magic_states")),
+    ("safe_passage", ("placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
+    ("placement_border", ("safe_passage", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
+    ("routing_strategy", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
+    ("t_routing_mode", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
+)
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
 DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
 OBSOLETE_PLOT_FILENAMES = {
     "13_heatmap_success_safe_vs_placement.png",
     "23_heatmap_success_safe_vs_mapping_type.png",
+    "08_scatter_elapsed_vs_routing_by_circuit.png",
+    "10_scatter_magic_states_vs_routing.png",
+    "11_scatter_border_vs_routing_center_circle.png",
+    "16_heatmap_success_by_grid_xy.png",
+    "48_heatmap_routing_strategy_vs_safe_passage.png",
+    "49_heatmap_routing_strategy_vs_mapping_type.png",
+    "50_heatmap_routing_strategy_vs_gaussian_strategy.png",
+    "51_heatmap_t_routing_mode_vs_safe_passage.png",
+    "52_heatmap_t_routing_mode_vs_mapping_type.png",
+    "53_heatmap_t_routing_mode_vs_gaussian_strategy.png",
+    "54_heatmap_success_routing_strategy_vs_safe_passage_excluding_timeouts.png",
+    "55_heatmap_success_routing_strategy_vs_mapping_type_excluding_timeouts.png",
+    "56_heatmap_success_routing_strategy_vs_gaussian_strategy_excluding_timeouts.png",
+    "57_heatmap_success_t_routing_mode_vs_safe_passage_excluding_timeouts.png",
+    "58_heatmap_success_t_routing_mode_vs_mapping_type_excluding_timeouts.png",
+    "59_heatmap_success_t_routing_mode_vs_gaussian_strategy_excluding_timeouts.png",
+    "60_heatmap_duration_routing_strategy_vs_safe_passage.png",
+    "61_heatmap_duration_routing_strategy_vs_mapping_type.png",
+    "62_heatmap_duration_routing_strategy_vs_gaussian_strategy.png",
+    "63_heatmap_duration_t_routing_mode_vs_safe_passage.png",
+    "64_heatmap_duration_t_routing_mode_vs_mapping_type.png",
+    "65_heatmap_duration_t_routing_mode_vs_gaussian_strategy.png",
     "28_table_top_gaussian_weight_configs.png",
     "31_heatmap_best_gaussian_weight_value_counts.png",
     "32_runtime_vs_qubits_plus_gates_with_timeouts.png",
@@ -60,6 +111,100 @@ OBSOLETE_PLOT_FILENAMES = {
 OBSOLETE_PLOT_PREFIXES = (
     "29_table_top_gaussian_weight_configs_",
 )
+
+
+def heatmap_slug(axis_slug):
+    return axis_slug
+
+
+def build_requested_heatmap_items(start_index=48):
+    items = []
+    plot_index = start_index
+    for col_axis, row_axes in HEATMAP_PAIR_GROUPS:
+        col_key, col_label = HEATMAP_AXIS_SPECS[col_axis]
+        group_heatmap_items = []
+        for row_axis in row_axes:
+            row_key, row_label = HEATMAP_AXIS_SPECS[row_axis]
+            triplet_items = []
+            for metric_slug, metric_filename_part, caption_prefix, sample_scope, colorbar_label, value_format in HEATMAP_METRIC_SPECS:
+                filename = (
+                    f"{plot_index:02d}_heatmap_{metric_filename_part}_"
+                    f"{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}.png"
+                )
+                spec = {
+                    "kind": "heatmap",
+                    "filename": filename,
+                    "caption": f"{caption_prefix} ({sample_scope}): {row_label} x {col_label}",
+                    "title": f"{caption_prefix} ({sample_scope}): {row_label} x {col_label}",
+                    "row_key": row_key,
+                    "col_key": col_key,
+                    "row_label": row_label,
+                    "col_label": col_label,
+                    "metric": metric_slug,
+                    "sample_scope": sample_scope,
+                    "colorbar_label": colorbar_label,
+                    "value_format": value_format,
+                }
+                items.append(spec)
+                triplet_items.append(spec)
+                group_heatmap_items.append(spec)
+                plot_index += 1
+
+            triplet_dashboard = {
+                "kind": "triplet_dashboard",
+                "filename": f"{plot_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}.png",
+                "caption": f"Dashboard: {row_label} x {col_label}",
+                "title": f"{row_label} x {col_label}",
+                "source_items": triplet_items,
+                "columns": 3,
+                "panel_title_mode": "metric",
+                "panel_width": 6.4,
+                "panel_height": 5.0,
+                "dpi": 180,
+            }
+            items.append(triplet_dashboard)
+            plot_index += 1
+
+        items.append(
+            {
+                "kind": "x_axis_dashboard",
+                "filename": f"{plot_index:02d}_dashboard_x_{heatmap_slug(col_axis)}.png",
+                "caption": f"Dashboard: all y axes x {col_label}",
+                "title": f"All y axes x {col_label}",
+                "source_items": group_heatmap_items,
+                "columns": 3,
+                "panel_title_mode": "axis_and_metric",
+                "panel_width": 6.4,
+                "panel_height": 5.0,
+                "dpi": 180,
+            }
+        )
+        plot_index += 1
+
+        for metric_slug, metric_filename_part, caption_prefix, sample_scope, ylabel, value_format, color in AXIS_BARPLOT_METRIC_SPECS:
+            items.append(
+                {
+                    "kind": "axis_barplot",
+                    "filename": f"{plot_index:02d}_barplot_{metric_filename_part}_by_{heatmap_slug(col_axis)}.png",
+                    "caption": f"{caption_prefix} {col_label} ({sample_scope})",
+                    "title": f"{caption_prefix} {col_label} ({sample_scope})",
+                    "axis_key": col_key,
+                    "metric": metric_slug,
+                    "ylabel": ylabel,
+                    "value_format": value_format,
+                    "color": color,
+                }
+            )
+            plot_index += 1
+    return items
+
+
+REQUESTED_HEATMAP_ITEMS = build_requested_heatmap_items()
+REQUESTED_HEATMAP_SPECS = [
+    item for item in REQUESTED_HEATMAP_ITEMS if item["kind"] == "heatmap"
+]
+
+
 REPORT_PLOTS = [
     ("00_overview_dashboard.png", "Overview dashboard"),
     ("01_status_and_exit_codes.png", "Run status and exit codes"),
@@ -69,7 +214,11 @@ REPORT_PLOTS = [
     ("05_box_routing_by_placement.png", "Routing by magic placement"),
     ("06_box_routing_by_safe_passage.png", "Routing by safe passage"),
     ("07_box_routing_by_magic_strategy.png", "Routing by magic-aware strategy"),
-    ("08_scatter_elapsed_vs_routing_by_circuit.png", "Duration vs routing"),
+    ("19_box_routing_by_gaussian_strategy.png", "Routing by gaussian strategy"),
+    ("47_box_elapsed_by_gaussian_strategy.png", "Duration by gaussian strategy"),
+    ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
+    ("09_scatter_density_vs_routing.png", "Density vs routing"),
+    ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
     (
         "32_runtime_vs_qubits_plus_gates_cube_with_timeouts.png",
         "Duration vs qubits plus gates: cube median points",
@@ -111,48 +260,10 @@ REPORT_PLOTS = [
     ("42_runtime_vs_graph_nodes_by_size_moltiplier.png", "Duration vs graph size by size multiplier"),
     ("43_runtime_vs_graph_nodes_by_gaussian_confidence.png", "Duration vs graph size by gaussian confidence"),
     ("44_runtime_vs_graph_nodes_by_safe_passage_strategy.png", "Duration vs graph size by safe passage"),
-    (
-        "45_heatmap_routing_safe_passage_vs_gaussian_confidence.png",
-        "Routing heatmap: safe passage x gaussian confidence",
-    ),
-    (
-        "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier.png",
-        "Routing heatmap: gaussian confidence x size multiplier",
-    ),
-    ("09_scatter_density_vs_routing.png", "Density vs routing"),
-    ("10_scatter_magic_states_vs_routing.png", "Magic state parameter vs routing"),
-    ("11_scatter_border_vs_routing_center_circle.png", "Border distance vs routing"),
-    ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
-    (
-        "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
-        "Success heatmap: safe passage x placement (timeouts excluded)",
-    ),
-    ("14_heatmap_routing_safe_vs_placement.png", "Routing heatmap: safe passage x placement"),
-    (
-        "25_heatmap_timeout_safe_vs_placement.png",
-        "Timeout heatmap: safe passage x placement",
-    ),
-    (
-        "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
-        "Success heatmap: safe passage x mapping type (timeouts excluded)",
-    ),
-    ("24_heatmap_routing_safe_vs_mapping_type.png", "Routing heatmap: safe passage x mapping type"),
-    (
-        "26_heatmap_timeout_safe_vs_mapping_type.png",
-        "Timeout heatmap: safe passage x mapping type",
-    ),
-    ("15_heatmap_routing_magic_vs_safe.png", "Routing heatmap: magic strategy x safe passage"),
-    ("16_heatmap_success_by_grid_xy.png", "Success heatmap by grid size"),
     ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
     ("18_experiment_set_routing_magicaware_homogeneous.png", "Experiment set: magic-aware + homogeneous"),
-    ("19_box_routing_by_gaussian_strategy.png", "Routing by gaussian strategy"),
-    ("47_box_elapsed_by_gaussian_strategy.png", "Duration by gaussian strategy"),
-    ("20_heatmap_routing_gaussian_strategy_vs_placement.png", "Routing heatmap: gaussian strategy x placement"),
-    ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
-    ("30_heatmap_best_gaussian_weight_profiles.png", "Best gaussian weight profile map"),
-    ("31_heatmap_best_gaussian_relative_weight_gaps.png", "Best gaussian relative weight gaps"),
     ("22_experiment_set_routing_all_mappings.png", "Experiment set: all mappings"),
-]
+] + [(item["filename"], item["caption"]) for item in REQUESTED_HEATMAP_ITEMS]
 STATUS_DISPLAY_LABELS = {
     "ok": "ok",
     "ok_no_routing_metric": "ok (no routing metric)",
@@ -698,10 +809,16 @@ def prepare_rows_for_analysis(raw_rows):
         row["safe_passage_norm"] = normalize_text(row.get("safe_passage_strategy"))
         row["magic_aware_strategy_norm"] = normalize_text(row.get("magic_aware_strategy"))
         row["gaussian_strategy_norm"] = normalize_text(row.get("gaussian_strategy"))
+        row["routing_strategy_norm"] = normalize_text(row.get("routing_strategy"))
+        row["t_routing_mode_norm"] = normalize_text(row.get("t_routing_mode"))
         row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
         row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
         row["total_nodes_i"] = to_int(row.get("total_nodes"))
         row["magic_states_f"] = to_float(row.get("number_of_magic_states"))
+        if row["magic_states_f"] is not None:
+            row["magic_states_label"] = format_number_label(row["magic_states_f"])
+        else:
+            row["magic_states_label"] = ""
         row["border_pct_f"] = to_float(row.get("border_distance_percentage"))
         row["magic_high_f"] = to_float(row.get("magic_high"))
         row["magic_low_f"] = to_float(row.get("magic_low"))
@@ -756,13 +873,19 @@ def non_empty(values):
     return [v for v in values if v is not None and not math.isnan(v)]
 
 
-def save_fig(fig, output_dir, filename, generated):
+def save_fig(fig, output_dir, filename, generated, dpi=160, tight=True):
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, filename)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", UserWarning)
-        fig.tight_layout()
-    fig.savefig(path, dpi=160, bbox_inches="tight", pad_inches=0.2)
+    if tight:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            fig.tight_layout()
+    fig.savefig(
+        path,
+        dpi=dpi,
+        bbox_inches="tight" if tight else None,
+        pad_inches=0.2 if tight else 0.1,
+    )
     plt.close(fig)
     generated.append(path)
 
@@ -787,6 +910,12 @@ def remove_obsolete_plots(output_dir):
     if os.path.isdir(output_dir):
         for filename in os.listdir(output_dir):
             if any(filename.startswith(prefix) for prefix in OBSOLETE_PLOT_PREFIXES):
+                filenames.add(filename)
+            if filename.lower().endswith(".png") and "_heatmap_" in filename:
+                filenames.add(filename)
+            if filename.lower().endswith(".png") and re.match(r"\d+_dashboard_", filename.lower()):
+                filenames.add(filename)
+            if filename.lower().endswith(".png") and re.match(r"\d+_barplot_", filename.lower()):
                 filenames.add(filename)
 
     for filename in filenames:
@@ -2350,8 +2479,14 @@ def make_pair_heatmap(
     value_format="{:.2f}",
     subset_transform=None,
 ):
-    row_labels = sorted({heatmap_axis_value(r, row_key) for r in rows})
-    col_labels = sorted({heatmap_axis_value(r, col_key) for r in rows})
+    row_labels = sorted(
+        {heatmap_axis_value(r, row_key) for r in rows},
+        key=lambda label: heatmap_axis_sort_key(row_key, label),
+    )
+    col_labels = sorted(
+        {heatmap_axis_value(r, col_key) for r in rows},
+        key=lambda label: heatmap_axis_sort_key(col_key, label),
+    )
     if not row_labels or not col_labels:
         record_skipped_plot(
             skipped,
@@ -2406,6 +2541,431 @@ def make_pair_heatmap(
     save_fig(fig, output_dir, filename, generated)
 
 
+def heatmap_metric_display_label(metric, sample_scope=None):
+    metric_titles = {
+        "success_rate": "success rate",
+        "routing_steps": "routing steps",
+        "execution_time": "execution time",
+    }
+    label = metric_titles.get(metric, str(metric))
+    if sample_scope:
+        return f"{label}\n({sample_scope})"
+    return label
+
+
+def dashboard_panel_title(item, mode="metric"):
+    if item.get("kind") == "heatmap":
+        metric_label = heatmap_metric_display_label(
+            item.get("metric"),
+            item.get("sample_scope"),
+        )
+        if mode == "axis_and_metric":
+            return f"{item.get('row_label', item.get('row_key', 'axis'))}\n{metric_label}"
+        return metric_label
+    return item.get("title") or item.get("caption") or item["filename"]
+
+
+def dashboard_font(ImageFont, size, bold=False):
+    font_names = (
+        ("DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+        if bold
+        else ("DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    )
+    for font_name in font_names:
+        try:
+            return ImageFont.truetype(font_name, size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def centered_multiline_text(draw, xy, text, font, fill):
+    x, y, width = xy
+    bbox = draw.multiline_textbbox((0, 0), text, font=font, spacing=4, align="center")
+    text_width = bbox[2] - bbox[0]
+    draw.multiline_text(
+        (x + (width - text_width) / 2, y),
+        text,
+        font=font,
+        fill=fill,
+        spacing=4,
+        align="center",
+    )
+
+
+def plot_image_dashboard(
+    source_items,
+    title,
+    filename,
+    output_dir,
+    generated,
+    skipped=None,
+    columns=3,
+    panel_title_mode="metric",
+    panel_width=6.2,
+    panel_height=5.3,
+    dpi=220,
+):
+    from PIL import Image, ImageDraw, ImageFont
+
+    if not source_items:
+        record_skipped_plot(skipped, filename, "dashboard has no source plots")
+        return
+
+    skipped_by_name = {
+        item["filename"]: item["reason"]
+        for item in (skipped or [])
+    }
+    source_panels = []
+    existing_count = 0
+    for item in source_items:
+        source_path = os.path.join(output_dir, item["filename"])
+        if os.path.isfile(source_path):
+            source_panels.append((item, source_path, None))
+            existing_count += 1
+        else:
+            reason = skipped_by_name.get(item["filename"], "source plot was not generated")
+            source_panels.append((item, None, reason))
+
+    if existing_count == 0:
+        record_skipped_plot(skipped, filename, "no source plots were generated for this dashboard")
+        return
+
+    columns = max(1, min(columns, len(source_panels)))
+    row_count = int(math.ceil(len(source_panels) / columns))
+    panel_pixel_width = int(max(900, panel_width * dpi))
+    placeholder_height = int(panel_pixel_width * 0.72)
+    title_height = 74
+    outer_pad = 34
+    gap = 28
+    header_height = 92
+    resampling = getattr(Image, "Resampling", Image).LANCZOS
+
+    rendered_panels = []
+    for item, source_path, missing_reason in source_panels:
+        panel_title = dashboard_panel_title(item, panel_title_mode)
+        if source_path is None:
+            rendered_panels.append((panel_title, None, missing_reason, placeholder_height))
+            continue
+
+        with Image.open(source_path) as original:
+            image = original.convert("RGBA")
+            scale = panel_pixel_width / image.width
+            target_height = max(1, int(round(image.height * scale)))
+            resized = image.resize((panel_pixel_width, target_height), resampling)
+        rendered_panels.append((panel_title, resized, None, resized.height))
+
+    row_heights = []
+    for row_index in range(row_count):
+        start = row_index * columns
+        end = min(start + columns, len(rendered_panels))
+        row_heights.append(title_height + max(panel[3] for panel in rendered_panels[start:end]))
+
+    canvas_width = outer_pad * 2 + columns * panel_pixel_width + (columns - 1) * gap
+    canvas_height = outer_pad * 2 + header_height + sum(row_heights) + (row_count - 1) * gap
+    canvas = Image.new("RGBA", (canvas_width, canvas_height), "white")
+    draw = ImageDraw.Draw(canvas)
+    header_font = dashboard_font(ImageFont, 38, bold=True)
+    panel_font = dashboard_font(ImageFont, 24, bold=True)
+    small_font = dashboard_font(ImageFont, 22)
+
+    centered_multiline_text(
+        draw,
+        (outer_pad, outer_pad, canvas_width - outer_pad * 2),
+        title,
+        header_font,
+        "#111827",
+    )
+
+    y = outer_pad + header_height
+    for row_index, row_height in enumerate(row_heights):
+        for col_index in range(columns):
+            panel_index = row_index * columns + col_index
+            if panel_index >= len(rendered_panels):
+                continue
+
+            panel_title, image, missing_reason, image_height = rendered_panels[panel_index]
+            x = outer_pad + col_index * (panel_pixel_width + gap)
+            centered_multiline_text(draw, (x, y, panel_pixel_width), panel_title, panel_font, "#111827")
+            image_y = y + title_height
+            if image is None:
+                bottom = image_y + image_height
+                draw.rectangle(
+                    (x, image_y, x + panel_pixel_width, bottom),
+                    fill="#F8FAFC",
+                    outline="#CBD5E1",
+                    width=2,
+                )
+                centered_multiline_text(
+                    draw,
+                    (x + 20, image_y + image_height / 2 - 34, panel_pixel_width - 40),
+                    f"Skipped\n{missing_reason}",
+                    small_font,
+                    "#64748B",
+                )
+            else:
+                canvas.alpha_composite(image, (x, image_y))
+
+        y += row_height + gap
+
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, filename)
+    canvas.convert("RGB").save(path, "PNG", optimize=True)
+    generated.append(path)
+
+
+def axis_boxplot_values(rows, metric):
+    if metric == "success_rate":
+        return [100.0 if row["success"] else 0.0 for row in rows]
+    if metric == "routing_steps":
+        return non_empty([row["routing_steps_f"] for row in rows])
+    if metric == "execution_time":
+        return non_empty([row["duration_s_f"] for row in rows])
+    raise ValueError(f"Unknown axis boxplot metric: {metric}")
+
+
+def axis_mean_label(metric, mean_value, value_format):
+    text = value_format.format(mean_value)
+    if metric == "success_rate":
+        text = f"{text}%"
+    elif metric == "execution_time":
+        text = f"{text}s"
+    return f"mean={text}"
+
+
+def axis_metric_value_text(metric, value, value_format):
+    text = value_format.format(value)
+    if metric == "success_rate":
+        return f"{text}%"
+    if metric == "execution_time":
+        return f"{text}s"
+    return text
+
+
+def boxplot_non_outlier_values(values):
+    if not values:
+        return []
+    q1, q3 = np.percentile(values, [25, 75])
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    visible = [value for value in values if lower_bound <= value <= upper_bound]
+    return visible or values
+
+
+def boxplot_whisker_limits(value_groups):
+    lows = []
+    highs = []
+    for values in value_groups:
+        if not values:
+            continue
+        visible = boxplot_non_outlier_values(values)
+        lows.append(min(visible))
+        highs.append(max(visible))
+
+    if not lows or not highs:
+        return 0.0, 1.0
+
+    y_min = min(lows)
+    y_max = max(highs)
+    y_span = y_max - y_min
+    if abs(y_span) < 1e-9:
+        y_span = max(1.0, abs(y_max) * 0.15)
+    return min(0.0, y_min - y_span * 0.08), y_max + y_span * 0.18
+
+
+def plot_axis_barplot(
+    rows,
+    axis_key,
+    metric,
+    title,
+    ylabel,
+    filename,
+    output_dir,
+    generated,
+    skipped=None,
+    value_format="{:.2f}",
+    color="#577590",
+):
+    grouped = defaultdict(list)
+    for row in rows:
+        if not has_heatmap_axis_value(row, axis_key):
+            continue
+        grouped[heatmap_axis_value(row, axis_key)].append(row)
+
+    labels = sorted(
+        grouped.keys(),
+        key=lambda label: heatmap_axis_sort_key(axis_key, label),
+    )
+    value_groups = []
+    valid_labels = []
+    for label in labels:
+        values = axis_boxplot_values(grouped[label], metric)
+        if not values:
+            continue
+        valid_labels.append(label)
+        value_groups.append(values)
+
+    if not valid_labels:
+        record_skipped_plot(
+            skipped,
+            filename,
+            f"no rows available for boxplot axis {axis_key}",
+        )
+        return
+
+    display_labels = [
+        label_with_sample_count(label, len(values))
+        for label, values in zip(valid_labels, value_groups)
+    ]
+    means = [float(np.mean(values)) for values in value_groups]
+    if metric == "success_rate":
+        means_no_outliers = means
+    else:
+        means_no_outliers = [
+            float(np.mean(boxplot_non_outlier_values(values)))
+            for values in value_groups
+        ]
+    medians = [float(np.median(values)) for values in value_groups]
+
+    fig, ax = plt.subplots(figsize=(max(10.5, len(valid_labels) * 2.05), 8.4))
+    box = ax.boxplot(
+        value_groups,
+        tick_labels=display_labels,
+        showfliers=False,
+        showmeans=False,
+        patch_artist=True,
+        widths=0.5,
+        boxprops={"facecolor": "white", "edgecolor": "black", "linewidth": 2.0},
+        whiskerprops={"color": "black", "linewidth": 2.0},
+        capprops={"color": "black", "linewidth": 2.0},
+        medianprops={"color": "#FF7F0E", "linewidth": 2.4},
+    )
+    for patch in box["boxes"]:
+        patch.set_facecolor("white")
+        patch.set_edgecolor("black")
+
+    if metric == "success_rate":
+        y_min, y_max = -4.0, 112.0
+    else:
+        y_min, y_max = boxplot_whisker_limits(value_groups)
+    ax.set_ylim(y_min, y_max)
+    text_offset = (y_max - y_min) * 0.035
+    any_mean_line = False
+    any_mean_no_outliers_line = False
+
+    for x_position, (mean_value, mean_no_outliers, median_value) in enumerate(
+        zip(means, means_no_outliers, medians),
+        start=1,
+    ):
+        raw_mean_is_distinct = not math.isclose(
+            mean_value,
+            mean_no_outliers,
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        )
+        mean_in_view = y_min <= mean_value <= y_max
+        mean_no_outliers_in_view = y_min <= mean_no_outliers <= y_max
+        if raw_mean_is_distinct and mean_in_view:
+            ax.hlines(
+                mean_value,
+                x_position - 0.25,
+                x_position + 0.25,
+                color="#D62728",
+                linewidth=2.6,
+                linestyle="--",
+                zorder=4,
+            )
+            any_mean_line = True
+        elif raw_mean_is_distinct:
+            mean_in_view = False
+
+        if mean_no_outliers_in_view:
+            ax.hlines(
+                mean_no_outliers,
+                x_position - 0.25,
+                x_position + 0.25,
+                color="#1F77B4",
+                linewidth=2.4,
+                linestyle=":",
+                zorder=4,
+            )
+            any_mean_no_outliers_line = True
+
+        median_label = axis_metric_value_text(metric, median_value, value_format)
+        mean_no_outliers_label = axis_metric_value_text(metric, mean_no_outliers, value_format)
+        summary_label = (
+            f"median={median_label}\n"
+            f"mean(no out)={mean_no_outliers_label}"
+        )
+        summary_y_anchor = max(
+            median_value,
+            mean_no_outliers if mean_no_outliers_in_view else median_value,
+        )
+        summary_y = min(summary_y_anchor + text_offset, y_max - text_offset * 0.4)
+        ax.text(
+            x_position,
+            summary_y,
+            summary_label,
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            color="#111111",
+            fontweight="bold",
+            bbox={"facecolor": "white", "edgecolor": "#BBBBBB", "alpha": 0.9, "pad": 2.5},
+        )
+
+        if raw_mean_is_distinct and mean_in_view:
+            mean_y = max(mean_value - text_offset * 1.25, y_min + text_offset * 0.5)
+            ax.text(
+                x_position,
+                mean_y,
+                axis_mean_label(metric, mean_value, value_format),
+                ha="center",
+                va="top",
+                fontsize=8,
+                color="#D62728",
+            )
+        elif raw_mean_is_distinct:
+            ax.text(
+                x_position,
+                0.03,
+                axis_mean_label(metric, mean_value, value_format),
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color="#D62728",
+                fontweight="bold",
+                transform=ax.get_xaxis_transform(),
+                bbox={"facecolor": "white", "edgecolor": "#BBBBBB", "alpha": 0.9, "pad": 2.0},
+            )
+
+    ax.set_title(title, fontsize=18, pad=14)
+    ax.set_ylabel(ylabel, fontsize=14)
+    ax.tick_params(axis="x", rotation=35, labelsize=12)
+    ax.tick_params(axis="y", labelsize=12)
+    ax.set_axisbelow(True)
+    ax.grid(True, axis="both", color="#CFCFCF", linewidth=1.15, alpha=0.85)
+    legend_handles = []
+    if any_mean_line:
+        legend_handles.append(
+            Line2D([0], [0], color="#D62728", linewidth=2.6, linestyle="--", label="mean")
+        )
+    if any_mean_no_outliers_line:
+        legend_handles.append(
+            Line2D([0], [0], color="#1F77B4", linewidth=2.4, linestyle=":", label="mean(no out)")
+        )
+    legend_handles.append(Line2D([0], [0], color="#FF7F0E", linewidth=2.4, label="median"))
+    ax.legend(
+        handles=legend_handles,
+        loc="upper right",
+        frameon=True,
+        fontsize=10,
+    )
+
+    save_fig(fig, output_dir, filename, generated, dpi=200)
+
+
 def mean_of(values):
     values = non_empty(values)
     if not values:
@@ -2438,6 +2998,30 @@ def heatmap_axis_value(row, key):
         return "unknown"
     text = str(value).strip()
     return text or "unknown"
+
+
+def heatmap_axis_sort_key(key, label):
+    if key in {"magic_states_label", "x_i", "y_i", "graph_nodes"}:
+        numeric = to_float(label)
+        if numeric is not None:
+            return (0, numeric, label)
+    return (1, str(label))
+
+
+def has_heatmap_axis_value(row, key):
+    value = row.get(key)
+    if value is None:
+        return False
+    text = str(value).strip()
+    return bool(text) and text.lower() != "unknown"
+
+
+def filter_heatmap_rows(rows, row_key, col_key):
+    return [
+        row
+        for row in rows
+        if has_heatmap_axis_value(row, row_key) and has_heatmap_axis_value(row, col_key)
+    ]
 
 
 def project_root():
@@ -3370,6 +3954,90 @@ def plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, g
     )
 
 
+def requested_heatmap_value_fn(metric):
+    if metric == "success_rate":
+        return success_rate
+    if metric == "routing_steps":
+        return lambda subset: mean_of([row["routing_steps_f"] for row in subset])
+    if metric == "execution_time":
+        return lambda subset: mean_of([row["duration_s_f"] for row in subset])
+    raise ValueError(f"Unknown heatmap metric: {metric}")
+
+
+def plot_requested_heatmaps(
+    rows,
+    rows_success_with_routing,
+    rows_with_duration,
+    output_dir,
+    generated,
+    skipped=None,
+):
+    rows_success_with_duration = [
+        row for row in rows if row["success"] and row["duration_s_f"] is not None
+    ]
+    heatmap_rows_by_metric = {
+        "success_rate": rows,
+        "routing_steps": rows_success_with_routing,
+        "execution_time": rows_success_with_duration,
+    }
+    axis_boxplot_rows_by_metric = {
+        "success_rate": rows,
+        "routing_steps": rows_success_with_routing,
+        "execution_time": rows_success_with_duration,
+    }
+
+    for item in REQUESTED_HEATMAP_ITEMS:
+        if item["kind"] == "heatmap":
+            metric_rows = heatmap_rows_by_metric[item["metric"]]
+            heatmap_rows = filter_heatmap_rows(metric_rows, item["row_key"], item["col_key"])
+            make_pair_heatmap(
+                heatmap_rows,
+                item["row_key"],
+                item["col_key"],
+                requested_heatmap_value_fn(item["metric"]),
+                item["title"],
+                item["colorbar_label"],
+                item["filename"],
+                output_dir,
+                generated,
+                skipped,
+                value_format=item["value_format"],
+            )
+            continue
+
+        if item["kind"] in {"triplet_dashboard", "x_axis_dashboard"}:
+            plot_image_dashboard(
+                item["source_items"],
+                item["title"],
+                item["filename"],
+                output_dir,
+                generated,
+                skipped,
+                columns=item.get("columns", 3),
+                panel_title_mode=item.get("panel_title_mode", "metric"),
+                panel_width=item.get("panel_width", 6.2),
+                panel_height=item.get("panel_height", 5.3),
+                dpi=item.get("dpi", 220),
+            )
+            continue
+
+        if item["kind"] == "axis_barplot":
+            metric_rows = axis_boxplot_rows_by_metric[item["metric"]]
+            plot_axis_barplot(
+                metric_rows,
+                item["axis_key"],
+                item["metric"],
+                item["title"],
+                item["ylabel"],
+                item["filename"],
+                output_dir,
+                generated,
+                skipped,
+                value_format=item["value_format"],
+                color=item["color"],
+            )
+
+
 def plot_summary_tables(rows, output_dir, generated):
     circuits = sorted({r["circuit_name"] for r in rows})
     fig, axs = plt.subplots(1, 2, figsize=(16, 6))
@@ -3910,6 +4578,7 @@ def main():
         if r["mapping_type_norm"] == "magic_aware"
         and r["magic_aware_strategy_norm"] in REQUESTED_MAGIC_AWARE_STRATEGIES
     ]
+    rows_with_duration = [r for r in rows if r["duration_s_f"] is not None]
 
     boxplot_by_category(
         rows_success_with_routing,
@@ -3948,7 +4617,7 @@ def main():
         rows_success_with_routing,
         "safe_passage_strategy",
         "routing_steps_f",
-        "Routing Steps by Safe Passage Strategy",
+        "Routing Steps by Safe Passage Strategy (Success Only)",
         "routing steps",
         "06_box_routing_by_safe_passage.png",
         output_dir,
@@ -3978,20 +4647,8 @@ def main():
         skipped,
     )
     plot_elapsed_by_gaussian_strategy(rows, output_dir, generated, skipped)
+    plot_gaussian_weight_combinations(rows_gaussian_with_routing, output_dir, generated, skipped)
 
-    scatter_plot(
-        rows_success_with_routing,
-        "duration_s_f",
-        "routing_steps_f",
-        "circuit_name",
-        "Duration vs Routing Steps (by Circuit)",
-        "duration_seconds",
-        "routing steps",
-        "08_scatter_elapsed_vs_routing_by_circuit.png",
-        output_dir,
-        generated,
-        skipped,
-    )
     scatter_plot(
         rows_success_with_routing,
         "data_density_f",
@@ -4001,37 +4658,6 @@ def main():
         "data_density",
         "routing steps",
         "09_scatter_density_vs_routing.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    scatter_plot(
-        rows_success_with_routing,
-        "magic_states_f",
-        "routing_steps_f",
-        "circuit_name",
-        "Magic State Parameter vs Routing Steps",
-        "number_of_magic_states",
-        "routing steps",
-        "10_scatter_magic_states_vs_routing.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-
-    center_circle_ok = [
-        r for r in rows_success_with_routing
-        if str(r.get("placement", "")) == "center_circle" and r.get("border_pct_f") is not None
-    ]
-    scatter_plot(
-        center_circle_ok,
-        "border_pct_f",
-        "routing_steps_f",
-        "safe_passage_strategy",
-        "Border Distance vs Routing (Center Circle Only)",
-        "border_distance_percentage",
-        "routing steps",
-        "11_scatter_border_vs_routing_center_circle.png",
         output_dir,
         generated,
         skipped,
@@ -4053,126 +4679,15 @@ def main():
 
     plot_runtime_qubits_plus_gates(rows, output_dir, generated, skipped)
     runtime_grouped_factors_csv_path = plot_runtime_grouped_factors(rows, output_dir, generated, skipped)
-    plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, generated, skipped)
-    plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, generated, skipped)
-
-    make_pair_heatmap(
-        rows,
-        "safe_passage_strategy",
-        "placement",
-        success_rate,
-        "Success Rate Heatmap (Timeouts Excluded)",
-        "success rate (%)",
-        "13_heatmap_success_safe_vs_placement_excluding_timeouts.png",
-        output_dir,
-        generated,
-        skipped,
-        value_format="{:.1f}",
-        subset_transform=exclude_timeout_rows,
-    )
-    make_pair_heatmap(
-        rows_success_with_routing,
-        "safe_passage_strategy",
-        "placement",
-        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        "Mean Routing Steps Heatmap",
-        "mean routing steps",
-        "14_heatmap_routing_safe_vs_placement.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    make_pair_heatmap(
-        rows,
-        "safe_passage_strategy",
-        "placement",
-        timeout_count,
-        "Timeout Heatmap by Safe Passage and Placement",
-        "timeout count",
-        "25_heatmap_timeout_safe_vs_placement.png",
-        output_dir,
-        generated,
-        skipped,
-        value_format="{:.0f}",
-    )
-    make_pair_heatmap(
-        rows,
-        "safe_passage_strategy",
-        "mapping_type_norm",
-        success_rate,
-        "Success Rate Heatmap by Safe Passage and Mapping Type (Timeouts Excluded)",
-        "success rate (%)",
-        "23_heatmap_success_safe_vs_mapping_type_excluding_timeouts.png",
-        output_dir,
-        generated,
-        skipped,
-        value_format="{:.1f}",
-        subset_transform=exclude_timeout_rows,
-    )
-    make_pair_heatmap(
-        rows_success_with_routing,
-        "safe_passage_strategy",
-        "mapping_type_norm",
-        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        "Mean Routing Steps Heatmap by Safe Passage and Mapping Type",
-        "mean routing steps",
-        "24_heatmap_routing_safe_vs_mapping_type.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    make_pair_heatmap(
-        rows,
-        "safe_passage_strategy",
-        "mapping_type_norm",
-        timeout_count,
-        "Timeout Heatmap by Safe Passage and Mapping Type",
-        "timeout count",
-        "26_heatmap_timeout_safe_vs_mapping_type.png",
-        output_dir,
-        generated,
-        skipped,
-        value_format="{:.0f}",
-    )
-    make_pair_heatmap(
-        rows_magicaware_with_routing,
-        "magic_aware_strategy",
-        "safe_passage_strategy",
-        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        "Mean Routing by Magic-Aware Strategy and Safe Passage",
-        "mean routing steps",
-        "15_heatmap_routing_magic_vs_safe.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    make_pair_heatmap(
-        rows_gaussian_with_routing,
-        "gaussian_strategy_norm",
-        "placement_detail",
-        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        "Mean Routing by Gaussian Strategy and Placement",
-        "mean routing steps",
-        "20_heatmap_routing_gaussian_strategy_vs_placement.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    make_pair_heatmap(
-        rows,
-        "y_i",
-        "x_i",
-        success_rate,
-        "Success Rate by Grid Size (y rows vs x cols)",
-        "success rate (%)",
-        "16_heatmap_success_by_grid_xy.png",
-        output_dir,
-        generated,
-        skipped,
-        value_format="{:.0f}",
-    )
     plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped)
-    plot_gaussian_weight_combinations(rows_gaussian_with_routing, output_dir, generated, skipped)
+    plot_requested_heatmaps(
+        rows,
+        rows_success_with_routing,
+        rows_with_duration,
+        output_dir,
+        generated,
+        skipped,
+    )
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,
         top_n=3,
@@ -4190,12 +4705,6 @@ def main():
         output_dir,
         "best_gaussian_weight_profile_by_circuit_dimension.csv",
     )
-    plot_best_gaussian_weight_profile_heatmap(
-        best_gaussian_weight_profile_rows,
-        output_dir,
-        generated,
-        skipped,
-    )
     gaussian_relative_weight_gap_rows = gaussian_relative_weight_gap_entries(
         best_gaussian_weight_profile_rows,
     )
@@ -4204,13 +4713,6 @@ def main():
         output_dir,
         "best_gaussian_relative_weight_gaps.csv",
     )
-    plot_gaussian_relative_weight_gap_heatmap(
-        gaussian_relative_weight_gap_rows,
-        output_dir,
-        generated,
-        skipped,
-    )
-
     gaussian_best_entries = best_gaussian_execution_entries(rows)
     gaussian_best_entries, gaussian_best_csv_path = write_best_gaussian_execution_table(
         gaussian_best_entries,
