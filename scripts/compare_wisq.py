@@ -289,7 +289,8 @@ def plot_circuit_bars(cg, cfg_map, wisq_val, our_key, ylabel, title, filename, c
         bar.set_alpha(a)
 
     if wisq_val is not None:
-        lbl_txt = str(int(round(wisq_val))) if abs(wisq_val - round(wisq_val)) < 1e-9 else f"{wisq_val:.3g}"
+        # lbl_txt = str(int(round(wisq_val))) if abs(wisq_val - round(wisq_val)) < 1e-9 else f"{wisq_val:.3g}"
+        lbl_txt = f"{wisq_val:.3g}"
         ax.axhline(wisq_val, color="#e11d48", linewidth=1.4, linestyle="--",
                    alpha=0.65, label=f"wisq = {lbl_txt}")
         ax.legend(fontsize=9)
@@ -307,8 +308,11 @@ def plot_circuit_bars(cg, cfg_map, wisq_val, our_key, ylabel, title, filename, c
 
 # ── plot: per-circuit ratio bars ──────────────────────────────────────────────
 
-def plot_circuit_ratio_bars(cg, cfg_map, wisq_val, our_key, ylabel, title, filename, circuit_dir, generated):
-    """Ratio bars (our/wisq) for one circuit. Green < 1 = ours better."""
+def plot_circuit_ratio_bars(cg, cfg_map, wisq_val, our_key, ylabel, title, filename, circuit_dir, generated, invertDiv=False):
+    """Ratio bars for one circuit.
+    invertDiv=False: ratio = our/wisq  — green when < 1 (ours uses fewer steps/less time)
+    invertDiv=True:  ratio = wisq/our  — green when >= 1 (ours yields higher value than wisq)
+    """
     if wisq_val is None or wisq_val == 0:
         return
 
@@ -316,15 +320,37 @@ def plot_circuit_ratio_bars(cg, cfg_map, wisq_val, our_key, ylabel, title, filen
     ratios = []
     for lbl in labels:
         v = cfg_map[lbl].get(our_key)
-        ratios.append(v / wisq_val if v is not None else None)
+        if v is None or v == 0:
+            ratios.append(None)
+        elif invertDiv:
+            ratios.append(wisq_val / v)
+        else:
+            ratios.append(v / wisq_val)
 
     if not any(r is not None for r in ratios):
         return
 
-    colors = ["#16a34a" if (r is not None and r < 1.0)
-              else "#dc2626" if r is not None
-              else "#94a3b8"
-              for r in ratios]
+    if invertDiv:
+        # higher ratio = ours is better
+        colors = ["#16a34a" if (r is not None and r >= 1.0)
+                  else "#dc2626" if r is not None
+                  else "#94a3b8"
+                  for r in ratios]
+        better_pred = lambda r: r >= 1.0
+        legend_hint = "green ≥ 1 = ours better, red < 1 = wisq better"
+        better_label = "our ≥ wisq (better)"
+        worse_label  = "our < wisq"
+    else:
+        # lower ratio = ours is better
+        colors = ["#16a34a" if (r is not None and r < 1.0)
+                  else "#dc2626" if r is not None
+                  else "#94a3b8"
+                  for r in ratios]
+        better_pred = lambda r: r < 1.0
+        legend_hint = "green < 1 = ours better, red ≥ 1 = wisq better"
+        better_label = "our < wisq (better)"
+        worse_label  = "our ≥ wisq"
+
     plot_ratios = [(r if r is not None else 0) for r in ratios]
 
     fig_w = max(10, 1.8 + len(labels) * 0.38)
@@ -338,17 +364,17 @@ def plot_circuit_ratio_bars(cg, cfg_map, wisq_val, our_key, ylabel, title, filen
 
     ax.axhline(1.0, color="#334155", linewidth=1.4, linestyle="--", label="parity (= wisq)")
 
-    better = sum(1 for r in ratios if r is not None and r < 1.0)
-    worse = sum(1 for r in ratios if r is not None and r >= 1.0)
+    better = sum(1 for r in ratios if r is not None and better_pred(r))
+    worse  = sum(1 for r in ratios if r is not None and not better_pred(r))
     ax.text(0.01, 0.98,
-            f"our < wisq (better): {better}   our ≥ wisq: {worse}",
+            f"{better_label}: {better}   {worse_label}: {worse}",
             transform=ax.transAxes, va="top", ha="left", fontsize=8.5,
             bbox={"facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.85})
 
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, rotation=50, ha="right", fontsize=7.5)
     ax.set_ylabel(ylabel, fontsize=10)
-    ax.set_title(f"{title}\n{cg}\n(green < 1 = ours better, red ≥ 1 = wisq better)", fontsize=11, pad=10)
+    ax.set_title(f"{title}\n{cg}\n({legend_hint})", fontsize=11, pad=10)
     ax.legend(fontsize=9)
     ax.grid(True, axis="y", alpha=0.3)
 
@@ -396,7 +422,8 @@ def plot_summary_heatmap(mat, row_labels, col_labels, title, cbar_label, filenam
             else:
                 bright = (val - vmin) / span
                 color = "white" if bright > 0.62 else "#0f172a"
-                txt = str(int(round(val))) if abs(val - round(val)) < 1e-9 else f"{val:.3g}"
+                # txt = str(int(round(val))) if abs(val - round(val)) < 1e-9 else f"{val:.3g}"
+                txt = f"{val:.3g}"
                 ax.text(ci, ri, txt, ha="center", va="center", fontsize=7,
                         color=color, fontweight="bold")
 
@@ -546,7 +573,7 @@ def main():
             plot_circuit_ratio_bars(
                 cg, cfg_map, wisq_entry.get("routing"),
                 "routing_min", "routing steps ratio (our ÷ wisq)",
-                "Routing Steps Ratio: Our ÷ WISQ",
+                "Routing Steps Ratio: Ours ÷ WISQ",
                 "ratio_routing.png", circuit_dir, generated,
             )
 
@@ -560,9 +587,10 @@ def main():
             )
             plot_circuit_ratio_bars(
                 cg, cfg_map, wisq_entry.get("duration"),
-                "duration_median", "duration ratio (our ÷ wisq)",
-                "Duration Ratio: Our ÷ WISQ",
-                "ratio_duration.png", circuit_dir, generated,
+                "duration_median", "Speedup (wisq ÷ ours)",
+                "Speedup (WISQ_Time ÷ Our_Time)",
+                "ratio_duration.png", circuit_dir, generated, 
+                invertDiv=True
             )
 
     # ── cross-circuit summary: scatter + heatmaps in root ────────────────────
