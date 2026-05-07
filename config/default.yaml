@@ -1,0 +1,10 @@
+# Default configuration for Fault-Tolerant-Quantum-Compiler.
+# Copy and customize as needed for local runs.
+
+paths:
+  input_dir: qasms
+  output_dir: build
+
+execution:
+  verbose: false
+  save_intermediate: true
