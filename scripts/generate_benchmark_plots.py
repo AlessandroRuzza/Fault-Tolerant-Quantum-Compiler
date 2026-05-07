@@ -1000,9 +1000,13 @@ def non_empty(values):
     return [v for v in values if v is not None and not math.isnan(v)]
 
 
-def save_fig(fig, output_dir, filename, generated, dpi=160, tight=True):
-    os.makedirs(output_dir, exist_ok=True)
-    path = os.path.join(output_dir, filename)
+def save_fig(fig, output_dir, filename, generated, dpi=160, tight=True, subfolder=None):
+    if subfolder:
+        target_dir = os.path.join(output_dir, subfolder)
+    else:
+        target_dir = output_dir
+    os.makedirs(target_dir, exist_ok=True)
+    path = os.path.join(target_dir, filename)
     if tight:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
@@ -2667,6 +2671,7 @@ def make_pair_heatmap(
     skipped=None,
     value_format="{:.2f}",
     subset_transform=None,
+    subfolder=None,
 ):
     row_labels = sorted(
         {heatmap_axis_value(r, row_key) for r in rows},
@@ -2730,7 +2735,7 @@ def make_pair_heatmap(
                 color = "white" if luminance < 0.45 else "#111111"
             ax.text(j, i, text, ha="center", va="center", color=color, fontsize=7, linespacing=0.9)
 
-    save_fig(fig, output_dir, filename, generated)
+    save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
 
 
 def heatmap_metric_display_label(metric, sample_scope=None):
@@ -2978,6 +2983,7 @@ def plot_axis_barplot(
     skipped=None,
     value_format="{:.2f}",
     color="#577590",
+    subfolder=None,
 ):
     grouped = defaultdict(list)
     for row in rows:
@@ -3155,7 +3161,7 @@ def plot_axis_barplot(
         fontsize=10,
     )
 
-    save_fig(fig, output_dir, filename, generated, dpi=200)
+    save_fig(fig, output_dir, filename, generated, dpi=200, subfolder=subfolder)
 
 
 def mean_of(values):
@@ -4249,6 +4255,14 @@ def plot_requested_heatmaps(
             else:
                 value_fn = requested_heatmap_value_fn(item["metric"])
                 value_label_suffix = ""
+            
+            col_axis_name = None
+            for axis_name, (axis_key, _) in HEATMAP_AXIS_SPECS.items():
+                if axis_key == item["col_key"]:
+                    col_axis_name = axis_name
+                    break
+            subfolder = f"heatmap_{col_axis_name}" if col_axis_name else None
+            
             make_pair_heatmap(
                 heatmap_rows,
                 item["row_key"],
@@ -4262,6 +4276,7 @@ def plot_requested_heatmaps(
                 generated,
                 skipped,
                 value_format=item["value_format"],
+                subfolder=subfolder,
             )
             continue
 
@@ -4283,6 +4298,14 @@ def plot_requested_heatmaps(
 
         if item["kind"] == "axis_barplot":
             metric_rows = axis_boxplot_rows_by_metric[item["metric"]]
+            
+            col_axis_name = None
+            for axis_name, (axis_key, _) in HEATMAP_AXIS_SPECS.items():
+                if axis_key == item["axis_key"]:
+                    col_axis_name = axis_name
+                    break
+            subfolder = f"heatmap_{col_axis_name}" if col_axis_name else None
+            
             plot_axis_barplot(
                 metric_rows,
                 item["axis_key"],
@@ -4295,6 +4318,7 @@ def plot_requested_heatmaps(
                 skipped,
                 value_format=item["value_format"],
                 color=item["color"],
+                subfolder=subfolder,
             )
 
 
@@ -4400,7 +4424,10 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
         ax.set_ylabel("best-count")
         ax.tick_params(axis="x", rotation=35)
         annotate_bars(ax, bars, fmt="{:.0f}")
-        save_fig(fig, output_dir, filename, generated)
+        
+        col_axis_name = axis_slug
+        subfolder = f"heatmap_{col_axis_name}"
+        save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
 
         for label in labels:
             count = counts[label]

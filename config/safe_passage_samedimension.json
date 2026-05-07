@@ -1,21 +1,23 @@
 {
-  "safe_passage_strategy": ["cube", "passage", "passage_no_subgraphs", "connectivity"],
+  "safe_passage_strategy": [
+    "cube",
+    "passage",
+    "passage_no_subgraphs",
+    "connectivity"
+  ],
   "MagicStatePlacementStrategy": "center_circle",
   "border_distance_percentage": 5.0,
   "number_of_magic_states": 0.7,
-
   "MAGIC_HIGH": 1.5,
   "MAGIC_LOW": 0.5,
   "CNOT_HIGH": 1.5,
   "CNOT_LOW": 0.5,
   "MAPPED_GAUSSIAN_WEIGHT": 0.8,
   "BASE_GAUSSIAN_WEIGHT": 1.0,
-
   "timeout": 600,
   "timeout_reached": false,
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing",
-
   "configs_type": [
     {
       "type": "gaussian",
@@ -29,8 +31,7 @@
       "magic_aware_strategy": "center"
     }
   ],
-
-  "configs_circuit" : [
+  "configs_circuit": [
     {
       "circuit": "adder_n4",
       "x": 5,
@@ -65,16 +66,6 @@
       "circuit": "hhl_n10",
       "x": 10,
       "y": 10
-    },
-    {
-      "circuit": "vqe_uccsd_n8",
-      "x": 8,
-      "y": 8
-    },
-    {
-      "circuit": "vqe_n24",
-      "x": 14,
-      "y": 14
     },
     {
       "circuit": "qaoa_n6_transpiled",

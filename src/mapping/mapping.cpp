@@ -1,5 +1,6 @@
 #include "mapping.hpp"
 #include "routing.hpp"
+#include "exceptions.hpp"
 
 const bool Mapping::mapToNeighbor(
     int qubit,
@@ -92,12 +93,12 @@ int Mapping::map_qubit_to_node(
                 << " (candidate rejected)\n";
         }
         if (iterations > circuit.getNumQubits()) {
-            throw std::runtime_error(
-                "Failed to find a safe passage for qubit " + std::to_string(qubit) + " after " + std::to_string(iterations) + " iterations. Aborting mapping.\n"
+            throw SafePassageException(
+                "Failed to find a safe passage for qubit " + std::to_string(qubit) + " after " + std::to_string(iterations) + " iterations. Aborting mapping."
             );
         }
         if (!mapToNeighbor(qubit, node, iterations + 1, visited_nodes)) {
-            throw std::runtime_error(
+            throw SafePassageException(
                 "Failed to map qubit " + std::to_string(qubit) +
                 ": no safe neighbor found from node " + std::to_string(node) + "."
             );

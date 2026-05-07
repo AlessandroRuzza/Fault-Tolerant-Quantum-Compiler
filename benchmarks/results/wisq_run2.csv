@@ -28,6 +28,4 @@ wisq,2026-05-05,2026-05-05 16:18:37,qpe_n9,9,9,qpe_n9-9x9,42,false,success,0,38.
 wisq,2026-05-05,2026-05-05 16:19:13,t_test2,9,9,t_test2-9x9,3904,false,success,0,362.589173
 wisq,2026-05-05,2026-05-05 16:24:57,t_test,9,9,t_test-9x9,110,false,success,0,143.094618
 wisq,2026-05-05,2026-05-05 16:27:14,toffoli_n3,7,7,toffoli_n3-7x7,11,false,success,0,37.898204
-wisq,2026-05-05,2026-05-05 16:27:50,vqe_uccsd_n4,7,7,vqe_uccsd_n4-7x7,87,false,success,0,36.645889
-wisq,2026-05-05,2026-05-05 16:28:23,vqe_uccsd_n8,9,9,vqe_uccsd_n8-9x9,5446,false,success,0,49.137595
 wisq,2026-05-05,2026-05-05 16:29:11,wstate_n27,15,15,wstate_n27-15x15,28,false,success,0,39.720002
