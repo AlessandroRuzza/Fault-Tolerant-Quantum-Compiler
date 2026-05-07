@@ -110,6 +110,7 @@ OBSOLETE_PLOT_FILENAMES = {
 }
 OBSOLETE_PLOT_PREFIXES = (
     "29_table_top_gaussian_weight_configs_",
+    "best_config_count_by_",
 )
 
 
@@ -123,9 +124,13 @@ def build_requested_heatmap_items(start_index=48):
     for col_axis, row_axes in HEATMAP_PAIR_GROUPS:
         col_key, col_label = HEATMAP_AXIS_SPECS[col_axis]
         group_heatmap_items = []
+        group_heatmap_items_no_out = []
+        group_heatmap_items_median = []
         for row_axis in row_axes:
             row_key, row_label = HEATMAP_AXIS_SPECS[row_axis]
             triplet_items = []
+            triplet_items_no_out = []
+            triplet_items_median = []
             for metric_slug, metric_filename_part, caption_prefix, sample_scope, colorbar_label, value_format in HEATMAP_METRIC_SPECS:
                 filename = (
                     f"{plot_index:02d}_heatmap_{metric_filename_part}_"
@@ -144,10 +149,61 @@ def build_requested_heatmap_items(start_index=48):
                     "sample_scope": sample_scope,
                     "colorbar_label": colorbar_label,
                     "value_format": value_format,
+                    "no_outliers": False,
                 }
                 items.append(spec)
                 triplet_items.append(spec)
                 group_heatmap_items.append(spec)
+                plot_index += 1
+
+                no_out_scope = f"{sample_scope}, no outliers"
+                no_out_filename = (
+                    f"{plot_index:02d}_heatmap_{metric_filename_part}_"
+                    f"{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_no_out.png"
+                )
+                no_out_spec = {
+                    "kind": "heatmap",
+                    "filename": no_out_filename,
+                    "caption": f"{caption_prefix} ({no_out_scope}): {row_label} x {col_label}",
+                    "title": f"{caption_prefix} ({no_out_scope}): {row_label} x {col_label}",
+                    "row_key": row_key,
+                    "col_key": col_key,
+                    "row_label": row_label,
+                    "col_label": col_label,
+                    "metric": metric_slug,
+                    "sample_scope": no_out_scope,
+                    "colorbar_label": f"{colorbar_label} (no outliers)",
+                    "value_format": value_format,
+                    "no_outliers": True,
+                }
+                items.append(no_out_spec)
+                triplet_items_no_out.append(no_out_spec)
+                group_heatmap_items_no_out.append(no_out_spec)
+                plot_index += 1
+
+                median_scope = f"{sample_scope}, median"
+                median_filename = (
+                    f"{plot_index:02d}_heatmap_{metric_filename_part}_"
+                    f"{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_median.png"
+                )
+                median_spec = {
+                    "kind": "heatmap",
+                    "filename": median_filename,
+                    "caption": f"{caption_prefix} ({median_scope}): {row_label} x {col_label}",
+                    "title": f"{caption_prefix} ({median_scope}): {row_label} x {col_label}",
+                    "row_key": row_key,
+                    "col_key": col_key,
+                    "row_label": row_label,
+                    "col_label": col_label,
+                    "metric": metric_slug,
+                    "sample_scope": median_scope,
+                    "colorbar_label": f"{colorbar_label} (median)",
+                    "value_format": value_format,
+                    "median": True,
+                }
+                items.append(median_spec)
+                triplet_items_median.append(median_spec)
+                group_heatmap_items_median.append(median_spec)
                 plot_index += 1
 
             triplet_dashboard = {
@@ -165,6 +221,36 @@ def build_requested_heatmap_items(start_index=48):
             items.append(triplet_dashboard)
             plot_index += 1
 
+            triplet_dashboard_no_out = {
+                "kind": "triplet_dashboard",
+                "filename": f"{plot_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_no_out.png",
+                "caption": f"Dashboard (no outliers): {row_label} x {col_label}",
+                "title": f"{row_label} x {col_label} (no outliers)",
+                "source_items": triplet_items_no_out,
+                "columns": 3,
+                "panel_title_mode": "metric",
+                "panel_width": 6.4,
+                "panel_height": 5.0,
+                "dpi": 180,
+            }
+            items.append(triplet_dashboard_no_out)
+            plot_index += 1
+
+            triplet_dashboard_median = {
+                "kind": "triplet_dashboard",
+                "filename": f"{plot_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_median.png",
+                "caption": f"Dashboard (median): {row_label} x {col_label}",
+                "title": f"{row_label} x {col_label} (median)",
+                "source_items": triplet_items_median,
+                "columns": 3,
+                "panel_title_mode": "metric",
+                "panel_width": 6.4,
+                "panel_height": 5.0,
+                "dpi": 180,
+            }
+            items.append(triplet_dashboard_median)
+            plot_index += 1
+
         items.append(
             {
                 "kind": "x_axis_dashboard",
@@ -172,6 +258,38 @@ def build_requested_heatmap_items(start_index=48):
                 "caption": f"Dashboard: all y axes x {col_label}",
                 "title": f"All y axes x {col_label}",
                 "source_items": group_heatmap_items,
+                "columns": 3,
+                "panel_title_mode": "axis_and_metric",
+                "panel_width": 6.4,
+                "panel_height": 5.0,
+                "dpi": 180,
+            }
+        )
+        plot_index += 1
+
+        items.append(
+            {
+                "kind": "x_axis_dashboard",
+                "filename": f"{plot_index:02d}_dashboard_x_{heatmap_slug(col_axis)}_no_out.png",
+                "caption": f"Dashboard (no outliers): all y axes x {col_label}",
+                "title": f"All y axes x {col_label} (no outliers)",
+                "source_items": group_heatmap_items_no_out,
+                "columns": 3,
+                "panel_title_mode": "axis_and_metric",
+                "panel_width": 6.4,
+                "panel_height": 5.0,
+                "dpi": 180,
+            }
+        )
+        plot_index += 1
+
+        items.append(
+            {
+                "kind": "x_axis_dashboard",
+                "filename": f"{plot_index:02d}_dashboard_x_{heatmap_slug(col_axis)}_median.png",
+                "caption": f"Dashboard (median): all y axes x {col_label}",
+                "title": f"All y axes x {col_label} (median)",
+                "source_items": group_heatmap_items_median,
                 "columns": 3,
                 "panel_title_mode": "axis_and_metric",
                 "panel_width": 6.4,
@@ -196,6 +314,19 @@ def build_requested_heatmap_items(start_index=48):
                 }
             )
             plot_index += 1
+
+        items.append(
+            {
+                "kind": "best_config_count",
+                "filename": f"{plot_index:02d}_best_config_count_by_{heatmap_slug(col_axis)}.png",
+                "caption": f"Best routing config count by {col_label}",
+                "title": f"Best routing config count by {col_label}",
+                "axis_slug": col_axis,
+                "axis_key": col_key,
+                "axis_label": col_label,
+            }
+        )
+        plot_index += 1
     return items
 
 
@@ -912,6 +1043,8 @@ def remove_obsolete_plots(output_dir):
             if filename.lower().endswith(".png") and re.match(r"\d+_dashboard_", filename.lower()):
                 filenames.add(filename)
             if filename.lower().endswith(".png") and re.match(r"\d+_barplot_", filename.lower()):
+                filenames.add(filename)
+            if filename.lower().endswith(".png") and re.match(r"\d+_best_config_count_", filename.lower()):
                 filenames.add(filename)
 
     for filename in filenames:
@@ -2525,7 +2658,7 @@ def make_pair_heatmap(
     row_key,
     col_key,
     value_fn,
-    value_fn_no_out,
+    value_label_suffix,
     title,
     colorbar_label,
     filename,
@@ -2552,7 +2685,6 @@ def make_pair_heatmap(
         return
 
     matrix = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
-    matrix_no_out = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
     count_matrix = np.zeros((len(row_labels), len(col_labels)), dtype=int)
     row_index = {k: i for i, k in enumerate(row_labels)}
     col_index = {k: j for j, k in enumerate(col_labels)}
@@ -2564,32 +2696,15 @@ def make_pair_heatmap(
     for (rk, ck), subset in grouped.items():
         metric_subset = subset_transform(subset) if subset_transform is not None else subset
         val = value_fn(metric_subset)
-        val_no_out = value_fn_no_out(metric_subset)
         count_matrix[row_index[rk], col_index[ck]] = len(metric_subset)
-        if val is not None:
-            matrix[row_index[rk], col_index[ck]] = val
-        if val_no_out is not None:
-            matrix_no_out[row_index[rk], col_index[ck]] = val_no_out
+        if val is None:
+            continue
+        matrix[row_index[rk], col_index[ck]] = val
 
     fig, ax = plt.subplots(figsize=(max(7, len(col_labels) * 1.15), max(5, len(row_labels) * 0.9)))
-    combined = np.concatenate(
-        [matrix[~np.isnan(matrix)], matrix_no_out[~np.isnan(matrix_no_out)]]
-    )
-    if combined.size:
-        vmin = float(np.min(combined))
-        vmax = float(np.max(combined))
-        if math.isclose(vmin, vmax, rel_tol=1e-9, abs_tol=1e-9):
-            span = max(1.0, abs(vmin) * 0.15)
-            vmin -= span
-            vmax += span
-    else:
-        vmin, vmax = 0.0, 1.0
-
-    cmap = plt.get_cmap("viridis")
-    norm = plt.Normalize(vmin=vmin, vmax=vmax)
-    sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=ax)
+    masked = np.ma.masked_invalid(matrix)
+    im = ax.imshow(masked, cmap="viridis", aspect="auto")
+    cbar = fig.colorbar(im, ax=ax)
     cbar.set_label(colorbar_label)
 
     ax.set_xticks(np.arange(len(col_labels)))
@@ -2600,93 +2715,20 @@ def make_pair_heatmap(
 
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
-            val_left = matrix[i, j]
-            val_right = matrix_no_out[i, j]
+            val = matrix[i, j]
             sample_count = count_matrix[i, j]
-
-            if np.isnan(val_left):
-                left_color = "#FFFFFF"
-                left_text = "-"
-                left_text_color = "#999999"
-                left_luminance = None
+            metric_text = "-" if np.isnan(val) else value_format.format(val)
+            if value_label_suffix:
+                text = f"{metric_text}\n{value_label_suffix}\nn={sample_count}"
             else:
-                left_color = cmap(norm(val_left))
-                left_text = value_format.format(val_left)
-                red, green, blue, _ = left_color
-                left_luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
-                left_text_color = "white" if left_luminance < 0.45 else "#111111"
-
-            if np.isnan(val_right):
-                right_color = "#FFFFFF"
-                right_text = "-"
-                right_text_color = "#999999"
-                right_luminance = None
+                text = f"{metric_text}\nn={sample_count}"
+            if np.isnan(val):
+                color = "#999999"
             else:
-                right_color = cmap(norm(val_right))
-                right_text = value_format.format(val_right)
-                red, green, blue, _ = right_color
-                right_luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
-                right_text_color = "white" if right_luminance < 0.45 else "#111111"
-
-            ax.add_patch(
-                plt.Rectangle(
-                    (j - 0.5, i - 0.5),
-                    0.5,
-                    1.0,
-                    facecolor=left_color,
-                    edgecolor="none",
-                )
-            )
-            ax.add_patch(
-                plt.Rectangle(
-                    (j, i - 0.5),
-                    0.5,
-                    1.0,
-                    facecolor=right_color,
-                    edgecolor="none",
-                )
-            )
-            ax.plot([j, j], [i - 0.5, i + 0.5], color="#FFFFFF", linewidth=0.6)
-
-            ax.text(
-                j - 0.25,
-                i,
-                left_text,
-                ha="center",
-                va="center",
-                color=left_text_color,
-                fontsize=7,
-            )
-            ax.text(
-                j + 0.25,
-                i,
-                f"{right_text}\nno out",
-                ha="center",
-                va="center",
-                color=right_text_color,
-                fontsize=7,
-                linespacing=0.9,
-            )
-
-            luminances = [lum for lum in (left_luminance, right_luminance) if lum is not None]
-            if luminances:
-                avg_luminance = sum(luminances) / len(luminances)
-                n_color = "white" if avg_luminance < 0.45 else "#111111"
-            else:
-                n_color = "#999999"
-            ax.text(
-                j,
-                i,
-                f"n={sample_count}",
-                ha="center",
-                va="center",
-                color=n_color,
-                fontsize=6,
-            )
-
-    ax.set_xlim(-0.5, len(col_labels) - 0.5)
-    ax.set_ylim(len(row_labels) - 0.5, -0.5)
-    ax.set_aspect("auto")
+                red, green, blue, _ = im.cmap(im.norm(val))
+                luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                color = "white" if luminance < 0.45 else "#111111"
+            ax.text(j, i, text, ha="center", va="center", color=color, fontsize=7, linespacing=0.9)
 
     save_fig(fig, output_dir, filename, generated)
 
@@ -4068,10 +4110,24 @@ def plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, gene
         "safe_passage_norm",
         "gaussian_confidence_label",
         lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        lambda subset: mean_of(boxplot_non_outlier_values([r["routing_steps_f"] for r in subset])),
+        "",
         "Mean Routing Steps by Safe Passage and Gaussian Confidence",
         "mean routing steps",
         "45_heatmap_routing_safe_passage_vs_gaussian_confidence.png",
+        output_dir,
+        generated,
+        skipped,
+        value_format="{:.0f}",
+    )
+    make_pair_heatmap(
+        heatmap_rows,
+        "safe_passage_norm",
+        "gaussian_confidence_label",
+        lambda subset: mean_of(boxplot_non_outlier_values([r["routing_steps_f"] for r in subset])),
+        "no out",
+        "Mean Routing Steps by Safe Passage and Gaussian Confidence (no outliers)",
+        "mean routing steps (no outliers)",
+        "45_heatmap_routing_safe_passage_vs_gaussian_confidence_no_out.png",
         output_dir,
         generated,
         skipped,
@@ -4095,10 +4151,24 @@ def plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, g
         "gaussian_confidence_label",
         "size_moltiplier_label",
         lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        lambda subset: mean_of(boxplot_non_outlier_values([r["routing_steps_f"] for r in subset])),
+        "",
         "Mean Routing Steps by Gaussian Confidence and Size Multiplier",
         "mean routing steps",
         "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier.png",
+        output_dir,
+        generated,
+        skipped,
+        value_format="{:.0f}",
+    )
+    make_pair_heatmap(
+        heatmap_rows,
+        "gaussian_confidence_label",
+        "size_moltiplier_label",
+        lambda subset: mean_of(boxplot_non_outlier_values([r["routing_steps_f"] for r in subset])),
+        "no out",
+        "Mean Routing Steps by Gaussian Confidence and Size Multiplier (no outliers)",
+        "mean routing steps (no outliers)",
+        "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier_no_out.png",
         output_dir,
         generated,
         skipped,
@@ -4125,12 +4195,23 @@ def heatmap_mean_no_outliers(metric, subset):
     return float(np.mean(visible))
 
 
+def heatmap_median_value(metric, subset):
+    values = axis_boxplot_values(subset, metric)
+    if not values:
+        return None
+    return float(np.median(values))
+
+
 def requested_heatmap_value_fn(metric):
     return lambda subset: heatmap_mean_value(metric, subset)
 
 
 def requested_heatmap_value_fn_no_outliers(metric):
     return lambda subset: heatmap_mean_no_outliers(metric, subset)
+
+
+def requested_heatmap_value_fn_median(metric):
+    return lambda subset: heatmap_median_value(metric, subset)
 
 
 def plot_requested_heatmaps(
@@ -4159,12 +4240,21 @@ def plot_requested_heatmaps(
         if item["kind"] == "heatmap":
             metric_rows = heatmap_rows_by_metric[item["metric"]]
             heatmap_rows = filter_heatmap_rows(metric_rows, item["row_key"], item["col_key"])
+            if item.get("median"):
+                value_fn = requested_heatmap_value_fn_median(item["metric"])
+                value_label_suffix = "mediana"
+            elif item.get("no_outliers"):
+                value_fn = requested_heatmap_value_fn_no_outliers(item["metric"])
+                value_label_suffix = "no out"
+            else:
+                value_fn = requested_heatmap_value_fn(item["metric"])
+                value_label_suffix = ""
             make_pair_heatmap(
                 heatmap_rows,
                 item["row_key"],
                 item["col_key"],
-                requested_heatmap_value_fn(item["metric"]),
-                requested_heatmap_value_fn_no_outliers(item["metric"]),
+                value_fn,
+                value_label_suffix,
                 item["title"],
                 item["colorbar_label"],
                 item["filename"],
@@ -4249,6 +4339,103 @@ def plot_summary_tables(rows, output_dir, generated):
     )
 
     save_fig(fig, output_dir, "02_circuit_summary_bars.png", generated)
+
+
+def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_dir, generated, skipped=None):
+    csv_rows = []
+    best_count_items = [
+        item for item in REQUESTED_HEATMAP_ITEMS if item.get("kind") == "best_config_count"
+    ]
+
+    for item in best_count_items:
+        axis_slug = item["axis_slug"]
+        axis_key = item["axis_key"]
+        axis_label = item["axis_label"]
+        by_circuit = defaultdict(lambda: defaultdict(list))
+
+        for row in rows_success_with_routing:
+            circuit_name = row.get("circuit_name")
+            if not circuit_name:
+                continue
+            if not has_heatmap_axis_value(row, axis_key):
+                continue
+            axis_value = heatmap_axis_value(row, axis_key)
+            routing_steps = row.get("routing_steps_f")
+            if routing_steps is None or (isinstance(routing_steps, float) and math.isnan(routing_steps)):
+                continue
+            by_circuit[circuit_name][axis_value].append(routing_steps)
+
+        counts = Counter()
+        circuit_count = 0
+        for values_by_axis in by_circuit.values():
+            min_by_axis = {
+                axis_value: min(values)
+                for axis_value, values in values_by_axis.items()
+                if values
+            }
+            if not min_by_axis:
+                continue
+            best_value = min(min_by_axis.values())
+            for axis_value, value in min_by_axis.items():
+                if math.isclose(value, best_value, rel_tol=1e-9, abs_tol=1e-9):
+                    counts[axis_value] += 1
+            circuit_count += 1
+
+        filename = item["filename"]
+        if not counts:
+            record_skipped_plot(skipped, filename, f"no rows available for axis {axis_label}")
+            continue
+
+        labels = sorted(
+            counts.keys(),
+            key=lambda label: heatmap_axis_sort_key(axis_key, label),
+        )
+        values = [counts[label] for label in labels]
+        fig, ax = plt.subplots(figsize=(max(8.5, len(labels) * 1.2), 6.5))
+        bars = ax.bar(labels, values, color="#577590")
+        ax.set_title(
+            f"Best routing config count by {axis_label} (n circuits={circuit_count})\n"
+            "lower routing steps wins; ties counted"
+        )
+        ax.set_ylabel("best-count")
+        ax.tick_params(axis="x", rotation=35)
+        annotate_bars(ax, bars, fmt="{:.0f}")
+        save_fig(fig, output_dir, filename, generated)
+
+        for label in labels:
+            count = counts[label]
+            csv_rows.append(
+                {
+                    "axis": axis_slug,
+                    "axis_label": axis_label,
+                    "axis_value": label,
+                    "best_count": count,
+                    "circuits": circuit_count,
+                    "best_share": (count / circuit_count) if circuit_count else 0.0,
+                }
+            )
+
+    if not csv_rows:
+        return None
+
+    csv_rows.sort(key=lambda row: (row["axis"], row["best_count"] * -1, row["axis_value"]))
+    csv_path = os.path.join(output_dir, "best_config_counts_by_heatmap_axis.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "axis",
+                "axis_label",
+                "axis_value",
+                "best_count",
+                "circuits",
+                "best_share",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(csv_rows)
+
+    return csv_path
 
 
 def routing_combo_label(row):
@@ -4814,6 +5001,12 @@ def main():
         generated,
         skipped,
     )
+    best_config_counts_csv_path = plot_best_config_counts_by_heatmap_axis(
+        rows_success_with_routing,
+        output_dir,
+        generated,
+        skipped,
+    )
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,
         top_n=3,
@@ -4891,6 +5084,8 @@ def main():
     print(best_mapping_exit0_csv_path)
     if runtime_grouped_factors_csv_path is not None:
         print(runtime_grouped_factors_csv_path)
+    if best_config_counts_csv_path is not None:
+        print(best_config_counts_csv_path)
     if distinct_info is not None:
         print(
             "Repeated configurations found: "
