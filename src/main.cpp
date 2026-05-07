@@ -3,6 +3,7 @@
 #include "helpers.hpp"
 #include "parsing.hpp"
 #include "write_csv.hpp"
+#include "exceptions.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -151,6 +152,10 @@ int main(int argc, char **argv) {
         }
         run_one_execution_from_args(argc, argv);
         return 0;
+    } catch (const SafePassageException &e) {
+        try_write_benchmark_error_file(e.what());
+        std::cerr << "Safe Passage Error: " << e.what() << '\n';
+        return 2;
     } catch (const std::exception &e) {
         try_write_benchmark_error_file(e.what());
         std::cerr << "Error: " << e.what() << '\n';
@@ -712,6 +717,14 @@ int run_bench_mode(
             std::string error_excerpt;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
+            const std::string planned_x = plan_field(plan.entry, {"x", "graph_x"});
+            const std::string planned_y = plan_field(plan.entry, {"y", "graph_y"});
+            if (!planned_x.empty() && planned_x != "-1") {
+                resolved_graph_x = planned_x;
+            }
+            if (!planned_y.empty() && planned_y != "-1") {
+                resolved_graph_y = planned_y;
+            }
 
             try {
                 std::ofstream temp_stream(temp_config_path);
@@ -775,6 +788,13 @@ int run_bench_mode(
                     std::ostringstream timeout_ss;
                     timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
                     error_excerpt = "Execution exceeded timeout of " + timeout_ss.str() + "s";
+                } else if (result.exit_code == 2) {
+                    result.status = "safe_passage_failed";
+                    const std::string worker_error = worker_error_from_result_file(temp_result_path);
+                    error_excerpt = "Safe passage check failed";
+                    if (!worker_error.empty()) {
+                        error_excerpt += ": " + worker_error;
+                    }
                 } else if (result.exit_code != 0) {
                     result.status = "failed";
                     const std::string worker_error = worker_error_from_result_file(temp_result_path);
@@ -815,6 +835,12 @@ int run_bench_mode(
             result.mark_entry_as_executed = (result.status != "interrupted");
 
             const std::string circuit = get_json_field(plan.entry, {"circuit"});
+            if (resolved_graph_x.empty() && !planned_x.empty() && planned_x != "-1") {
+                resolved_graph_x = planned_x;
+            }
+            if (resolved_graph_y.empty() && !planned_y.empty() && planned_y != "-1") {
+                resolved_graph_y = planned_y;
+            }
             std::string circuit_graph_label = get_json_field(plan.entry, {"circuit_graph_label"});
             if (circuit_graph_label.empty() && !circuit.empty() && !resolved_graph_x.empty() && !resolved_graph_y.empty()) {
                 circuit_graph_label = circuit + "-" + resolved_graph_x + "x" + resolved_graph_y;
@@ -902,6 +928,13 @@ int run_bench_mode(
                     << " " << empty_to_dash(plan.case_id)
                     << " duration=" << duration_short_ss.str()
                     << " timeout_reached=true";
+            } else if (result.status == "safe_passage_failed") {
+                progress
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] SAFE_PASSAGE_FAILED"
+                    << " #" << execution_id
+                    << " " << empty_to_dash(plan.case_id)
+                    << " duration=" << duration_short_ss.str()
+                    << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120));
             } else if (result.status == "interrupted") {
                 progress
                     << "[" << (plan.index + 1) << "/" << total_cases << "] INTERRUPTED"

@@ -1,4 +1,5 @@
 #include "circuit.hpp"
+#include <filesystem>
 #include <sstream>
 #include <unordered_map>
 
@@ -162,7 +163,12 @@ void Circuit::parse_qasm_file(const std::string &path) {
 }
 
 void Circuit::write_qasm_file(const std::string& path) const {
-    std::ofstream ofs("../"+path);
+    std::filesystem::path output_path(path);
+    if (output_path.has_parent_path()) {
+        std::filesystem::create_directories(output_path.parent_path());
+    }
+
+    std::ofstream ofs(output_path);
     if (!ofs) throw std::runtime_error("failed to open file for writing: " + path);
 
     // header minimal
