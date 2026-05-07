@@ -211,10 +211,6 @@ REPORT_PLOTS = [
     ("02_circuit_summary_bars.png", "Circuit-level summary"),
     ("03_box_routing_by_circuit.png", "Routing steps by circuit"),
     ("04_box_elapsed_by_circuit.png", "Duration by circuit"),
-    ("05_box_routing_by_placement.png", "Routing by magic placement"),
-    ("06_box_routing_by_safe_passage.png", "Routing by safe passage"),
-    ("07_box_routing_by_magic_strategy.png", "Routing by magic-aware strategy"),
-    ("19_box_routing_by_gaussian_strategy.png", "Routing by gaussian strategy"),
     ("47_box_elapsed_by_gaussian_strategy.png", "Duration by gaussian strategy"),
     ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
     ("09_scatter_density_vs_routing.png", "Density vs routing"),
@@ -926,6 +922,65 @@ def remove_obsolete_plots(output_dir):
             os.remove(path)
         except OSError as exc:
             warnings.warn(f"Could not remove obsolete plot {path}: {exc}")
+
+
+def renumber_generated_pngs(output_dir, generated, skipped):
+    numeric_items = []
+    for path in generated:
+        name = os.path.basename(path)
+        match = re.match(r"(\d+)_", name)
+        if match:
+            numeric_items.append((int(match.group(1)), name))
+
+    if not numeric_items:
+        return
+
+    numeric_items.sort(key=lambda item: (item[0], item[1]))
+    width = max(2, len(str(len(numeric_items) - 1)))
+    mapping = {}
+    for idx, (_, name) in enumerate(numeric_items):
+        suffix = name.split("_", 1)[1]
+        mapping[name] = f"{idx:0{width}d}_{suffix}"
+
+    if all(old == new for old, new in mapping.items()):
+        return
+
+    for old_name, new_name in mapping.items():
+        if old_name == new_name:
+            continue
+        old_path = os.path.join(output_dir, old_name)
+        if not os.path.exists(old_path):
+            continue
+        temp_path = os.path.join(output_dir, f".tmp_{old_name}")
+        os.rename(old_path, temp_path)
+
+    for old_name, new_name in mapping.items():
+        if old_name == new_name:
+            continue
+        temp_path = os.path.join(output_dir, f".tmp_{old_name}")
+        if not os.path.exists(temp_path):
+            continue
+        new_path = os.path.join(output_dir, new_name)
+        os.rename(temp_path, new_path)
+
+    generated[:] = [
+        os.path.join(output_dir, mapping.get(os.path.basename(path), os.path.basename(path)))
+        if os.path.basename(path) in mapping
+        else path
+        for path in generated
+    ]
+
+    if skipped:
+        for item in skipped:
+            name = item.get("filename")
+            if name in mapping:
+                item["filename"] = mapping[name]
+
+    global REPORT_PLOTS
+    REPORT_PLOTS = [
+        (mapping.get(filename, filename), caption)
+        for filename, caption in REPORT_PLOTS
+    ]
 
 
 def category_color_map(labels):
@@ -2470,6 +2525,7 @@ def make_pair_heatmap(
     row_key,
     col_key,
     value_fn,
+    value_fn_no_out,
     title,
     colorbar_label,
     filename,
@@ -2496,6 +2552,7 @@ def make_pair_heatmap(
         return
 
     matrix = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
+    matrix_no_out = np.full((len(row_labels), len(col_labels)), np.nan, dtype=float)
     count_matrix = np.zeros((len(row_labels), len(col_labels)), dtype=int)
     row_index = {k: i for i, k in enumerate(row_labels)}
     col_index = {k: j for j, k in enumerate(col_labels)}
@@ -2507,15 +2564,32 @@ def make_pair_heatmap(
     for (rk, ck), subset in grouped.items():
         metric_subset = subset_transform(subset) if subset_transform is not None else subset
         val = value_fn(metric_subset)
+        val_no_out = value_fn_no_out(metric_subset)
         count_matrix[row_index[rk], col_index[ck]] = len(metric_subset)
-        if val is None:
-            continue
-        matrix[row_index[rk], col_index[ck]] = val
+        if val is not None:
+            matrix[row_index[rk], col_index[ck]] = val
+        if val_no_out is not None:
+            matrix_no_out[row_index[rk], col_index[ck]] = val_no_out
 
     fig, ax = plt.subplots(figsize=(max(7, len(col_labels) * 1.15), max(5, len(row_labels) * 0.9)))
-    masked = np.ma.masked_invalid(matrix)
-    im = ax.imshow(masked, cmap="viridis", aspect="auto")
-    cbar = fig.colorbar(im, ax=ax)
+    combined = np.concatenate(
+        [matrix[~np.isnan(matrix)], matrix_no_out[~np.isnan(matrix_no_out)]]
+    )
+    if combined.size:
+        vmin = float(np.min(combined))
+        vmax = float(np.max(combined))
+        if math.isclose(vmin, vmax, rel_tol=1e-9, abs_tol=1e-9):
+            span = max(1.0, abs(vmin) * 0.15)
+            vmin -= span
+            vmax += span
+    else:
+        vmin, vmax = 0.0, 1.0
+
+    cmap = plt.get_cmap("viridis")
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax)
     cbar.set_label(colorbar_label)
 
     ax.set_xticks(np.arange(len(col_labels)))
@@ -2526,17 +2600,93 @@ def make_pair_heatmap(
 
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
-            val = matrix[i, j]
+            val_left = matrix[i, j]
+            val_right = matrix_no_out[i, j]
             sample_count = count_matrix[i, j]
-            metric_text = "-" if np.isnan(val) else value_format.format(val)
-            text = f"{metric_text}\nn={sample_count}"
-            if np.isnan(val):
-                color = "#999999"
+
+            if np.isnan(val_left):
+                left_color = "#FFFFFF"
+                left_text = "-"
+                left_text_color = "#999999"
+                left_luminance = None
             else:
-                red, green, blue, _ = im.cmap(im.norm(val))
-                luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
-                color = "white" if luminance < 0.45 else "#111111"
-            ax.text(j, i, text, ha="center", va="center", color=color, fontsize=7, linespacing=0.9)
+                left_color = cmap(norm(val_left))
+                left_text = value_format.format(val_left)
+                red, green, blue, _ = left_color
+                left_luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                left_text_color = "white" if left_luminance < 0.45 else "#111111"
+
+            if np.isnan(val_right):
+                right_color = "#FFFFFF"
+                right_text = "-"
+                right_text_color = "#999999"
+                right_luminance = None
+            else:
+                right_color = cmap(norm(val_right))
+                right_text = value_format.format(val_right)
+                red, green, blue, _ = right_color
+                right_luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                right_text_color = "white" if right_luminance < 0.45 else "#111111"
+
+            ax.add_patch(
+                plt.Rectangle(
+                    (j - 0.5, i - 0.5),
+                    0.5,
+                    1.0,
+                    facecolor=left_color,
+                    edgecolor="none",
+                )
+            )
+            ax.add_patch(
+                plt.Rectangle(
+                    (j, i - 0.5),
+                    0.5,
+                    1.0,
+                    facecolor=right_color,
+                    edgecolor="none",
+                )
+            )
+            ax.plot([j, j], [i - 0.5, i + 0.5], color="#FFFFFF", linewidth=0.6)
+
+            ax.text(
+                j - 0.25,
+                i,
+                left_text,
+                ha="center",
+                va="center",
+                color=left_text_color,
+                fontsize=7,
+            )
+            ax.text(
+                j + 0.25,
+                i,
+                f"{right_text}\nno out",
+                ha="center",
+                va="center",
+                color=right_text_color,
+                fontsize=7,
+                linespacing=0.9,
+            )
+
+            luminances = [lum for lum in (left_luminance, right_luminance) if lum is not None]
+            if luminances:
+                avg_luminance = sum(luminances) / len(luminances)
+                n_color = "white" if avg_luminance < 0.45 else "#111111"
+            else:
+                n_color = "#999999"
+            ax.text(
+                j,
+                i,
+                f"n={sample_count}",
+                ha="center",
+                va="center",
+                color=n_color,
+                fontsize=6,
+            )
+
+    ax.set_xlim(-0.5, len(col_labels) - 0.5)
+    ax.set_ylim(len(row_labels) - 0.5, -0.5)
+    ax.set_aspect("auto")
 
     save_fig(fig, output_dir, filename, generated)
 
@@ -3917,9 +4067,10 @@ def plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, gene
         heatmap_rows,
         "safe_passage_norm",
         "gaussian_confidence_label",
-        lambda subset: median_of([r["routing_steps_f"] for r in subset]),
-        "Median Routing Steps by Safe Passage and Gaussian Confidence",
-        "median routing steps",
+        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
+        lambda subset: mean_of(boxplot_non_outlier_values([r["routing_steps_f"] for r in subset])),
+        "Mean Routing Steps by Safe Passage and Gaussian Confidence",
+        "mean routing steps",
         "45_heatmap_routing_safe_passage_vs_gaussian_confidence.png",
         output_dir,
         generated,
@@ -3943,9 +4094,10 @@ def plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, g
         heatmap_rows,
         "gaussian_confidence_label",
         "size_moltiplier_label",
-        lambda subset: median_of([r["routing_steps_f"] for r in subset]),
-        "Median Routing Steps by Gaussian Confidence and Size Multiplier",
-        "median routing steps",
+        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
+        lambda subset: mean_of(boxplot_non_outlier_values([r["routing_steps_f"] for r in subset])),
+        "Mean Routing Steps by Gaussian Confidence and Size Multiplier",
+        "mean routing steps",
         "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier.png",
         output_dir,
         generated,
@@ -3954,14 +4106,31 @@ def plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, g
     )
 
 
-def requested_heatmap_value_fn(metric):
+def heatmap_mean_value(metric, subset):
+    values = axis_boxplot_values(subset, metric)
+    if not values:
+        return None
+    return float(np.mean(values))
+
+
+def heatmap_mean_no_outliers(metric, subset):
+    values = axis_boxplot_values(subset, metric)
+    if not values:
+        return None
     if metric == "success_rate":
-        return success_rate
-    if metric == "routing_steps":
-        return lambda subset: mean_of([row["routing_steps_f"] for row in subset])
-    if metric == "execution_time":
-        return lambda subset: mean_of([row["duration_s_f"] for row in subset])
-    raise ValueError(f"Unknown heatmap metric: {metric}")
+        return float(np.mean(values))
+    visible = boxplot_non_outlier_values(values)
+    if not visible:
+        return None
+    return float(np.mean(visible))
+
+
+def requested_heatmap_value_fn(metric):
+    return lambda subset: heatmap_mean_value(metric, subset)
+
+
+def requested_heatmap_value_fn_no_outliers(metric):
+    return lambda subset: heatmap_mean_no_outliers(metric, subset)
 
 
 def plot_requested_heatmaps(
@@ -3995,6 +4164,7 @@ def plot_requested_heatmaps(
                 item["row_key"],
                 item["col_key"],
                 requested_heatmap_value_fn(item["metric"]),
+                requested_heatmap_value_fn_no_outliers(item["metric"]),
                 item["title"],
                 item["colorbar_label"],
                 item["filename"],
@@ -4602,50 +4772,6 @@ def main():
         generated,
         skipped,
     )
-    boxplot_by_category(
-        rows_success_with_routing,
-        "placement",
-        "routing_steps_f",
-        "Routing Steps by Magic Placement",
-        "routing steps",
-        "05_box_routing_by_placement.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    boxplot_by_category(
-        rows_success_with_routing,
-        "safe_passage_strategy",
-        "routing_steps_f",
-        "Routing Steps by Safe Passage Strategy (Success Only)",
-        "routing steps",
-        "06_box_routing_by_safe_passage.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    boxplot_by_category(
-        rows_magicaware_with_routing,
-        "magic_aware_strategy",
-        "routing_steps_f",
-        "Routing Steps by Magic-Aware Strategy (Magic-Aware Runs Only)",
-        "routing steps",
-        "07_box_routing_by_magic_strategy.png",
-        output_dir,
-        generated,
-        skipped,
-    )
-    boxplot_by_category(
-        rows_gaussian_with_routing,
-        "gaussian_strategy_norm",
-        "routing_steps_f",
-        "Routing Steps by Gaussian Strategy (Gaussian Runs Only)",
-        "routing steps",
-        "19_box_routing_by_gaussian_strategy.png",
-        output_dir,
-        generated,
-        skipped,
-    )
     plot_elapsed_by_gaussian_strategy(rows, output_dir, generated, skipped)
     plot_gaussian_weight_combinations(rows_gaussian_with_routing, output_dir, generated, skipped)
 
@@ -4731,6 +4857,7 @@ def main():
         output_dir,
         "best_mapping_by_circuit_dimension_all_families_exit0.csv",
     )
+    renumber_generated_pngs(output_dir, generated, skipped)
     write_summary(rows, csv_files, output_dir, generated, skipped, distinct_info=distinct_info)
     write_report_markdown(
         output_dir,
