@@ -4943,16 +4943,19 @@ def main():
         )
 
     rows = prepare_rows_for_analysis(raw_rows)
+    rows_no_timeout = exclude_timeout_rows(rows)
     remove_obsolete_plots(output_dir)
 
     generated = []
     skipped = []
 
-    plot_overview_dashboard(rows, output_dir, generated)
+    plot_overview_dashboard(rows_no_timeout, output_dir, generated)
     plot_status_and_exit(rows, output_dir, generated)
-    plot_summary_tables(rows, output_dir, generated)
+    plot_summary_tables(rows_no_timeout, output_dir, generated)
 
-    rows_success_with_routing = [r for r in rows if r["success"] and r["routing_steps_f"] is not None]
+    rows_success_with_routing = [
+        r for r in rows_no_timeout if r["success"] and r["routing_steps_f"] is not None
+    ]
     rows_gaussian_with_routing = [
         r for r in rows_success_with_routing if r["mapping_type_norm"] == "gaussian"
     ]
@@ -4962,7 +4965,7 @@ def main():
         if r["mapping_type_norm"] == "magic_aware"
         and r["magic_aware_strategy_norm"] in REQUESTED_MAGIC_AWARE_STRATEGIES
     ]
-    rows_with_duration = [r for r in rows if r["duration_s_f"] is not None]
+    rows_with_duration = [r for r in rows_no_timeout if r["duration_s_f"] is not None]
 
     boxplot_by_category(
         rows_success_with_routing,
@@ -4976,7 +4979,7 @@ def main():
         skipped,
     )
     boxplot_by_category(
-        rows,
+        rows_no_timeout,
         "circuit_name",
         "duration_s_f",
         "Duration by Circuit",
@@ -4986,7 +4989,7 @@ def main():
         generated,
         skipped,
     )
-    plot_elapsed_by_gaussian_strategy(rows, output_dir, generated, skipped)
+    plot_elapsed_by_gaussian_strategy(rows_no_timeout, output_dir, generated, skipped)
     plot_gaussian_weight_combinations(rows_gaussian_with_routing, output_dir, generated, skipped)
 
     scatter_plot(
@@ -5004,7 +5007,7 @@ def main():
     )
 
     scatter_plot(
-        rows,
+        rows_no_timeout,
         "interaction_pressure_f",
         "duration_s_f",
         "status",
@@ -5017,11 +5020,16 @@ def main():
         skipped,
     )
 
-    plot_runtime_qubits_plus_gates(rows, output_dir, generated, skipped)
-    runtime_grouped_factors_csv_path = plot_runtime_grouped_factors(rows, output_dir, generated, skipped)
+    plot_runtime_qubits_plus_gates(rows_no_timeout, output_dir, generated, skipped)
+    runtime_grouped_factors_csv_path = plot_runtime_grouped_factors(
+        rows_no_timeout,
+        output_dir,
+        generated,
+        skipped,
+    )
     plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped)
     plot_requested_heatmaps(
-        rows,
+        rows_no_timeout,
         rows_success_with_routing,
         rows_with_duration,
         output_dir,
