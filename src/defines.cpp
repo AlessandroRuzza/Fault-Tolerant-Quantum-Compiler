@@ -13,7 +13,7 @@ const bool PRINT_SAFE_PASSAGE = true;
 
 const bool PRINT_LAYER = false;
 const bool PRINT_ROUTING = false;
-const bool PRINT_DRAW_ROUTING = false;
+const bool PRINT_DRAW_ROUTING = true;
 const bool PRINT_ROUTING_PROGRESS = false;
 
 /*
