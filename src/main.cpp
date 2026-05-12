@@ -193,6 +193,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::string routing_strategy = "congestion";
     std::string t_routing_mode = "normal_t_routing";
     int patience_threshold = 3;
+    bool use_layer_cache = true;
 
     apply_config_overrides(
         argc,
@@ -220,7 +221,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         border_distance_percentage, 
         routing_strategy,
         t_routing_mode,
-        patience_threshold
+        patience_threshold,
+        use_layer_cache
     );
 
     argument_parsing(
@@ -248,7 +250,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         border_distance_percentage,
         routing_strategy,
         t_routing_mode,
-        patience_threshold
+        patience_threshold,
+        use_layer_cache
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -273,6 +276,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     }
     std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
     std::cout << "routing strategy: " << routing_strategy << std::endl;
+    std::cout << "use_layer_cache: " << (use_layer_cache ? "true" : "false") << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -303,7 +307,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         border_distance_percentage,
         routing_strategy,
         t_routing_mode,
-        patience_threshold
+        patience_threshold,
+        use_layer_cache
     );
     write_benchmark_result_file_if_requested(result);
 
@@ -555,7 +560,8 @@ int run_bench_mode(
                 {20, plan_field(entry, {"border_distance_percentage"})},
                 {21, plan_field(entry, {"number_of_magic_states"})},
                 {22, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
-                {23, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")}
+                {23, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")},
+                {24, plan_field(entry, {"use_layer_cache", "use-layer-cache"}, "true")}
             };
 
             for (const auto &[index, expected] : comparisons) {
@@ -895,6 +901,7 @@ int run_bench_mode(
                 get_json_field(plan.entry, {"number_of_magic_states"}),
                 routing_strategy_csv,
                 t_routing_mode_csv,
+                get_json_field(plan.entry, {"use_layer_cache", "use-layer-cache"}).empty() ? "true" : get_json_field(plan.entry, {"use_layer_cache", "use-layer-cache"}),
                 routing_steps,
                 result.timeout_reached ? "true" : "false",
                 result.status,

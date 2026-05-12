@@ -14,6 +14,14 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
     "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
     "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV7 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
     "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,routing_steps,timeout_reached,"
     "status,exit_code,duration_seconds,log_file,error_excerpt";
 
@@ -302,7 +310,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV6 ||
+        (first_line == kBenchmarkRunsCsvHeaderV7 ||
+         first_line == kBenchmarkRunsCsvHeaderV6 ||
          first_line == kBenchmarkRunsCsvHeaderV5 ||
          first_line == kBenchmarkRunsCsvHeaderV4 ||
          first_line == kBenchmarkRunsCsvHeaderV3 ||
