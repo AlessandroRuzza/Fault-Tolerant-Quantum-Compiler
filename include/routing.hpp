@@ -143,6 +143,7 @@ private:
     const ITGateRoutingStrategy* tGateRoutingStrategy;
     std::vector<Routing> routing_steps;
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
+    std::unordered_map<std::string, Routing>* layer_routing_cache;
 
     mutable std::unordered_set<int> used_nodes_cache;
     mutable std::unordered_map<std::pair<int,int>, float, PairIntHash> min_gate_route_length_cache;
@@ -157,17 +158,20 @@ public:
         LayeredCircuit& c,
         const Graph& g,
         const IPathStrategy* p,
-        const ITGateRoutingStrategy* t
+        const ITGateRoutingStrategy* t,
+        std::unordered_map<std::string, Routing>* cache = nullptr
     ) : mapping(m),
         circuit(c),
         graph(g),
         pathStrategy(p),
-        tGateRoutingStrategy(t) {
+        tGateRoutingStrategy(t),
+        layer_routing_cache(cache) {
             precompute_magic_state_order();
         }
     void route_circuit() override;
     void precompute_magic_state_order();
     inline int get_routing_length() const override { return routing_steps.size(); }
+
     void print_routing_steps() const override;
     inline void reset() override { circuit.reset(); routing_steps.clear(); }
 

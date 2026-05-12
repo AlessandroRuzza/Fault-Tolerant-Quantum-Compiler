@@ -5,6 +5,7 @@
 #include "layering.hpp"
 #include "mapping.hpp"
 #include "igraph.hpp"
+#include "routing.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -16,6 +17,23 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+inline std::string compute_layer_fingerprint(const Layer& layer) {
+    std::vector<std::string> parts;
+    parts.reserve(layer.size());
+    for (const Gate& g : layer) {
+        std::ostringstream oss;
+        oss << g.name;
+        std::vector<uint32_t> qs = g.qubits;
+        std::sort(qs.begin(), qs.end());
+        for (uint32_t q : qs) oss << '_' << q;
+        parts.push_back(oss.str());
+    }
+    std::sort(parts.begin(), parts.end());
+    std::ostringstream res;
+    for (const std::string& s : parts) res << s << '|';
+    return res.str();
+}
 
 struct CircuitMetrics {
     int total_gates = 0;
@@ -40,6 +58,7 @@ struct CircuitMetrics {
     int max_repeated_seq_len = 0;
     double avg_estimated_path_length = 0.0;
     int max_estimated_path_length = 0;
+    std::unordered_map<std::string, Routing> layer_routing_cache;
 };
 
 // Computes, prints, and optionally writes to CSV all circuit cache metrics.
@@ -56,7 +75,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     namespace fs = std::filesystem;
 
     // ---- Gate-level metrics ----
-    const auto& gates = layered.getGates();
+    const std::vector<Gate>& gates = layered.getGates();
     const int total_gates  = layered.getNumGates();
     const int num_qubits   = layered.getNumQubits();
     const int num_layers   = layered.getNumLayers();
@@ -68,7 +87,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
         if (g.name == "cx") {
             num_cnot++;
             if (g.qubits.size() >= 2) {
-                auto key = std::make_pair(
+                std::pair<int,int> key = std::make_pair(
                     static_cast<int>(std::min(g.qubits[0], g.qubits[1])),
                     static_cast<int>(std::max(g.qubits[0], g.qubits[1]))
                 );
@@ -87,31 +106,14 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     int    max_cnot_pair_rep = 0;
     if (!cnot_pair_counts.empty()) {
         int total_rep = 0;
-        for (const auto& [k, v] : cnot_pair_counts) {
-            total_rep += v;
-            max_cnot_pair_rep = std::max(max_cnot_pair_rep, v);
+        for (const std::pair<const std::pair<int,int>, int>& entry : cnot_pair_counts) {
+            total_rep += entry.second;
+            max_cnot_pair_rep = std::max(max_cnot_pair_rep, entry.second);
         }
         avg_cnot_pair_rep = static_cast<double>(total_rep) / cnot_pair_counts.size();
     }
 
     // ---- Layer fingerprints (structural: gate name + sorted qubits) ----
-    auto make_fp = [](const Layer& layer) -> std::string {
-        std::vector<std::string> parts;
-        parts.reserve(layer.size());
-        for (const Gate& g : layer) {
-            std::ostringstream oss;
-            oss << g.name;
-            std::vector<uint32_t> qs = g.qubits;
-            std::sort(qs.begin(), qs.end());
-            for (uint32_t q : qs) oss << '_' << q;
-            parts.push_back(oss.str());
-        }
-        std::sort(parts.begin(), parts.end());
-        std::ostringstream res;
-        for (const auto& s : parts) res << s << '|';
-        return res.str();
-    };
-
     std::vector<std::string> layer_fps;
     std::vector<int>         layer_sizes;
     std::vector<int>         layer_cnot_counts;
@@ -136,7 +138,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
         layer_cnot_counts.push_back(lc);
         layer_t_counts.push_back(lt);
 
-        std::string fp = make_fp(layer);
+        std::string fp = compute_layer_fingerprint(layer);
         layer_fps.push_back(fp);
         fp_counts[fp]++;
     }
@@ -209,7 +211,9 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     // Layers sorted by frequency (most frequent first)
     std::vector<std::pair<std::string, int>> fps_sorted(fp_counts.begin(), fp_counts.end());
     std::sort(fps_sorted.begin(), fps_sorted.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
+              [](const std::pair<std::string,int>& a, const std::pair<std::string,int>& b) {
+                  return a.second > b.second;
+              });
 
     // Estimated path lengths for CNOT gates (Manhattan distance between mapped nodes)
     double avg_path_len = 0.0;
@@ -262,8 +266,8 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     std::cout << "  Max repeated seq length:       " << max_rep_seq          << "\n";
 
     std::cout << "[Layer Size Distribution]\n";
-    for (const auto& [sz, cnt] : size_dist)
-        std::cout << "  size=" << sz << ": " << cnt << " layer(s)\n";
+    for (const std::pair<const int, int>& entry : size_dist)
+        std::cout << "  size=" << entry.first << ": " << entry.second << " layer(s)\n";
 
     std::cout << "[Top Layers by Frequency]\n";
     const int show_n = std::min(static_cast<int>(fps_sorted.size()), 5);
@@ -277,7 +281,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     std::cout << "============================================\n\n";
 
     if (!write_csv) {
-        return CircuitMetrics{
+        CircuitMetrics metrics{
             total_gates, num_qubits, num_cnot, num_t_tdg, t_ratio, cnot_ratio,
             num_unique_cnot_pairs, max_cnot_pair_rep, avg_cnot_pair_rep,
             num_layers, num_unique_layers, layer_reuse_ratio, avg_layer_size,
@@ -285,6 +289,8 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
             max_t_in_layer, max_cnot_in_layer, congestion_score,
             max_rep_seq, avg_path_len, max_path_len
         };
+        metrics.layer_routing_cache = {};
+        return metrics;
     }
 
     // ====== SINGLE CSV (update-or-insert) ======
@@ -295,7 +301,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
 
     // Serialize layer size distribution and top-5 frequencies
     std::ostringstream dist_ss, topfreq_ss;
-    for (const auto& [sz, cnt] : size_dist) dist_ss << sz << ':' << cnt << ';';
+    for (const std::pair<const int, int>& entry : size_dist) dist_ss << entry.first << ':' << entry.second << ';';
     const int top5 = std::min(static_cast<int>(fps_sorted.size()), 5);
     for (int i = 0; i < top5; i++) {
         topfreq_ss << fps_sorted[i].second;
@@ -347,7 +353,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     }
 
     // Write existing circuits
-    for (const auto& line : csv_lines) {
+    for (const std::string& line : csv_lines) {
         csv << line << '\n';
     }
 
@@ -366,7 +372,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     csv.close();
     std::cout << "Cache metrics CSV written to: " << csv_path << "\n\n";
 
-    return CircuitMetrics{
+    CircuitMetrics metrics{
         total_gates, num_qubits, num_cnot, num_t_tdg, t_ratio, cnot_ratio,
         num_unique_cnot_pairs, max_cnot_pair_rep, avg_cnot_pair_rep,
         num_layers, num_unique_layers, layer_reuse_ratio, avg_layer_size,
@@ -374,6 +380,8 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
         max_t_in_layer, max_cnot_in_layer, congestion_score,
         max_rep_seq, avg_path_len, max_path_len
     };
+    metrics.layer_routing_cache = {};
+    return metrics;
 }
 
 #endif // CIRCUIT_METRICS_HPP
