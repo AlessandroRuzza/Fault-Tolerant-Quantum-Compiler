@@ -115,6 +115,7 @@ OBSOLETE_PLOT_FILENAMES = {
 OBSOLETE_PLOT_PREFIXES = (
     "29_table_top_gaussian_weight_configs_",
     "best_config_count_by_",
+    "timeout_count_by_",
 )
 
 
@@ -343,6 +344,20 @@ def build_requested_heatmap_items(start_index=48):
             }
         )
         plot_index += 1
+
+        items.append(
+            {
+                "kind": "timeout_count",
+                "filename": f"{plot_index:02d}_timeout_count_by_{heatmap_slug(col_axis)}.png",
+                "caption": f"Timeout count by {col_label}",
+                "title": f"Timeout count by {col_label}",
+                "axis_slug": col_axis,
+                "axis_key": col_key,
+                "axis_label": col_label,
+                "subfolder": subfolder,
+            }
+        )
+        plot_index += 1
     return items
 
 
@@ -424,6 +439,29 @@ STATUS_COLORS = {
     "timeout": "#E9C46A",
     "interrupted": "#577590",
 }
+_EXTRA_STATUS_PALETTE = [
+    "#264653",
+    "#9B2226",
+    "#005F73",
+    "#CA6702",
+    "#0A9396",
+    "#AE2012",
+    "#BB3E03",
+    "#94D2BD",
+]
+
+
+def register_extra_statuses(rows):
+    seen = sorted({
+        normalize_text(row.get("status"))
+        for row in rows
+        if row.get("status") and normalize_text(row.get("status")) not in STATUS_COLORS
+    })
+    for i, status in enumerate(seen):
+        STATUS_DISPLAY_LABELS[status] = status.replace("_", " ")
+        STATUS_COLORS[status] = _EXTRA_STATUS_PALETTE[i % len(_EXTRA_STATUS_PALETTE)]
+
+
 EXIT_CODE_DISPLAY_LABELS = {
     124: "124 (timeout)",
     129: "129 (SIGHUP)",
@@ -4520,6 +4558,87 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
     return csv_path
 
 
+def plot_timeout_counts_by_heatmap_axis(rows, output_dir, generated, skipped=None):
+    csv_rows = []
+    timeout_count_items = [
+        item for item in REQUESTED_HEATMAP_ITEMS if item.get("kind") == "timeout_count"
+    ]
+
+    for item in timeout_count_items:
+        axis_slug = item["axis_slug"]
+        axis_key = item["axis_key"]
+        axis_label = item["axis_label"]
+        subfolder = item.get("subfolder", f"heatmap_{axis_slug}")
+
+        counts = Counter()
+        totals = Counter()
+        for row in rows:
+            if not has_heatmap_axis_value(row, axis_key):
+                continue
+            axis_value = heatmap_axis_value(row, axis_key)
+            totals[axis_value] += 1
+            if is_timeout(row):
+                counts[axis_value] += 1
+
+        filename = item["filename"]
+        if not totals:
+            save_empty_plot(
+                item["title"],
+                output_dir,
+                filename,
+                generated,
+                message=f"No data for {axis_label}",
+                subfolder=subfolder,
+                ylabel="timeout count",
+            )
+            continue
+
+        labels = sorted(
+            totals.keys(),
+            key=lambda label: heatmap_axis_sort_key(axis_key, label),
+        )
+        values = [counts.get(label, 0) for label in labels]
+        total_runs = sum(totals.values())
+        fig, ax = plt.subplots(figsize=(max(8.5, len(labels) * 1.2), 6.5))
+        bars = ax.bar(labels, values, color="#E9C46A")
+        ax.set_title(
+            f"Timeout count by {axis_label} (n runs={total_runs})"
+        )
+        ax.set_ylabel("timeout count")
+        ax.tick_params(axis="x", rotation=35)
+        annotate_bars(ax, bars, fmt="{:.0f}")
+        save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
+
+        for label in labels:
+            count = counts.get(label, 0)
+            total = totals[label]
+            csv_rows.append(
+                {
+                    "axis": axis_slug,
+                    "axis_label": axis_label,
+                    "axis_value": label,
+                    "timeout_count": count,
+                    "total_runs": total,
+                    "timeout_rate": (count / total) if total else 0.0,
+                }
+            )
+
+    if not csv_rows:
+        return None
+
+    csv_rows.sort(key=lambda row: (row["axis"], row["timeout_count"] * -1, row["axis_value"]))
+    csv_path = os.path.join(output_dir, "timeout_counts_by_heatmap_axis.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["axis", "axis_label", "axis_value", "timeout_count", "total_runs", "timeout_rate"],
+        )
+        writer.writeheader()
+        writer.writerows(csv_rows)
+
+    return csv_path
+
+
 def routing_combo_label(row):
     mapping = row.get("mapping_type_norm", "") or "unknown"
     if mapping == "gaussian":
@@ -4998,6 +5117,7 @@ def main():
         )
 
     rows = prepare_rows_for_analysis(raw_rows)
+    register_extra_statuses(rows)
     rows_no_timeout = exclude_timeout_rows(rows)
     remove_obsolete_plots(output_dir)
 
@@ -5097,6 +5217,12 @@ def main():
         generated,
         skipped,
     )
+    timeout_counts_csv_path = plot_timeout_counts_by_heatmap_axis(
+        rows,
+        output_dir,
+        generated,
+        skipped,
+    )
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,
         top_n=3,
@@ -5182,6 +5308,8 @@ def main():
         print(runtime_grouped_factors_csv_path)
     if best_config_counts_csv_path is not None:
         print(best_config_counts_csv_path)
+    if timeout_counts_csv_path is not None:
+        print(timeout_counts_csv_path)
     if distinct_info is not None:
         print(
             "Repeated configurations found: "
