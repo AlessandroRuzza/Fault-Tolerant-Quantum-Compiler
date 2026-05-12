@@ -347,7 +347,8 @@ void apply_config_overrides(
     double& border_distance_percentage,
     std::string& routing_method,
     std::string& t_routing_mode,
-    int& patience_threshold
+    int& patience_threshold,
+    bool& use_layer_cache
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -638,6 +639,14 @@ void apply_config_overrides(
             throw std::runtime_error(std::string("Config key '") + key + "' must be >= 0");
         }
     }
+
+    if (config_json.contains("use_layer_cache") || config_json.contains("use-layer-cache")) {
+        const char* key = config_json.contains("use_layer_cache") ? "use_layer_cache" : "use-layer-cache";
+        if (!config_json[key].is_boolean()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
+        }
+        use_layer_cache = config_json[key].get<bool>();
+    }
 }
 
 void argument_parsing(
@@ -665,7 +674,8 @@ void argument_parsing(
     double& border_distance_percentage,
     std::string& routing_method,
     std::string& t_routing_mode,
-    int& patience_threshold
+    int& patience_threshold,
+    bool& use_layer_cache
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -938,6 +948,23 @@ void argument_parsing(
             }
             if (patience_threshold < 0) {
                 throw std::runtime_error("--patience-threshold must be >= 0");
+            }
+            continue;
+        }
+
+        if (arg == "--use-layer-cache" || arg == "--use_layer_cache") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --use-layer-cache\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --use-layer-cache");
+            }
+            const std::string val = argv[++i];
+            if (val == "true" || val == "1") {
+                use_layer_cache = true;
+            } else if (val == "false" || val == "0") {
+                use_layer_cache = false;
+            } else {
+                throw std::runtime_error("Invalid boolean value for --use-layer-cache: " + val);
             }
             continue;
         }
