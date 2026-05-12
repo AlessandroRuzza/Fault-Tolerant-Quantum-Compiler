@@ -52,6 +52,8 @@ HEATMAP_AXIS_SPECS = {
     "mapping_strategy": ("magic_aware_strategy_norm", "mapping strategy"),
     "routing_strategy": ("routing_strategy_norm", "routing strategy"),
     "t_routing_mode": ("t_routing_mode_norm", "t routing mode"),
+    "size_moltiplier": ("size_moltiplier_label", "size multiplier"),
+    "gaussian_confidence": ("gaussian_confidence_label", "gaussian confidence"),
 }
 HEATMAP_METRIC_SPECS = (
     ("success_rate", "success", "Success heatmap", "all runs", "success rate (%)", "{:.1f}"),
@@ -71,6 +73,8 @@ HEATMAP_PAIR_GROUPS = (
     ("placement_border", ("safe_passage", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
     ("routing_strategy", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
     ("t_routing_mode", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
+    ("size_moltiplier", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode", "gaussian_confidence")),
+    ("gaussian_confidence", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode", "size_moltiplier")),
 )
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
 DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
@@ -123,6 +127,7 @@ def build_requested_heatmap_items(start_index=48):
     plot_index = start_index
     for col_axis, row_axes in HEATMAP_PAIR_GROUPS:
         col_key, col_label = HEATMAP_AXIS_SPECS[col_axis]
+        subfolder = f"heatmap_{heatmap_slug(col_axis)}"
         group_heatmap_items = []
         group_heatmap_items_no_out = []
         group_heatmap_items_median = []
@@ -150,6 +155,7 @@ def build_requested_heatmap_items(start_index=48):
                     "colorbar_label": colorbar_label,
                     "value_format": value_format,
                     "no_outliers": False,
+                    "subfolder": subfolder,
                 }
                 items.append(spec)
                 triplet_items.append(spec)
@@ -175,6 +181,7 @@ def build_requested_heatmap_items(start_index=48):
                     "colorbar_label": f"{colorbar_label} (no outliers)",
                     "value_format": value_format,
                     "no_outliers": True,
+                    "subfolder": subfolder,
                 }
                 items.append(no_out_spec)
                 triplet_items_no_out.append(no_out_spec)
@@ -200,6 +207,7 @@ def build_requested_heatmap_items(start_index=48):
                     "colorbar_label": f"{colorbar_label} (median)",
                     "value_format": value_format,
                     "median": True,
+                    "subfolder": subfolder,
                 }
                 items.append(median_spec)
                 triplet_items_median.append(median_spec)
@@ -217,6 +225,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": 180,
+                "subfolder": subfolder,
             }
             items.append(triplet_dashboard)
             plot_index += 1
@@ -232,6 +241,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": 180,
+                "subfolder": subfolder,
             }
             items.append(triplet_dashboard_no_out)
             plot_index += 1
@@ -247,6 +257,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": 180,
+                "subfolder": subfolder,
             }
             items.append(triplet_dashboard_median)
             plot_index += 1
@@ -263,6 +274,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": 180,
+                "subfolder": subfolder,
             }
         )
         plot_index += 1
@@ -279,6 +291,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": 180,
+                "subfolder": subfolder,
             }
         )
         plot_index += 1
@@ -295,6 +308,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": 180,
+                "subfolder": subfolder,
             }
         )
         plot_index += 1
@@ -311,6 +325,7 @@ def build_requested_heatmap_items(start_index=48):
                     "ylabel": ylabel,
                     "value_format": value_format,
                     "color": color,
+                    "subfolder": subfolder,
                 }
             )
             plot_index += 1
@@ -324,6 +339,7 @@ def build_requested_heatmap_items(start_index=48):
                 "axis_slug": col_axis,
                 "axis_key": col_key,
                 "axis_label": col_label,
+                "subfolder": subfolder,
             }
         )
         plot_index += 1
@@ -344,6 +360,7 @@ REPORT_PLOTS = [
     ("04_box_elapsed_by_circuit.png", "Duration by circuit"),
     ("47_box_elapsed_by_gaussian_strategy.png", "Duration by gaussian strategy"),
     ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
+    ("31_heatmap_best_gaussian_relative_weight_gaps.png", "Relative distances between best gaussian weights"),
     ("09_scatter_density_vs_routing.png", "Density vs routing"),
     ("12_scatter_pressure_vs_elapsed.png", "Interaction pressure vs duration"),
     (
@@ -1027,6 +1044,29 @@ def record_skipped_plot(skipped, filename, reason):
     skipped.append({"filename": filename, "reason": reason})
 
 
+def save_empty_plot(title, output_dir, filename, generated, message="No data", subfolder=None, ylabel=None):
+    fig, ax = plt.subplots(figsize=(8.5, 5.2))
+    ax.set_title(title, fontsize=14, pad=14)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    ax.text(
+        0.5,
+        0.5,
+        message,
+        ha="center",
+        va="center",
+        transform=ax.transAxes,
+        fontsize=13,
+        color="#64748B",
+    )
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
+
+
 def compact_labels(labels, limit=8):
     labels = [str(label) for label in labels if str(label).strip()]
     if not labels:
@@ -1063,59 +1103,62 @@ def remove_obsolete_plots(output_dir):
 
 def renumber_generated_pngs(output_dir, generated, skipped):
     numeric_items = []
+    seen_paths = set()
     for path in generated:
+        if path in seen_paths:
+            continue
+        seen_paths.add(path)
         name = os.path.basename(path)
         match = re.match(r"(\d+)_", name)
         if match:
-            numeric_items.append((int(match.group(1)), name))
+            numeric_items.append((int(match.group(1)), name, path))
 
     if not numeric_items:
         return
 
     numeric_items.sort(key=lambda item: (item[0], item[1]))
     width = max(2, len(str(len(numeric_items) - 1)))
-    mapping = {}
-    for idx, (_, name) in enumerate(numeric_items):
+    path_mapping = {}
+    name_mapping = {}
+    for idx, (_, name, path) in enumerate(numeric_items):
         suffix = name.split("_", 1)[1]
-        mapping[name] = f"{idx:0{width}d}_{suffix}"
+        new_name = f"{idx:0{width}d}_{suffix}"
+        path_mapping[path] = os.path.join(os.path.dirname(path), new_name)
+        name_mapping[name] = new_name
 
-    if all(old == new for old, new in mapping.items()):
+    if all(old_path == new_path for old_path, new_path in path_mapping.items()):
         return
 
-    for old_name, new_name in mapping.items():
-        if old_name == new_name:
+    temp_moves = []
+    for old_path, new_path in path_mapping.items():
+        if old_path == new_path:
             continue
-        old_path = os.path.join(output_dir, old_name)
         if not os.path.exists(old_path):
             continue
-        temp_path = os.path.join(output_dir, f".tmp_{old_name}")
+        temp_path = os.path.join(
+            os.path.dirname(old_path),
+            f".tmp_{os.getpid()}_{os.path.basename(old_path)}",
+        )
         os.rename(old_path, temp_path)
+        temp_moves.append((temp_path, new_path))
 
-    for old_name, new_name in mapping.items():
-        if old_name == new_name:
-            continue
-        temp_path = os.path.join(output_dir, f".tmp_{old_name}")
-        if not os.path.exists(temp_path):
-            continue
-        new_path = os.path.join(output_dir, new_name)
+    for temp_path, new_path in temp_moves:
         os.rename(temp_path, new_path)
 
     generated[:] = [
-        os.path.join(output_dir, mapping.get(os.path.basename(path), os.path.basename(path)))
-        if os.path.basename(path) in mapping
-        else path
+        path_mapping.get(path, path)
         for path in generated
     ]
 
     if skipped:
         for item in skipped:
             name = item.get("filename")
-            if name in mapping:
-                item["filename"] = mapping[name]
+            if name in name_mapping:
+                item["filename"] = name_mapping[name]
 
     global REPORT_PLOTS
     REPORT_PLOTS = [
-        (mapping.get(filename, filename), caption)
+        (name_mapping.get(filename, filename), caption)
         for filename, caption in REPORT_PLOTS
     ]
 
@@ -2682,10 +2725,13 @@ def make_pair_heatmap(
         key=lambda label: heatmap_axis_sort_key(col_key, label),
     )
     if not row_labels or not col_labels:
-        record_skipped_plot(
-            skipped,
+        save_empty_plot(
+            title,
+            output_dir,
             filename,
-            f"no rows available for heatmap axes {row_key} x {col_key}",
+            generated,
+            message=f"No data for {row_key} x {col_key}",
+            subfolder=subfolder,
         )
         return
 
@@ -2802,11 +2848,19 @@ def plot_image_dashboard(
     panel_width=6.2,
     panel_height=5.3,
     dpi=220,
+    subfolder=None,
 ):
     from PIL import Image, ImageDraw, ImageFont
 
     if not source_items:
-        record_skipped_plot(skipped, filename, "dashboard has no source plots")
+        save_empty_plot(
+            title,
+            output_dir,
+            filename,
+            generated,
+            message="No source plots",
+            subfolder=subfolder,
+        )
         return
 
     skipped_by_name = {
@@ -2814,19 +2868,18 @@ def plot_image_dashboard(
         for item in (skipped or [])
     }
     source_panels = []
-    existing_count = 0
     for item in source_items:
-        source_path = os.path.join(output_dir, item["filename"])
+        source_subfolder = item.get("subfolder")
+        source_path = (
+            os.path.join(output_dir, source_subfolder, item["filename"])
+            if source_subfolder
+            else os.path.join(output_dir, item["filename"])
+        )
         if os.path.isfile(source_path):
             source_panels.append((item, source_path, None))
-            existing_count += 1
         else:
             reason = skipped_by_name.get(item["filename"], "source plot was not generated")
             source_panels.append((item, None, reason))
-
-    if existing_count == 0:
-        record_skipped_plot(skipped, filename, "no source plots were generated for this dashboard")
-        return
 
     columns = max(1, min(columns, len(source_panels)))
     row_count = int(math.ceil(len(source_panels) / columns))
@@ -2905,8 +2958,9 @@ def plot_image_dashboard(
 
         y += row_height + gap
 
-    os.makedirs(output_dir, exist_ok=True)
-    path = os.path.join(output_dir, filename)
+    target_dir = os.path.join(output_dir, subfolder) if subfolder else output_dir
+    os.makedirs(target_dir, exist_ok=True)
+    path = os.path.join(target_dir, filename)
     canvas.convert("RGB").save(path, "PNG", optimize=True)
     generated.append(path)
 
@@ -3005,10 +3059,14 @@ def plot_axis_barplot(
         value_groups.append(values)
 
     if not valid_labels:
-        record_skipped_plot(
-            skipped,
+        save_empty_plot(
+            title,
+            output_dir,
             filename,
-            f"no rows available for boxplot axis {axis_key}",
+            generated,
+            message=f"No data for {axis_key}",
+            subfolder=subfolder,
+            ylabel=ylabel,
         )
         return
 
@@ -3199,7 +3257,7 @@ def heatmap_axis_value(row, key):
 
 
 def heatmap_axis_sort_key(key, label):
-    if key in {"magic_states_label", "x_i", "y_i", "graph_nodes"}:
+    if key in {"magic_states_label", "size_moltiplier_label", "gaussian_confidence_label", "x_i", "y_i", "graph_nodes"}:
         numeric = to_float(label)
         if numeric is not None:
             return (0, numeric, label)
@@ -4256,12 +4314,7 @@ def plot_requested_heatmaps(
                 value_fn = requested_heatmap_value_fn(item["metric"])
                 value_label_suffix = ""
             
-            col_axis_name = None
-            for axis_name, (axis_key, _) in HEATMAP_AXIS_SPECS.items():
-                if axis_key == item["col_key"]:
-                    col_axis_name = axis_name
-                    break
-            subfolder = f"heatmap_{col_axis_name}" if col_axis_name else None
+            subfolder = item.get("subfolder")
             
             make_pair_heatmap(
                 heatmap_rows,
@@ -4293,18 +4346,13 @@ def plot_requested_heatmaps(
                 panel_width=item.get("panel_width", 6.2),
                 panel_height=item.get("panel_height", 5.3),
                 dpi=item.get("dpi", 220),
+                subfolder=item.get("subfolder"),
             )
             continue
 
         if item["kind"] == "axis_barplot":
             metric_rows = axis_boxplot_rows_by_metric[item["metric"]]
-            
-            col_axis_name = None
-            for axis_name, (axis_key, _) in HEATMAP_AXIS_SPECS.items():
-                if axis_key == item["axis_key"]:
-                    col_axis_name = axis_name
-                    break
-            subfolder = f"heatmap_{col_axis_name}" if col_axis_name else None
+            subfolder = item.get("subfolder")
             
             plot_axis_barplot(
                 metric_rows,
@@ -4375,6 +4423,7 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
         axis_slug = item["axis_slug"]
         axis_key = item["axis_key"]
         axis_label = item["axis_label"]
+        subfolder = item.get("subfolder", f"heatmap_{axis_slug}")
         by_circuit = defaultdict(lambda: defaultdict(list))
 
         for row in rows_success_with_routing:
@@ -4407,7 +4456,15 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
 
         filename = item["filename"]
         if not counts:
-            record_skipped_plot(skipped, filename, f"no rows available for axis {axis_label}")
+            save_empty_plot(
+                item["title"],
+                output_dir,
+                filename,
+                generated,
+                message=f"No data for {axis_label}",
+                subfolder=subfolder,
+                ylabel="best-count",
+            )
             continue
 
         labels = sorted(
@@ -4425,8 +4482,6 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
         ax.tick_params(axis="x", rotation=35)
         annotate_bars(ax, bars, fmt="{:.0f}")
         
-        col_axis_name = axis_slug
-        subfolder = f"heatmap_{col_axis_name}"
         save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
 
         for label in labels:
@@ -5066,6 +5121,12 @@ def main():
         gaussian_relative_weight_gap_rows,
         output_dir,
         "best_gaussian_relative_weight_gaps.csv",
+    )
+    plot_gaussian_relative_weight_gap_heatmap(
+        gaussian_relative_weight_gap_rows,
+        output_dir,
+        generated,
+        skipped,
     )
     gaussian_best_entries = best_gaussian_execution_entries(rows)
     gaussian_best_entries, gaussian_best_csv_path = write_best_gaussian_execution_table(
