@@ -1523,7 +1523,7 @@ def scatter_plot(
     ax.set_title(f"{title} (n={len(points)})")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
     save_fig(fig, output_dir, filename, generated)
 
 
@@ -1620,7 +1620,7 @@ def plot_gaussian_weight_combinations(rows, output_dir, generated, skipped=None)
     ax.grid(True, axis="y", alpha=0.35)
     ax.tick_params(axis="x", labelrotation=0)
     if shown_labels:
-        ax.legend(title="gaussian strategy", fontsize=8)
+        ax.legend(title="gaussian strategy", fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
 
     save_fig(fig, output_dir, "21_box_gaussian_weight_combinations_vs_routing.png", generated)
 
@@ -3252,7 +3252,8 @@ def plot_axis_barplot(
     legend_handles.append(Line2D([0], [0], color="#FF7F0E", linewidth=2.4, label="median"))
     ax.legend(
         handles=legend_handles,
-        loc="upper right",
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1.0),
         frameon=True,
         fontsize=10,
     )
@@ -3769,7 +3770,7 @@ def plot_runtime_entries(
                 label=timeout_label,
             )
         )
-    ax.legend(handles=legend_handles, loc="best", fontsize=9, ncols=2, frameon=True)
+    ax.legend(handles=legend_handles, loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=9, ncols=2, frameon=True)
 
     save_fig(fig, output_dir, filename, generated)
 
@@ -4120,7 +4121,7 @@ def plot_runtime_grouped_entries(
     ax.set_ylabel("execution time (seconds)")
     ax.set_title(f"{title} grouped by {group_label}")
     ax.grid(True, which="both", linestyle=":", linewidth=0.65, alpha=0.7)
-    ax.legend(fontsize=8, frameon=True)
+    ax.legend(fontsize=8, frameon=True, loc="upper left", bbox_to_anchor=(1.02, 1.0))
     save_fig(fig, output_dir, filename, generated)
 
 
@@ -4477,6 +4478,7 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
             by_circuit[circuit_name][axis_value].append(routing_steps)
 
         counts = Counter()
+        strict_counts = Counter()
         circuit_count = 0
         for values_by_axis in by_circuit.values():
             min_by_axis = {
@@ -4487,9 +4489,15 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
             if not min_by_axis:
                 continue
             best_value = min(min_by_axis.values())
-            for axis_value, value in min_by_axis.items():
-                if math.isclose(value, best_value, rel_tol=1e-9, abs_tol=1e-9):
-                    counts[axis_value] += 1
+            best_axis_values = [
+                axis_value for axis_value, value in min_by_axis.items()
+                if math.isclose(value, best_value, rel_tol=1e-9, abs_tol=1e-9)
+            ]
+            is_sole_best = len(best_axis_values) == 1
+            for axis_value in best_axis_values:
+                counts[axis_value] += 1
+                if is_sole_best:
+                    strict_counts[axis_value] += 1
             circuit_count += 1
 
         filename = item["filename"]
@@ -4509,29 +4517,41 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
             counts.keys(),
             key=lambda label: heatmap_axis_sort_key(axis_key, label),
         )
-        values = [counts[label] for label in labels]
+        strict_vals = [strict_counts.get(label, 0) for label in labels]
+        tied_vals = [counts[label] - strict_counts.get(label, 0) for label in labels]
         fig, ax = plt.subplots(figsize=(max(8.5, len(labels) * 1.2), 6.5))
-        bars = ax.bar(labels, values, color="#577590")
+        bars_strict = ax.bar(labels, strict_vals, color="#577590", label="strict best (sole winner)")
+        bars_tied = ax.bar(labels, tied_vals, bottom=strict_vals, color="#A8C5D8", label="tied best")
         ax.set_title(
             f"Best routing config count by {axis_label} (n circuits={circuit_count})\n"
-            "lower routing steps wins; ties counted"
+            "lower routing steps wins; stacked: strict (sole) vs tied"
         )
         ax.set_ylabel("best-count")
         ax.tick_params(axis="x", rotation=35)
-        annotate_bars(ax, bars, fmt="{:.0f}")
-        
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=2, fontsize=9, frameon=True)
+        for i, label in enumerate(labels):
+            total = counts[label]
+            strict = strict_counts.get(label, 0)
+            ax.text(
+                i, total + 0.15, f"{total}\n({strict})",
+                ha="center", va="bottom", fontsize=8, color="#333333",
+            )
+
         save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
 
         for label in labels:
             count = counts[label]
+            strict = strict_counts.get(label, 0)
             csv_rows.append(
                 {
                     "axis": axis_slug,
                     "axis_label": axis_label,
                     "axis_value": label,
                     "best_count": count,
+                    "strict_best_count": strict,
                     "circuits": circuit_count,
                     "best_share": (count / circuit_count) if circuit_count else 0.0,
+                    "strict_best_share": (strict / circuit_count) if circuit_count else 0.0,
                 }
             )
 
@@ -4548,8 +4568,10 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
                 "axis_label",
                 "axis_value",
                 "best_count",
+                "strict_best_count",
                 "circuits",
                 "best_share",
+                "strict_best_share",
             ],
         )
         writer.writeheader()

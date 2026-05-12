@@ -43,7 +43,7 @@
   "BASE_GAUSSIAN_WEIGHT": 1.0,
   "x": -1,
   "y": -1,
-  "timeout": 600,
+  "timeout": 1200,
   "timeout_reached": false,
   "routing_strategy": [
     "naive",
