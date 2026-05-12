@@ -16,6 +16,7 @@
 #include "defines.hpp"
 #include "compute_dimensions.hpp"
 #include "helpers.hpp"
+#include "circuit_metrics.hpp"
 
 #include <memory>
 #include <chrono>
@@ -228,6 +229,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     if (PRINT_LAYER) layeredCircuit.print_layered();
 
 
+    const auto metrics = compute_and_print_circuit_metrics(layeredCircuit, mapping, graph, path, true);
+
     std::cout << "------- ROUTING ---------" << std::endl;
     // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr
     // (QubitRouter holds raw pointers into them).
@@ -281,6 +284,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Mapping time: " << mapping_time_seconds << " s\n";
     std::cout << "Routing time: " << routing_time_seconds << " s\n";
     std::cout << "Total mapping + routing time: " << total_time_seconds << " s\n\n";
+
+    compute_and_print_circuit_metrics(layeredCircuit, mapping, graph, path, false);  // metrics available if needed
 
     return benchmarkResult{
         routerPtr->get_routing_length(),
