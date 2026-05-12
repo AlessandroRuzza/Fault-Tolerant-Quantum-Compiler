@@ -229,7 +229,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     if (PRINT_LAYER) layeredCircuit.print_layered();
 
 
-    const auto metrics = compute_and_print_circuit_metrics(layeredCircuit, mapping, graph, path, true);
+    CircuitMetrics metrics = compute_and_print_circuit_metrics(layeredCircuit, mapping, graph, path, true);
 
     std::cout << "------- ROUTING ---------" << std::endl;
     // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr
@@ -264,7 +264,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             layeredCircuit,
             graph,
             pathStrategyPtr.get(),
-            tGateRoutingStrategyPtr.get()
+            tGateRoutingStrategyPtr.get(),
+            &metrics.layer_routing_cache
         );
     }
 

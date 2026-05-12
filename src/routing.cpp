@@ -1,4 +1,5 @@
 #include "routing.hpp"
+#include "circuit_metrics.hpp"
 #include <map>
 #include <iomanip>
 
@@ -270,11 +271,19 @@ std::unordered_set<int> QubitRouter::get_used_nodes() const {
 }
 
 Routing QubitRouter::route_layer(const Layer& layer_gates) const {
+    // Check layer cache first
+    if (layer_routing_cache != nullptr) {
+        const std::string layer_fp = compute_layer_fingerprint(layer_gates);
+        if (layer_routing_cache->count(layer_fp) > 0) {
+            return layer_routing_cache->at(layer_fp);
+        }
+    }
+
     // min_gate_route_length_cache.clear();
     Routing routing;
     std::unordered_set<int> used_nodes = get_used_nodes();
     std::unordered_set<int> used_magic_states;
-    
+
     if (const auto* congestion_strategy = dynamic_cast<const CongestionAwareShortestPath*>(pathStrategy)) {
         congestion_strategy->prepare_for_layer(circuit, mapping, used_nodes);
     }
@@ -340,6 +349,11 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         }
     }
 
+    // Save to cache
+    if (layer_routing_cache != nullptr) {
+        std::string layer_fp = compute_layer_fingerprint(layer_gates);
+        (*layer_routing_cache)[layer_fp] = routing;
+    }
 
     return routing;
 }
