@@ -4,7 +4,7 @@
   "type": "gaussian",
   "gaussian_strategy": "coarse",
   "magic_aware_strategy": "center",
-  "safe_passage_strategy": "passage",
+  "safe_passage_strategy": "connectivity",
   "MagicStatePlacementStrategy": "center_circle",
   "number_of_magic_states": 0.7,
   "border_distance_percentage": 5.0,
