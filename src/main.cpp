@@ -4,6 +4,7 @@
 #include "parsing.hpp"
 #include "write_csv.hpp"
 #include "exceptions.hpp"
+#include "bench_cuda.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -31,6 +32,7 @@
 #include <omp.h>
 #endif
 
+benchmarkResult run_one_execution_from_args(int argc, char **argv);
 
 namespace {
 constexpr const char *kBenchResultFileEnv = "FTQC_BENCH_RESULT_FILE";
@@ -129,6 +131,81 @@ std::string worker_error_from_result_file(const std::filesystem::path &path) {
     } catch (const std::exception &) {
         return "";
     }
+}
+
+constexpr const char *kCudaJobsEnv = "CUDA_JOBS";
+
+int read_cuda_jobs_env() {
+    const char *raw = std::getenv(kCudaJobsEnv);
+    if (raw == nullptr || *raw == '\0') {
+        return 0;
+    }
+    try {
+        const int value = std::stoi(raw);
+        return value > 0 ? value : 0;
+    } catch (const std::exception &) {
+        return 0;
+    }
+}
+
+struct InProcessOutcome {
+    std::string status;        // "success" | "failed" | "safe_passage_failed"
+    int exit_code = 0;
+    std::string error;
+    benchmarkResult result;
+};
+
+// Run a single benchmark case in-process (no fork/exec). Stdout/stderr from
+// the inner pipeline are redirected to a discarded sink so they don't spam
+// the parent. Exceptions are caught and mapped to status/exit_code mirroring
+// the subprocess path. Note: this does NOT provide subprocess isolation: a
+// segfault, infinite loop, or heap corruption in one_execution will affect
+// the parent process. Callers should only enable this path on stable code.
+InProcessOutcome run_in_process_case(
+    char *executable,
+    const std::filesystem::path &config_path
+) {
+    InProcessOutcome out;
+    out.status = "success";
+
+    std::vector<std::string> arg_storage = {
+        executable ? std::string(executable) : std::string("FaultTolerantQuantumCompiler"),
+        "--config",
+        config_path.string(),
+    };
+    std::vector<char *> argv;
+    argv.reserve(arg_storage.size());
+    for (std::string &s : arg_storage) {
+        argv.push_back(s.data());
+    }
+
+    std::ostringstream sink_out;
+    std::ostringstream sink_err;
+    std::streambuf *old_cout = std::cout.rdbuf(sink_out.rdbuf());
+    std::streambuf *old_cerr = std::cerr.rdbuf(sink_err.rdbuf());
+
+    try {
+        out.result = ::run_one_execution_from_args(
+            static_cast<int>(argv.size()), argv.data());
+        out.status = "success";
+        out.exit_code = 0;
+    } catch (const SafePassageException &e) {
+        out.status = "safe_passage_failed";
+        out.exit_code = 2;
+        out.error = e.what();
+    } catch (const std::exception &e) {
+        out.status = "failed";
+        out.exit_code = 1;
+        out.error = e.what();
+    } catch (...) {
+        out.status = "failed";
+        out.exit_code = 1;
+        out.error = "Unknown exception in in-process case";
+    }
+
+    std::cout.rdbuf(old_cout);
+    std::cerr.rdbuf(old_cerr);
+    return out;
 }
 } // namespace
 
@@ -686,6 +763,32 @@ int run_bench_mode(
 #endif
         }
 
+        const int cuda_jobs_requested = read_cuda_jobs_env();
+        bool use_inprocess = false;
+        if (cuda_jobs_requested > 0) {
+            if (!bench_cuda::is_compiled_with_cuda()) {
+                std::cout << "CUDA_JOBS=" << cuda_jobs_requested
+                          << " requested but binary was built without CUDA. "
+                             "Falling back to subprocess execution.\n";
+            } else {
+                std::string cuda_err;
+                if (bench_cuda::init(cuda_jobs_requested, cuda_err)) {
+                    use_inprocess = true;
+                    std::cout << "CUDA enabled: " << cuda_jobs_requested
+                              << " in-process worker slot(s) with CUDA streams. "
+                                 "Per-case subprocess isolation is DISABLED.\n";
+                } else {
+                    std::cout << "CUDA init failed (" << cuda_err
+                              << "). Falling back to subprocess execution.\n";
+                }
+            }
+        }
+        struct BenchCudaScope {
+            bool active;
+            BenchCudaScope(bool a) : active(a) {}
+            ~BenchCudaScope() { if (active) bench_cuda::shutdown(); }
+        } bench_cuda_scope(use_inprocess);
+
         const auto execute_case = [&](const BenchCasePlan &plan, int execution_id) {
             BenchCaseResult result;
             result.completed = true;
@@ -737,78 +840,124 @@ int run_bench_mode(
                 std::error_code remove_ec;
                 std::filesystem::remove(temp_result_path, remove_ec);
 
-                const std::string worker_env =
-                    "FTQC_BENCH_WORKER=1 FTQC_BENCH_RESULT_FILE=" +
-                    shell_quote(temp_result_path.string()) + " ";
-
-                std::string command;
-                if (plan.timeout_enabled) {
-                    std::ostringstream timeout_ss;
-                    timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
-                    command =
-                        worker_env +
-                        "timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
-                        " " + shell_quote(executable) +
-                        " --config " + shell_quote(temp_config_path.string()) +
-                        " > /dev/null 2>&1";
-                } else {
-                    command =
-                        worker_env +
-                        shell_quote(executable) +
-                        " --config " + shell_quote(temp_config_path.string()) +
-                        " > /dev/null 2>&1";
-                }
-
-                const int system_rc = std::system(command.c_str());
-                result.exit_code = decode_system_exit_code(system_rc);
-                const bool interrupted_by_signal =
-                    system_rc != -1 &&
-                    WIFSIGNALED(system_rc) &&
-                    (WTERMSIG(system_rc) == SIGINT || WTERMSIG(system_rc) == SIGTERM || WTERMSIG(system_rc) == SIGHUP);
-                const bool interrupted_by_exit_code =
-                    (result.exit_code == 130) || (result.exit_code == 143) || (result.exit_code == 129);
-                result.interrupted =
-                    (g_bench_interrupt_requested != 0) || interrupted_by_signal || interrupted_by_exit_code;
-                if (result.interrupted && g_bench_interrupt_requested == 0) {
-                    g_bench_interrupt_requested = 1;
-                    if (interrupted_by_signal) {
-                        g_bench_interrupt_signal = WTERMSIG(system_rc);
+                if (use_inprocess) {
+                    // CUDA stream marker on the worker's slot. Failure here
+                    // is logged into error_excerpt but the case still runs.
+#ifdef _OPENMP
+                    const int worker_id = omp_get_thread_num() % bench_cuda::active_worker_count();
+#else
+                    const int worker_id = 0;
+#endif
+                    std::string cuda_marker_err;
+                    if (!bench_cuda::run_worker_marker(worker_id, cuda_marker_err)) {
+                        error_excerpt = "CUDA marker: " + cuda_marker_err;
                     }
-                }
 
-                result.timeout_reached = !result.interrupted && plan.timeout_enabled && result.exit_code == 124;
+                    const InProcessOutcome outcome =
+                        run_in_process_case(executable, temp_config_path);
+                    result.exit_code = outcome.exit_code;
+                    result.interrupted = (g_bench_interrupt_requested != 0);
+                    result.timeout_reached = false; // no timeout enforcement in-process
 
-                if (result.interrupted) {
-                    result.status = "interrupted";
-                    error_excerpt = "Execution interrupted by SIGINT (Ctrl+C)";
-                } else if (result.timeout_reached) {
-                    result.status = "timeout";
-                    std::ostringstream timeout_ss;
-                    timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
-                    error_excerpt = "Execution exceeded timeout of " + timeout_ss.str() + "s";
-                } else if (result.exit_code == 2) {
-                    result.status = "safe_passage_failed";
-                    const std::string worker_error = worker_error_from_result_file(temp_result_path);
-                    error_excerpt = "Safe passage check failed";
-                    if (!worker_error.empty()) {
-                        error_excerpt += ": " + worker_error;
-                    }
-                } else if (result.exit_code != 0) {
-                    result.status = "failed";
-                    const std::string worker_error = worker_error_from_result_file(temp_result_path);
-                    error_excerpt = "Execution failed with exit code " + std::to_string(result.exit_code);
-                    if (!worker_error.empty()) {
-                        error_excerpt += ": " + worker_error;
+                    if (result.interrupted) {
+                        result.status = "interrupted";
+                        error_excerpt = "Execution interrupted by SIGINT (Ctrl+C)";
+                    } else if (outcome.status == "success") {
+                        result.status = "success";
+                        routing_steps = std::to_string(outcome.result.routing_steps);
+                        if (outcome.result.resolved_graph_x >= 0) {
+                            resolved_graph_x = std::to_string(outcome.result.resolved_graph_x);
+                        }
+                        if (outcome.result.resolved_graph_y >= 0) {
+                            resolved_graph_y = std::to_string(outcome.result.resolved_graph_y);
+                        }
+                    } else if (outcome.status == "safe_passage_failed") {
+                        result.status = "safe_passage_failed";
+                        error_excerpt = "Safe passage check failed";
+                        if (!outcome.error.empty()) {
+                            error_excerpt += ": " + outcome.error;
+                        }
+                    } else {
+                        result.status = "failed";
+                        error_excerpt = "Execution failed";
+                        if (!outcome.error.empty()) {
+                            error_excerpt += ": " + outcome.error;
+                        }
                     }
                 } else {
-                    const benchmarkResult worker_result =
-                        benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_result_path));
-                    routing_steps = std::to_string(worker_result.routing_steps);
-                    if (worker_result.resolved_graph_x >= 0) {
-                        resolved_graph_x = std::to_string(worker_result.resolved_graph_x);
+                    const std::string worker_env =
+                        "FTQC_BENCH_WORKER=1 FTQC_BENCH_RESULT_FILE=" +
+                        shell_quote(temp_result_path.string()) + " ";
+
+                    std::string command;
+                    if (plan.timeout_enabled) {
+                        std::ostringstream timeout_ss;
+                        timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
+                        command =
+                            worker_env +
+                            "timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
+                            " " + shell_quote(executable) +
+                            " --config " + shell_quote(temp_config_path.string()) +
+                            " > /dev/null 2>&1";
+                    } else {
+                        command =
+                            worker_env +
+                            shell_quote(executable) +
+                            " --config " + shell_quote(temp_config_path.string()) +
+                            " > /dev/null 2>&1";
                     }
-                    if (worker_result.resolved_graph_y >= 0) {
-                        resolved_graph_y = std::to_string(worker_result.resolved_graph_y);
+
+                    const int system_rc = std::system(command.c_str());
+                    result.exit_code = decode_system_exit_code(system_rc);
+                    const bool interrupted_by_signal =
+                        system_rc != -1 &&
+                        WIFSIGNALED(system_rc) &&
+                        (WTERMSIG(system_rc) == SIGINT || WTERMSIG(system_rc) == SIGTERM || WTERMSIG(system_rc) == SIGHUP);
+                    const bool interrupted_by_exit_code =
+                        (result.exit_code == 130) || (result.exit_code == 143) || (result.exit_code == 129);
+                    result.interrupted =
+                        (g_bench_interrupt_requested != 0) || interrupted_by_signal || interrupted_by_exit_code;
+                    if (result.interrupted && g_bench_interrupt_requested == 0) {
+                        g_bench_interrupt_requested = 1;
+                        if (interrupted_by_signal) {
+                            g_bench_interrupt_signal = WTERMSIG(system_rc);
+                        }
+                    }
+
+                    result.timeout_reached = !result.interrupted && plan.timeout_enabled && result.exit_code == 124;
+
+                    if (result.interrupted) {
+                        result.status = "interrupted";
+                        error_excerpt = "Execution interrupted by SIGINT (Ctrl+C)";
+                    } else if (result.timeout_reached) {
+                        result.status = "timeout";
+                        std::ostringstream timeout_ss;
+                        timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
+                        error_excerpt = "Execution exceeded timeout of " + timeout_ss.str() + "s";
+                    } else if (result.exit_code == 2) {
+                        result.status = "safe_passage_failed";
+                        const std::string worker_error = worker_error_from_result_file(temp_result_path);
+                        error_excerpt = "Safe passage check failed";
+                        if (!worker_error.empty()) {
+                            error_excerpt += ": " + worker_error;
+                        }
+                    } else if (result.exit_code != 0) {
+                        result.status = "failed";
+                        const std::string worker_error = worker_error_from_result_file(temp_result_path);
+                        error_excerpt = "Execution failed with exit code " + std::to_string(result.exit_code);
+                        if (!worker_error.empty()) {
+                            error_excerpt += ": " + worker_error;
+                        }
+                    } else {
+                        const benchmarkResult worker_result =
+                            benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_result_path));
+                        routing_steps = std::to_string(worker_result.routing_steps);
+                        if (worker_result.resolved_graph_x >= 0) {
+                            resolved_graph_x = std::to_string(worker_result.resolved_graph_x);
+                        }
+                        if (worker_result.resolved_graph_y >= 0) {
+                            resolved_graph_y = std::to_string(worker_result.resolved_graph_y);
+                        }
                     }
                 }
             } catch (const std::exception &e) {

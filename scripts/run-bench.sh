@@ -4,10 +4,11 @@ set -eu
 binary_path="${1:-}"
 bench_path="${2:-${BENCH_PATH:-}}"
 rerun_timeouts="${3:-${RERUN_TIMEOUTS:-}}"
-bench_jobs="${4:-${BENCH_JOBS:-}}"
-bench_process_count="${5:-${BENCH_PROCESS_COUNT:-}}"
-processor="${6:-${PROCESSOR:-}}"
-allow_failures="${7:-${ALLOW_FAILURES:-}}"
+openmp_jobs="${4:-${OPENMP_JOBS:-}}"
+cuda_jobs="${5:-${CUDA_JOBS:-}}"
+bench_process_count="${6:-${BENCH_PROCESS_COUNT:-}}"
+processor="${7:-${PROCESSOR:-}}"
+allow_failures="${8:-${ALLOW_FAILURES:-}}"
 
 read_makeflag_var() {
     key="$1"
@@ -30,8 +31,12 @@ if [ -z "$rerun_timeouts" ]; then
     rerun_timeouts="$(read_makeflag_var RERUN_TIMEOUTS || true)"
 fi
 
-if [ -z "$bench_jobs" ]; then
-    bench_jobs="$(read_makeflag_var BENCH_JOBS || true)"
+if [ -z "$openmp_jobs" ]; then
+    openmp_jobs="$(read_makeflag_var OPENMP_JOBS || true)"
+fi
+
+if [ -z "$cuda_jobs" ]; then
+    cuda_jobs="$(read_makeflag_var CUDA_JOBS || true)"
 fi
 
 if [ -z "$bench_process_count" ]; then
@@ -51,7 +56,7 @@ if [ -z "$processor" ]; then
 fi
 
 if [ -z "$binary_path" ] || [ -z "$bench_path" ]; then
-    echo "Usage: make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1] [BENCH_JOBS=<n>] [BENCH_PROCESS_COUNT=<n>] [PROCESSOR=<n>] [ALLOW_FAILURES=True]"
+    echo "Usage: make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1] [OPENMP_JOBS=<n>] [CUDA_JOBS=<n>] [BENCH_PROCESS_COUNT=<n>] [PROCESSOR=<n>] [ALLOW_FAILURES=True]"
     exit 1
 fi
 
@@ -79,8 +84,18 @@ run_binary() {
         set -- "$@" --rerun-timeouts
     fi
 
-    if [ -n "$bench_jobs" ]; then
-        env OMP_NUM_THREADS="$bench_jobs" "$@"
+    if [ -n "$openmp_jobs" ] && [ -n "$cuda_jobs" ]; then
+        env OMP_NUM_THREADS="$openmp_jobs" CUDA_JOBS="$cuda_jobs" "$@"
+        return $?
+    fi
+
+    if [ -n "$openmp_jobs" ]; then
+        env OMP_NUM_THREADS="$openmp_jobs" "$@"
+        return $?
+    fi
+
+    if [ -n "$cuda_jobs" ]; then
+        env CUDA_JOBS="$cuda_jobs" "$@"
         return $?
     fi
 

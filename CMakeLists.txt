@@ -41,6 +41,33 @@ add_definitions(-DPROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 
 find_package(OpenMP QUIET)
 
+# ------CUDA-------------
+include(CheckLanguage)
+check_language(CUDA)
+set(FTOQC_CUDA_ENABLED OFF)
+if(CMAKE_CUDA_COMPILER)
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+        enable_language(CUDA)
+        file(GLOB_RECURSE CUDA_SRC_FILES CONFIGURE_DEPENDS src/*.cu)
+        if(CUDA_SRC_FILES)
+            target_sources(FaultTolerantQuantumCompiler PRIVATE ${CUDA_SRC_FILES})
+            set_source_files_properties(${CUDA_SRC_FILES} PROPERTIES COMPILE_DEFINITIONS FTOQC_HAS_CUDA=1)
+        endif()
+        set_target_properties(FaultTolerantQuantumCompiler PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+        target_link_libraries(FaultTolerantQuantumCompiler PRIVATE CUDA::cudart)
+        target_compile_definitions(FaultTolerantQuantumCompiler PRIVATE FTOQC_HAS_CUDA=1)
+        set(FTOQC_CUDA_ENABLED ON)
+        message(STATUS "CUDA enabled: ${CUDAToolkit_VERSION}")
+    else()
+        message(WARNING "nvcc found but CUDAToolkit headers/libs missing: GPU acceleration disabled")
+    endif()
+endif()
+if(NOT FTOQC_CUDA_ENABLED)
+    target_compile_definitions(FaultTolerantQuantumCompiler PRIVATE FTOQC_HAS_CUDA=0)
+    message(STATUS "CUDA not enabled in this build: GPU acceleration disabled (set up nvcc + CUDA toolkit to enable)")
+endif()
+
 if(FTOQC_HAS_BOOST_ROUTER)
     target_include_directories(FaultTolerantQuantumCompiler SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
     # Silence "#pragma message: This header is deprecated" notes from Boost 1.76
@@ -73,7 +100,7 @@ target_link_libraries(FaultTolerantQuantumCompiler
   PRIVATE nlohmann_json::nlohmann_json
 )
 
-if (OpenMP_CXX_FOUND)
+if(OpenMP_CXX_FOUND)
     target_link_libraries(FaultTolerantQuantumCompiler PRIVATE OpenMP::OpenMP_CXX)
     message(STATUS "OpenMP enabled for benchmark parallelism")
 else()
@@ -97,7 +124,7 @@ add_custom_target(clearexpanded
 )
 
 # Target to run the executable in bench mode:
-# make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1] [BENCH_JOBS=<n>] [BENCH_PROCESS_COUNT=<n>] [PROCESSOR=<n>]
+# make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1] [OPENMP_JOBS=<n>] [CUDA_JOBS=<n>] [BENCH_PROCESS_COUNT=<n>] [PROCESSOR=<n>]
 add_custom_target(run-bench
     DEPENDS FaultTolerantQuantumCompiler
     COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler>
