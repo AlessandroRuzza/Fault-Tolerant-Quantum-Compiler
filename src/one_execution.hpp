@@ -33,6 +33,8 @@ struct benchmarkResult {
     double avg_parallelism = 1;
     int resolved_graph_x = -1;
     int resolved_graph_y = -1;
+    int num_qubits = -1;
+    int max_interaction_degree = -1;
 };
 
 namespace {
@@ -136,10 +138,14 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     //---------------graph----------------
 
     const bool use_generated_graph = graph_path.empty();
-    
+    const int max_deg = circuit.getMaxInteractionDegree();
+
     if (use_generated_graph) {
-        if (x == -1 || y == -1){
-            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type, border_distance_percentage);
+        if (x == -2 || y == -2) {
+            x = compute_upper_dimensions(qubitsNumber, max_deg);
+            y = x;
+        } else if (x == -1 || y == -1){
+            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type, border_distance_percentage, max_deg);
             y = x;
         }
         std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
@@ -294,6 +300,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         routerPtr->get_routing_length(),
         avg_parallelism,
         resolved_graph_x,
-        resolved_graph_y
+        resolved_graph_y,
+        qubitsNumber,
+        max_deg
     };
 }

@@ -67,6 +67,12 @@ void write_benchmark_result_file_if_requested(const benchmarkResult &result) {
         payload["resolved_graph_x"] = result.resolved_graph_x;
         payload["resolved_graph_y"] = result.resolved_graph_y;
     }
+    if (result.num_qubits >= 0) {
+        payload["num_qubits"] = result.num_qubits;
+    }
+    if (result.max_interaction_degree >= 0) {
+        payload["max_interaction_degree"] = result.max_interaction_degree;
+    }
 
     write_benchmark_worker_payload_if_requested(payload);
 }
@@ -115,6 +121,12 @@ benchmarkResult benchmark_result_from_worker_payload(const json &payload) {
     }
     if (payload.contains("resolved_graph_y") && payload.at("resolved_graph_y").is_number_integer()) {
         result.resolved_graph_y = payload.at("resolved_graph_y").get<int>();
+    }
+    if (payload.contains("num_qubits") && payload.at("num_qubits").is_number_integer()) {
+        result.num_qubits = payload.at("num_qubits").get<int>();
+    }
+    if (payload.contains("max_interaction_degree") && payload.at("max_interaction_degree").is_number_integer()) {
+        result.max_interaction_degree = payload.at("max_interaction_degree").get<int>();
     }
     return result;
 }
@@ -536,7 +548,8 @@ int run_bench_mode(
         const auto entry_has_explicit_graph_dimensions = [&](const json &entry) {
             const std::string x_value = plan_field(entry, {"x"});
             const std::string y_value = plan_field(entry, {"y"});
-            return !x_value.empty() && !y_value.empty() && x_value != "-1" && y_value != "-1";
+            return !x_value.empty() && !y_value.empty() && x_value != "-1" && y_value != "-1"
+                && x_value != "-2" && y_value != "-2";
         };
 
         const auto csv_row_matches_plan = [&](const std::vector<std::string> &row, const json &entry) {
@@ -717,12 +730,14 @@ int run_bench_mode(
             std::string error_excerpt;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
+            int resolved_num_qubits = -1;
+            int resolved_max_degree = -1;
             const std::string planned_x = plan_field(plan.entry, {"x", "graph_x"});
             const std::string planned_y = plan_field(plan.entry, {"y", "graph_y"});
-            if (!planned_x.empty() && planned_x != "-1") {
+            if (!planned_x.empty() && planned_x != "-1" && planned_x != "-2") {
                 resolved_graph_x = planned_x;
             }
-            if (!planned_y.empty() && planned_y != "-1") {
+            if (!planned_y.empty() && planned_y != "-1" && planned_y != "-2") {
                 resolved_graph_y = planned_y;
             }
 
@@ -810,6 +825,8 @@ int run_bench_mode(
                     if (worker_result.resolved_graph_y >= 0) {
                         resolved_graph_y = std::to_string(worker_result.resolved_graph_y);
                     }
+                    resolved_num_qubits = worker_result.num_qubits;
+                    resolved_max_degree = worker_result.max_interaction_degree;
                 }
             } catch (const std::exception &e) {
                 result.status = "failed";
@@ -818,6 +835,100 @@ int run_bench_mode(
             }
 
             cleanup_temp();
+
+            // ---- lower-dimension run (only when x == -2 and main run succeeded) ----
+            std::string lower_x_str;
+            std::string lower_y_str;
+            std::string lower_duration_str;
+            std::string lower_routing_steps_str;
+
+            if (planned_x == "-2" && result.status == "success" && resolved_num_qubits >= 0) {
+                int ms_resolved = 0;
+                try {
+                    const auto &entry = plan.entry;
+                    if (entry.contains("number_of_magic_states") && entry.at("number_of_magic_states").is_number()) {
+                        ms_resolved = entry.at("number_of_magic_states").get<int>();
+                    }
+                    const double ms_mult = entry.contains("number_of_magic_states_multiplier") && entry.at("number_of_magic_states_multiplier").is_number()
+                        ? entry.at("number_of_magic_states_multiplier").get<double>() : 0.0;
+                    if (ms_mult > 0.0) {
+                        ms_resolved = static_cast<int>(std::round(static_cast<double>(resolved_num_qubits) * ms_mult));
+                    }
+                } catch (...) {}
+
+                const int lower_dim = compute_lower_dimensions(resolved_num_qubits, resolved_max_degree);
+                lower_x_str = std::to_string(lower_dim);
+                lower_y_str = std::to_string(lower_dim);
+
+                const std::filesystem::path temp_lower_config =
+                    expanded_path.parent_path() /
+                    ("__bench_runtime_lower_config_" + std::to_string(execution_id) + ".json");
+                const std::filesystem::path temp_lower_result =
+                    expanded_path.parent_path() /
+                    ("__bench_runtime_lower_result_" + std::to_string(execution_id) + ".json");
+
+                const auto cleanup_lower = [&]() {
+                    std::error_code ec;
+                    std::filesystem::remove(temp_lower_config, ec);
+                    std::filesystem::remove(temp_lower_result, ec);
+                };
+
+                try {
+                    json lower_entry = plan.entry;
+                    lower_entry["x"] = lower_dim;
+                    lower_entry["y"] = lower_dim;
+
+                    std::ofstream lower_stream(temp_lower_config);
+                    if (!lower_stream.is_open()) {
+                        throw std::runtime_error("Cannot write lower config: " + temp_lower_config.string());
+                    }
+                    lower_stream << lower_entry.dump(2) << '\n';
+                    lower_stream.close();
+
+                    std::error_code remove_ec;
+                    std::filesystem::remove(temp_lower_result, remove_ec);
+
+                    const std::string lower_worker_env =
+                        "FTQC_BENCH_WORKER=1 FTQC_BENCH_RESULT_FILE=" +
+                        shell_quote(temp_lower_result.string()) + " ";
+
+                    std::string lower_cmd;
+                    if (plan.timeout_enabled) {
+                        std::ostringstream timeout_ss;
+                        timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
+                        lower_cmd =
+                            lower_worker_env +
+                            "timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
+                            " " + shell_quote(executable) +
+                            " --config " + shell_quote(temp_lower_config.string()) +
+                            " > /dev/null 2>&1";
+                    } else {
+                        lower_cmd =
+                            lower_worker_env +
+                            shell_quote(executable) +
+                            " --config " + shell_quote(temp_lower_config.string()) +
+                            " > /dev/null 2>&1";
+                    }
+
+                    const auto lower_start = std::chrono::steady_clock::now();
+                    const int lower_rc = std::system(lower_cmd.c_str());
+                    const auto lower_end = std::chrono::steady_clock::now();
+                    const int lower_exit = decode_system_exit_code(lower_rc);
+
+                    if (lower_exit == 0) {
+                        const benchmarkResult lower_worker =
+                            benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_lower_result));
+                        lower_routing_steps_str = std::to_string(lower_worker.routing_steps);
+                        const std::chrono::duration<double> lower_elapsed = lower_end - lower_start;
+                        std::ostringstream lower_dur_ss;
+                        lower_dur_ss << std::fixed << std::setprecision(6) << lower_elapsed.count();
+                        lower_duration_str = lower_dur_ss.str();
+                    }
+                } catch (...) {}
+
+                cleanup_lower();
+            }
+            // -----------------------------------------------------------------------
 
             const auto end_steady = std::chrono::steady_clock::now();
             const std::chrono::duration<double> elapsed = end_steady - start_steady;
@@ -833,10 +944,10 @@ int run_bench_mode(
             result.mark_entry_as_executed = (result.status != "interrupted");
 
             const std::string circuit = get_json_field(plan.entry, {"circuit"});
-            if (resolved_graph_x.empty() && !planned_x.empty() && planned_x != "-1") {
+            if (resolved_graph_x.empty() && !planned_x.empty() && planned_x != "-1" && planned_x != "-2") {
                 resolved_graph_x = planned_x;
             }
-            if (resolved_graph_y.empty() && !planned_y.empty() && planned_y != "-1") {
+            if (resolved_graph_y.empty() && !planned_y.empty() && planned_y != "-1" && planned_y != "-2") {
                 resolved_graph_y = planned_y;
             }
             std::string circuit_graph_label = get_json_field(plan.entry, {"circuit_graph_label"});
@@ -900,7 +1011,11 @@ int run_bench_mode(
                 std::to_string(result.exit_code),
                 duration_ss.str(),
                 "",
-                limit_text(compact_line(error_excerpt), 300)
+                limit_text(compact_line(error_excerpt), 300),
+                lower_x_str,
+                lower_y_str,
+                lower_duration_str,
+                lower_routing_steps_str
             };
 
             std::ostringstream progress;
