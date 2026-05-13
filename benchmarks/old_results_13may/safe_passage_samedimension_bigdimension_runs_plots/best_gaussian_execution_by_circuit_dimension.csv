@@ -1,0 +1,15 @@
+circuit_graph_label,circuit,graph_x,graph_y,run_id,routing_steps,duration_seconds,tied_best_count,safe_passage,magic_placement,border_distance_percentage,number_of_magic_states,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,mapped_gaussian_weight,base_gaussian_weight,routing_strategy
+adder_n4-60x60,adder_n4,60,60,1,9.0,0.441505,4,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+adder_n64_transpiled-60x60,adder_n64_transpiled,60,60,57,191.0,8.473333,1,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+bigadder_n18_transpiled-60x60,bigadder_n18_transpiled,60,60,43,88.0,1.953795,2,passage_no_subgraphs,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+cat_n130-60x60,cat_n130,60,60,61,129.0,23.71704,3,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+dnn_n16-60x60,dnn_n16,60,60,45,48.0,1.509832,3,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+fredkin_n3-60x60,fredkin_n3,60,60,9,10.0,0.344853,4,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+ghz_n255-60x60,ghz_n255,60,60,65,254.0,62.023282,2,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+hhl_n10-60x60,hhl_n10,60,60,25,72039.0,205.761646,1,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+ising_n26-60x60,ising_n26,60,60,17,6.0,2.279476,4,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+qaoa_n6_transpiled-60x60,qaoa_n6_transpiled,60,60,40,33.0,0.550309,4,connectivity,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+qft_20-60x60,qft_20,60,60,53,95.0,2.183824,1,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+qft_n18-60x60,qft_n18,60,60,13,82.0,1.826597,1,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+toffoli_n3-60x60,toffoli_n3,60,60,7,11.0,0.33253,4,passage_no_subgraphs,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+wstate_n27-60x60,wstate_n27,60,60,49,28.0,2.292476,1,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive

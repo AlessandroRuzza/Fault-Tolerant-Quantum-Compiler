@@ -65,6 +65,7 @@ AXIS_BARPLOT_METRIC_SPECS = (
     ("routing_steps", "routing_steps", "Routing Steps by", "success only", "routing steps", "{:.2f}", "#577590"),
     ("execution_time", "execution_time", "Execution Time by", "success only", "duration (s)", "{:.2f}", "#E76F51"),
 )
+PER_CIRCUIT_BARPLOT_DIR = "barplots_by_circuit"
 HEATMAP_PAIR_GROUPS = (
     ("type", ("safe_passage", "placement_border", "n_magic_states")),
     ("gaussian_strategy", ("safe_passage", "placement_border", "n_magic_states")),
@@ -1150,6 +1151,29 @@ def remove_obsolete_plots(output_dir):
             os.remove(path)
         except OSError as exc:
             warnings.warn(f"Could not remove obsolete plot {path}: {exc}")
+
+
+def clear_per_circuit_barplot_dir(output_dir):
+    target_dir = os.path.join(output_dir, PER_CIRCUIT_BARPLOT_DIR)
+    if not os.path.isdir(target_dir):
+        return
+
+    for root, dirs, files in os.walk(target_dir, topdown=False):
+        for filename in files:
+            if not filename.lower().endswith(".png"):
+                continue
+            path = os.path.join(root, filename)
+            try:
+                os.remove(path)
+            except OSError as exc:
+                warnings.warn(f"Could not remove obsolete per-circuit barplot {path}: {exc}")
+        for dirname in dirs:
+            path = os.path.join(root, dirname)
+            try:
+                if not os.listdir(path):
+                    os.rmdir(path)
+            except OSError:
+                pass
 
 
 def renumber_generated_pngs(output_dir, generated, skipped):
@@ -3274,6 +3298,79 @@ def plot_axis_barplot(
     save_fig(fig, output_dir, filename, generated, dpi=200, subfolder=subfolder)
 
 
+def heatmap_x_axis_slugs():
+    axis_slugs = []
+    for axis_slug, _ in HEATMAP_PAIR_GROUPS:
+        if axis_slug not in axis_slugs:
+            axis_slugs.append(axis_slug)
+    return axis_slugs
+
+
+def safe_filename_component(value, default="unknown"):
+    text = str(value).strip()
+    if not text:
+        text = default
+    text = os.path.basename(text)
+    text = re.sub(r"[^A-Za-z0-9_.-]+", "_", text).strip("._")
+    return text or default
+
+
+def plot_axis_barplots_by_circuit(
+    rows,
+    rows_success_with_routing,
+    output_dir,
+    generated,
+    skipped=None,
+):
+    rows_success_with_duration = [
+        row for row in rows if row["success"] and row["duration_s_f"] is not None
+    ]
+    rows_by_metric = {
+        "success_rate": rows,
+        "routing_steps": rows_success_with_routing,
+        "execution_time": rows_success_with_duration,
+    }
+    circuits = sorted({row["circuit_name"] for row in rows if row["circuit_name"]})
+
+    for axis_slug in heatmap_x_axis_slugs():
+        axis_key, axis_label = HEATMAP_AXIS_SPECS[axis_slug]
+        subfolder = os.path.join(PER_CIRCUIT_BARPLOT_DIR, heatmap_slug(axis_slug))
+        for circuit in circuits:
+            circuit_slug = safe_filename_component(circuit)
+            for (
+                metric_slug,
+                metric_filename_part,
+                caption_prefix,
+                sample_scope,
+                ylabel,
+                value_format,
+                color,
+            ) in AXIS_BARPLOT_METRIC_SPECS:
+                metric_rows = [
+                    row for row in rows_by_metric[metric_slug]
+                    if row.get("circuit_name") == circuit
+                ]
+                filename = (
+                    f"barplot_{metric_filename_part}_by_"
+                    f"{heatmap_slug(axis_slug)}_{circuit_slug}.png"
+                )
+                title = f"{caption_prefix} {axis_label} ({sample_scope}) - {circuit}"
+                plot_axis_barplot(
+                    metric_rows,
+                    axis_key,
+                    metric_slug,
+                    title,
+                    ylabel,
+                    filename,
+                    output_dir,
+                    generated,
+                    skipped,
+                    value_format=value_format,
+                    color=color,
+                    subfolder=subfolder,
+                )
+
+
 def mean_of(values):
     values = non_empty(values)
     if not values:
@@ -5224,6 +5321,7 @@ def main():
     register_extra_statuses(rows)
     rows_no_timeout = exclude_timeout_rows(rows)
     remove_obsolete_plots(output_dir)
+    clear_per_circuit_barplot_dir(output_dir)
 
     generated = []
     skipped = []
@@ -5311,6 +5409,13 @@ def main():
         rows_no_timeout,
         rows_success_with_routing,
         rows_with_duration,
+        output_dir,
+        generated,
+        skipped,
+    )
+    plot_axis_barplots_by_circuit(
+        rows_no_timeout,
+        rows_success_with_routing,
         output_dir,
         generated,
         skipped,

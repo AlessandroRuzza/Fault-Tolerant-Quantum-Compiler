@@ -1,0 +1,13 @@
+axis,axis_label,axis_value,best_count,strict_best_count,circuits,best_share,strict_best_share
+gaussian_strategy,gaussian strategy,coarse,13,13,13,1.0,1.0
+mapping_strategy,mapping strategy,center,12,12,12,1.0,1.0
+placement_border,magic placement x border distance,center_circle(5%),13,13,13,1.0,1.0
+routing_strategy,routing strategy,naive,13,13,13,1.0,1.0
+safe_passage,safe passage,connectivity,10,2,13,0.7692307692307693,0.15384615384615385
+safe_passage,safe passage,passage_no_subgraphs,10,1,13,0.7692307692307693,0.07692307692307693
+safe_passage,safe passage,passage,9,0,13,0.6923076923076923,0.0
+safe_passage,safe passage,cube,5,1,13,0.38461538461538464,0.07692307692307693
+t_routing_mode,t routing mode,normal_t_routing,13,13,13,1.0,1.0
+type,type,gaussian,9,1,13,0.6923076923076923,0.07692307692307693
+type,type,homogeneous,9,2,13,0.6923076923076923,0.15384615384615385
+type,type,magic_aware,8,2,13,0.6153846153846154,0.15384615384615385

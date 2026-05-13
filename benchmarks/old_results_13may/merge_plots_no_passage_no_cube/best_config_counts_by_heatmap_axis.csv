@@ -1,0 +1,26 @@
+axis,axis_label,axis_value,best_count,strict_best_count,circuits,best_share,strict_best_share
+gaussian_confidence,gaussian confidence,0.66,3,0,4,0.75,0.0
+gaussian_confidence,gaussian confidence,0.8,3,0,4,0.75,0.0
+gaussian_confidence,gaussian confidence,0.99,3,1,4,0.75,0.25
+gaussian_confidence,gaussian confidence,0.95,2,0,4,0.5,0.0
+gaussian_strategy,gaussian strategy,coarse,4,2,4,1.0,0.5
+gaussian_strategy,gaussian strategy,fine,2,0,4,0.5,0.0
+mapping_strategy,mapping strategy,center,4,3,4,1.0,0.75
+mapping_strategy,mapping strategy,distance,1,0,4,0.25,0.0
+placement_border,magic placement x border distance,center_circle(5%),4,2,4,1.0,0.5
+placement_border,magic placement x border distance,center_circle(0%),2,0,4,0.5,0.0
+placement_border,magic placement x border distance,right_row,2,0,4,0.5,0.0
+routing_strategy,routing strategy,congestion,3,1,4,0.75,0.25
+routing_strategy,routing strategy,naive,3,1,4,0.75,0.25
+routing_strategy,routing strategy,boost,2,0,4,0.5,0.0
+safe_passage,safe passage,cube,4,1,4,1.0,0.25
+safe_passage,safe passage,connectivity,3,0,4,0.75,0.0
+size_moltiplier,size multiplier,0.5,2,1,4,0.5,0.25
+size_moltiplier,size multiplier,0.7,2,1,4,0.5,0.25
+size_moltiplier,size multiplier,1,2,1,4,0.5,0.25
+size_moltiplier,size multiplier,0.3,1,0,4,0.25,0.0
+t_routing_mode,t routing mode,normal_t_routing,4,2,4,1.0,0.5
+t_routing_mode,t routing mode,smart_t_routing,2,0,4,0.5,0.0
+type,type,homogeneous,4,1,4,1.0,0.25
+type,type,gaussian,3,0,4,0.75,0.0
+type,type,magic_aware,2,0,4,0.5,0.0

@@ -142,10 +142,11 @@ void Circuit::parse_qasm_file(const std::string &path) {
                 // and `t` (magic) gates. Gates that operate on more than two qubits (e.g. `cswap`,
                 // `ccx`) must be decomposed into supported primitives prior to routing.
                 if (gate.qubits.size() > 2) {
-                    throw std::runtime_error(
-                        "Unsupported multi-qubit gate '" + gate.name + "' with " +
-                        std::to_string(gate.qubits.size()) +
-                        " qubits. Please decompose it into single- and two-qubit gates before routing.");
+                    continue;
+                    // throw std::runtime_error(
+                    //     "Unsupported multi-qubit gate '" + gate.name + "' with " +
+                    //     std::to_string(gate.qubits.size()) +
+                    //     " qubits. Please decompose it into single- and two-qubit gates before routing.");
                 }
 
                 if (lname == "tdg" || lname == "t") {

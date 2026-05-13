@@ -1,0 +1,13 @@
+circuit_graph_label,circuit,graph_x,graph_y,run_id,routing_steps,duration_seconds,tied_best_count,safe_passage,magic_placement,border_distance_percentage,number_of_magic_states,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,mapped_gaussian_weight,base_gaussian_weight,routing_strategy
+adder_n4-8x8,adder_n4,8,8,50,8.0,0.018752,8,cube,center_circle(5%),5.0,0.9,coarse,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+dnn_n16-13x13,dnn_n16,13,13,168,48.0,0.14076,10,cube,right_row,5.0,0.9,fine,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+fredkin_n3-7x7,fredkin_n3,7,7,11,10.0,0.012587,8,cube,center_circle(0%),0.0,0.7,fine,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+fredkin_n3-8x8,fredkin_n3,8,8,60,10.0,0.015713,8,cube,center_circle(5%),5.0,0.9,fine,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+hhl_n10-11x11,hhl_n10,11,11,184,72039.0,229.908047,10,cube,right_row,5.0,0.9,fine,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+ising_n26-15x15,ising_n26,15,15,123,4.0,0.179793,4,cube,right_row,0.0,0.7,fine,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+ising_n26-16x16,ising_n26,16,16,170,4.0,0.213538,6,cube,right_row,5.0,0.9,coarse,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+qaoa_n6_transpiled-9x9,qaoa_n6_transpiled,9,9,110,33.0,0.026073,16,cube,right_row,0.0,0.9,coarse,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+qft_n18-13x13,qft_n18,13,13,161,83.0,0.192771,2,cube,right_row,5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+qft_n18-14x14,qft_n18,14,14,114,81.0,0.245022,2,cube,right_row,0.0,0.9,coarse,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+toffoli_n3-7x7,toffoli_n3,7,7,53,11.0,0.012363,8,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,congestion
+toffoli_n3-8x8,toffoli_n3,8,8,150,11.0,0.014544,8,cube,right_row,5.0,0.9,coarse,1.5,0.5,1.5,0.5,0.8,1.0,congestion

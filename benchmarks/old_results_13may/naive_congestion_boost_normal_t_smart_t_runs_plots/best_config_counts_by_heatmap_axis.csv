@@ -1,0 +1,19 @@
+axis,axis_label,axis_value,best_count,strict_best_count,circuits,best_share,strict_best_share
+gaussian_strategy,gaussian strategy,coarse,14,14,14,1.0,1.0
+mapping_strategy,mapping strategy,center,13,3,14,0.9285714285714286,0.21428571428571427
+mapping_strategy,mapping strategy,distance,11,1,14,0.7857142857142857,0.07142857142857142
+placement_border,magic placement x border distance,center_circle(0%),12,1,14,0.8571428571428571,0.07142857142857142
+placement_border,magic placement x border distance,center_circle(5%),12,1,14,0.8571428571428571,0.07142857142857142
+placement_border,magic placement x border distance,right_row,12,1,14,0.8571428571428571,0.07142857142857142
+routing_strategy,routing strategy,congestion,13,1,14,0.9285714285714286,0.07142857142857142
+routing_strategy,routing strategy,naive,13,1,14,0.9285714285714286,0.07142857142857142
+routing_strategy,routing strategy,boost,12,0,14,0.8571428571428571,0.0
+safe_passage,safe passage,cube,14,3,14,1.0,0.21428571428571427
+safe_passage,safe passage,connectivity,11,0,14,0.7857142857142857,0.0
+safe_passage,safe passage,passage,11,0,14,0.7857142857142857,0.0
+safe_passage,safe passage,passage_no_subgraphs,11,0,14,0.7857142857142857,0.0
+t_routing_mode,t routing mode,normal_t_routing,14,0,14,1.0,0.0
+t_routing_mode,t routing mode,smart_t_routing,14,0,14,1.0,0.0
+type,type,gaussian,13,1,14,0.9285714285714286,0.07142857142857142
+type,type,magic_aware,13,1,14,0.9285714285714286,0.07142857142857142
+type,type,homogeneous,11,0,14,0.7857142857142857,0.0

@@ -1,0 +1,18 @@
+axis,axis_label,axis_value,timeout_count,total_runs,timeout_rate
+gaussian_confidence,gaussian confidence,0.95,7,128,0.0546875
+gaussian_confidence,gaussian confidence,0.99,6,128,0.046875
+gaussian_confidence,gaussian confidence,0.66,5,128,0.0390625
+gaussian_confidence,gaussian confidence,0.8,5,128,0.0390625
+gaussian_strategy,gaussian strategy,coarse,23,544,0.042279411764705885
+mapping_strategy,mapping strategy,center,23,544,0.042279411764705885
+placement_border,magic placement x border distance,center_circle(5%),23,544,0.042279411764705885
+routing_strategy,routing strategy,congestion,23,544,0.042279411764705885
+safe_passage,safe passage,connectivity,16,272,0.058823529411764705
+safe_passage,safe passage,cube,7,272,0.025735294117647058
+size_moltiplier,size multiplier,0.3,8,128,0.0625
+size_moltiplier,size multiplier,0.7,6,128,0.046875
+size_moltiplier,size multiplier,1,5,128,0.0390625
+size_moltiplier,size multiplier,0.5,4,128,0.03125
+t_routing_mode,t routing mode,normal_t_routing,23,544,0.042279411764705885
+type,type,gaussian,23,512,0.044921875
+type,type,homogeneous,0,32,0.0

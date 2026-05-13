@@ -1,0 +1,8 @@
+axis,axis_label,axis_value,best_count,strict_best_count,circuits,best_share,strict_best_share
+placement_border,magic placement x border distance,center_circle(0%),13,3,14,0.9285714285714286,0.21428571428571427
+placement_border,magic placement x border distance,center_circle(5%),11,1,14,0.7857142857142857,0.07142857142857142
+routing_strategy,routing strategy,congestion,14,14,14,1.0,1.0
+safe_passage,safe passage,cube,14,4,14,1.0,0.2857142857142857
+safe_passage,safe passage,connectivity,10,0,14,0.7142857142857143,0.0
+t_routing_mode,t routing mode,normal_t_routing,14,14,14,1.0,1.0
+type,type,gaussian,14,14,14,1.0,1.0

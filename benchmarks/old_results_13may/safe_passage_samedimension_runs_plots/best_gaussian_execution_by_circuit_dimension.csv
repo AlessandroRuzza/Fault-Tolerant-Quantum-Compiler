@@ -1,0 +1,14 @@
+circuit_graph_label,circuit,graph_x,graph_y,run_id,routing_steps,duration_seconds,tied_best_count,safe_passage,magic_placement,border_distance_percentage,number_of_magic_states,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,mapped_gaussian_weight,base_gaussian_weight,routing_strategy
+adder_n4-5x5,adder_n4,5,5,4,9.0,0.244005,1,connectivity,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+adder_n64_transpiled-19x19,adder_n64_transpiled,19,19,171,205.0,6.609168,1,passage_no_subgraphs,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+cat_n130-32x32,cat_n130,32,32,181,129.0,16.639368,3,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+dnn_n16-10x10,dnn_n16,10,10,134,48.0,0.388969,3,passage,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+fredkin_n3-5x5,fredkin_n3,5,5,28,10.0,0.081312,4,connectivity,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+ghz_n255-44x44,ghz_n255,44,44,193,254.0,100.137416,3,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+hhl_n10-10x10,hhl_n10,10,10,73,72044.0,569.967314,1,cube,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+ising_n26-12x12,ising_n26,12,12,52,4.0,0.713334,2,connectivity,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+qaoa_n6_transpiled-6x6,qaoa_n6_transpiled,6,6,111,33.0,0.219112,2,passage_no_subgraphs,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+qft_20-13x13,qft_20,13,13,158,195.0,0.812617,2,passage,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+qft_n18-12x12,qft_n18,12,12,39,186.0,0.600047,3,passage_no_subgraphs,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+toffoli_n3-5x5,toffoli_n3,5,5,16,11.0,0.18436,4,connectivity,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
+wstate_n27-12x12,wstate_n27,12,12,148,28.0,0.789036,3,connectivity,center_circle(5%),5.0,0.7,coarse,1.5,0.5,1.5,0.5,0.8,1.0,naive
