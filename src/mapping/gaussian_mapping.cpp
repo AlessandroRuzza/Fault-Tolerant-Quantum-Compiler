@@ -1,4 +1,5 @@
 #include "mapping.hpp"
+#include "exceptions.hpp"
 #include "gaussian.hpp"
 #include "circuit.hpp"
 #include "qubit.hpp"
@@ -139,6 +140,10 @@ void Mapping::gaussian_mapping() {
         }
         try {
             one_iteration_gaussian_mapping(qubit, &iterations, mapped_gaussians, magic_gaussians, baseline_gaussian);
+        } catch (const SafePassageException& e) {
+            throw SafePassageException(
+                "Failed to map qubit " + std::to_string(qubit->getQubitID()) + ": " + e.what()
+            );
         } catch (const std::exception& e) {
             throw std::runtime_error(
                 "Failed to map qubit " + std::to_string(qubit->getQubitID()) + ": " + e.what()
@@ -409,10 +414,10 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
     }
 
     if (candidates.empty()) {
-        throw std::runtime_error("No valid free non-magic node was found.");
+        throw SafePassageException("No valid free non-magic node was found.");
     }
 
-    throw std::runtime_error("No valid free non-magic node with safe passage was found.");
+    throw SafePassageException("No valid free non-magic node with safe passage was found.");
 }
 
 
