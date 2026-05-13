@@ -304,6 +304,9 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     if (!std::getline(in, first_line)) {
         return;
     }
+    if (!first_line.empty() && first_line.back() == '\r') {
+        first_line.pop_back();
+    }
 
     if (first_line == header) {
         return;
@@ -322,6 +325,9 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         std::vector<std::string> rows;
         std::string line;
         while (std::getline(in, line)) {
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
             if (!line.empty()) {
                 rows.push_back(line);
             }
@@ -335,6 +341,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v7 = (first_line == kBenchmarkRunsCsvHeaderV7);
             const bool from_v6 = (first_line == kBenchmarkRunsCsvHeaderV6);
             const bool from_v5 = (first_line == kBenchmarkRunsCsvHeaderV5);
             const bool from_v4 = (first_line == kBenchmarkRunsCsvHeaderV4);
@@ -344,7 +351,42 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v6) {
+            if (from_v7) {
+                migrated = {
+                    at_or_empty(parsed, 0),   // id
+                    at_or_empty(parsed, 1),   // run_date
+                    at_or_empty(parsed, 2),   // run_datetime
+                    at_or_empty(parsed, 3),   // circuit
+                    at_or_empty(parsed, 4),   // graph_x
+                    at_or_empty(parsed, 5),   // graph_y
+                    at_or_empty(parsed, 6),   // circuit_graph_label
+                    at_or_empty(parsed, 7),   // mapping_type
+                    at_or_empty(parsed, 8),   // magic_aware_strategy
+                    at_or_empty(parsed, 9),   // gaussian_strategy
+                    at_or_empty(parsed, 10),  // magic_high
+                    at_or_empty(parsed, 11),  // magic_low
+                    at_or_empty(parsed, 12),  // cnot_high
+                    at_or_empty(parsed, 13),  // cnot_low
+                    at_or_empty(parsed, 14),  // mapped_gaussian_weight
+                    at_or_empty(parsed, 15),  // base_gaussian_weight
+                    at_or_empty(parsed, 16),  // size_moltiplier
+                    at_or_empty(parsed, 17),  // gaussian_confidence
+                    at_or_empty(parsed, 18),  // safe_passage_strategy
+                    at_or_empty(parsed, 19),  // magic_state_placement_strategy
+                    at_or_empty(parsed, 20),  // border_distance_percentage
+                    at_or_empty(parsed, 21),  // number_of_magic_states
+                    at_or_empty(parsed, 22),  // routing_strategy
+                    at_or_empty(parsed, 23),  // t_routing_mode
+                    "",                       // use_layer_cache (not available in V7)
+                    at_or_empty(parsed, 24),  // routing_steps
+                    at_or_empty(parsed, 25),  // timeout_reached
+                    at_or_empty(parsed, 26),  // status
+                    at_or_empty(parsed, 27),  // exit_code
+                    at_or_empty(parsed, 28),  // duration_seconds
+                    at_or_empty(parsed, 29),  // log_file
+                    at_or_empty(parsed, 30)   // error_excerpt
+                };
+            } else if (from_v6) {
                 migrated = {
                     config_id_from_log_file(at_or_empty(parsed, 29), at_or_empty(parsed, 0)), // id
                     at_or_empty(parsed, 1),   // run_date

@@ -1,0 +1,3 @@
+right row with passage and passage no subgraph always fail
+
+distance vs center non chiaro, da eseguire con solo connectivity e cube e con stessi circuiti (da modificare il python)
