@@ -64,6 +64,7 @@ config/__bench_*.json
 # Exclude output files except for .csv (raw results)
 benchmarks/logs/
 benchmarks/results/*
+benchmarks/old_results_13may/
 !*.csv
 merged_distinct*
 
