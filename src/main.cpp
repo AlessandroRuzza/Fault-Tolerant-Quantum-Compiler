@@ -862,7 +862,7 @@ int run_bench_mode(
                 if (result.interrupted) {
                     result.status = "interrupted";
                     error_excerpt = "Execution interrupted by SIGINT (Ctrl+C)";
-                } else if (result.timeout_reached) {
+                } else if (result.timeout_reached || result.exit_code == 137) {
                     result.status = "timeout";
                     std::ostringstream timeout_ss;
                     timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
