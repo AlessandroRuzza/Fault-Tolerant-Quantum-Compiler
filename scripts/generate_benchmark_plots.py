@@ -54,6 +54,7 @@ HEATMAP_AXIS_SPECS = {
     "t_routing_mode": ("t_routing_mode_norm", "t routing mode"),
     "size_moltiplier": ("size_moltiplier_label", "size multiplier"),
     "gaussian_confidence": ("gaussian_confidence_label", "gaussian confidence"),
+    "use_layer_cache": ("use_layer_cache_norm", "use layer cache"),
 }
 HEATMAP_METRIC_SPECS = (
     ("success_rate", "success", "Success heatmap", "all runs", "success rate (%)", "{:.1f}"),
@@ -76,6 +77,7 @@ HEATMAP_PAIR_GROUPS = (
     ("t_routing_mode", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
     ("size_moltiplier", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode", "gaussian_confidence")),
     ("gaussian_confidence", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode", "size_moltiplier")),
+    ("use_layer_cache", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode")),
 )
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
 DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
@@ -1007,6 +1009,7 @@ def prepare_rows_for_analysis(raw_rows):
         row["gaussian_strategy_norm"] = normalize_text(row.get("gaussian_strategy"))
         row["routing_strategy_norm"] = normalize_text(row.get("routing_strategy"))
         row["t_routing_mode_norm"] = normalize_text(row.get("t_routing_mode"))
+        row["use_layer_cache_norm"] = normalize_text(row.get("use_layer_cache"))
         row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
         row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
         row["total_nodes_i"] = to_int(row.get("total_nodes"))
