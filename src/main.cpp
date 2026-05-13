@@ -350,9 +350,7 @@ int run_bench_mode(
 
     const std::filesystem::path project_root(PROJECT_ROOT);
     const std::filesystem::path results_dir = project_root / "benchmarks" / "results";
-    const std::filesystem::path logs_dir = project_root / "benchmarks" / "logs";
     std::filesystem::create_directories(results_dir);
-    std::filesystem::create_directories(logs_dir);
 
     const std::string csv_file_name = sanitize_filename(bench_name) + "_runs.csv";
     const std::filesystem::path csv_path = results_dir / csv_file_name;
@@ -702,10 +700,6 @@ int run_bench_mode(
             const std::string run_date = format_now_date(start_tp);
             const std::string run_datetime = format_now_datetime(start_tp);
 
-            const std::string log_file_name =
-                "run_" + std::to_string(execution_id) + "_" +
-                sanitize_filename(plan.case_id.empty() ? std::to_string(plan.index + 1) : plan.case_id) + ".log";
-            const std::filesystem::path log_path = logs_dir / log_file_name;
             const std::filesystem::path temp_config_path =
                 expanded_path.parent_path() /
                 ("__bench_runtime_config_" + std::to_string(execution_id) + ".json");
@@ -756,15 +750,13 @@ int run_bench_mode(
                         "timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
                         " " + shell_quote(executable) +
                         " --config " + shell_quote(temp_config_path.string()) +
-                        " > " + shell_quote(log_path.string()) +
-                        " 2>&1";
+                        " > /dev/null 2>&1";
                 } else {
                     command =
                         worker_env +
                         shell_quote(executable) +
                         " --config " + shell_quote(temp_config_path.string()) +
-                        " > " + shell_quote(log_path.string()) +
-                        " 2>&1";
+                        " > /dev/null 2>&1";
                 }
 
                 const int system_rc = std::system(command.c_str());
@@ -907,7 +899,7 @@ int run_bench_mode(
                 result.status,
                 std::to_string(result.exit_code),
                 duration_ss.str(),
-                log_path.string(),
+                "",
                 limit_text(compact_line(error_excerpt), 300)
             };
 

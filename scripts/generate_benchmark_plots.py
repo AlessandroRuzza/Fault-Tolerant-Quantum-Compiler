@@ -358,6 +358,19 @@ def build_requested_heatmap_items(start_index=48):
             }
         )
         plot_index += 1
+
+        items.append(
+            {
+                "kind": "circuit_table",
+                "filename": f"{plot_index:02d}_circuit_table_x_{heatmap_slug(col_axis)}.png",
+                "caption": f"Circuits tested by {col_label}",
+                "title": f"Circuits tested by {col_label}",
+                "col_key": col_key,
+                "col_label": col_label,
+                "subfolder": subfolder,
+            }
+        )
+        plot_index += 1
     return items
 
 
@@ -4317,6 +4330,61 @@ def requested_heatmap_value_fn_median(metric):
     return lambda subset: heatmap_median_value(metric, subset)
 
 
+def plot_circuit_coverage_table(rows, col_key, col_label, title, filename, output_dir, generated, skipped=None, subfolder=None):
+    col_values = sorted(
+        {heatmap_axis_value(r, col_key) for r in rows if has_heatmap_axis_value(r, col_key)},
+        key=lambda label: heatmap_axis_sort_key(col_key, label),
+    )
+    if not col_values:
+        save_empty_plot(title, output_dir, filename, generated, message=f"No data for {col_key}", subfolder=subfolder)
+        return
+
+    circuits_by_col = {}
+    for cv in col_values:
+        labels = sorted({
+            r.get("circuit_graph_label", "")
+            for r in rows
+            if heatmap_axis_value(r, col_key) == cv and r.get("circuit_graph_label", "").strip()
+        })
+        circuits_by_col[cv] = labels
+
+    max_rows = max((len(v) for v in circuits_by_col.values()), default=0)
+    if max_rows == 0:
+        save_empty_plot(title, output_dir, filename, generated, message="No circuit data", subfolder=subfolder)
+        return
+
+    table_data = [
+        [circuits_by_col[cv][i] if i < len(circuits_by_col[cv]) else "" for cv in col_values]
+        for i in range(max_rows)
+    ]
+
+    n_cols = len(col_values)
+    cell_w = 2.8
+    cell_h = 0.32
+    fig_width = max(6, n_cols * cell_w + 0.5)
+    fig_height = max(3, (max_rows + 1) * cell_h + 1.2)
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.axis("off")
+    ax.set_title(title, pad=10, fontsize=10, fontweight="bold")
+
+    tbl = ax.table(cellText=table_data, colLabels=col_values, loc="center", cellLoc="center")
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(7)
+    tbl.auto_set_column_width(col=list(range(n_cols)))
+
+    for j in range(n_cols):
+        cell = tbl[0, j]
+        cell.set_facecolor("#2A9D8F")
+        cell.set_text_props(color="white", fontweight="bold")
+    for i in range(1, max_rows + 1):
+        bg = "#f5f5f5" if i % 2 == 0 else "white"
+        for j in range(n_cols):
+            tbl[i, j].set_facecolor(bg)
+
+    save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
+
+
 def plot_requested_heatmaps(
     rows,
     rows_success_with_routing,
@@ -4392,7 +4460,7 @@ def plot_requested_heatmaps(
         if item["kind"] == "axis_barplot":
             metric_rows = axis_boxplot_rows_by_metric[item["metric"]]
             subfolder = item.get("subfolder")
-            
+
             plot_axis_barplot(
                 metric_rows,
                 item["axis_key"],
@@ -4406,6 +4474,20 @@ def plot_requested_heatmaps(
                 value_format=item["value_format"],
                 color=item["color"],
                 subfolder=subfolder,
+            )
+            continue
+
+        if item["kind"] == "circuit_table":
+            plot_circuit_coverage_table(
+                rows,
+                item["col_key"],
+                item["col_label"],
+                item["title"],
+                item["filename"],
+                output_dir,
+                generated,
+                skipped,
+                subfolder=item.get("subfolder"),
             )
 
 
