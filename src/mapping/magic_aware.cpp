@@ -1,4 +1,5 @@
 #include "mapping.hpp"
+#include "exceptions.hpp"
 #include "circuit.hpp"
 
 void Mapping::magic_aware_mapping() {
@@ -34,6 +35,10 @@ void Mapping::magic_aware_mapping() {
             }
             pseudo_random_mapping(fallback_qubit, -1);
             iterations++; // consider this as an iteration even if it falls back to pseudo-random
+        } catch (const SafePassageException& e) {
+            throw SafePassageException(
+                "Failed to map qubit " + std::to_string(qubit->getQubitID()) + ": " + e.what()
+            );
         } catch (const std::exception& e) {
             throw std::runtime_error(
                 "Failed to map qubit " + std::to_string(qubit->getQubitID()) + ": " + e.what()
