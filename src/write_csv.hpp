@@ -15,6 +15,15 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
     "safe_passage_strategy,magic_state_placement_strategy,"
     "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV8 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
     "status,exit_code,duration_seconds,log_file,error_excerpt";
 
 inline constexpr const char *kBenchmarkRunsCsvHeaderV7 =
@@ -313,7 +322,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV7 ||
+        (first_line == kBenchmarkRunsCsvHeaderV8 ||
+         first_line == kBenchmarkRunsCsvHeaderV7 ||
          first_line == kBenchmarkRunsCsvHeaderV6 ||
          first_line == kBenchmarkRunsCsvHeaderV5 ||
          first_line == kBenchmarkRunsCsvHeaderV4 ||
@@ -341,6 +351,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v8 = (first_line == kBenchmarkRunsCsvHeaderV8);
             const bool from_v7 = (first_line == kBenchmarkRunsCsvHeaderV7);
             const bool from_v6 = (first_line == kBenchmarkRunsCsvHeaderV6);
             const bool from_v5 = (first_line == kBenchmarkRunsCsvHeaderV5);
@@ -351,7 +362,46 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v7) {
+            if (from_v8) {
+                migrated = {
+                    at_or_empty(parsed, 0),   // id
+                    at_or_empty(parsed, 1),   // run_date
+                    at_or_empty(parsed, 2),   // run_datetime
+                    at_or_empty(parsed, 3),   // circuit
+                    at_or_empty(parsed, 4),   // graph_x
+                    at_or_empty(parsed, 5),   // graph_y
+                    at_or_empty(parsed, 6),   // circuit_graph_label
+                    at_or_empty(parsed, 7),   // mapping_type
+                    at_or_empty(parsed, 8),   // magic_aware_strategy
+                    at_or_empty(parsed, 9),   // gaussian_strategy
+                    at_or_empty(parsed, 10),  // magic_high
+                    at_or_empty(parsed, 11),  // magic_low
+                    at_or_empty(parsed, 12),  // cnot_high
+                    at_or_empty(parsed, 13),  // cnot_low
+                    at_or_empty(parsed, 14),  // mapped_gaussian_weight
+                    at_or_empty(parsed, 15),  // base_gaussian_weight
+                    at_or_empty(parsed, 16),  // size_moltiplier
+                    at_or_empty(parsed, 17),  // gaussian_confidence
+                    at_or_empty(parsed, 18),  // safe_passage_strategy
+                    at_or_empty(parsed, 19),  // magic_state_placement_strategy
+                    at_or_empty(parsed, 20),  // border_distance_percentage
+                    at_or_empty(parsed, 21),  // number_of_magic_states
+                    at_or_empty(parsed, 22),  // routing_strategy
+                    at_or_empty(parsed, 23),  // t_routing_mode
+                    at_or_empty(parsed, 24),  // use_layer_cache
+                    at_or_empty(parsed, 25),  // routing_steps
+                    at_or_empty(parsed, 26),  // timeout_reached
+                    at_or_empty(parsed, 27),  // status
+                    at_or_empty(parsed, 28),  // exit_code
+                    at_or_empty(parsed, 29),  // duration_seconds
+                    at_or_empty(parsed, 30),  // log_file
+                    at_or_empty(parsed, 31),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
+                };
+            } else if (from_v7) {
                 migrated = {
                     at_or_empty(parsed, 0),   // id
                     at_or_empty(parsed, 1),   // run_date
@@ -384,7 +434,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 27),  // exit_code
                     at_or_empty(parsed, 28),  // duration_seconds
                     at_or_empty(parsed, 29),  // log_file
-                    at_or_empty(parsed, 30)   // error_excerpt
+                    at_or_empty(parsed, 30),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             } else if (from_v6) {
                 migrated = {
@@ -418,7 +472,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 27),  // exit_code
                     at_or_empty(parsed, 28),  // duration_seconds
                     at_or_empty(parsed, 29),  // log_file
-                    at_or_empty(parsed, 30)   // error_excerpt
+                    at_or_empty(parsed, 30),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             } else if (from_v5) {
                 migrated = {
@@ -452,7 +510,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 26),  // exit_code
                     at_or_empty(parsed, 27),  // duration_seconds
                     at_or_empty(parsed, 28),  // log_file
-                    at_or_empty(parsed, 29)   // error_excerpt
+                    at_or_empty(parsed, 29),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             } else if (from_v4) {
                 migrated = {
@@ -486,7 +548,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 25),  // exit_code
                     at_or_empty(parsed, 26),  // duration_seconds
                     at_or_empty(parsed, 27),  // log_file
-                    at_or_empty(parsed, 28)   // error_excerpt
+                    at_or_empty(parsed, 28),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             } else if (from_v3) {
                 migrated = {
@@ -520,7 +586,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 24),  // exit_code
                     at_or_empty(parsed, 25),  // duration_seconds
                     at_or_empty(parsed, 26),  // log_file
-                    at_or_empty(parsed, 27)   // error_excerpt
+                    at_or_empty(parsed, 27),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             } else if (from_v2) {
                 migrated = {
@@ -554,7 +624,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 20),  // exit_code
                     at_or_empty(parsed, 21),  // duration_seconds
                     at_or_empty(parsed, 22),  // log_file
-                    at_or_empty(parsed, 23)   // error_excerpt
+                    at_or_empty(parsed, 23),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             } else if (from_v1) {
                 migrated = {
@@ -588,7 +662,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     at_or_empty(parsed, 18),  // exit_code
                     at_or_empty(parsed, 19),  // duration_seconds
                     at_or_empty(parsed, 20),  // log_file
-                    at_or_empty(parsed, 21)   // error_excerpt
+                    at_or_empty(parsed, 21),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             } else {
                 const std::string legacy_case_id = at_or_empty(parsed, 5);
@@ -623,7 +701,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                     from_legacy ? at_or_empty(parsed, 20) : at_or_empty(parsed, 21), // exit_code
                     from_legacy ? at_or_empty(parsed, 21) : at_or_empty(parsed, 22), // duration_seconds
                     from_legacy ? at_or_empty(parsed, 22) : at_or_empty(parsed, 23), // log_file
-                    from_legacy ? at_or_empty(parsed, 23) : at_or_empty(parsed, 24)  // error_excerpt
+                    from_legacy ? at_or_empty(parsed, 23) : at_or_empty(parsed, 24),  // error_excerpt
+                    "",                       // lower_x
+                    "",                       // lower_y
+                    "",                       // lower_duration_seconds
+                    ""                        // lower_routing_steps
                 };
             }
 

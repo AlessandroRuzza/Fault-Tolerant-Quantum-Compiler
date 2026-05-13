@@ -52,13 +52,14 @@
     "connectivity",
     "passage_no_subgraph"
   ],
-  "MagicStatePlacementStrategy": [
-    "center_circle",
-    "right_row"
-  ],
-  "border_distance_percentage": [
-    0.0,
-    5.0
+  "MagicStatePlacementConfigs": [
+    {
+      "MagicStatePlacementStrategy": "center_circle",
+      "border_distance_percentage": [5.0, 0.0]
+    },
+    {
+      "MagicStatePlacementStrategy": "right_row"
+    }
   ],
   "number_of_magic_states": [
     0.7,

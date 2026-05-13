@@ -185,6 +185,20 @@ public:
     }
 
 
+    int getMaxInteractionDegree() const {
+        int max_deg = 0;
+        for (size_t i = 0; i < qubitsVector.size(); ++i) {
+            if (qubitsVector[i] == nullptr) continue;
+            int deg = 0;
+            for (size_t j = 0; j < qubitsVector.size(); ++j) {
+                if (i != j && qubitsVector[j] != nullptr && getCNOTCount(i, j) > 0)
+                    deg++;
+            }
+            max_deg = std::max(max_deg, deg);
+        }
+        return max_deg;
+    }
+
     const double getCNOTMean() const {
         int total_qubits = getNumQubits();
         if (total_qubits <= 1) return 0.0;
