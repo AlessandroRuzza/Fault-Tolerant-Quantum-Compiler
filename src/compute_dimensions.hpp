@@ -15,10 +15,7 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
 
     if (safe_passage_strategy == "cube") {
         double border = std::ceil((border_distance_percentage/100)*std::round(std::sqrt(dimension)));
-        dimension = static_cast<int>(std::round(std::sqrt(dimension)));
-        if (border < 3 && border > 0) {
-            dimension += 2;
-        }
+        dimension = static_cast<int>(std::ceil(std::sqrt(dimension))) + 1;
         std::cout << "border: " << border << std::endl;
         return dimension;
     }
