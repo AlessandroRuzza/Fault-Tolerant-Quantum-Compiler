@@ -2,7 +2,7 @@
   "circuit":"qft_20",
 
 
-  "type": "gaussian",
+  "type": "random",
   "gaussian_strategy": "coarse",
   "magic_aware_strategy": "center",
   "safe_passage_strategy": "cube",

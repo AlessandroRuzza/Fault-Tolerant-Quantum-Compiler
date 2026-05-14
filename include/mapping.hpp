@@ -43,7 +43,8 @@ public:
     enum class MappingType {
         MAGIC_AWARE,
         HOMOGENEOUS,
-        GAUSSIAN
+        GAUSSIAN,
+        RANDOM
     };
 
     enum class GaussianStrategy {
@@ -63,7 +64,7 @@ public:
     }
 
     static vector<std::string> get_available_mapping_types() {
-        return {"magic_aware", "homogeneous", "gaussian"};
+        return {"magic_aware", "gaussian", "random"};
     }
 
     static vector<std::string> get_available_gaussian_strategies() {
@@ -80,7 +81,7 @@ public:
     } 
 
     static std::string available_mapping_types() {
-        return "magic_aware | homogeneous | gaussian";
+        return "magic_aware | gaussian | random";
     }
 
     static std::string available_gaussian_strategies() {
@@ -193,6 +194,9 @@ public:
             case MappingType::GAUSSIAN:
                 gaussian_mapping();
                 return;
+            case MappingType::RANDOM:
+                random_cube_mapping();
+                return;
             default:
                 throw std::runtime_error("Invalid mapping type");
         }
@@ -298,6 +302,8 @@ public:
 
     void gaussian_mapping();
 
+    void random_cube_mapping();
+
     bool _3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes);
 
     bool safe_passage(const Node& node, const std::vector<Node>& occupied_nodes);
@@ -393,11 +399,11 @@ private:
         if (normalized_name == "magic_aware") {
             mappingType = MappingType::MAGIC_AWARE;
             return true;
-        } else if (normalized_name == "homogeneous") {
-            mappingType = MappingType::HOMOGENEOUS;
-            return true;
         } else if (normalized_name == "gaussian") {
             mappingType = MappingType::GAUSSIAN;
+            return true;
+        } else if (normalized_name == "random") {
+            mappingType = MappingType::RANDOM;
             return true;
         }
 
