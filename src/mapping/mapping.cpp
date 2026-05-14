@@ -147,6 +147,13 @@ bool has_exit_path_from_occupied(
     int safe_passage_ignore_outer_layers
 );
 
+bool has_entry_path_from_border(
+    const Node& border_node,
+    const std::vector<Node>& blocked_nodes,
+    int width,
+    int height
+);
+
 
 bool Mapping::_3x3_occupied(const Node& node, const std::vector<Node>& occupied_nodes) {
 
@@ -195,7 +202,14 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
     };
 
     const auto has_escape_path = [this, &occupied_nodes_after_map](const int node) -> bool {
-        return has_exit_path_from_occupied(graph.get_node(node), occupied_nodes_after_map, graph.getMaxX()+1, graph.getMaxY()+1, safe_passage_ignore_outer_layers);
+        const Node& n = graph.get_node(node);
+        const int maxX = graph.getMaxX();
+        const int maxY = graph.getMaxY();
+        const int eps = safe_passage_ignore_outer_layers;
+        if (n.coordX <= eps || n.coordX >= maxX - eps || n.coordY <= eps || n.coordY >= maxY - eps) {
+            return has_entry_path_from_border(n, occupied_nodes_after_map, maxX + 1, maxY + 1);
+        }
+        return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
     };
     std::vector<Gate> min2q_gates = circuit.getGates();
     min2q_gates.erase( // Filter, keep only 2qubit gates
@@ -496,6 +510,69 @@ bool has_exit_path_from_occupied(
                 continue;
             }
             const int idx = index(nx, ny);
+            if (!visited[static_cast<std::size_t>(idx)]) {
+                visited[static_cast<std::size_t>(idx)] = 1;
+                queue.push_back({nx, ny});
+            }
+        }
+    }
+
+    return false;
+}
+
+bool has_entry_path_from_border(
+    const Node& border_node,
+    const std::vector<Node>& blocked_nodes,
+    int width,
+    int height
+) {
+    const auto is_blocked = [&blocked_nodes](int x, int y) {
+        for (const Node& blocked : blocked_nodes) {
+            if (blocked.coordX == x && blocked.coordY == y) return true;
+        }
+        return false;
+    };
+
+    const auto is_inside_grid = [width, height](int x, int y) {
+        return x >= 0 && x < width && y >= 0 && y < height;
+    };
+
+    std::vector<char> visited(static_cast<std::size_t>(width * height), 0);
+    std::vector<std::pair<int, int>> queue;
+    queue.reserve(static_cast<std::size_t>(width * height));
+
+    const int directions[4][2] = {{1,0},{-1,0},{0,1},{0,-1}};
+
+    visited[static_cast<std::size_t>(border_node.coordY * width + border_node.coordX)] = 1;
+
+    for (const auto& dir : directions) {
+        const int nx = border_node.coordX + dir[0];
+        const int ny = border_node.coordY + dir[1];
+        if (!is_inside_grid(nx, ny)) continue;
+        if (is_blocked(nx, ny)) continue;
+        const int idx = ny * width + nx;
+        if (!visited[static_cast<std::size_t>(idx)]) {
+            visited[static_cast<std::size_t>(idx)] = 1;
+            queue.push_back({nx, ny});
+        }
+    }
+
+    if (queue.empty()) return false;
+
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+        const int x = queue[head].first;
+        const int y = queue[head].second;
+
+        if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
+            return true;
+        }
+
+        for (const auto& dir : directions) {
+            const int nx = x + dir[0];
+            const int ny = y + dir[1];
+            if (!is_inside_grid(nx, ny)) continue;
+            if (is_blocked(nx, ny)) continue;
+            const int idx = ny * width + nx;
             if (!visited[static_cast<std::size_t>(idx)]) {
                 visited[static_cast<std::size_t>(idx)] = 1;
                 queue.push_back({nx, ny});
