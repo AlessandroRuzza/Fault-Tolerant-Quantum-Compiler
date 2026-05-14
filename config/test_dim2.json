@@ -1,0 +1,26 @@
+{
+  "circuit": [
+    "adder_n4",
+    "bigadder_n18_transpiled"
+  ],
+  "safe_passage_strategy": "connectivity",
+  "MagicStatePlacementStrategy": "center_circle",
+  "border_distance_percentage": 0.0,
+  "number_of_magic_states": 3,
+  "x": -2,
+  "y": -2,
+  "timeout": 120,
+  "routing_strategy": "congestion",
+  "t-routing-mode": "normal_t_routing",
+  "configs": [
+    {
+      "type": "gaussian",
+      "MAGIC_HIGH": 1.5,
+      "MAGIC_LOW": 0.5,
+      "CNOT_HIGH": 1.5,
+      "CNOT_LOW": 0.5,
+      "MAPPED_GAUSSIAN_WEIGHT": 0.8,
+      "BASE_GAUSSIAN_WEIGHT": 1.0
+    }
+  ]
+}
