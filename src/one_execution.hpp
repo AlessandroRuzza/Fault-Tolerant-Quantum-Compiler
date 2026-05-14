@@ -227,6 +227,18 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     graph.print_rectangular();
 
+    if (MAPPING_ONLY) {
+        std::cout << "MAPPING_ONLY is enabled — stopping after mapping.\n";
+        return benchmarkResult{
+            0,
+            0.0,
+            resolved_graph_x,
+            resolved_graph_y,
+            qubitsNumber,
+            max_deg
+        };
+    }
+
     std::cout << "------- LAYERING ---------" << std::endl;
     LayeredCircuit layeredCircuit = LayeredCircuit(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
     if (PRINT_LAYER) layeredCircuit.print_layered();

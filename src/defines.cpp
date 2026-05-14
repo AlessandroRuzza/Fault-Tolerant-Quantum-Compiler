@@ -25,5 +25,6 @@ const bool ORDER_GATES_BY_MANHATTAN = false;
 const int LAYERING_LOOKAHEAD = 5;
 
 const bool WRITE_UNIVERSAL_QASM = false;
+const bool MAPPING_ONLY = true;
 
 }

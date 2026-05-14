@@ -607,9 +607,9 @@ void apply_config_overrides(
             throw std::runtime_error("Config key 'x' must be an integer");
         }
         x = config_json["x"].get<int>();
-        // -1 means compute from circuit dimensions
-        if (x <= 0 && x != -1) {
-            throw std::runtime_error("Config key 'x' must be > 0");
+        // -1: compute from circuit dimensions; -2: compute_upper_dimensions
+        if (x <= 0 && x != -1 && x != -2) {
+            throw std::runtime_error("Config key 'x' must be > 0 (or -1 / -2 sentinel)");
         }
     }
 
@@ -618,9 +618,8 @@ void apply_config_overrides(
             throw std::runtime_error("Config key 'y' must be an integer");
         }
         y = config_json["y"].get<int>();
-        // -1 means compute from circuit dimensions
-        if (y <= 0 && y != -1) {
-            throw std::runtime_error("Config key 'y' must be > 0");
+        if (y <= 0 && y != -1 && y != -2) {
+            throw std::runtime_error("Config key 'y' must be > 0 (or -1 / -2 sentinel)");
         }
     }
 
@@ -927,9 +926,12 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --x");
             }
-            // -1 means compute from circuit dimensions
-            if (x != -1) {
-                x = parse_positive_integer(argv[++i], "--x");
+            // -1: compute from circuit dimensions; -2: compute_upper_dimensions
+            const std::string xv = argv[++i];
+            if (xv == "-1" || xv == "-2") {
+                x = std::stoi(xv);
+            } else {
+                x = parse_positive_integer(xv, "--x");
             }
             continue;
         }
@@ -940,9 +942,11 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --y");
             }
-            // -1 means compute from circuit dimensions
-            if (y != -1) {
-                y = parse_positive_integer(argv[++i], "--y");
+            const std::string yv = argv[++i];
+            if (yv == "-1" || yv == "-2") {
+                y = std::stoi(yv);
+            } else {
+                y = parse_positive_integer(yv, "--y");
             }
             continue;
         }
