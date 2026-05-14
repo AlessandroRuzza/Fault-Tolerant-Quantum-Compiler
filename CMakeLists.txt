@@ -32,7 +32,7 @@ elseif(DEFINED ENV{mkBoostInc} AND EXISTS "$ENV{mkBoostInc}/boost/graph/adjacenc
     set(Boost_INCLUDE_DIRS "$ENV{mkBoostInc}")
     message(STATUS "Using Boost headers from mkBoostInc: $ENV{mkBoostInc}")
 else()
-    list(REMOVE_ITEM ALL_SRC_FILES "${CMAKE_SOURCE_DIR}/src/routing/router_conflict_driven.cpp")
+    list(REMOVE_ITEM ALL_SRC_FILES "${CMAKE_SOURCE_DIR}/src/routing/boost_router.cpp")
     message(STATUS "Boost not found: Boost_QubitRouter (RRR router) is disabled. Non-boost routing strategies will still compile.")
 endif()
 
