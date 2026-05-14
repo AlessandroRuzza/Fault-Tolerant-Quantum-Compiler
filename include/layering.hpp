@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
+#include <deque>
 #include <algorithm>
 
 using Layer = std::unordered_set<Gate>;
@@ -14,8 +15,9 @@ using Layer = std::unordered_set<Gate>;
 class LayeredCircuit : public Circuit {
     static const Layer emptyLayer;
 protected:
-    // Each layer is a vector of gate pointers
-    std::vector<Layer> layers;
+    // Stored as a deque so that popping the front layer (called once per routing
+    // step) is O(1) instead of O(N) shift that std::vector would require.
+    std::deque<Layer> layers;
     std::unordered_set<Gate> ignored_gates;
     std::size_t layer_pull_lookahead;
     
