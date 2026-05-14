@@ -89,9 +89,6 @@
       "gaussian_strategy": "coarse"
     },
     {
-      "type": "homogeneous"
-    },
-    {
       "type": "magic_aware",
       "magic_aware_strategy": [
         "center",

@@ -13,7 +13,7 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
     const float multiplier = 3.5f + 0.8f * degree_ratio;
     float dimension = (num_qubits + number_of_magic_states) * multiplier;
 
-    if (safe_passage_strategy == "cube") {
+    if (safe_passage_strategy == "cube" || type == "random") {
         double border = std::ceil((border_distance_percentage/100)*std::round(std::sqrt(dimension)));
         dimension = static_cast<int>(std::ceil(std::sqrt(dimension))) + 1;
         std::cout << "border: " << border << std::endl;

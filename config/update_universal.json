@@ -56,5 +56,5 @@
   "timeout_reached": false,
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing",
-  "type": "homogeneous"
+  "type": "magic_aware"
 }
