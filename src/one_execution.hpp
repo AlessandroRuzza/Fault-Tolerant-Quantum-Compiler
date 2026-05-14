@@ -111,12 +111,11 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     if (number_of_magic_states_multiplier > 0.0) {
         number_of_magic_states = static_cast<int>(std::round(static_cast<double>(qubitsNumber) * number_of_magic_states_multiplier));
-        if (!std::isfinite(number_of_magic_states) || number_of_magic_states <= 0.0) {
-            throw std::runtime_error("Resolved number_of_magic_states must be > 0");
-        }
-
         if (number_of_magic_states < 1) {
             number_of_magic_states = 1;
+        }
+        if (!std::isfinite(static_cast<double>(number_of_magic_states)) || number_of_magic_states <= 0) {
+            throw std::runtime_error("Resolved number_of_magic_states must be > 0");
         }
 
 
