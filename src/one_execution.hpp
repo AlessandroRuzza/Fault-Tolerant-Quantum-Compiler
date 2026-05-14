@@ -270,7 +270,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         } else {
             tGateRoutingStrategyPtr = std::make_unique<NormalTGateRouting>();
         }
-        std::unordered_map<std::string, Routing>* cache_ptr = use_layer_cache ? &metrics.layer_routing_cache : nullptr;
+        std::unordered_map<size_t, Routing>* cache_ptr = use_layer_cache ? &metrics.layer_routing_cache : nullptr;
         routerPtr = std::make_unique<QubitRouter>(
             mapping,
             layeredCircuit,

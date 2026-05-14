@@ -41,12 +41,10 @@ inline void LayeredCircuit::remove_routed_from_topLayer(const std::unordered_set
 }
 
 inline void LayeredCircuit::remove_leading_empty_layers() {
-    std::size_t first_non_empty = 0;
-    while (first_non_empty < layers.size() && layers[first_non_empty].empty()) {
-        ++first_non_empty;
-    }
-    if (first_non_empty > 0) {
-        layers.erase(layers.begin(), layers.begin() + first_non_empty);
+    // pop_front() on a deque is O(1); using it in a loop avoids the O(N) shift
+    // that a vector erase-from-front would cause.
+    while (!layers.empty() && layers.front().empty()) {
+        layers.pop_front();
     }
 }
 
@@ -107,7 +105,9 @@ void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
         return;
     }
 
-    ignored_gates.insert(routed_gates.begin(), routed_gates.end());
+    // ignored_gates is only read by build_layers() (i.e. via reset()), which is
+    // never called during routing. Accumulating into it here was pure overhead
+    // for long-running circuits (e.g. hhl_n10: ~72k routing steps).
 
     std::unordered_set<Gate> routed_set(routed_gates.begin(), routed_gates.end());
     remove_routed_from_topLayer(routed_set);

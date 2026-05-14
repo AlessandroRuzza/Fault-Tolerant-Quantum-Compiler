@@ -143,7 +143,7 @@ private:
     const ITGateRoutingStrategy* tGateRoutingStrategy;
     std::vector<Routing> routing_steps;
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
-    std::unordered_map<std::string, Routing>* layer_routing_cache;
+    std::unordered_map<size_t, Routing>* layer_routing_cache;
 
     mutable std::unordered_set<int> used_nodes_cache;
     mutable std::unordered_map<std::pair<int,int>, float, PairIntHash> min_gate_route_length_cache;
@@ -159,7 +159,7 @@ public:
         const Graph& g,
         const IPathStrategy* p,
         const ITGateRoutingStrategy* t,
-        std::unordered_map<std::string, Routing>* cache = nullptr
+        std::unordered_map<size_t, Routing>* cache = nullptr
     ) : mapping(m),
         circuit(c),
         graph(g),

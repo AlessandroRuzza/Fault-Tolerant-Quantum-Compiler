@@ -18,21 +18,29 @@
 #include <string>
 #include <vector>
 
-inline std::string compute_layer_fingerprint(const Layer& layer) {
-    std::vector<std::string> parts;
-    parts.reserve(layer.size());
+// Returns a numeric hash that identifies the gate set of a layer.
+// Faster than a string-based fingerprint: no ostringstream, no heap string per gate.
+inline size_t compute_layer_fingerprint(const Layer& layer) {
+    // Compute a hash for each gate (name + sorted qubits), then sort the per-gate
+    // hashes so the result is independent of the unordered_set iteration order.
+    std::vector<size_t> gate_hashes;
+    gate_hashes.reserve(layer.size());
     for (const Gate& g : layer) {
-        std::ostringstream oss;
-        oss << g.name;
-        std::vector<uint32_t> qs = g.qubits;
-        std::sort(qs.begin(), qs.end());
-        for (uint32_t q : qs) oss << '_' << q;
-        parts.push_back(oss.str());
+        size_t h = std::hash<std::string>{}(g.name);
+        // Do NOT sort qubits: qubit order is semantically significant for two-qubit
+        // gates (e.g. cx(0,1) and cx(1,0) are different gates).
+        for (uint32_t q : g.qubits) {
+            // hash_combine: avoids trivial XOR cancellation
+            h ^= std::hash<uint32_t>{}(q) + 0x9e3779b9u + (h << 6) + (h >> 2);
+        }
+        gate_hashes.push_back(h);
     }
-    std::sort(parts.begin(), parts.end());
-    std::ostringstream res;
-    for (const std::string& s : parts) res << s << '|';
-    return res.str();
+    std::sort(gate_hashes.begin(), gate_hashes.end());
+    size_t result = 0;
+    for (size_t h : gate_hashes) {
+        result ^= h + 0x9e3779b9u + (result << 6) + (result >> 2);
+    }
+    return result;
 }
 
 struct CircuitMetrics {
@@ -58,7 +66,7 @@ struct CircuitMetrics {
     int max_repeated_seq_len = 0;
     double avg_estimated_path_length = 0.0;
     int max_estimated_path_length = 0;
-    std::unordered_map<std::string, Routing> layer_routing_cache;
+    std::unordered_map<size_t, Routing> layer_routing_cache;
 };
 
 // Computes, prints, and optionally writes to CSV all circuit cache metrics.
@@ -113,12 +121,12 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
         avg_cnot_pair_rep = static_cast<double>(total_rep) / cnot_pair_counts.size();
     }
 
-    // ---- Layer fingerprints (structural: gate name + sorted qubits) ----
-    std::vector<std::string> layer_fps;
-    std::vector<int>         layer_sizes;
-    std::vector<int>         layer_cnot_counts;
-    std::vector<int>         layer_t_counts;
-    std::map<std::string, int> fp_counts;
+    // ---- Layer fingerprints (numeric hash: gate name + sorted qubits) ----
+    std::vector<size_t> layer_fps;
+    std::vector<int>    layer_sizes;
+    std::vector<int>    layer_cnot_counts;
+    std::vector<int>    layer_t_counts;
+    std::map<size_t, int> fp_counts;
 
     layer_fps.reserve(num_layers);
     layer_sizes.reserve(num_layers);
@@ -138,7 +146,7 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
         layer_cnot_counts.push_back(lc);
         layer_t_counts.push_back(lt);
 
-        std::string fp = compute_layer_fingerprint(layer);
+        size_t fp = compute_layer_fingerprint(layer);
         layer_fps.push_back(fp);
         fp_counts[fp]++;
     }
@@ -209,9 +217,9 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
     }
 
     // Layers sorted by frequency (most frequent first)
-    std::vector<std::pair<std::string, int>> fps_sorted(fp_counts.begin(), fp_counts.end());
+    std::vector<std::pair<size_t, int>> fps_sorted(fp_counts.begin(), fp_counts.end());
     std::sort(fps_sorted.begin(), fps_sorted.end(),
-              [](const std::pair<std::string,int>& a, const std::pair<std::string,int>& b) {
+              [](const std::pair<size_t,int>& a, const std::pair<size_t,int>& b) {
                   return a.second > b.second;
               });
 

@@ -271,13 +271,8 @@ std::unordered_set<int> QubitRouter::get_used_nodes() const {
 }
 
 Routing QubitRouter::route_layer(const Layer& layer_gates) const {
-    // Check layer cache first
-    if (layer_routing_cache != nullptr) {
-        const std::string layer_fp = compute_layer_fingerprint(layer_gates);
-        if (layer_routing_cache->count(layer_fp) > 0) {
-            return layer_routing_cache->at(layer_fp);
-        }
-    }
+    // Pure computation: no cache logic here.
+    // Cache lookup and insert are handled by the caller (route_circuit).
 
     // min_gate_route_length_cache.clear();
     Routing routing;
@@ -349,12 +344,6 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
         }
     }
 
-    // Save to cache
-    if (layer_routing_cache != nullptr) {
-        std::string layer_fp = compute_layer_fingerprint(layer_gates);
-        (*layer_routing_cache)[layer_fp] = routing;
-    }
-
     return routing;
 }
 
@@ -379,16 +368,56 @@ void QubitRouter::route_circuit() {
         if (topLayer.empty()) {
             throw std::runtime_error("Layer is empty: no gates to route.");
         }
+
+        // Compute fingerprint once. Used for both cache lookup and insert below.
+        // Only compute when a cache is active (avoids hashing cost when cache is off).
+        const size_t layer_fp = (layer_routing_cache != nullptr)
+            ? compute_layer_fingerprint(topLayer)
+            : 0;
+
+        // Cache hit: get a const reference — no copy inside route_layer, one copy into routing_steps.
+        const Routing* cached_route = nullptr;
+        if (layer_routing_cache != nullptr) {
+            auto it = layer_routing_cache->find(layer_fp);
+            if (it != layer_routing_cache->end()) {
+                cached_route = &it->second;
+            }
+        }
+
         /*
         *   Optimization for LayeredCircuit (?)
         *       Since this only needs the first layer,
         *       no need to construct all layers at each routing step.
         *       Only the first can be made and rebuilt from scratch after routing.
-        * 
-        *   OR (better): change LayeredCircuit::update_layers to not rebuild from scratch, 
+        *
+        *   OR (better): change LayeredCircuit::update_layers to not rebuild from scratch,
         *                instead scan the 2nd layer and move gates to first layer.
         */
-        Routing route = route_layer(topLayer);
+
+        Routing computed_route;
+        if (cached_route != nullptr) {
+            // Cache hit: the stored Routing maps Gate objects from the first occurrence of
+            // this layer. Gate::operator== includes the gate ID, so those stale Gate objects
+            // would not match the current layer's gates in update_layers(), causing it to
+            // silently skip removal and loop forever. Rebuild the Routing by matching each
+            // cached entry to the current topLayer gate with the same name+qubits.
+            for (const auto& [cached_gate, path] : *cached_route) {
+                for (const Gate& cur : topLayer) {
+                    if (cur.name == cached_gate.name && cur.qubits == cached_gate.qubits) {
+                        computed_route.emplace(cur, path);
+                        break;
+                    }
+                }
+            }
+        } else {
+            computed_route = route_layer(topLayer);
+            if (layer_routing_cache != nullptr) {
+                layer_routing_cache->emplace(layer_fp, computed_route);  // copy into cache
+            }
+        }
+
+        const Routing& route = computed_route;
+
         draw_routing_layer(
             static_cast<int>(routing_steps.size()) + 1,
             graph,
@@ -396,7 +425,7 @@ void QubitRouter::route_circuit() {
             topLayer,
             route
         );
-        
+
         const std::size_t non_routed = topLayer.size() - route.size();
         if(non_routed > 0)
             non_routed_histogram[non_routed]++;
@@ -412,14 +441,14 @@ void QubitRouter::route_circuit() {
             );
         }
 
-        routing_steps.emplace_back(route);
-
-        // Extract all keys of route (== gates that have been routed)
+        // Extract routed gates before moving route into routing_steps.
         std::vector<Gate> used_gates;
         used_gates.reserve(route.size());
         for (const auto& item : route) {
             used_gates.push_back(item.first);
         }
+
+        routing_steps.push_back(std::move(computed_route));
 
         // Update layering given used gates
         circuit.update_layers(used_gates);
