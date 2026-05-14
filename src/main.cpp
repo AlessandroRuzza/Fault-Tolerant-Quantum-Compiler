@@ -336,6 +336,42 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     return result;
 }
 
+struct DimCsvEntry {
+    int max_x = 0;
+    int max_y = 0;
+    int min_x = 0;
+    int min_y = 0;
+    std::string note;
+};
+
+static std::unordered_map<std::string, DimCsvEntry> load_dimensions_csv(const std::filesystem::path &path) {
+    std::unordered_map<std::string, DimCsvEntry> map;
+    std::ifstream f(path);
+    if (!f.is_open()) return map;
+    std::string line;
+    std::getline(f, line); // skip header
+    while (std::getline(f, line)) {
+        if (line.empty()) continue;
+        std::istringstream ss(line);
+        std::string circuit, max_x, max_y, min_x, min_y, note;
+        std::getline(ss, circuit, ',');
+        std::getline(ss, max_x, ',');
+        std::getline(ss, max_y, ',');
+        std::getline(ss, min_x, ',');
+        std::getline(ss, min_y, ',');
+        std::getline(ss, note);
+        if (circuit.empty()) continue;
+        DimCsvEntry e;
+        try { e.max_x = std::stoi(max_x); } catch (...) {}
+        try { e.max_y = std::stoi(max_y); } catch (...) {}
+        try { e.min_x = std::stoi(min_x); } catch (...) {}
+        try { e.min_y = std::stoi(min_y); } catch (...) {}
+        e.note = note;
+        map[circuit] = e;
+    }
+    return map;
+}
+
 int run_bench_mode(
     const std::string &bench_path_arg,
     char *executable,
@@ -362,6 +398,8 @@ int run_bench_mode(
 
     const std::filesystem::path project_root(PROJECT_ROOT);
     const std::filesystem::path results_dir = project_root / "benchmarks" / "results";
+    const std::unordered_map<std::string, DimCsvEntry> dim_csv =
+        load_dimensions_csv(project_root / "config" / "dimensions.csv");
     std::filesystem::create_directories(results_dir);
 
     const std::string csv_file_name = sanitize_filename(bench_name) + "_runs.csv";
@@ -741,12 +779,40 @@ int run_bench_mode(
                 resolved_graph_y = planned_y;
             }
 
+            // For dimension -2, look up upper/lower dims from dimensions.csv.
+            // If the circuit is missing or has 0 dimensions, skip the run.
+            const DimCsvEntry *dim_entry_ptr = nullptr;
+            if (planned_x == "-2") {
+                const std::string circuit_key = get_json_field(plan.entry, {"circuit"});
+                const auto it = dim_csv.find(circuit_key);
+                if (it == dim_csv.end()) {
+                    result.status = "skipped";
+                    result.mark_entry_as_executed = false;
+                    std::cout << "dimensions.csv: no entry for circuit '" << circuit_key << "', skipping.\n";
+                    return result;
+                }
+                dim_entry_ptr = &it->second;
+                if (dim_entry_ptr->max_x <= 0 || dim_entry_ptr->max_y <= 0) {
+                    result.status = "skipped";
+                    result.mark_entry_as_executed = false;
+                    std::cout << "dimensions.csv: circuit '" << circuit_key
+                              << "' has zero/invalid upper dims (note: " << dim_entry_ptr->note << "), skipping.\n";
+                    return result;
+                }
+            }
+
             try {
+                json run_entry = plan.entry;
+                if (planned_x == "-2" && dim_entry_ptr) {
+                    run_entry["x"] = dim_entry_ptr->max_x;
+                    run_entry["y"] = dim_entry_ptr->max_y;
+                }
+
                 std::ofstream temp_stream(temp_config_path);
                 if (!temp_stream.is_open()) {
                     throw std::runtime_error("Cannot write temporary config: " + temp_config_path.string());
                 }
-                temp_stream << plan.entry.dump(2) << '\n';
+                temp_stream << run_entry.dump(2) << '\n';
                 temp_stream.close();
 
                 std::error_code remove_ec;
@@ -841,24 +907,14 @@ int run_bench_mode(
             std::string lower_y_str;
             std::string lower_duration_str;
             std::string lower_routing_steps_str;
+            std::string lower_status_str;
 
-            if (planned_x == "-2" && result.status == "success" && resolved_num_qubits >= 0) {
-                int ms_resolved = 0;
-                try {
-                    const auto &entry = plan.entry;
-                    if (entry.contains("number_of_magic_states") && entry.at("number_of_magic_states").is_number()) {
-                        ms_resolved = entry.at("number_of_magic_states").get<int>();
-                    }
-                    const double ms_mult = entry.contains("number_of_magic_states_multiplier") && entry.at("number_of_magic_states_multiplier").is_number()
-                        ? entry.at("number_of_magic_states_multiplier").get<double>() : 0.0;
-                    if (ms_mult > 0.0) {
-                        ms_resolved = static_cast<int>(std::round(static_cast<double>(resolved_num_qubits) * ms_mult));
-                    }
-                } catch (...) {}
-
-                const int lower_dim = compute_lower_dimensions(resolved_num_qubits, resolved_max_degree);
-                lower_x_str = std::to_string(lower_dim);
-                lower_y_str = std::to_string(lower_dim);
+            if (planned_x == "-2" && result.status == "success" && dim_entry_ptr != nullptr
+                && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0) {
+                const int lower_dim_x = dim_entry_ptr->min_x;
+                const int lower_dim_y = dim_entry_ptr->min_y;
+                lower_x_str = std::to_string(lower_dim_x);
+                lower_y_str = std::to_string(lower_dim_y);
 
                 const std::filesystem::path temp_lower_config =
                     expanded_path.parent_path() /
@@ -875,8 +931,8 @@ int run_bench_mode(
 
                 try {
                     json lower_entry = plan.entry;
-                    lower_entry["x"] = lower_dim;
-                    lower_entry["y"] = lower_dim;
+                    lower_entry["x"] = lower_dim_x;
+                    lower_entry["y"] = lower_dim_y;
 
                     std::ofstream lower_stream(temp_lower_config);
                     if (!lower_stream.is_open()) {
@@ -915,14 +971,22 @@ int run_bench_mode(
                     const auto lower_end = std::chrono::steady_clock::now();
                     const int lower_exit = decode_system_exit_code(lower_rc);
 
+                    const std::chrono::duration<double> lower_elapsed = lower_end - lower_start;
+                    std::ostringstream lower_dur_ss;
+                    lower_dur_ss << std::fixed << std::setprecision(6) << lower_elapsed.count();
+                    lower_duration_str = lower_dur_ss.str();
+
                     if (lower_exit == 0) {
                         const benchmarkResult lower_worker =
                             benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_lower_result));
                         lower_routing_steps_str = std::to_string(lower_worker.routing_steps);
-                        const std::chrono::duration<double> lower_elapsed = lower_end - lower_start;
-                        std::ostringstream lower_dur_ss;
-                        lower_dur_ss << std::fixed << std::setprecision(6) << lower_elapsed.count();
-                        lower_duration_str = lower_dur_ss.str();
+                        lower_status_str = "success";
+                    } else if (lower_exit == 2) {
+                        lower_status_str = "safe_passage_failed";
+                    } else if (lower_exit == 124) {
+                        lower_status_str = "timeout";
+                    } else {
+                        lower_status_str = "failed";
                     }
                 } catch (...) {}
 
@@ -1015,7 +1079,8 @@ int run_bench_mode(
                 lower_x_str,
                 lower_y_str,
                 lower_duration_str,
-                lower_routing_steps_str
+                lower_routing_steps_str,
+                lower_status_str
             };
 
             std::ostringstream progress;

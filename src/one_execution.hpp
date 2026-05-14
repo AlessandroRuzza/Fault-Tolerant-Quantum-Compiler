@@ -228,11 +228,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         }
     }
 
-    if (MAPPING_ONLY) {
-        std::cout << "MAPPING_ONLY=true: skipping layering and routing.\n";
-        return benchmarkResult{0, 1.0, resolved_graph_x, resolved_graph_y, qubitsNumber, max_deg};
-    }
-
     graph.print_rectangular();
 
     std::cout << "------- LAYERING ---------" << std::endl;

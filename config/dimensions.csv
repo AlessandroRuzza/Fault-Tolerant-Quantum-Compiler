@@ -1,0 +1,9 @@
+circuit,max_x,max_y,min_x,min_y,note
+19qubits_511gate_153layers,10,10,7,7,
+19qubits_521gate_352layers,10,10,7,7,
+53qubits_155gate_57layers,0,0,0,0,failed_at_upper_dim
+53qubits_332gate_152layers,17,17,9,9,
+adder_n28,0,0,0,0,failed_at_upper_dim
+adder_n4,5,5,3,3,
+adder_n64_transpiled,0,0,0,0,failed_at_upper_dim
+bigadder_n18_transpiled,10,10,6,6,
