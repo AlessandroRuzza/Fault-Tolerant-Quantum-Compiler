@@ -9,6 +9,7 @@
 #include <vector>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 struct Node {
     int id;
@@ -197,6 +198,7 @@ public:
     void print() const;
     
     void print_rectangular() const;
+    void print_rectangular(const std::unordered_set<int>& candidates) const;
 
 
     //-------add---------------
