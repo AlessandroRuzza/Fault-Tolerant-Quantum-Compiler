@@ -191,6 +191,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double cnot_low = 0.5;
     double mapped_gaussian_weight = 0.8;
     double base_gaussian_weight = 1.0;
+    double external_weight = 0.0;
     double size_moltiplier = 1.0;
     double gaussian_confidence = 0.95;
     std::string config_path = "../config/compiler_config.json";
@@ -223,6 +224,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         base_gaussian_weight,
         size_moltiplier,
         gaussian_confidence,
+        external_weight,
         config_path,
         x,
         y,
@@ -253,6 +255,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         base_gaussian_weight,
         size_moltiplier,
         gaussian_confidence,
+        external_weight,
         x,
         y,
         graph_path,
@@ -276,6 +279,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "CNOT_LOW: " << cnot_low << std::endl;
     std::cout << "MAPPED_GAUSSIAN_WEIGHT: " << mapped_gaussian_weight << std::endl;
     std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
+    std::cout << "EXTERNAL_WEIGHT: " << external_weight << std::endl;
     std::cout << "size_moltiplier: " << size_moltiplier << std::endl;
     std::cout << "gaussian_confidence: " << gaussian_confidence << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
@@ -310,6 +314,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         base_gaussian_weight,
         size_moltiplier,
         gaussian_confidence,
+        external_weight,
         x,
         y,
         graph_path,

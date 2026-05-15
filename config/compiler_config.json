@@ -1,13 +1,14 @@
 {
-  "circuit":"qft_20",
+  "circuit": "qaoa_n6",
 
-
-  "type": "random",
+  "type": "gaussian",
   "gaussian_strategy": "coarse",
-  "magic_aware_strategy": "center",
   "safe_passage_strategy": "cube",
   "MagicStatePlacementStrategy": "center_circle",
-  "number_of_magic_states": 0.7,
+
+  "x": 7,
+  "y": 7,
+  "number_of_magic_states": 3,
   "border_distance_percentage": 5.0,
 
   "MAGIC_HIGH": 1.6,
@@ -16,14 +17,11 @@
   "CNOT_LOW": 0.6,
   "MAPPED_GAUSSIAN_WEIGHT": 1.2,
   "BASE_GAUSSIAN_WEIGHT": 1.4,
+  "EXTERNAL_WEIGHT": -0.5,
   "SIZE_MOLTIPLIER": 1.0,
   "GAUSSIAN_CONFIDENCE": 0.66,
 
-  
-  "x": -1,
-  "y": -1,
-
-  "routing_strategy": "naive",
+  "routing_strategy": "congestion",
   "t-routing-mode": "normal_t_routing"
 }
 

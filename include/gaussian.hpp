@@ -19,8 +19,8 @@ public:
     inline int get_size_y() const { return size_y; }
     inline double get_weight() const { return weight; }
     inline bool is_inverse() const { return inverse; }
-    inline double get_peak_value() const { return normFactor * weight; }
-    
+    inline double get_peak_value() const { return weight; }
+
 private:
     const int mean_x;
     const int mean_y;
@@ -30,7 +30,6 @@ private:
     const int size_y;
     const double invTwoSigmaXSq;
     const double invTwoSigmaYSq;
-    const double normFactor;
     bool inverse;
     double weight;
 };

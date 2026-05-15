@@ -347,7 +347,7 @@ void update_gaussians_fine(
 
 Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit) {
     
-    GaussianMappingVisualization::save_gaussian_frame(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, qubit);
+    GaussianMappingVisualization::save_gaussian_frame(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, qubit, externalWeight);
 
     // Compute the combined Gaussian influence for each node and select the best one
     const std::vector<Node> nodes = graph.get_nodes();
@@ -389,6 +389,15 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
         }
 
         score += baseline_gaussian.gaussian_at(node.coordX, node.coordY);
+
+        const double ext_w = this->getExternalWeight();
+        if (ext_w != 0.0) {
+            const bool on_border = (node.coordX == 0 || node.coordX == graph.get_maxX() ||
+                                    node.coordY == 0 || node.coordY == graph.get_maxY());
+            if (on_border) {
+                score += ext_w;
+            }
+        }
 
         if (std::isfinite(score)) {
             candidates.push_back(CandidateScore{&node, score, order});
