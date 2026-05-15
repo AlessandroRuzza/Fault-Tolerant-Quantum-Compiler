@@ -1298,10 +1298,33 @@ def plot_overview_dashboard(rows, output_dir, generated):
     axs[0].set_ylabel("Count")
     annotate_bars(axs[0], bars)
 
-    bars = axs[1].bar(circuits, [circuit_counts[c] for c in circuits], color="#577590")
-    axs[1].set_title("Runs by Circuit")
-    axs[1].tick_params(axis="x", rotation=35)
-    annotate_bars(axs[1], bars)
+    qasm_cache = {}
+    qubit_points = []
+    for r in rows:
+        circuit = r.get("circuit") or r.get("circuit_name")
+        duration = r.get("duration_s_f")
+        if duration is None:
+            continue
+        metrics = qasm_metrics_for_circuit(circuit, qasm_cache)
+        if metrics is None:
+            continue
+        qubit_points.append((duration, metrics["qubits"], r["status"]))
+    for status in sorted({p[2] for p in qubit_points}):
+        subset = [p for p in qubit_points if p[2] == status]
+        if not subset:
+            continue
+        axs[1].scatter(
+            [p[0] for p in subset],
+            [p[1] for p in subset],
+            s=28,
+            alpha=0.7,
+            label=legend_label_with_sample_count(status_display_label(status), len(subset)),
+            color=status_color(status),
+        )
+    axs[1].set_title(f"Duration vs #Qubits (n={len(qubit_points)})")
+    axs[1].set_xlabel("duration_seconds")
+    axs[1].set_ylabel("#qubits")
+    axs[1].legend(fontsize=8)
 
     circuit_sample_labels = [label_with_sample_count(c, circuit_counts[c]) for c in circuits]
     bars = axs[2].bar(circuits, [success_by_circuit.get(c, 0.0) * 100 for c in circuits], color="#43AA8B")
