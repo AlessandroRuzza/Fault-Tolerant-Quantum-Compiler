@@ -46,6 +46,7 @@ void Mapping::random_cube_mapping() {
 
     std::shuffle(candidates.begin(), candidates.end(), rng);
 
+    const int total_qubits = circuit.getNumQubits();
     int cand_idx = 0;
     int mapped   = 0;
     for (int qubit_id = 0; qubit_id < circuit.getQubitsVectorSize(); ++qubit_id) {
@@ -60,9 +61,10 @@ void Mapping::random_cube_mapping() {
         const int chosen = candidates[cand_idx++];
         graph_to_circuit[qubit_id] = chosen;
         graph.occupy_node(chosen);
-        if (PRINT_MAPPING) std::cout << "Mapped qubit " << qubit_id << " to node " << chosen << "\n";
+        if (PRINT_MAPPING) std::cout << "\nMapped qubit " << qubit_id << " to node " << chosen << "\n";
         if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
         ++mapped;
+        if (PRINT_MAPPING) std::cout << "Mapped qubits: " << mapped << "/" << total_qubits << "\n\n";
     }
 
     if (mapped < circuit.getNumQubits())
