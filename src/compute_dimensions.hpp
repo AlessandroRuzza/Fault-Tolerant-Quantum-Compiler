@@ -14,8 +14,13 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
     float dimension = (num_qubits + number_of_magic_states) * multiplier;
 
     if (safe_passage_strategy == "cube" || type == "random") {
-        double border = std::ceil((border_distance_percentage/100)*std::round(std::sqrt(dimension)));
-        dimension = static_cast<int>(std::ceil(std::sqrt(dimension))) + 1;
+        int border = static_cast<int>(std::ceil((border_distance_percentage/100)*std::round(std::sqrt(dimension))));
+        dimension = static_cast<int>(std::ceil(std::sqrt(dimension))) +1;
+        if (border == 0) {
+            dimension += 1;
+        } else if (border % 3 != 0) {
+            dimension += 2;
+        }
         std::cout << "border: " << border << std::endl;
         return dimension;
     }
@@ -25,16 +30,15 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
         safe_passage_strategy == "passage_no_subgraphs" ||
         safe_passage_strategy == "connectivity"
     ) {
-        if (type == "homogeneous") {
-            dimension = dimension * 0.60;
-        } else if (type == "gaussian") {
-            dimension = dimension * 0.55;
+         if (type == "gaussian") {
+            dimension = dimension * 0.80;
         } else if (type == "magic_aware") {
-            dimension = dimension * 0.60;
+            dimension = dimension * 0.80;
         }
+        
     }
 
-    return static_cast<int>(std::round(std::sqrt(dimension) * (1.1 + border_distance_percentage/100.0)));
+    return static_cast<int>(std::ceil(std::sqrt(dimension) * (1.1 + border_distance_percentage/100.0)));
 }
 
 inline int compute_upper_dimensions(int num_qubits, int max_interaction_degree = -1) {
