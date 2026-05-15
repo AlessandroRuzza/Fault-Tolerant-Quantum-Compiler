@@ -26,6 +26,8 @@ visualization/gaussian_frames/*.gp
 
 # Temporary benchmark execution files
 config/__bench_*.json
+# Pre-expanded configs — generated, not needed at runtime
+config/*_expanded.json
 
 # QASMBench checkout (large, not needed)
 QASMBench-master/
