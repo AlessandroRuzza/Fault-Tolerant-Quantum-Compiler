@@ -67,11 +67,11 @@ WORKDIR /app
 COPY --from=builder /app/build/FaultTolerantQuantumCompiler ./build/FaultTolerantQuantumCompiler
 
 # Runtime support files
-COPY scripts/           ./scripts/
-COPY config/            ./config/
-COPY graphs/            ./graphs/
-COPY qasms/             ./qasms/
-COPY universal_set_qasms/ ./universal_set_qasms/
+COPY scripts/                ./scripts/
+COPY config/                 ./config/
+COPY graphs/                 ./graphs/
+COPY qasms/                  ./qasms/
+COPY universal_set_qasms/    ./universal_set_qasms/
 
 # Writable benchmark output directories
 RUN mkdir -p benchmarks/results benchmarks/logs
