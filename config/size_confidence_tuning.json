@@ -1,4 +1,4 @@
-[
+
 {
     "circuit": [
         "19qubits_511gate_153layers",
@@ -49,12 +49,11 @@
     ],
 
     "type": "gaussian",
-    "gaussian_strategy": "coarse",
-    "magic_aware_strategy": "center",
+    "gaussian_strategy": ["coarse", "fine"],
     "safe_passage_strategy": ["connectivity", "cube"],
     "MagicStatePlacementStrategy": "center_circle",
-    "number_of_magic_states": 0.9,
-    "border_distance_percentage": 5.0,
+    "number_of_magic_states": [0.9, 0.5],
+    "border_distance_percentage": [0.0, 5.0],
 
     "MAGIC_HIGH": 1.6,
     "MAGIC_LOW": 0.6,
@@ -72,29 +71,7 @@
     "routing_strategy": "congestion",
     "t-routing-mode": "normal_t_routing",
 
-    "timeout": 2400,
-    "timeout_reached": false
-},
-{
-    "circuit": ["qft_20", "dnn_n16", "adder_n64_transpiled", "ghz_n255", "qaoa_n6_transpiled", "wstate_n27", "adder_n4", "toffoli_n3", "fredkin_n3", "qft_n18", "ising_n26", "bwt_n21", "factor247_n15", "hhl_n10", "vqe_uccsd_n8", "vqe_n24"],
-
-    "type": "magic_aware",
-    "gaussian_strategy": "coarse",
-    "magic_aware_strategy": "center",
-    "safe_passage_strategy": ["connectivity", "cube"],
-    "MagicStatePlacementStrategy": "center_circle",
-    "number_of_magic_states": 0.9,
-    "border_distance_percentage": 5.0,
-
-
-    
-    "x": -1,
-    "y": -1,
-
-    "routing_strategy": "congestion",
-    "t-routing-mode": "normal_t_routing",
-
-    "timeout": 2400,
+    "timeout": 600,
     "timeout_reached": false
 }
-]
+
