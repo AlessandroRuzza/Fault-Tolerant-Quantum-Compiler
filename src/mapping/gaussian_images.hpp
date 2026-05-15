@@ -78,6 +78,51 @@ void write_gaussian_layer(
     }
 }
 
+void write_external_layer(
+    const std::filesystem::path& out_path,
+    double external_weight,
+    int width,
+    int height
+) {
+    std::ofstream out(out_path);
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            const bool on_border = (x == 0 || x == width - 1 || y == 0 || y == height - 1);
+            out << x << " " << y << " " << (on_border ? external_weight : 0.0) << "\n";
+        }
+        out << "\n";
+    }
+}
+
+void write_total_with_external(
+    const std::filesystem::path& out_path,
+    const std::vector<Gaussian>& gaussians,
+    double external_weight,
+    int width,
+    int height
+) {
+    std::ofstream out(out_path);
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            double z = 0.0;
+            for (const Gaussian& g : gaussians) {
+                z += g.gaussian_at(x, y);
+            }
+            const bool on_border = (x == 0 || x == width - 1 || y == 0 || y == height - 1);
+            if (on_border) {
+                z += external_weight;
+            }
+            out << x << " " << y << " " << z << "\n";
+        }
+        out << "\n";
+    }
+}
+
+double max_external_value(double external_weight, int width, int height) {
+    if (width <= 0 || height <= 0) return 0.0;
+    return external_weight; // flat value on border, 0 elsewhere
+}
+
 std::vector<std::filesystem::path> write_component_layers(
     const std::filesystem::path& out_dir,
     const std::string& prefix,
@@ -118,7 +163,8 @@ void save_gaussian_frame(
     const std::vector<Gaussian>& cnot_gaussians,
     const Gaussian& baseline_gaussian,
     const Graph& graph,
-    const Qubit& qubit
+    const Qubit& qubit,
+    double external_weight
 ) {
     if (!benchmark_artifacts_enabled()) {
         return;
@@ -140,6 +186,7 @@ void save_gaussian_frame(
     const std::filesystem::path magic_dat = out_dir / ("magic_" + idx + ".dat");
     const std::filesystem::path cnot_dat = out_dir / ("cnot_" + idx + ".dat");
     const std::filesystem::path baseline_dat = out_dir / ("baseline_" + idx + ".dat");
+    const std::filesystem::path external_dat = out_dir / ("external_" + idx + ".dat");
     const std::filesystem::path total_dat = out_dir / ("total_" + idx + ".dat");
     const std::filesystem::path script_gp = out_dir / ("plot_" + idx + ".gp");
     const std::filesystem::path output_png = out_dir / ("gaussians_" + idx + ".png");
@@ -155,6 +202,7 @@ void save_gaussian_frame(
     write_gaussian_layer(cnot_dat, cnot_plot, width, height);
     std::vector<Gaussian> baseline_layer{baseline_gaussian};
     write_gaussian_layer(baseline_dat, baseline_layer, width, height);
+    write_external_layer(external_dat, external_weight, width, height);
 
     std::vector<Gaussian> total_plot;
     total_plot.reserve(mapped_plot.size() + magic_plot.size() + cnot_plot.size() + baseline_layer.size());
@@ -170,7 +218,7 @@ void save_gaussian_frame(
     for (const Gaussian& g : baseline_layer) {
         total_plot.push_back(g);
     }
-    write_gaussian_layer(total_dat, total_plot, width, height);
+    write_total_with_external(total_dat, total_plot, external_weight, width, height);
 
     std::vector<std::string> mapped_labels;
     std::vector<std::string> magic_labels;
@@ -183,7 +231,8 @@ void save_gaussian_frame(
     const double max_magic = max_gaussian_value(magic_plot, width, height);
     const double max_cnot = max_gaussian_value(cnot_plot, width, height);
     const double max_baseline = max_gaussian_value(baseline_layer, width, height);
-    const double max_total = max_gaussian_value(total_plot, width, height);
+    const double max_external = max_external_value(external_weight, width, height);
+    const double max_total = max_gaussian_value(total_plot, width, height) + (external_weight > 0.0 ? external_weight : 0.0);
 
 
     std::ofstream gp(script_gp);
@@ -201,6 +250,7 @@ void save_gaussian_frame(
           << "  max(magic)=" << max_magic
           << "  max(cnot)=" << max_cnot
           << "  max(base)=" << max_baseline
+          << "  ext_w=" << external_weight
           << "' at screen 0.02,0.92 front tc rgb '#111111'\n";
     gp << "set xlabel 'x'\n";
     gp << "set ylabel 'y'\n";
@@ -243,6 +293,13 @@ void save_gaussian_frame(
         plot_entries.push_back(entry.str());
     }
 
+    if (external_weight != 0.0) {
+        std::ostringstream entry;
+        entry << "'" << external_dat.string() << "' using 1:2:3 with lines lc rgb '#E53935' lw 2 dt 4 title 'external_weight="
+              << external_weight << "'";
+        plot_entries.push_back(entry.str());
+    }
+
     gp << "splot ";
     for (std::size_t i = 0; i < plot_entries.size(); ++i) {
         gp << plot_entries[i];
@@ -267,6 +324,7 @@ void save_gaussian_frame(
            << "  max(magic)=" << max_magic
            << "  max(cnot)=" << max_cnot
            << "  max(base)=" << max_baseline
+           << "  ext_w=" << external_weight
            << "' at screen 0.02,0.92 front tc rgb '#111111'\n";
     gp_sum << "set xlabel 'x'\n";
     gp_sum << "set ylabel 'y'\n";

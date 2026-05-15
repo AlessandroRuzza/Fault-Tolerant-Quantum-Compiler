@@ -134,6 +134,21 @@ double parse_non_negative_double(const std::string& value, const char* flag_name
     return parsed_value;
 }
 
+double parse_finite_double(const std::string& value, const char* flag_name) {
+    double parsed_value = 0.0;
+    try {
+        parsed_value = std::stod(value);
+    } catch (const std::exception&) {
+        throw std::runtime_error("Invalid floating-point value for " + std::string(flag_name) + ": " + value);
+    }
+
+    if (!std::isfinite(parsed_value)) {
+        throw std::runtime_error(std::string(flag_name) + " must be a finite number");
+    }
+
+    return parsed_value;
+}
+
 double parse_gaussian_confidence(const std::string& value, const char* flag_name) {
     double parsed_value = 0.0;
     try {
@@ -337,6 +352,7 @@ void apply_config_overrides(
     double& base_gaussian_weight,
     double& size_moltiplier,
     double& gaussian_confidence,
+    double& external_weight,
     std::string& config_path,
     int& x,
     int& y,
@@ -454,6 +470,23 @@ void apply_config_overrides(
     }
     if (!load_non_negative_double_from_config("BASE_GAUSSIAN_WEIGHT", base_gaussian_weight)) {
         load_non_negative_double_from_config("base_gaussian_weight", base_gaussian_weight);
+    }
+    const auto load_finite_double_from_config = [&](const char* key, double& target) {
+        if (!config_json.contains(key)) {
+            return false;
+        }
+        if (!config_json[key].is_number()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
+        }
+        const double value = config_json[key].get<double>();
+        if (!std::isfinite(value)) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a finite number");
+        }
+        target = value;
+        return true;
+    };
+    if (!load_finite_double_from_config("EXTERNAL_WEIGHT", external_weight)) {
+        load_finite_double_from_config("external_weight", external_weight);
     }
 
     const auto load_size_moltiplier_from_config = [&](const char* key) {
@@ -665,6 +698,7 @@ void argument_parsing(
     double& base_gaussian_weight,
     double& size_moltiplier,
     double& gaussian_confidence,
+    double& external_weight,
     int& x,
     int& y,
     std::string& graph_path,
@@ -795,6 +829,16 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --base-gaussian-weight");
             }
             base_gaussian_weight = parse_non_negative_double(argv[++i], "--base-gaussian-weight");
+            continue;
+        }
+
+        if (arg == "--external-weight" || arg == "--external_weight") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --external-weight\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --external-weight");
+            }
+            external_weight = parse_finite_double(argv[++i], "--external-weight");
             continue;
         }
 

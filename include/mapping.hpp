@@ -109,6 +109,7 @@ private:
     double baseGaussianWeight;
     double sizeMoltiplier;
     double gaussianConfidence;
+    double externalWeight;
     int T_lower_bound;
     int T_upper_bound;
     int CNOT_threshold;
@@ -133,6 +134,7 @@ public:
         double base_gaussian_weight,
         double size_moltiplier,
         double gaussian_confidence,
+        double external_weight,
         int maximum_iterations,
         int safe_passage_ignore_outer_layers
     ) :
@@ -146,6 +148,7 @@ public:
     baseGaussianWeight(base_gaussian_weight),
     sizeMoltiplier(size_moltiplier),
     gaussianConfidence(gaussian_confidence),
+    externalWeight(external_weight),
     maximum_iterations(maximum_iterations),
     safe_passage_ignore_outer_layers(safe_passage_ignore_outer_layers),
     farthest_from_magic_selector(graph)  {
@@ -257,6 +260,7 @@ public:
     inline double getBaseGaussianWeight() const { return baseGaussianWeight; }
     inline double getSizeMoltiplier() const { return sizeMoltiplier; }
     inline double getGaussianConfidence() const { return gaussianConfidence; }
+    inline double getExternalWeight() const { return externalWeight; }
 
 
     // returns -1 if qubit is not mapped
@@ -464,6 +468,9 @@ private:
         validate_non_negative_finite(mappedGaussianWeight, "MAPPED_GAUSSIAN_WEIGHT");
         validate_non_negative_finite(baseGaussianWeight, "BASE_GAUSSIAN_WEIGHT");
         validate_non_negative_finite(sizeMoltiplier, "SIZE_MOLTIPLIER");
+        if (!std::isfinite(externalWeight)) {
+            throw std::invalid_argument("EXTERNAL_WEIGHT must be a finite number");
+        }
         validate_gaussian_confidence(gaussianConfidence);
 
         if (magicHigh < magicLow) {
