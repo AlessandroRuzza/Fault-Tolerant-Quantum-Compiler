@@ -1,5 +1,6 @@
 #include "mapping.hpp"
 #include "circuit.hpp"
+#include "exceptions.hpp"
 
 #include <algorithm>
 #include <random>
@@ -14,35 +15,54 @@ void Mapping::random_cube_mapping() {
 
     static thread_local std::mt19937 rng(std::random_device{}());
 
-    // Single pass: visit rows y = 0, 2, 4, ...
-    // Within each row walk columns with "one yes, one no":
-    //   - normal cell: add to candidates, advance by 2
-    //   - magic cell:  skip it, add the next cell (if valid), advance by 2 from there
     std::vector<int> candidates;
     candidates.reserve(graph.get_node_count() / 4);
 
+    const auto row_has_magic = [&](int row) {
+        if (row < 0 || row >= height) return false;
+        int acc = 0;
+        for (int x = 0; x < width; ++x)
+            if (magic_set.count(row * width + x)) acc++;
+        return acc > 2;
+    };
+
     for (int y = 0; y < height; y += 2) {
-        int x = 0;
-        while (x < width) {
-            const int node_id = y * width + x;
-            if (magic_set.count(node_id)) {
-                ++x;                              // skip over the magic state
-                if (x < width) {
-                    const int next_id = y * width + x;
-                    if (!magic_set.count(next_id) && !graph.is_occupied(next_id))
-                        candidates.push_back(next_id);
-                }
-                x += 2;                           // keep the one-yes-one-no rhythm
-            } else {
-                if (!graph.is_occupied(node_id))
-                    candidates.push_back(node_id);
-                x += 2;
+        if (row_has_magic(y+1)) {
+            y -= 1;
+            continue;
+        }
+        if (y > 0){
+            if (row_has_magic(y-1)) {
+                y -= 1;
+                continue;
             }
         }
+
+
+        for (int x = 0; x < width; x += 2) {
+            const int nid = y * width + x;
+            if (magic_set.count(nid +1)) {x -= 1; continue;} 
+            if (magic_set.count(nid)) continue;
+            if (graph.is_occupied(nid)) continue;
+
+            candidates.push_back(nid);
+        }
+    
+
     }
 
-    if (candidates.empty())
-        throw std::runtime_error("No mappable node found in random_cube_mapping.");
+    if (PRINT_MAPPING_GRAPH) {
+        const std::unordered_set<int> cand_set(candidates.begin(), candidates.end());
+        graph.print_rectangular(cand_set);
+    }
+
+
+    if (static_cast<int>(candidates.size()) < circuit.getNumQubits())
+        throw SafePassageException(
+            "Not enough cube-valid candidates (" + std::to_string(candidates.size()) +
+            ") for " + std::to_string(circuit.getNumQubits()) + " qubits in random_cube_mapping.");
+
+
 
     std::shuffle(candidates.begin(), candidates.end(), rng);
 

@@ -3,6 +3,7 @@
 #include <climits>
 #include <cstdio>
 #include <iostream>
+#include <unordered_set>
 #include <limits>
 
 namespace {
@@ -67,6 +68,46 @@ void IGraph::print_rectangular() const {
     }
 }
 
+
+
+void IGraph::print_rectangular(const std::unordered_set<int>& candidates) const {
+    if (node_count == 0 || maxX < 0 || maxY < 0) {
+        std::cout << "(empty graph)" << std::endl;
+        return;
+    }
+
+    for (int y = 0; y <= this->maxY; ++y) {
+        for (int x = 0; x <= this->maxX; ++x) {
+            int node_id = -1;
+            try {
+                node_id = get_node_by_coordinates(x, y).id;
+            } catch (const std::exception&) {
+                std::cout << "   ";
+                continue;
+            }
+            const bool is_magic =
+                std::find(magic_states_ids.begin(), magic_states_ids.end(), node_id) != magic_states_ids.end();
+
+            if (is_magic) {
+                std::cout << "\033[1;32m";
+                printf("%3d", node_id);
+                std::cout << "\033[0m";
+            } else if (is_occupied(node_id)) {
+                std::cout << "\033[1;31m";
+                printf("%3d", node_id);
+                std::cout << "\033[0m";
+            } else if (candidates.count(node_id)) {
+                std::cout << "\033[1;33m";
+                printf("%3d", node_id);
+                std::cout << "\033[0m";
+            } else {
+                printf("%3d", node_id);
+            }
+            std::cout << " ";
+        }
+        std::cout << std::endl;
+    }
+}
 
 
 // Add a node with coordinates
