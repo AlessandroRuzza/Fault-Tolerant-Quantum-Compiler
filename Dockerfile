@@ -83,6 +83,12 @@ RUN mkdir -p benchmarks/results benchmarks/logs
 RUN printf '.PHONY: run-bench\nrun-bench:\n\tsh /app/scripts/run-bench.sh /app/build/FaultTolerantQuantumCompiler\n' \
     > /app/Makefile
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 5 — Entry-point layer
+# Only ENV / CMD live here; editing them doesn't invalidate any layer above.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM runtime AS final
+
 # Default benchmark; override at run-time:
 #   docker run -e BENCH_PATH=gaussian_coarse_vs_fine <image>
 #   docker run <image> make run-bench BENCH_PATH=cache_vs_no_cache
