@@ -11,20 +11,18 @@
     "bigadder_n18_transpiled",
     "bwt_n21",
     "bwt_n37",
-    "cat_n130",
     "continuous_3_17_13",
     "dnn_n16",
     "example",
+    "factor247_n15",
     "fredkin_n3",
     "ghz_state_n23",
-    "ghz_state_n255",
     "hhl_n10",
     "ising_n26",
     "knn_n25",
     "multiply_n13",
     "multiplier_n15",
     "multiplier_n45",
-    "multiplier_n75",
     "parallel",
     "parallel_big",
     "qaoa_n6",
@@ -45,16 +43,26 @@
     "vqe_uccsd_n4",
     "wstate_n27"
   ],
-
-
-  "type": ["gaussian", "random"],
+  "type": [
+    "gaussian",
+    "random"
+  ],
   "gaussian_strategy": "coarse",
   "magic_aware_strategy": "center",
-  "safe_passage_strategy": ["cube", "connectivity"],
+  "safe_passage_strategy": [
+    "cube",
+    "connectivity"
+  ],
   "MagicStatePlacementStrategy": "center_circle",
-  "number_of_magic_states": [0.1, 1.01],
-  "border_distance_percentage": [0.0, 5.0, 20.0],
-
+  "number_of_magic_states": [
+    0.1,
+    1.01
+  ],
+  "border_distance_percentage": [
+    0.0,
+    5.0,
+    20.0
+  ],
   "MAGIC_HIGH": 1.6,
   "MAGIC_LOW": 0.6,
   "CNOT_HIGH": 1.6,
@@ -63,14 +71,9 @@
   "BASE_GAUSSIAN_WEIGHT": 1.4,
   "SIZE_MOLTIPLIER": 1.0,
   "GAUSSIAN_CONFIDENCE": 0.66,
-
-  
   "x": -1,
   "y": -1,
-
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing",
-
-  "timeout" : 40
+  "timeout": 30
 }
-

@@ -1,14 +1,10 @@
 {
   "circuit": [
     "factor247_n15",
-    "ghz_n255",
-    "ghz_state_n255",
     "bwt_n37",
     "bwt_n21",
     "hhl_n10"
   ],
-
-
   "type": "gaussian",
   "gaussian_strategy": "coarse",
   "magic_aware_strategy": "center",
@@ -16,7 +12,6 @@
   "MagicStatePlacementStrategy": "center_circle",
   "number_of_magic_states": 1.01,
   "border_distance_percentage": 5.0,
-
   "MAGIC_HIGH": 1.6,
   "MAGIC_LOW": 0.6,
   "CNOT_HIGH": 1.6,
@@ -25,14 +20,9 @@
   "BASE_GAUSSIAN_WEIGHT": 1.4,
   "SIZE_MOLTIPLIER": 1.0,
   "GAUSSIAN_CONFIDENCE": 0.66,
-
-  
   "x": -1,
   "y": -1,
-
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing",
-
-  "timeout" : 1200
+  "timeout": 1200
 }
-
