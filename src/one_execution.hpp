@@ -154,11 +154,11 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     }
 
 
-    int safe_passage_ignore_outer_layers = 0;
+    int safe_passage_ignore_outer_layers = 1;
     if (magic_state_placement_strategy == "center_circle" &&
         number_of_magic_states > 2*x + 2*y - 5) {
-        
-        safe_passage_ignore_outer_layers = 1;
+
+        safe_passage_ignore_outer_layers = std::max(2, std::min(x, y) / 10);
         border_distance_percentage = 0.0;
         std::cout << "Safe passage will ignore outer layer of graph due to large number of magic states with center_circle placement strategy.\n";
     }
