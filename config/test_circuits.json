@@ -10,22 +10,18 @@
     "bigadder_n18_transpiled",
     "bwt_n21",
     "bwt_n37",
-    "cat_n130",
     "continuous_3_17_13",
     "dnn_n16",
     "example",
     "factor247_n15",
     "fredkin_n3",
-    "ghz_n255",
     "ghz_state_n23",
-    "ghz_state_n255",
     "hhl_n10",
     "ising_n26",
     "knn_n25",
     "multiply_n13",
     "multiplier_n15",
     "multiplier_n45",
-    "multiplier_n75",
     "parallel",
     "parallel_big",
     "qaoa_n6",
@@ -46,6 +42,7 @@
     "vqe_uccsd_n4",
     "wstate_n27"
   ],
+
   "safe_passage_strategy": "cube",
   "MagicStatePlacementStrategy": "center_circle",
   "border_distance_percentage": 0.0,
@@ -57,4 +54,5 @@
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing",
   "type": "magic_aware"
+  
 }

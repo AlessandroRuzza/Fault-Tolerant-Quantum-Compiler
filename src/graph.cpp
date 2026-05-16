@@ -1,6 +1,7 @@
 #include "graph.hpp"
 #include <cctype>
 #include <cmath>
+#include <random>
 
 const std::vector<int> emptyVec;
 
@@ -269,76 +270,113 @@ void Graph::add_magic_states_center_circle(
     const int center_row = height / 2;
     const int center_col = width / 2;
     const int center_id = center_row * width + center_col;
+    const int max_inset = std::max(0, (std::min(height, width) - 1) / 2);
 
     std::unordered_set<int> used_magic_ids(magic_states_ids.begin(), magic_states_ids.end());
 
-    auto try_add_magic_id = [&](int magic_id) {
-        if (magic_states_ids.size() >= static_cast<size_t>(number_of_magic_states)) {
-            return;
-        }
-        if (magic_id < 0 || magic_id >= height * width) {
-            return;
-        }
+    auto try_add_magic_id = [&](int magic_id) -> bool {
+        if (magic_states_ids.size() >= static_cast<size_t>(number_of_magic_states)) return false;
+        if (magic_id < 0 || magic_id >= height * width) return false;
         if (used_magic_ids.insert(magic_id).second) {
             magic_states_ids.push_back(magic_id);
+            return true;
+        }
+        return false;
+    };
+
+    auto needs_more = [&]() {
+        return magic_states_ids.size() < static_cast<size_t>(number_of_magic_states);
+    };
+
+    try_add_magic_id(center_id);
+    if (!needs_more()) return;
+
+    auto build_ring = [&](int inset) -> std::vector<int> {
+        std::vector<int> ring;
+        if (inset < 0 || inset > max_inset) return ring;
+        const int top = inset;
+        const int bottom = height - 1 - inset;
+        const int left = inset;
+        const int right = width - 1 - inset;
+        if (top > bottom || left > right) return ring;
+        if (top == bottom && left == right) {
+            ring.push_back(top * width + left);
+            return ring;
+        }
+        for (int col = left; col <= right; ++col) ring.push_back(top * width + col);
+        for (int row = top + 1; row <= bottom; ++row) ring.push_back(row * width + right);
+        if (bottom > top) {
+            for (int col = right - 1; col >= left; --col) ring.push_back(bottom * width + col);
+        }
+        if (right > left) {
+            for (int row = bottom - 1; row > top; --row) ring.push_back(row * width + left);
+        }
+        return ring;
+    };
+
+    // "one yes, one no" — every other cell along the ring path, so adjacent
+    // placed magic states are at least one empty cell apart along the ring.
+    auto place_alternating = [&](const std::vector<int>& ring) {
+        for (size_t i = 0; i < ring.size() && needs_more(); i += 2) {
+            try_add_magic_id(ring[i]);
         }
     };
 
-    // Keep exactly one magic state at the center first.
-    try_add_magic_id(center_id);
-    if (magic_states_ids.size() >= static_cast<size_t>(number_of_magic_states)) {
-        return;
-    }
-
-    // Place remaining magic states on a rectangular ring inset by a percentage
-    // from the outer border (e.this->, 10x10 with 10% -> one-cell non-magic border).
     const double clamped_percentage = std::clamp(border_distance_percentage, 0.0, 100.0);
-    const int max_inset = std::max(0, (std::min(height, width) - 1) / 2);
-    int inset = static_cast<int>(std::ceil((std::min(height, width) * clamped_percentage) / 100.0));
-    inset = std::clamp(inset, 0, max_inset);
+    int first_inset = static_cast<int>(std::ceil((std::min(height, width) * clamped_percentage) / 100.0));
+    first_inset = std::clamp(first_inset, 0, max_inset);
 
-    const int top = inset;
-    const int bottom = height - 1 - inset;
-    const int left = inset;
-    const int right = width - 1 - inset;
+    place_alternating(build_ring(first_inset));
+    if (!needs_more()) return;
 
-    std::vector<int> ring_ids;
-    ring_ids.reserve(2 * ((right - left + 1) + (bottom - top + 1)));
+    // Second ring: pick the side of the first ring (toward center vs. toward
+    // exterior) with more free space and place a ring halfway between that
+    // edge and the first ring, keeping at least one cell of separation.
+    const int distance_to_center = max_inset - first_inset;
+    const int distance_to_exterior = first_inset;
 
-    for (int col = left; col <= right; ++col) {
-        ring_ids.push_back(top * width + col);
+    int second_inset = -1;
+    if (distance_to_center >= distance_to_exterior && distance_to_center >= 1) {
+        second_inset = (first_inset + max_inset) / 2;
+        if (second_inset - first_inset < 1) second_inset = first_inset + 1;
+        if (second_inset > max_inset) second_inset = -1;
+    } else if (distance_to_exterior >= 1) {
+        second_inset = first_inset / 2;
+        if (first_inset - second_inset < 1) second_inset = first_inset - 1;
+        if (second_inset < 0) second_inset = -1;
     }
-    for (int row = top + 1; row <= bottom; ++row) {
-        ring_ids.push_back(row * width + right);
+
+    if (second_inset >= 0 && second_inset != first_inset) {
+        place_alternating(build_ring(second_inset));
+        if (!needs_more()) return;
     }
-    if (bottom > top) {
-        for (int col = right - 1; col >= left; --col) {
-            ring_ids.push_back(bottom * width + col);
+
+    // Random fill: Chebyshev distance >= 2 from every existing magic state
+    // (no edge- or diagonal-adjacency to any other magic state).
+    auto far_enough = [&](int row, int col) {
+        for (int magic_id : magic_states_ids) {
+            const int mrow = magic_id / width;
+            const int mcol = magic_id % width;
+            if (std::max(std::abs(mrow - row), std::abs(mcol - col)) < 2) return false;
+        }
+        return true;
+    };
+
+    std::vector<int> candidates;
+    candidates.reserve(static_cast<size_t>(width) * height);
+    for (int row = 0; row < height; ++row) {
+        for (int col = 0; col < width; ++col) {
+            candidates.push_back(row * width + col);
         }
     }
-    if (right > left) {
-        for (int row = bottom - 1; row > top; --row) {
-            ring_ids.push_back(row * width + left);
-        }
-    }
 
-    const int remaining_magic_states = number_of_magic_states - static_cast<int>(magic_states_ids.size());
-    if (remaining_magic_states <= 0 || ring_ids.empty()) {
-        return;
-    }
-
-    const int to_place_on_ring = std::min(remaining_magic_states, static_cast<int>(ring_ids.size()));
-    if (to_place_on_ring == static_cast<int>(ring_ids.size())) {
-        for (const int ring_id : ring_ids) {
-            try_add_magic_id(ring_id);
-        }
-        return;
-    }
-
-    // Distribute requested magic states uniformly around the selected ring.
-    for (int i = 0; i < to_place_on_ring; ++i) {
-        const int index = (i * static_cast<int>(ring_ids.size())) / to_place_on_ring;
-        try_add_magic_id(ring_ids[static_cast<size_t>(index)]);
+    static thread_local std::mt19937 rng{std::random_device{}()};
+    std::shuffle(candidates.begin(), candidates.end(), rng);
+    for (int cand : candidates) {
+        if (!needs_more()) break;
+        if (used_magic_ids.count(cand)) continue;
+        if (!far_enough(cand / width, cand % width)) continue;
+        try_add_magic_id(cand);
     }
 }
 

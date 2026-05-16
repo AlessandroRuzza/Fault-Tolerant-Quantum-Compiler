@@ -11,18 +11,33 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
         ? static_cast<float>(max_interaction_degree) / num_qubits
         : 0.6f;
     const float multiplier = 3.5f + 0.8f * degree_ratio;
-    float dimension = (num_qubits + number_of_magic_states) * multiplier;
+    float dimension;
+
 
     if (safe_passage_strategy == "cube" || type == "random") {
+        dimension = (num_qubits + number_of_magic_states*1.5) * multiplier;
         int border = static_cast<int>(std::ceil((border_distance_percentage/100)*std::round(std::sqrt(dimension))));
         dimension = static_cast<int>(std::ceil(std::sqrt(dimension))) +1;
-        if (border == 0) {
-            dimension += 1;
-        } else if (border % 3 != 0) {
-            dimension += 2;
+        if (type == "random") {
+            if (border == 0) {
+                dimension += 2;
+            } else if (border % 3 != 0) {
+                dimension += 3;
+            }
+            std::cout << "border: " << border << std::endl;
+            return dimension +1 ;
+        } else {
+            if (border == 0) {
+                dimension += 1;
+            } else if (border % 3 != 0) {
+                dimension += 2;
+            }
+            std::cout << "border: " << border << std::endl;
+            return dimension;
         }
-        std::cout << "border: " << border << std::endl;
-        return dimension;
+
+
+
     }
 
     else if (
@@ -30,10 +45,12 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
         safe_passage_strategy == "passage_no_subgraphs" ||
         safe_passage_strategy == "connectivity"
     ) {
-         if (type == "gaussian") {
-            dimension = dimension * 0.80;
+        dimension = (num_qubits + number_of_magic_states) * multiplier;
+
+        if (type == "gaussian") {
+            dimension = dimension * 0.65;
         } else if (type == "magic_aware") {
-            dimension = dimension * 0.80;
+            dimension = dimension * 0.65;
         }
         
     }
