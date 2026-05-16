@@ -262,6 +262,37 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
         t_gates.end()
     );
 
+    bool has_unmapped_t_qubit = false;
+    for (const Gate& gate : t_gates) {
+        if (mapped_node_after_candidate(gate.qubits[0]) < 0) {
+            has_unmapped_t_qubit = true;
+            break;
+        }
+    }
+
+    if (has_unmapped_t_qubit) {
+        bool has_open_magic_entry = false;
+        for (const int magic : graph.get_magic_state_ids()) {
+            for (const int neighbor : graph.neighbors(magic)) {
+                if (used_nodes.count(neighbor) == 0) {
+                    has_open_magic_entry = true;
+                    break;
+                }
+            }
+            if (has_open_magic_entry) {
+                break;
+            }
+        }
+
+        if (!has_open_magic_entry) {
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "CANDIDATE REJECTED " << node.id
+                          << ": it blocks magic-state access for unmapped T gates\n";
+            }
+            return false;
+        }
+    }
+
     // Ensure all mapped qubits can reach a magic state if they need
     std::unordered_set<int> ensured_qubits;
     ensured_qubits.reserve(circuit.getNumQubits());
