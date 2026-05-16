@@ -151,7 +151,8 @@ bool has_entry_path_from_border(
     const Node& border_node,
     const std::vector<Node>& blocked_nodes,
     int width,
-    int height
+    int height,
+    int ignored_outer_layers
 );
 
 
@@ -207,7 +208,7 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
         const int maxY = graph.getMaxY();
         const int eps = safe_passage_ignore_outer_layers;
         if (n.coordX <= eps || n.coordX >= maxX - eps || n.coordY <= eps || n.coordY >= maxY - eps) {
-            return has_entry_path_from_border(n, occupied_nodes_after_map, maxX + 1, maxY + 1);
+            return has_entry_path_from_border(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
         }
         return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
     };
@@ -413,11 +414,6 @@ bool has_exit_path_from_occupied(
     max_x -= ignored_outer_layers;
     max_y -= ignored_outer_layers;
 
-
-    if (min_x > max_x || min_y > max_y) {
-        return false;
-    }
-
     const auto is_inside_effective_area = [min_x, min_y, max_x, max_y](int x, int y) {
         return x >= min_x && x <= max_x && y >= min_y && y <= max_y;
     };
@@ -434,23 +430,6 @@ bool has_exit_path_from_occupied(
     if (!is_inside_effective_area(occupied_node.coordX, occupied_node.coordY)) {
         // This node belongs to the ignored outer layers.
         return true;
-    }
-
-    if (occupied_node.coordX < 0 || occupied_node.coordX >= width || occupied_node.coordY < 0 || occupied_node.coordY >= height) {
-        return false;
-    }
-
-    if (occupied_node.coordY == min_y && (occupied_node.coordY + 1 > max_y || is_blocked(occupied_node.coordX, occupied_node.coordY + 1))) {
-        return false;
-    }
-    if (occupied_node.coordY == max_y && (occupied_node.coordY - 1 < min_y || is_blocked(occupied_node.coordX, occupied_node.coordY - 1))) {
-        return false;
-    }
-    if (occupied_node.coordX == min_x && (occupied_node.coordX + 1 > max_x || is_blocked(occupied_node.coordX + 1, occupied_node.coordY))) {
-        return false;
-    }
-    if (occupied_node.coordX == max_x && (occupied_node.coordX - 1 < min_x || is_blocked(occupied_node.coordX - 1, occupied_node.coordY))) {
-        return false;
     }
 
     const int effective_width = max_x - min_x + 1;
@@ -524,13 +503,34 @@ bool has_entry_path_from_border(
     const Node& border_node,
     const std::vector<Node>& blocked_nodes,
     int width,
-    int height
+    int height,
+    int ignored_outer_layers
 ) {
-    const auto is_blocked = [&blocked_nodes](int x, int y) {
-        for (const Node& blocked : blocked_nodes) {
-            if (blocked.coordX == x && blocked.coordY == y) return true;
-        }
-        return false;
+    const int layers = std::max(0, ignored_outer_layers);
+    const int min_x = layers;
+    const int min_y = layers;
+    const int max_x = width - 1 - layers;
+    const int max_y = height - 1 - layers;
+
+    // No target region exists — the ignored layers consume the entire grid.
+    if (min_x > max_x || min_y > max_y) return false;
+
+    const int bx = border_node.coordX;
+    const int by = border_node.coordY;
+
+    if (bx < 0 || bx >= width || by < 0 || by >= height) return false;
+
+    // Node is already in the target region — entry path trivially exists.
+    if (bx >= min_x && bx <= max_x && by >= min_y && by <= max_y) return true;
+
+    std::unordered_set<int> blocked_set;
+    blocked_set.reserve(blocked_nodes.size());
+    for (const Node& n : blocked_nodes) {
+        blocked_set.insert(n.coordY * width + n.coordX);
+    }
+
+    const auto is_blocked = [&blocked_set, width](int x, int y) {
+        return blocked_set.count(y * width + x) != 0;
     };
 
     const auto is_inside_grid = [width, height](int x, int y) {
@@ -543,11 +543,11 @@ bool has_entry_path_from_border(
 
     const int directions[4][2] = {{1,0},{-1,0},{0,1},{0,-1}};
 
-    visited[static_cast<std::size_t>(border_node.coordY * width + border_node.coordX)] = 1;
+    visited[static_cast<std::size_t>(by * width + bx)] = 1;
 
     for (const auto& dir : directions) {
-        const int nx = border_node.coordX + dir[0];
-        const int ny = border_node.coordY + dir[1];
+        const int nx = bx + dir[0];
+        const int ny = by + dir[1];
         if (!is_inside_grid(nx, ny)) continue;
         if (is_blocked(nx, ny)) continue;
         const int idx = ny * width + nx;
@@ -563,7 +563,7 @@ bool has_entry_path_from_border(
         const int x = queue[head].first;
         const int y = queue[head].second;
 
-        if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
+        if (x >= min_x && x <= max_x && y >= min_y && y <= max_y) {
             return true;
         }
 
