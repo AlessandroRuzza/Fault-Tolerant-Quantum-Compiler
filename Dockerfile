@@ -90,10 +90,14 @@ RUN printf '.PHONY: run-bench\nrun-bench:\n\tsh /app/scripts/run-bench.sh /app/b
 FROM runtime AS final
 
 # Default benchmark; override at run-time:
-#   docker run -e BENCH_PATH=gaussian_coarse_vs_fine <image>
-#   docker run <image> make run-bench BENCH_PATH=cache_vs_no_cache
+#   docker run --init -e BENCH_PATH=gaussian_coarse_vs_fine <image>
+#   docker run --init <image> make run-bench BENCH_PATH=cache_vs_no_cache
 ENV BENCH_PATH=naive_congestion_boost_normal_t_smart_t
 
 # Default BENCH_JOBS = all cores
 
-CMD ["make", "run-bench"]
+# IMPORTANT: launch with `docker run --init ...` so tini becomes PID 1 and
+# forwards signals to the benchmark binary. run-bench.sh `exec`s the binary,
+# so SIGINT/SIGTERM/SIGHUP land directly on it and trigger a clean "interrupted"
+# write to the CSV before exiting.
+CMD ["sh", "/app/scripts/run-bench.sh", "/app/build/FaultTolerantQuantumCompiler"]
