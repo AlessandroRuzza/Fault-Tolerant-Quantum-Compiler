@@ -63,8 +63,8 @@
     "x": -1,
     "y": -1,
 
-    "routing_strategy": "congestion",
-    "t-routing-mode": "normal_t_routing",
+    "routing_strategy": "naive",
+    "t-routing-mode": "smart_t_routing",
 
     "timeout": 600,
     "timeout_reached": false
