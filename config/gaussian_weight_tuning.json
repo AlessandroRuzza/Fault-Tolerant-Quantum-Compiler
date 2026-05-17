@@ -44,21 +44,24 @@
         "wstate_n27"
     ],
     "type": "gaussian",
-    "gaussian_strategy": ["coarse", "fine"],
-    "safe_passage_strategy": ["connectivity", "cube", "passage_no_subgraph"],
-    "MagicStatePlacementStrategy": "center_circle",
-    "number_of_magic_states": [0.9, 0.5, 0.3],
-    "border_distance_percentage": [0.0, 5.0],
+    "gaussian_strategy": ["coarse"],
+    "safe_passage_strategy": ["connectivity"],
+    "MagicStatePlacementStrategy": ["center_circle"],
+    "number_of_magic_states": [0.8],
+    "border_distance_percentage": [5.0],
 
-    "MAGIC_HIGH": 1.6,
-    "MAGIC_LOW": 0.6,
-    "CNOT_HIGH": 1.6,
-    "CNOT_LOW": 0.6,
-    "MAPPED_GAUSSIAN_WEIGHT": 1.2,
-    "BASE_GAUSSIAN_WEIGHT": 1.4,
-    "EXTERNAL_WEIGHT": 0,
-    "SIZE_MOLTIPLIER": [0.3, 0.5, 0.7, 1.0],
-    "GAUSSIAN_CONFIDENCE": [0.66, 0.8, 0.95, 0.99],
+    "MAGIC_HIGH": [0.0, 0.4, 1.2, 1.6, 2.0],
+    "MAGIC_LOW": [0.0, 0.4, 1.2, 1.6, 2.0],
+    "CNOT_HIGH": [0.0, 0.4, 1.2, 1.6, 2.0],
+    "CNOT_LOW": [0.0, 0.4, 1.2, 1.6, 2.0],
+    "MAPPED_GAUSSIAN_WEIGHT": [0.0, 0.4, 1.2, 1.6, 2.0],
+    "EXTERNAL_WEIGHT": [0.0, 0.4, 0.8, 1.2],
+
+    "BASE_GAUSSIAN_WEIGHT": 1.0,
+
+
+    "SIZE_MOLTIPLIER": 0.7,
+    "GAUSSIAN_CONFIDENCE": 0.8,
 
     
     "x": -1,
