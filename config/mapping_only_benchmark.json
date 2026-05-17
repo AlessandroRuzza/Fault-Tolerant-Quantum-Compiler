@@ -76,5 +76,5 @@
   "y": -1,
   "routing_strategy": "naive",
   "t-routing-mode": "normal_t_routing",
-  "timeout": 30
+  "timeout": 600
 }
