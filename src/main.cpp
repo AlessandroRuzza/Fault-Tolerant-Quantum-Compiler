@@ -907,6 +907,100 @@ int run_bench_mode(
 
             cleanup_temp();
 
+            // ---- mid-dimension run (only when x == -2 and main run succeeded) ----
+            // mid dims are auto-computed as (min+max)/2 so dimensions.csv stays unchanged.
+            std::string mid_x_str;
+            std::string mid_y_str;
+            std::string mid_duration_str;
+            std::string mid_routing_steps_str;
+            std::string mid_status_str;
+
+            if (planned_x == "-2" && result.status == "success" && dim_entry_ptr != nullptr
+                && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0
+                && dim_entry_ptr->max_x > 0 && dim_entry_ptr->max_y > 0) {
+                const int mid_dim_x = (dim_entry_ptr->min_x + dim_entry_ptr->max_x) / 2;
+                const int mid_dim_y = (dim_entry_ptr->min_y + dim_entry_ptr->max_y) / 2;
+                mid_x_str = std::to_string(mid_dim_x);
+                mid_y_str = std::to_string(mid_dim_y);
+
+                const std::filesystem::path temp_mid_config =
+                    expanded_path.parent_path() /
+                    ("__bench_runtime_mid_config_" + std::to_string(execution_id) + ".json");
+                const std::filesystem::path temp_mid_result =
+                    expanded_path.parent_path() /
+                    ("__bench_runtime_mid_result_" + std::to_string(execution_id) + ".json");
+
+                const auto cleanup_mid = [&]() {
+                    std::error_code ec;
+                    std::filesystem::remove(temp_mid_config, ec);
+                    std::filesystem::remove(temp_mid_result, ec);
+                };
+
+                try {
+                    json mid_entry = plan.entry;
+                    mid_entry["x"] = mid_dim_x;
+                    mid_entry["y"] = mid_dim_y;
+
+                    std::ofstream mid_stream(temp_mid_config);
+                    if (!mid_stream.is_open()) {
+                        throw std::runtime_error("Cannot write mid config: " + temp_mid_config.string());
+                    }
+                    mid_stream << mid_entry.dump(2) << '\n';
+                    mid_stream.close();
+
+                    std::error_code remove_ec;
+                    std::filesystem::remove(temp_mid_result, remove_ec);
+
+                    const std::string mid_worker_env =
+                        "FTQC_BENCH_WORKER=1 FTQC_BENCH_RESULT_FILE=" +
+                        shell_quote(temp_mid_result.string()) + " ";
+
+                    std::string mid_cmd;
+                    if (plan.timeout_enabled) {
+                        std::ostringstream timeout_ss;
+                        timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
+                        mid_cmd =
+                            mid_worker_env +
+                            "timeout --signal=TERM --kill-after=1s " + timeout_ss.str() +
+                            " " + shell_quote(executable) +
+                            " --config " + shell_quote(temp_mid_config.string()) +
+                            " > /dev/null 2>&1";
+                    } else {
+                        mid_cmd =
+                            mid_worker_env +
+                            shell_quote(executable) +
+                            " --config " + shell_quote(temp_mid_config.string()) +
+                            " > /dev/null 2>&1";
+                    }
+
+                    const auto mid_start = std::chrono::steady_clock::now();
+                    const int mid_rc = std::system(mid_cmd.c_str());
+                    const auto mid_end = std::chrono::steady_clock::now();
+                    const int mid_exit = decode_system_exit_code(mid_rc);
+
+                    const std::chrono::duration<double> mid_elapsed = mid_end - mid_start;
+                    std::ostringstream mid_dur_ss;
+                    mid_dur_ss << std::fixed << std::setprecision(6) << mid_elapsed.count();
+                    mid_duration_str = mid_dur_ss.str();
+
+                    if (mid_exit == 0) {
+                        const benchmarkResult mid_worker =
+                            benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_mid_result));
+                        mid_routing_steps_str = std::to_string(mid_worker.routing_steps);
+                        mid_status_str = "success";
+                    } else if (mid_exit == 2) {
+                        mid_status_str = "safe_passage_failed";
+                    } else if (mid_exit == 124) {
+                        mid_status_str = "timeout";
+                    } else {
+                        mid_status_str = "failed";
+                    }
+                } catch (...) {}
+
+                cleanup_mid();
+            }
+            // -----------------------------------------------------------------------
+
             // ---- lower-dimension run (only when x == -2 and main run succeeded) ----
             std::string lower_x_str;
             std::string lower_y_str;
@@ -1081,6 +1175,11 @@ int run_bench_mode(
                 duration_ss.str(),
                 "",
                 limit_text(compact_line(error_excerpt), 300),
+                mid_x_str,
+                mid_y_str,
+                mid_duration_str,
+                mid_routing_steps_str,
+                mid_status_str,
                 lower_x_str,
                 lower_y_str,
                 lower_duration_str,

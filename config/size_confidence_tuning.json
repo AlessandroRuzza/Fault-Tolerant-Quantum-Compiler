@@ -45,7 +45,7 @@
     ],
     "type": "gaussian",
     "gaussian_strategy": ["coarse", "fine"],
-    "safe_passage_strategy": ["connectivity", "cube", "passage_no_subgraph"],
+    "safe_passage_strategy": ["cube", "passage_no_subgraphs"],
     "MagicStatePlacementStrategy": "center_circle",
     "number_of_magic_states": [0.9, 0.5, 0.3],
     "border_distance_percentage": [0.0, 5.0],

@@ -66,40 +66,61 @@ is_truthy() {
     esac
 }
 
-run_binary() {
-    set -- "$@" --bench_path "$bench_path"
+# Assemble the argv for the binary into the script's positional params,
+# then exec so the binary replaces this shell. The binary then receives
+# SIGINT/SIGTERM/SIGHUP directly and can write "interrupted" to the CSV.
+# Caveat: with exec we can't honor ALLOW_FAILURES (we don't get to inspect
+# the exit code), so when that flag is requested we fall back to child-process
+# mode and forward signals via a trap.
 
-    if [ -n "$bench_process_count" ]; then
-        set -- "$@" --process-count "$bench_process_count"
-    fi
+set -- "$binary_path" --bench_path "$bench_path"
 
-    set -- "$@" --processor "$processor"
-
-    if [ -n "$rerun_timeouts" ] && [ "$rerun_timeouts" != "0" ] && [ "$rerun_timeouts" != "false" ] && [ "$rerun_timeouts" != "False" ]; then
-        set -- "$@" --rerun-timeouts
-    fi
-
-    if [ -n "$bench_jobs" ]; then
-        env OMP_NUM_THREADS="$bench_jobs" "$@"
-        return $?
-    fi
-
-    "$@"
-}
-
-if run_binary "$binary_path"; then
-    run_rc=0
-else
-    run_rc=$?
+if [ -n "$bench_process_count" ]; then
+    set -- "$@" --process-count "$bench_process_count"
 fi
 
-if [ "$run_rc" -eq 0 ]; then
-    exit 0
+set -- "$@" --processor "$processor"
+
+if [ -n "$rerun_timeouts" ] && [ "$rerun_timeouts" != "0" ] && [ "$rerun_timeouts" != "false" ] && [ "$rerun_timeouts" != "False" ]; then
+    set -- "$@" --rerun-timeouts
 fi
 
 if is_truthy "$allow_failures"; then
+    # Child-process mode with signal forwarding so the binary still writes
+    # "interrupted" rows when Ctrl+C / docker stop arrives during a run.
+    binary_pid=
+    forward_signal() {
+        if [ -n "$binary_pid" ]; then
+            kill -"$1" "$binary_pid" 2>/dev/null || true
+        fi
+    }
+    trap 'forward_signal TERM' TERM
+    trap 'forward_signal INT' INT
+    trap 'forward_signal HUP' HUP
+
+    if [ -n "$bench_jobs" ]; then
+        env OMP_NUM_THREADS="$bench_jobs" "$@" &
+    else
+        "$@" &
+    fi
+    binary_pid=$!
+    # `wait` returns early when interrupted by a signal — loop until the
+    # binary really exits.
+    while kill -0 "$binary_pid" 2>/dev/null; do
+        wait "$binary_pid" 2>/dev/null || true
+    done
+    wait "$binary_pid" 2>/dev/null
+    run_rc=$?
+
+    if [ "$run_rc" -eq 0 ]; then
+        exit 0
+    fi
     echo "Benchmark failed with exit code $run_rc, but ALLOW_FAILURES=$allow_failures so exiting successfully."
     exit 0
 fi
 
-exit "$run_rc"
+# Default path: exec so signals go straight to the binary.
+if [ -n "$bench_jobs" ]; then
+    exec env OMP_NUM_THREADS="$bench_jobs" "$@"
+fi
+exec "$@"
