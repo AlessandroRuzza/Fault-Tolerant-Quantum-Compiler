@@ -25,7 +25,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cerrno>
+#include <mutex>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -38,9 +41,77 @@ constexpr const char *kBenchResultFileEnv = "FTQC_BENCH_RESULT_FILE";
 volatile std::sig_atomic_t g_bench_interrupt_requested = 0;
 volatile std::sig_atomic_t g_bench_interrupt_signal = 0;
 
+// Worker subprocess registry. Each OpenMP thread that spawns a worker
+// registers its PID here so handle_bench_interrupt() can forward the signal.
+// Access from regular threads is mutex-protected; the signal handler reads
+// without the mutex (each slot is sig_atomic_t and aligned, so a torn read
+// is impossible — at worst it sees 0 or the PID, both of which are safe).
+constexpr std::size_t kMaxBenchWorkers = 256;
+volatile std::sig_atomic_t g_worker_pids[kMaxBenchWorkers] = {};
+std::mutex g_worker_pids_mutex;
+
+void register_worker_pid(pid_t pid) {
+    std::lock_guard<std::mutex> lock(g_worker_pids_mutex);
+    for (std::size_t i = 0; i < kMaxBenchWorkers; ++i) {
+        if (g_worker_pids[i] == 0) {
+            g_worker_pids[i] = static_cast<std::sig_atomic_t>(pid);
+            return;
+        }
+    }
+}
+
+void unregister_worker_pid(pid_t pid) {
+    std::lock_guard<std::mutex> lock(g_worker_pids_mutex);
+    for (std::size_t i = 0; i < kMaxBenchWorkers; ++i) {
+        if (g_worker_pids[i] == static_cast<std::sig_atomic_t>(pid)) {
+            g_worker_pids[i] = 0;
+            return;
+        }
+    }
+}
+
 void handle_bench_interrupt(int signal_number) {
     g_bench_interrupt_requested = 1;
     g_bench_interrupt_signal = signal_number;
+    // Forward to every currently-registered worker subprocess so they exit
+    // promptly instead of running to completion while the parent is blocked
+    // in waitpid(). kill() is async-signal-safe.
+    for (std::size_t i = 0; i < kMaxBenchWorkers; ++i) {
+        const pid_t worker_pid = static_cast<pid_t>(g_worker_pids[i]);
+        if (worker_pid > 0) {
+            kill(worker_pid, signal_number);
+        }
+    }
+}
+
+// fork/exec/waitpid wrapper that mirrors std::system() but exposes the worker
+// PID to the signal handler via the worker registry. Returns the same
+// integer std::system() would (waitpid-style status on success, -1 on fork
+// or exec setup error).
+int spawn_worker_and_wait(const std::string &command) {
+    const pid_t pid = fork();
+    if (pid < 0) {
+        return -1;
+    }
+    if (pid == 0) {
+        // Child: replace with /bin/sh -c "command" to keep shell semantics
+        // (redirection, timeout chaining, env prefix) intact.
+        execl("/bin/sh", "sh", "-c", command.c_str(), static_cast<char *>(nullptr));
+        // Only reached if execl failed.
+        _exit(127);
+    }
+    // Parent.
+    register_worker_pid(pid);
+    int status = 0;
+    pid_t waited;
+    do {
+        waited = waitpid(pid, &status, 0);
+    } while (waited == -1 && errno == EINTR);
+    unregister_worker_pid(pid);
+    if (waited == -1) {
+        return -1;
+    }
+    return status;
 }
 
 void write_benchmark_worker_payload_if_requested(const json &payload) {
@@ -845,7 +916,7 @@ int run_bench_mode(
                         " > /dev/null 2>&1";
                 }
 
-                const int system_rc = std::system(command.c_str());
+                const int system_rc = spawn_worker_and_wait(command);
                 result.exit_code = decode_system_exit_code(system_rc);
                 const bool interrupted_by_signal =
                     system_rc != -1 &&
@@ -974,7 +1045,7 @@ int run_bench_mode(
                     }
 
                     const auto mid_start = std::chrono::steady_clock::now();
-                    const int mid_rc = std::system(mid_cmd.c_str());
+                    const int mid_rc = spawn_worker_and_wait(mid_cmd);
                     const auto mid_end = std::chrono::steady_clock::now();
                     const int mid_exit = decode_system_exit_code(mid_rc);
 
@@ -1066,7 +1137,7 @@ int run_bench_mode(
                     }
 
                     const auto lower_start = std::chrono::steady_clock::now();
-                    const int lower_rc = std::system(lower_cmd.c_str());
+                    const int lower_rc = spawn_worker_and_wait(lower_cmd);
                     const auto lower_end = std::chrono::steady_clock::now();
                     const int lower_exit = decode_system_exit_code(lower_rc);
 
