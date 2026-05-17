@@ -156,7 +156,11 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     }
 
 
-    int safe_passage_ignore_outer_layers = std::max(1, static_cast<int>(std::min(x, y) / 2.5));
+    int safe_passage_ignore_outer_layers = std::max(1, static_cast<int>((std::min(x, y) / 3.5)));
+
+    if (std::min(x, y) <= 5) {
+        safe_passage_ignore_outer_layers = 1;
+    }
 
     Graph graph(
         use_generated_graph,
