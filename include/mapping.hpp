@@ -2,6 +2,7 @@
 #define MAPPING_HPP
 
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -16,6 +17,7 @@
 #include "defines.hpp"
 
 class Gaussian;
+class NaiveShortestPath;
 
 
 // Custom exceptions for mapping errors
@@ -118,8 +120,12 @@ private:
     int safe_passage_ignore_outer_layers;
     std::vector<Gate> cnot_gates;
     std::vector<Gate> t_gates;
+    bool use_apsp;
+    mutable NaiveShortestPath* naive_path_strategy = nullptr;
 
 public:
+
+    ~Mapping();
 
     Mapping(
         Circuit& circuit,
@@ -138,7 +144,8 @@ public:
         double gaussian_confidence,
         double external_weight,
         int maximum_iterations,
-        int safe_passage_ignore_outer_layers
+        int safe_passage_ignore_outer_layers,
+        bool use_apsp = false
     ) :
     circuit(circuit),
     graph(graph),
@@ -153,7 +160,8 @@ public:
     externalWeight(external_weight),
     maximum_iterations(maximum_iterations),
     safe_passage_ignore_outer_layers(safe_passage_ignore_outer_layers),
-    farthest_from_magic_selector(graph)  {
+    farthest_from_magic_selector(graph),
+    use_apsp(use_apsp)  {
         if (!set_mapping_strategy(magic_aware_strategy_name)) {
             throw std::invalid_argument("Invalid magic-aware strategy: " + magic_aware_strategy_name);
         }

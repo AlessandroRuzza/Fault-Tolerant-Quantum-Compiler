@@ -26,8 +26,15 @@ public:
 };
 
 class NaiveShortestPath : public IPathStrategy {
+private:
+    // next_node[s][t] = first hop from s toward t on the shortest path (APSP).
+    // -1 means no path or s == t. Populated only when use_apsp == true.
+    std::vector<std::vector<int>> next_node;
+    void populate_next_node();
 public:
-    NaiveShortestPath(const Graph& g) : IPathStrategy(g) {}
+    NaiveShortestPath(const Graph& g, bool use_apsp = false) : IPathStrategy(g) {
+        if (use_apsp) populate_next_node();
+    }
     Path find_shortest_path(int start_node, int end_node, const std::unordered_set<int>& used_nodes) const;
 };
 

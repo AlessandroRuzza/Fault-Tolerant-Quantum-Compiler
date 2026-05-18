@@ -278,6 +278,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::string t_routing_mode = "normal_t_routing";
     int patience_threshold = 3;
     bool use_layer_cache = true;
+    bool use_apsp = false;
 
     apply_config_overrides(
         argc,
@@ -307,7 +308,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         routing_strategy,
         t_routing_mode,
         patience_threshold,
-        use_layer_cache
+        use_layer_cache,
+        use_apsp
     );
 
     argument_parsing(
@@ -337,7 +339,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         routing_strategy,
         t_routing_mode,
         patience_threshold,
-        use_layer_cache
+        use_layer_cache,
+        use_apsp
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -364,6 +367,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
     std::cout << "routing strategy: " << routing_strategy << std::endl;
     std::cout << "use_layer_cache: " << (use_layer_cache ? "true" : "false") << std::endl;
+    std::cout << "use_apsp: " << (use_apsp ? "true" : "false") << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -396,7 +400,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         routing_strategy,
         t_routing_mode,
         patience_threshold,
-        use_layer_cache
+        use_layer_cache,
+        use_apsp
     );
     write_benchmark_result_file_if_requested(result);
 
