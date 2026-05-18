@@ -175,6 +175,77 @@ bool Mapping::_3x3_occupied(const Node& node, const std::vector<Node>& occupied_
 }
 
 
+static bool can_reach_opposite_borders(
+    const Node& node,
+    const std::vector<Node>& blocked_nodes,
+    int width,
+    int height,
+    int ignored_outer_layers = 0
+) {
+    const int layers = std::max(0, ignored_outer_layers);
+    const int minX = layers,         minY = layers;
+    const int maxX = width  - 1 - layers;
+    const int maxY = height - 1 - layers;
+
+    if (minX > maxX || minY > maxY) return true;
+
+    // The two "opposite" borders are those farthest from the node in each axis.
+    const int target_x = (node.coordX * 2 <= minX + maxX) ? maxX : minX;
+    const int target_y = (node.coordY * 2 <= minY + maxY) ? maxY : minY;
+
+    std::unordered_set<int> blocked_set;
+    blocked_set.reserve(blocked_nodes.size());
+    for (const Node& b : blocked_nodes)
+        blocked_set.insert(b.coordY * width + b.coordX);
+
+    const int dirs[4][2] = {{1,0},{-1,0},{0,1},{0,-1}};
+    std::vector<char> visited(static_cast<size_t>(width * height), 0);
+
+    // Min-heap: prioritise cells closest to either target border.
+    auto cmp = [target_x, target_y](const std::pair<int,int>& a, const std::pair<int,int>& b) {
+        const int da = std::min(std::abs(a.first - target_x), std::abs(a.second - target_y));
+        const int db = std::min(std::abs(b.first - target_x), std::abs(b.second - target_y));
+        return da > db;
+    };
+    std::priority_queue<std::pair<int,int>, std::vector<std::pair<int,int>>, decltype(cmp)> queue(cmp);
+
+    const auto in_bounds = [minX, minY, maxX, maxY](int x, int y) {
+        return x >= minX && x <= maxX && y >= minY && y <= maxY;
+    };
+
+    // The node itself is occupied; seed from its free neighbours.
+    visited[static_cast<size_t>(node.coordY * width + node.coordX)] = 1;
+    for (const auto& d : dirs) {
+        const int nx = node.coordX + d[0], ny = node.coordY + d[1];
+        if (!in_bounds(nx, ny)) continue;
+        const int idx = ny * width + nx;
+        if (!blocked_set.count(idx) && !visited[static_cast<size_t>(idx)]) {
+            visited[static_cast<size_t>(idx)] = 1;
+            queue.push({nx, ny});
+        }
+    }
+
+    bool reached_x = false, reached_y = false;
+    while (!queue.empty()) {
+        const auto [x, y] = queue.top();
+        queue.pop();
+        if (x == target_x) reached_x = true;
+        if (y == target_y) reached_y = true;
+        if (reached_x && reached_y) return true;
+        for (const auto& d : dirs) {
+            const int nx = x + d[0], ny = y + d[1];
+            if (!in_bounds(nx, ny)) continue;
+            const int idx = ny * width + nx;
+            if (!blocked_set.count(idx) && !visited[static_cast<size_t>(idx)]) {
+                visited[static_cast<size_t>(idx)] = 1;
+                queue.push({nx, ny});
+            }
+        }
+    }
+    return reached_x && reached_y;
+}
+
+
 bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vector<Node>& occupied_nodes){
     // Impossible mapping
     for (const Node& blocked_node : occupied_nodes) {
@@ -216,19 +287,12 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
         const int maxX = graph.getMaxX();
         const int maxY = graph.getMaxY();
         const int eps = safe_passage_ignore_outer_layers;
-        if (n.coordX <= eps || n.coordX >= maxX - eps || n.coordY <= eps || n.coordY >= maxY - eps) {
-            return has_entry_path_from_border(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
-        }
-        return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
+        // if (n.coordX <= eps || n.coordX >= maxX - eps || n.coordY <= eps || n.coordY >= maxY - eps) {
+            
+        // }
+        return can_reach_opposite_borders(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
+        // return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
     };
-    // std::vector<Gate> min2q_gates = circuit.getGates();
-    // min2q_gates.erase( // Filter, keep only 2qubit gates
-    //     std::remove_if(min2q_gates.begin(), min2q_gates.end(), 
-    //         [](const Gate& gate) {
-    //             return gate.qubits.size() < 2;
-    //         }),
-    //     min2q_gates.end()
-    // );
 
     std::unordered_set<int> cnot_nodes_requiring_access;
     std::unordered_set<uint64_t> checked_pairs;
@@ -265,15 +329,6 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
             return false;
         }
     }
-
-    // std::vector<Gate> t_gates = circuit.getGates();
-    // t_gates.erase( // Filter, keep only T gates
-    //     std::remove_if(t_gates.begin(), t_gates.end(),
-    //         [](const Gate& gate) {
-    //             return gate.name != "t";
-    //         }),
-    //     t_gates.end()
-    // );
 
     bool has_unmapped_t_qubit = false;
     for (const Gate& gate : t_gates) {
