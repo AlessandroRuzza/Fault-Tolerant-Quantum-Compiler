@@ -22,6 +22,6 @@
   "SIZE_MOLTIPLIER": 0.3,
   "GAUSSIAN_CONFIDENCE": 0.66,
 
-  "routing_strategy": "nive",
+  "routing_strategy": "naive",
   "t-routing-mode": "smart_t_routing"
 }

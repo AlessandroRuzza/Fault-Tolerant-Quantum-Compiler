@@ -116,6 +116,8 @@ private:
     int maximum_iterations;
     FarthestFromMagicSelector farthest_from_magic_selector;
     int safe_passage_ignore_outer_layers;
+    std::vector<Gate> cnot_gates;
+    std::vector<Gate> t_gates;
 
 public:
 
@@ -164,6 +166,22 @@ public:
         if (!set_safe_passage_strategy(safe_passage_strategy)) {
             throw std::invalid_argument("Invalid safe passage strategy: " + safe_passage_strategy);
         }
+        cnot_gates = circuit.getGates();
+        cnot_gates.erase( // Filter, keep only 2qubit gates
+            std::remove_if(cnot_gates.begin(), cnot_gates.end(), 
+                [](const Gate& gate) {
+                    return gate.qubits.size() < 2;
+                }),
+            cnot_gates.end()
+        );
+        t_gates = circuit.getGates();
+        t_gates.erase( // Filter, keep only T gates
+            std::remove_if(t_gates.begin(), t_gates.end(),
+                [](const Gate& gate) {
+                    return gate.name != "t";
+                }),
+            t_gates.end()
+        );
         validate_gaussian_weights();
         set_thresholds();
     }
