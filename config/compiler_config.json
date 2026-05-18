@@ -3,7 +3,7 @@
 
   "type": "gaussian",
   "gaussian_strategy": "coarse",
-  "safe_passage_strategy": "connectivity",
+  "safe_passage_strategy": "passage_no_subgraphs",
   "MagicStatePlacementStrategy": "center_circle",
 
   "x": -1,

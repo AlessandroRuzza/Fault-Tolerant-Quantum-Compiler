@@ -50,8 +50,7 @@
   "gaussian_strategy": "coarse",
   "magic_aware_strategy": "center",
   "safe_passage_strategy": [
-    "cube",
-    "connectivity"
+    "passage_no_subgraphs"
   ],
   "MagicStatePlacementStrategy": "center_circle",
   "number_of_magic_states": [
