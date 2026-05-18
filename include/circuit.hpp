@@ -290,7 +290,9 @@ struct hash<Gate> {
         hash<int> hi = hash<int>();
         hash<std::string> hs = hash<std::string>();
         // Combine hashes of all relevant members
-        return hi(g.id) + hs(g.name);
+        size_t seed = hi(g.id);
+        seed ^= hs(g.name) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
     }
 };
 }
