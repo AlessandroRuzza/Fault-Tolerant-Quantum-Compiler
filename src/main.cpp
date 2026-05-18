@@ -762,23 +762,32 @@ int run_bench_mode(
                 plan.entry["timeout_reached"].get<bool>();
             plan.rerun_timeout_case = rerun_timeouts && plan.already_executed && plan.timeout_reached_before;
 
+            const std::string plan_type = plan_field(plan.entry, {"mapping_type", "type"});
+            const std::string plan_safe_passage_strategy = plan_field(plan.entry, {"safe_passage_strategy"});
+
             if (plan.processor != processor) {
                 std::cout
                     << "[" << (i + 1) << "/" << total_cases << "] SKIP"
-                    << " " << empty_to_dash(plan.case_id)
+                    << " id=" << empty_to_dash(plan.case_id)
+                    << " safe_passage_strategy=" << empty_to_dash(plan_safe_passage_strategy)
+                    << " type=" << empty_to_dash(plan_type)
                     << " processor=" << plan.processor
                     << " selected_processor=" << processor << "\n";
             } else if (plan.already_executed && !plan.rerun_timeout_case) {
                 std::cout
                     << "[" << (i + 1) << "/" << total_cases << "] SKIP"
-                    << " " << empty_to_dash(plan.case_id)
+                    << " id=" << empty_to_dash(plan.case_id)
+                    << " safe_passage_strategy=" << empty_to_dash(plan_safe_passage_strategy)
+                    << " type=" << empty_to_dash(plan_type)
                     << " executed=true\n";
             } else {
                 if (plan.rerun_timeout_case) {
                     std::cout
                         << "[" << (i + 1) << "/" << total_cases << "] RERUN_TIMEOUT"
-                        << " " << empty_to_dash(plan.case_id)
-                        << " executed=true timeout_reached=true\n";
+                        << " id=" << empty_to_dash(plan.case_id)
+                        << " safe_passage_strategy=" << empty_to_dash(plan_safe_passage_strategy)
+                        << " type=" << empty_to_dash(plan_type)
+                        << " executed=true\n";
                 }
                 runnable_indices.push_back(i);
             }
@@ -1217,6 +1226,8 @@ int run_bench_mode(
             const std::string ml = get_json_field(plan.entry, {"MAGIC_LOW", "magic_low"});
             const std::string ch = get_json_field(plan.entry, {"CNOT_HIGH", "cnot_high"});
             const std::string cl = get_json_field(plan.entry, {"CNOT_LOW", "cnot_low"});
+            const std::string mapping_type_csv = get_json_field(plan.entry, {"mapping_type", "type"});
+            const std::string safe_passage_strategy_csv = get_json_field(plan.entry, {"safe_passage_strategy"});
 
             result.csv_row = {
                 plan.case_id.empty() ? std::to_string(plan.index + 1) : plan.case_id,
@@ -1226,7 +1237,7 @@ int run_bench_mode(
                 resolved_graph_x,
                 resolved_graph_y,
                 circuit_graph_label,
-                get_json_field(plan.entry, {"mapping_type", "type"}),
+                mapping_type_csv,
                 get_json_field(plan.entry, {"magic_aware_strategy"}),
                 get_json_field(plan.entry, {"gaussian_strategy"}),
                 mh,
@@ -1237,7 +1248,7 @@ int run_bench_mode(
                 bw,
                 sm,
                 gc,
-                get_json_field(plan.entry, {"safe_passage_strategy"}),
+                safe_passage_strategy_csv,
                 get_json_field(plan.entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
                 get_json_field(plan.entry, {"border_distance_percentage"}),
                 get_json_field(plan.entry, {"number_of_magic_states"}),
@@ -1264,49 +1275,37 @@ int run_bench_mode(
             };
 
             std::ostringstream progress;
-            if (result.status == "success") {
+            const auto append_progress_details = [&]() {
                 progress
-                    << "[" << (plan.index + 1) << "/" << total_cases << "] OK"
-                    << " run#" << execution_id
                     << " id=" << empty_to_dash(plan.case_id)
                     << " routing_steps=" << empty_to_dash(routing_steps)
                     << " duration=" << duration_short_ss.str()
-                    << " mw=" << empty_to_dash(mw)
-                    << " bw=" << empty_to_dash(bw)
-                    << " mh=" << empty_to_dash(mh)
-                    << " ml=" << empty_to_dash(ml)
-                    << " ch=" << empty_to_dash(ch)
-                    << " cl=" << empty_to_dash(cl)
-                    << " sm=" << empty_to_dash(sm)
-                    << " gc=" << empty_to_dash(gc)
-                    << " timeout_reached=" << (result.timeout_reached ? "true" : "false");
+                    << " safe_passage_strategy=" << empty_to_dash(safe_passage_strategy_csv)
+                    << " type=" << empty_to_dash(mapping_type_csv);
+            };
+
+            if (result.status == "success") {
+                progress
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] OK";
+                append_progress_details();
             } else if (result.status == "timeout") {
                 progress
-                    << "[" << (plan.index + 1) << "/" << total_cases << "] TIMEOUT"
-                    << " #" << execution_id
-                    << " " << empty_to_dash(plan.case_id)
-                    << " duration=" << duration_short_ss.str()
-                    << " timeout_reached=true";
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] TIMEOUT";
+                append_progress_details();
             } else if (result.status == "safe_passage_failed") {
                 progress
-                    << "[" << (plan.index + 1) << "/" << total_cases << "] SAFE_PASSAGE_FAILED"
-                    << " #" << execution_id
-                    << " " << empty_to_dash(plan.case_id)
-                    << " duration=" << duration_short_ss.str()
-                    << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120));
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] SAFE_PASSAGE_FAILED";
+                append_progress_details();
+                progress << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120));
             } else if (result.status == "interrupted") {
                 progress
-                    << "[" << (plan.index + 1) << "/" << total_cases << "] INTERRUPTED"
-                    << " #" << execution_id
-                    << " " << empty_to_dash(plan.case_id)
-                    << " duration=" << duration_short_ss.str();
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] INTERRUPTED";
+                append_progress_details();
             } else {
                 progress
-                    << "[" << (plan.index + 1) << "/" << total_cases << "] FAIL"
-                    << " #" << execution_id
-                    << " " << empty_to_dash(plan.case_id)
-                    << " duration=" << duration_short_ss.str()
-                    << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120));
+                    << "[" << (plan.index + 1) << "/" << total_cases << "] FAIL";
+                append_progress_details();
+                progress << " error=" << empty_to_dash(limit_text(compact_line(error_excerpt), 120));
             }
             progress << "\n";
             result.progress_line = progress.str();
