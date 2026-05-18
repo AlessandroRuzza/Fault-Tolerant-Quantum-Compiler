@@ -45,7 +45,7 @@
     ],
     "type": "gaussian",
     "gaussian_strategy": ["coarse", "fine"],
-    "safe_passage_strategy": ["cube"],
+    "safe_passage_strategy": ["cube", "passage_no_subgraphs"],
     "MagicStatePlacementStrategy": "center_circle",
     "number_of_magic_states": [0.9, 0.5, 0.3],
     "border_distance_percentage": [0.0, 5.0],
@@ -68,6 +68,8 @@
     "t-routing-mode": "smart_t_routing",
 
     "timeout": 600,
-    "timeout_reached": false
+    "timeout_reached": false,
+
+    "use_layer_cache": false
 }
 
