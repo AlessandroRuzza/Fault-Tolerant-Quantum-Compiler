@@ -371,7 +371,6 @@ bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_n
 bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes) {
     int width = graph.getMaxX() + 1;
     int height = graph.getMaxY() + 1;
-    // TODO: implement a connectivity check that rejects placements splitting the free lattice into disconnected subgraphs.
     std::queue<Node> node_queue;
     node_queue.push(node);
     std::unordered_set<int> visited_ids;
@@ -381,11 +380,11 @@ bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node
 
     int num_touching_borders = 0;
 
-    for (Node current = node_queue.front(); !node_queue.empty() && num_touching_borders < 2;
+    for (Node current = node_queue.front();
+         !node_queue.empty() && num_touching_borders < 2;
          node_queue.pop(), current = node_queue.empty() ? current : node_queue.front()) {
 
         if (visited_ids.count(current.id) > 0) continue;
-        
 
         for (int dy = -1; dy <= 1; ++dy) {
             for (int dx = -1; dx <= 1; ++dx) {
@@ -419,12 +418,116 @@ bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node
         }
         visited_ids.insert(current.id);
     }
-    
-    if (num_touching_borders < 2 && safe_passage(node, occupied_nodes)) {
-        return true;
-    } else {
+
+    if (num_touching_borders >= 2) {
         return false;
     }
+
+    // Suffocation check: placing `node` must not strip every free neighbour from any
+    // already-mapped data qubit, and must leave at least one magic state reachable
+    // (i.e. with at least one free neighbour) so future T gates can still be routed.
+    std::unordered_set<int> blocked_after;
+    blocked_after.reserve(occupied_nodes.size() + magic_ids.size() + 1);
+    for (const Node& on : occupied_nodes) {
+        blocked_after.insert(on.id);
+    }
+    for (int mid : magic_ids) {
+        blocked_after.insert(mid);
+    }
+    blocked_after.insert(node.id);
+
+    // Compute 4-connected free-cell components (cells that are not occupied,
+    // not magic, and not the candidate). A qubit is "useful" only if at least
+    // one of its free 4-neighbours belongs to the *largest* free component;
+    // otherwise the placement traps the qubit in an off-main pocket.
+    const int total_cells = width * height;
+    std::vector<int> component_of(static_cast<std::size_t>(total_cells), -1);
+    std::vector<int> component_size;
+    {
+        const int dx_4[4] = {1, -1, 0, 0};
+        const int dy_4[4] = {0, 0, 1, -1};
+        for (int id = 0; id < total_cells; ++id) {
+            if (blocked_after.count(id) > 0) continue;
+            if (component_of[id] >= 0) continue;
+            const int label = static_cast<int>(component_size.size());
+            int size = 0;
+            std::queue<int> bfs;
+            bfs.push(id);
+            component_of[id] = label;
+            while (!bfs.empty()) {
+                const int cur = bfs.front();
+                bfs.pop();
+                ++size;
+                const int cx = cur % width;
+                const int cy = cur / width;
+                for (int i = 0; i < 4; ++i) {
+                    const int nx = cx + dx_4[i];
+                    const int ny = cy + dy_4[i];
+                    if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                    const int nid = ny * width + nx;
+                    if (blocked_after.count(nid) > 0) continue;
+                    if (component_of[nid] >= 0) continue;
+                    component_of[nid] = label;
+                    bfs.push(nid);
+                }
+            }
+            component_size.push_back(size);
+        }
+    }
+    const int max_component_size =
+        component_size.empty() ? 0 : *std::max_element(component_size.begin(), component_size.end());
+
+    const auto reaches_largest_component = [&](int qubit_id) -> bool {
+        for (int nbr : graph.neighbors(qubit_id)) {
+            if (blocked_after.count(nbr) > 0) continue;
+            const int c = component_of[nbr];
+            if (c >= 0 && component_size[c] == max_component_size) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (max_component_size > 0 && !reaches_largest_component(node.id)) {
+        if (PRINT_SAFE_PASSAGE) {
+            std::cout << "CANDIDATE REJECTED " << node.id
+                      << ": placing it here leaves it off the main free region\n";
+        }
+        return false;
+    }
+
+    for (const Node& on : occupied_nodes) {
+        if (magic_ids_set.count(on.id) > 0) continue;
+        if (max_component_size > 0 && !reaches_largest_component(on.id)) {
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "CANDIDATE REJECTED " << node.id
+                          << ": it cuts occupied node " << on.id << " off the main free region\n";
+            }
+            return false;
+        }
+    }
+
+    if (!magic_ids.empty()) {
+        bool any_magic_accessible = false;
+        for (int mid : magic_ids) {
+            for (int nid : graph.neighbors(mid)) {
+                if (blocked_after.count(nid) == 0) {
+                    any_magic_accessible = true;
+                    break;
+                }
+            }
+            if (any_magic_accessible) break;
+        }
+        if (!any_magic_accessible) {
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "CANDIDATE REJECTED " << node.id
+                          << ": it blocks every magic state\n";
+            }
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool has_exit_path_from_occupied(
