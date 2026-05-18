@@ -231,7 +231,11 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
     // );
 
     std::unordered_set<int> cnot_nodes_requiring_access;
-    for (const Gate& gate : cnot_gates) { // qui nel caso bisogna rimettere min2q_gates al posto di cnot_gates
+    std::unordered_set<uint64_t> checked_pairs;
+    for (const Gate& gate : cnot_gates) { 
+        const uint64_t pair_key = ((uint64_t)gate.qubits[0] << 32) | gate.qubits[1];
+        if (!checked_pairs.insert(pair_key).second) continue;
+        
         const int node1 = mapped_node_after_candidate(gate.qubits[0]);
         const int node2 = mapped_node_after_candidate(gate.qubits[1]);
 
@@ -306,7 +310,7 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
     std::unordered_set<int> ensured_qubits;
     ensured_qubits.reserve(circuit.getNumQubits());
     for(const Gate& gate : t_gates){
-        if(ensured_qubits.count(gate.qubits[0]) != 0) continue;
+        if(ensured_qubits.count(gate.qubits[0])) continue;
 
         int loc_node = mapped_node_after_candidate(gate.qubits[0]);
         if(loc_node < 0){
@@ -380,7 +384,12 @@ bool Mapping::safe_passage(const Node& node, const std::vector<Node>& occupied_n
 bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node>& occupied_nodes) {
     int width = graph.getMaxX() + 1;
     int height = graph.getMaxY() + 1;
-    std::queue<Node> node_queue;
+    auto node_cmp = [width, height](const Node& a, const Node& b) {
+        int da = std::min({a.coordX, width - 1 - a.coordX, a.coordY, height - 1 - a.coordY});
+        int db = std::min({b.coordX, width - 1 - b.coordX, b.coordY, height - 1 - b.coordY});
+        return da > db;
+    };
+    std::priority_queue<Node, std::vector<Node>, decltype(node_cmp)> node_queue(node_cmp);
     node_queue.push(node);
     std::unordered_set<int> visited_ids;
 
@@ -389,9 +398,9 @@ bool Mapping::safe_passage_no_subgraphs(const Node& node, const std::vector<Node
 
     int num_touching_borders = 0;
 
-    for (Node current = node_queue.front();
+    for (Node current = node_queue.top();
          !node_queue.empty() && num_touching_borders < 2;
-         node_queue.pop(), current = node_queue.empty() ? current : node_queue.front()) {
+         node_queue.pop(), current = node_queue.empty() ? current : node_queue.top()) {
 
         if (visited_ids.count(current.id) > 0) continue;
 
