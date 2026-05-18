@@ -721,7 +721,7 @@ int run_bench_mode(
         const std::vector<std::vector<std::string>> existing_csv_rows = write_csv::read_data_rows(csv_path);
         for (std::size_t row_index = 0; row_index < existing_csv_rows.size(); ++row_index) {
             const std::vector<std::string> &row = existing_csv_rows[row_index];
-            if (csv_field(row, 26) != "interrupted") {
+            if (csv_field(row, 27) != "interrupted") {
                 continue;
             }
 
