@@ -25,5 +25,5 @@
   "routing_strategy": "naive",
   "t-routing-mode": "smart_t_routing",
 
-  "use_layer_cache": false
+  "use_layer_cache": true
 }
