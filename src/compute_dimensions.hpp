@@ -42,7 +42,6 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
 
     else if (
         safe_passage_strategy == "passage" ||
-        safe_passage_strategy == "passage_no_subgraphs" ||
         safe_passage_strategy == "connectivity"
     ) {
         dimension = (num_qubits + number_of_magic_states) * multiplier;
@@ -53,6 +52,13 @@ int compute_dimensions(int num_qubits, std::string safe_passage_strategy,
             dimension = dimension * 0.65;
         }
         
+    } else if (safe_passage_strategy == "passage_no_subgraphs") {
+        dimension = (num_qubits + number_of_magic_states) * multiplier;
+        if (type == "gaussian") {
+            dimension = dimension * 0.55;
+        } else if (type == "magic_aware") {
+            dimension = dimension * 0.55;
+        }
     }
 
     return static_cast<int>(std::ceil(std::sqrt(dimension) * (1.1 + border_distance_percentage/100.0)));

@@ -197,7 +197,8 @@ void update_gaussians_coarse(
         if (MAPPING_VERBOSE) {
             std::cout << "Qubits with CNOT count above threshold (" << cnot_threshold << "): ";
             for (int i : highCnotQubits) {
-                std::cout << i << " ";
+                const int mapped_node = mapping.get_mapped_node(i);
+                std::cout << i << "(" << mapped_node << ") ";
             }
             std::cout << "\n";
         }
