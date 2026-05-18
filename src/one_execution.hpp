@@ -78,7 +78,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double number_of_magic_states_multiplier,
     double border_distance_percentage, std::string routing_strategy,
     std::string t_routing_mode, int patience_threshold,
-    bool use_layer_cache) {
+    bool use_layer_cache,
+    bool use_apsp) {
 
 
     //----------circuit------------
@@ -203,7 +204,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         gaussian_confidence,
         external_weight,
         circuit.getNumQubits()*2,
-        safe_passage_ignore_outer_layers
+        safe_passage_ignore_outer_layers,
+        use_apsp
     );
 
     const auto mapping_start = std::chrono::steady_clock::now();
