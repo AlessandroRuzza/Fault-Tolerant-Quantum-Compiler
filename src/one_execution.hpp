@@ -232,6 +232,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     CircuitMetrics metrics = compute_and_print_circuit_metrics(layeredCircuit, mapping, graph, path, true);
 
+    // if(metrics.layer_reuse_ratio > 0.95){
+    //     use_layer_cache = true;
+    // }
+
     std::cout << "------- ROUTING ---------" << std::endl;
     // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr
     // (QubitRouter holds raw pointers into them).

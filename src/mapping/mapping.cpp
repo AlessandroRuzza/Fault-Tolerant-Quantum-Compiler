@@ -212,17 +212,17 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
         }
         return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
     };
-    std::vector<Gate> min2q_gates = circuit.getGates();
-    min2q_gates.erase( // Filter, keep only 2qubit gates
-        std::remove_if(min2q_gates.begin(), min2q_gates.end(), 
-            [](const Gate& gate) {
-                return gate.qubits.size() < 2;
-            }),
-        min2q_gates.end()
-    );
+    // std::vector<Gate> min2q_gates = circuit.getGates();
+    // min2q_gates.erase( // Filter, keep only 2qubit gates
+    //     std::remove_if(min2q_gates.begin(), min2q_gates.end(), 
+    //         [](const Gate& gate) {
+    //             return gate.qubits.size() < 2;
+    //         }),
+    //     min2q_gates.end()
+    // );
 
     std::unordered_set<int> cnot_nodes_requiring_access;
-    for (const Gate& gate : min2q_gates) {
+    for (const Gate& gate : cnot_gates) { // qui nel caso bisogna rimettere min2q_gates al posto di cnot_gates
         const int node1 = mapped_node_after_candidate(gate.qubits[0]);
         const int node2 = mapped_node_after_candidate(gate.qubits[1]);
 
@@ -253,14 +253,14 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
         }
     }
 
-    std::vector<Gate> t_gates = circuit.getGates();
-    t_gates.erase( // Filter, keep only T gates
-        std::remove_if(t_gates.begin(), t_gates.end(),
-            [](const Gate& gate) {
-                return gate.name != "t";
-            }),
-        t_gates.end()
-    );
+    // std::vector<Gate> t_gates = circuit.getGates();
+    // t_gates.erase( // Filter, keep only T gates
+    //     std::remove_if(t_gates.begin(), t_gates.end(),
+    //         [](const Gate& gate) {
+    //             return gate.name != "t";
+    //         }),
+    //     t_gates.end()
+    // );
 
     bool has_unmapped_t_qubit = false;
     for (const Gate& gate : t_gates) {
