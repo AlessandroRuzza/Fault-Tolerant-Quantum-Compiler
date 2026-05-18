@@ -364,8 +364,7 @@ void apply_config_overrides(
     std::string& routing_method,
     std::string& t_routing_mode,
     int& patience_threshold,
-    bool& use_layer_cache,
-    bool& use_apsp
+    bool& use_layer_cache
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -681,14 +680,6 @@ void apply_config_overrides(
         }
         use_layer_cache = config_json[key].get<bool>();
     }
-
-    if (config_json.contains("use_apsp") || config_json.contains("use-apsp")) {
-        const char* key = config_json.contains("use_apsp") ? "use_apsp" : "use-apsp";
-        if (!config_json[key].is_boolean()) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
-        }
-        use_apsp = config_json[key].get<bool>();
-    }
 }
 
 void argument_parsing(
@@ -718,8 +709,7 @@ void argument_parsing(
     std::string& routing_method,
     std::string& t_routing_mode,
     int& patience_threshold,
-    bool& use_layer_cache,
-    bool& use_apsp
+    bool& use_layer_cache
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -1019,23 +1009,6 @@ void argument_parsing(
                 use_layer_cache = false;
             } else {
                 throw std::runtime_error("Invalid boolean value for --use-layer-cache: " + val);
-            }
-            continue;
-        }
-
-        if (arg == "--use-apsp" || arg == "--use_apsp") {
-            if (i + 1 >= argc) {
-                std::cerr << "Missing value for --use-apsp\n";
-                print_usage(argv[0]);
-                throw std::runtime_error("Missing value for --use-apsp");
-            }
-            const std::string val = argv[++i];
-            if (val == "true" || val == "1") {
-                use_apsp = true;
-            } else if (val == "false" || val == "0") {
-                use_apsp = false;
-            } else {
-                throw std::runtime_error("Invalid boolean value for --use-apsp: " + val);
             }
             continue;
         }

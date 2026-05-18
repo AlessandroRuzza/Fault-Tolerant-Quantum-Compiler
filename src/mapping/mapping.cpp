@@ -2,10 +2,6 @@
 #include "routing.hpp"
 #include "exceptions.hpp"
 
-// Out-of-line so the raw NaiveShortestPath* member can be deleted with the
-// complete type visible (the header only forward-declares the class).
-Mapping::~Mapping() { delete naive_path_strategy; }
-
 const bool Mapping::mapToNeighbor(
     int qubit,
     int node_id,
@@ -257,20 +253,15 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
     std::vector<Node> occupied_nodes_after_map = occupied_nodes;
     occupied_nodes_after_map.push_back(node);
 
-    // Lazily build the path strategy once per Mapping instance and reuse it for
-    // every safe_connectivity candidate. When use_apsp is true the constructor
-    // precomputes all-pairs shortest paths so subsequent queries skip BFS.
-    if (naive_path_strategy == nullptr) {
-        naive_path_strategy = new NaiveShortestPath(graph, use_apsp);
-    }
+    const auto pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
     std::unordered_set<int> used_nodes;
     used_nodes.reserve(occupied_nodes_after_map.size());
     for(const Node& n : occupied_nodes_after_map){
         used_nodes.insert(n.id);
     }
 
-    const auto path_exists = [this, &used_nodes](const int start, const int goal) -> bool {
-        Path path = naive_path_strategy->find_shortest_path(start, goal, used_nodes);
+    const auto path_exists = [&pathStrategyPtr, &used_nodes](const int start, const int goal) -> bool {
+        Path path = pathStrategyPtr->find_shortest_path(start, goal, used_nodes);
         return !path.empty();
     };
 
@@ -295,11 +286,7 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
     };
 
     std::unordered_set<int> cnot_nodes_requiring_access;
-    std::unordered_set<uint64_t> checked_pairs;
-    for (const Gate& gate : cnot_gates) { 
-        const uint64_t pair_key = ((uint64_t)gate.qubits[0] << 32) | gate.qubits[1];
-        if (!checked_pairs.insert(pair_key).second) continue;
-        
+    for (const Gate& gate : cnot_gates) {
         const int node1 = mapped_node_after_candidate(gate.qubits[0]);
         const int node2 = mapped_node_after_candidate(gate.qubits[1]);
 

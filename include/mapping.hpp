@@ -2,7 +2,6 @@
 #define MAPPING_HPP
 
 #include <iostream>
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -17,7 +16,6 @@
 #include "defines.hpp"
 
 class Gaussian;
-class NaiveShortestPath;
 
 
 // Custom exceptions for mapping errors
@@ -120,12 +118,8 @@ private:
     int safe_passage_ignore_outer_layers;
     std::vector<Gate> cnot_gates;
     std::vector<Gate> t_gates;
-    bool use_apsp;
-    mutable NaiveShortestPath* naive_path_strategy = nullptr;
 
 public:
-
-    ~Mapping();
 
     Mapping(
         Circuit& circuit,
@@ -144,8 +138,7 @@ public:
         double gaussian_confidence,
         double external_weight,
         int maximum_iterations,
-        int safe_passage_ignore_outer_layers,
-        bool use_apsp = false
+        int safe_passage_ignore_outer_layers
     ) :
     circuit(circuit),
     graph(graph),
@@ -160,8 +153,7 @@ public:
     externalWeight(external_weight),
     maximum_iterations(maximum_iterations),
     safe_passage_ignore_outer_layers(safe_passage_ignore_outer_layers),
-    farthest_from_magic_selector(graph),
-    use_apsp(use_apsp)  {
+    farthest_from_magic_selector(graph)  {
         if (!set_mapping_strategy(magic_aware_strategy_name)) {
             throw std::invalid_argument("Invalid magic-aware strategy: " + magic_aware_strategy_name);
         }
@@ -175,21 +167,32 @@ public:
             throw std::invalid_argument("Invalid safe passage strategy: " + safe_passage_strategy);
         }
         cnot_gates = circuit.getGates();
-        cnot_gates.erase( // Filter, keep only 2qubit gates
-            std::remove_if(cnot_gates.begin(), cnot_gates.end(), 
-                [](const Gate& gate) {
-                    return gate.qubits.size() < 2;
-                }),
-            cnot_gates.end()
-        );
+        {
+            std::unordered_set<uint64_t> seen_pairs;
+            cnot_gates.erase( // Filter to 2qubit gates and dedup by qubit pair
+                std::remove_if(cnot_gates.begin(), cnot_gates.end(),
+                    [&seen_pairs](const Gate& gate) {
+                        if (gate.qubits.size() < 2) return true;
+                        const int a = std::min(gate.qubits[0], gate.qubits[1]);
+                        const int b = std::max(gate.qubits[0], gate.qubits[1]);
+                        const uint64_t key = ((uint64_t)a << 32) | (uint32_t)b;
+                        return !seen_pairs.insert(key).second;
+                    }),
+                cnot_gates.end()
+            );
+        }
         t_gates = circuit.getGates();
-        t_gates.erase( // Filter, keep only T gates
-            std::remove_if(t_gates.begin(), t_gates.end(),
-                [](const Gate& gate) {
-                    return gate.name != "t";
-                }),
-            t_gates.end()
-        );
+        {
+            std::unordered_set<int> seen_qubits;
+            t_gates.erase( // Filter to T gates and dedup by qubit
+                std::remove_if(t_gates.begin(), t_gates.end(),
+                    [&seen_qubits](const Gate& gate) {
+                        if (gate.name != "t") return true;
+                        return !seen_qubits.insert(gate.qubits[0]).second;
+                    }),
+                t_gates.end()
+            );
+        }
         validate_gaussian_weights();
         set_thresholds();
     }
