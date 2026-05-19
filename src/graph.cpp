@@ -224,6 +224,7 @@ void Graph::from_json(const std::string& filename) {
                     }
 
                     if (seen_magic_ids.insert(magic_state_id).second) {
+                        this->get_node(magic_state_id).occupied = true;
                         this->magic_states_ids.push_back(magic_state_id);
                     }
                 }
