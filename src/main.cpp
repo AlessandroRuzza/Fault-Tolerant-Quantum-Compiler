@@ -472,6 +472,9 @@ int run_bench_mode(
         throw std::runtime_error("Expanded bench file must contain a JSON array: " + expanded_path.string());
     }
 
+    const std::filesystem::path sidecar_path =
+        expanded_path.parent_path() / (expanded_path.stem().string() + ".status.jsonl");
+
     const std::filesystem::path project_root(PROJECT_ROOT);
     const std::filesystem::path results_dir = project_root / "benchmarks" / "results";
     const std::unordered_map<std::string, DimCsvEntry> dim_csv =
@@ -492,6 +495,31 @@ int run_bench_mode(
     };
 
     const std::size_t total_cases = bench_data.size();
+
+    // Sidecar: per-case execution state written as one JSONL line per case.
+    // Replaces per-case persist_expanded() (was O(n) per case → O(n²) total).
+    struct SidecarEntry { bool executed = false; bool timeout_reached = false; };
+    std::unordered_map<std::size_t, SidecarEntry> sidecar;
+    {
+        std::ifstream sidecar_in(sidecar_path);
+        if (sidecar_in.is_open()) {
+            std::string sidecar_line;
+            while (std::getline(sidecar_in, sidecar_line)) {
+                if (sidecar_line.empty()) continue;
+                try {
+                    const json sc = json::parse(sidecar_line);
+                    const std::size_t idx = sc.value("i", std::numeric_limits<std::size_t>::max());
+                    if (idx < total_cases) {
+                        sidecar[idx] = {sc.value("e", false), sc.value("t", false)};
+                    }
+                } catch (...) {}
+            }
+        }
+    }
+    std::ofstream sidecar_out(sidecar_path, std::ios::app);
+    if (!sidecar_out.is_open()) {
+        throw std::runtime_error("Cannot open sidecar status file: " + sidecar_path.string());
+    }
 
     const auto parse_timeout_seconds = [](const json &entry) -> double {
         if (!entry.contains("timeout")) {
@@ -758,12 +786,20 @@ int run_bench_mode(
             if (plan.case_id.empty()) {
                 plan.case_id = get_json_field(plan.entry, {"id"});
             }
-            plan.already_executed =
-                plan.entry.contains("executed") && plan.entry["executed"].is_boolean() && plan.entry["executed"].get<bool>();
-            plan.timeout_reached_before =
-                plan.entry.contains("timeout_reached") &&
-                plan.entry["timeout_reached"].is_boolean() &&
-                plan.entry["timeout_reached"].get<bool>();
+            {
+                const auto sc_it = sidecar.find(i);
+                if (sc_it != sidecar.end()) {
+                    plan.already_executed      = sc_it->second.executed;
+                    plan.timeout_reached_before = sc_it->second.timeout_reached;
+                } else {
+                    plan.already_executed =
+                        plan.entry.contains("executed") && plan.entry["executed"].is_boolean() && plan.entry["executed"].get<bool>();
+                    plan.timeout_reached_before =
+                        plan.entry.contains("timeout_reached") &&
+                        plan.entry["timeout_reached"].is_boolean() &&
+                        plan.entry["timeout_reached"].get<bool>();
+                }
+            }
             plan.rerun_timeout_case = rerun_timeouts && plan.already_executed && plan.timeout_reached_before;
 
             const std::string plan_type = plan_field(plan.entry, {"mapping_type", "type"});
@@ -1341,7 +1377,12 @@ int run_bench_mode(
                     try {
                         bench_data.at(result.index)["executed"] = result.mark_entry_as_executed;
                         bench_data.at(result.index)["timeout_reached"] = result.timeout_reached;
-                        persist_expanded();
+                        sidecar_out
+                            << json({{"i", result.index},
+                                     {"e", result.mark_entry_as_executed},
+                                     {"t", result.timeout_reached}}).dump()
+                            << '\n';
+                        sidecar_out.flush();
                         const BenchCasePlan &committed_plan = plans[result.index];
                         if (committed_plan.replace_interrupted_csv_row) {
                             write_csv::replace_row(
@@ -1374,6 +1415,11 @@ int run_bench_mode(
     } catch (...) {
         restore_signal_handlers();
         throw;
+    }
+
+    // Write the expanded file once now that all cases are done.
+    try { persist_expanded(); } catch (const std::exception &e) {
+        std::cerr << "Warning: failed to persist expanded bench file: " << e.what() << '\n';
     }
 
     int final_exit_code = 0;
