@@ -141,11 +141,13 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     const int max_deg = circuit.getMaxInteractionDegree();
 
     if (use_generated_graph) {
-        if (x == -2 || y == -2) {
+        if (x == 0 || y == 0) {
             x = compute_upper_dimensions(qubitsNumber, max_deg);
             y = x;
-        } else if (x == -1 || y == -1){
-            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type, border_distance_percentage, max_deg);
+        } else if (x < 0 || y < 0){
+            const int sentinel = (x < 0) ? x : y;
+            const int offset = -sentinel - 1;
+            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type, border_distance_percentage, max_deg) + offset;
             y = x;
         }
         std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";

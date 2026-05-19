@@ -659,11 +659,20 @@ int run_bench_mode(
             return normalize_identity_value(value);
         };
 
+        const auto is_sentinel_dim = [](const std::string &v) {
+            if (v.empty()) return false;
+            try {
+                return std::stoi(v) <= 0;
+            } catch (...) {
+                return false;
+            }
+        };
+
         const auto entry_has_explicit_graph_dimensions = [&](const json &entry) {
             const std::string x_value = plan_field(entry, {"x"});
             const std::string y_value = plan_field(entry, {"y"});
-            return !x_value.empty() && !y_value.empty() && x_value != "-1" && y_value != "-1"
-                && x_value != "-2" && y_value != "-2";
+            return !x_value.empty() && !y_value.empty()
+                && !is_sentinel_dim(x_value) && !is_sentinel_dim(y_value);
         };
 
         const auto csv_row_matches_plan = [&](const std::vector<std::string> &row, const json &entry) {
@@ -857,17 +866,17 @@ int run_bench_mode(
             int resolved_max_degree = -1;
             const std::string planned_x = plan_field(plan.entry, {"x", "graph_x"});
             const std::string planned_y = plan_field(plan.entry, {"y", "graph_y"});
-            if (!planned_x.empty() && planned_x != "-1" && planned_x != "-2") {
+            if (!planned_x.empty() && !is_sentinel_dim(planned_x)) {
                 resolved_graph_x = planned_x;
             }
-            if (!planned_y.empty() && planned_y != "-1" && planned_y != "-2") {
+            if (!planned_y.empty() && !is_sentinel_dim(planned_y)) {
                 resolved_graph_y = planned_y;
             }
 
-            // For dimension -2, look up upper/lower dims from dimensions.csv.
-            // If the circuit is missing or has 0 dimensions, skip the run.
+            // For dimension 0, look up upper/lower dims from dimensions.csv.
+            // If the circuit is missing or has invalid dimensions, skip the run.
             const DimCsvEntry *dim_entry_ptr = nullptr;
-            if (planned_x == "-2") {
+            if (planned_x == "0") {
                 const std::string circuit_key = get_json_field(plan.entry, {"circuit"});
                 const auto it = dim_csv.find(circuit_key);
                 if (it == dim_csv.end()) {
@@ -888,7 +897,7 @@ int run_bench_mode(
 
             try {
                 json run_entry = plan.entry;
-                if (planned_x == "-2" && dim_entry_ptr) {
+                if (planned_x == "0" && dim_entry_ptr) {
                     run_entry["x"] = dim_entry_ptr->max_x;
                     run_entry["y"] = dim_entry_ptr->max_y;
                 }
@@ -987,7 +996,7 @@ int run_bench_mode(
 
             cleanup_temp();
 
-            // ---- mid-dimension run (only when x == -2 and main run succeeded) ----
+            // ---- mid-dimension run (only when x == 0 and main run succeeded) ----
             // mid dims are auto-computed as (min+max)/2 so dimensions.csv stays unchanged.
             std::string mid_x_str;
             std::string mid_y_str;
@@ -995,7 +1004,7 @@ int run_bench_mode(
             std::string mid_routing_steps_str;
             std::string mid_status_str;
 
-            if (planned_x == "-2" && result.status == "success" && dim_entry_ptr != nullptr
+            if (planned_x == "0" && result.status == "success" && dim_entry_ptr != nullptr
                 && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0
                 && dim_entry_ptr->max_x > 0 && dim_entry_ptr->max_y > 0) {
                 const int mid_dim_x = (dim_entry_ptr->min_x + dim_entry_ptr->max_x) / 2;
@@ -1081,14 +1090,14 @@ int run_bench_mode(
             }
             // -----------------------------------------------------------------------
 
-            // ---- lower-dimension run (only when x == -2 and main run succeeded) ----
+            // ---- lower-dimension run (only when x == 0 and main run succeeded) ----
             std::string lower_x_str;
             std::string lower_y_str;
             std::string lower_duration_str;
             std::string lower_routing_steps_str;
             std::string lower_status_str;
 
-            if (planned_x == "-2" && result.status == "success" && dim_entry_ptr != nullptr
+            if (planned_x == "0" && result.status == "success" && dim_entry_ptr != nullptr
                 && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0) {
                 const int lower_dim_x = dim_entry_ptr->min_x;
                 const int lower_dim_y = dim_entry_ptr->min_y;
@@ -1187,10 +1196,10 @@ int run_bench_mode(
             result.mark_entry_as_executed = (result.status != "interrupted");
 
             const std::string circuit = get_json_field(plan.entry, {"circuit"});
-            if (resolved_graph_x.empty() && !planned_x.empty() && planned_x != "-1" && planned_x != "-2") {
+            if (resolved_graph_x.empty() && !planned_x.empty() && !is_sentinel_dim(planned_x)) {
                 resolved_graph_x = planned_x;
             }
-            if (resolved_graph_y.empty() && !planned_y.empty() && planned_y != "-1" && planned_y != "-2") {
+            if (resolved_graph_y.empty() && !planned_y.empty() && !is_sentinel_dim(planned_y)) {
                 resolved_graph_y = planned_y;
             }
             std::string circuit_graph_label = get_json_field(plan.entry, {"circuit_graph_label"});
