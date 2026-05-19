@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Part 2 analysis: pairwise parameter comparison across 3 dimension classes
-(low / mid / high) for benchmarks executed with x=-2 in dimensions.csv.
+(low / mid / high) for benchmarks executed with x=0 in dimensions.csv.
 
-For each CSV row produced by a `-2` run we have 3 measurements of the same
+For each CSV row produced by a `0` run we have 3 measurements of the same
 configuration at 3 different grid sizes:
   - main row    -> HIGH (max_x / max_y)
   - mid_*       -> MID  ((min+max)/2)
@@ -374,13 +374,13 @@ def analyze_one_csv(csv_path: str, output_root: str) -> None:
         print(f"[skip] {csv_path}: empty")
         return
 
-    # Detect whether this CSV has -2 data at all
+    # Detect whether this CSV has multi-dimension data at all
     has_dim_data = any(
         (r.get("mid_status") or "").strip() or (r.get("lower_status") or "").strip()
         for r in rows
     )
     if not has_dim_data:
-        print(f"[skip] {csv_path}: no mid/lower data (probably not a -2 run)")
+        print(f"[skip] {csv_path}: no mid/lower data (probably not a multi-dim run)")
         return
 
     exploded = explode_by_dim(rows)

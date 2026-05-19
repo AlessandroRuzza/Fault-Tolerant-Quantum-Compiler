@@ -1,3 +1,2 @@
-right row with passage and passage no subgraph always fail
-
-distance vs center non chiaro, da eseguire con solo connectivity e cube e con stessi circuiti (da modificare il python)
+guassian confidence is correlated only with gaussian size
+guassian size is correlated also with safe passage
