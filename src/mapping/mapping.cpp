@@ -19,11 +19,15 @@ const bool Mapping::mapToNeighbor(
         visited_nodes = &local_visited_nodes;
     }
 
-    const std::vector<int>& neighbors = graph.neighbors(node_id);
+    const std::vector<int> neighbors_vec = graph.neighbors(node_id);
+    std::deque<int> neighbors(neighbors_vec.begin(), neighbors_vec.end());
     const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
     bool mapped = false;
     std::string last_error;
-    for (int neighbor_id : neighbors) {
+    while (!neighbors.empty()) {
+        const int neighbor_id = neighbors.front();
+        neighbors.pop_front();
+
         if (visited_nodes->find(neighbor_id) != visited_nodes->end()) {
             continue; // Avoid cycles in the current DFS branch.
         }
@@ -38,6 +42,11 @@ const bool Mapping::mapToNeighbor(
                 last_error = e.what();
                 // Keep neighbor_id in visited_nodes so we do not retry the same
                 // failing candidate from a different DFS branch.
+            }
+        }
+        else{
+            for (int far_neighbor_id : graph.neighbors(neighbor_id)) {
+                neighbors.push_back(far_neighbor_id);
             }
         }
     }
