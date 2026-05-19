@@ -24,14 +24,12 @@ const bool Mapping::mapToNeighbor(
     bool mapped = false;
     std::string last_error;
     for (int neighbor_id : neighbors) {
-        if (std::find(magic_state_ids.begin(), magic_state_ids.end(), neighbor_id) != magic_state_ids.end()) {
-            continue; // Never map a data qubit on a magic-state node.
+        if (visited_nodes->find(neighbor_id) != visited_nodes->end()) {
+            continue; // Avoid cycles in the current DFS branch.
         }
+
+        visited_nodes->insert(neighbor_id);
         if (!graph.is_occupied(neighbor_id)) {
-            if (visited_nodes->find(neighbor_id) != visited_nodes->end()) {
-                continue; // Avoid cycles in the current DFS branch.
-            }
-            visited_nodes->insert(neighbor_id);
             try {
                 map_qubit_to_node(qubit, neighbor_id, iterations, visited_nodes);
                 mapped = true;
@@ -227,7 +225,7 @@ static bool can_reach_opposite_borders(
         queue.pop();
         if (x == target_x) reached_x = true;
         if (y == target_y) reached_y = true;
-        if (reached_x && reached_y) return true;
+        if (reached_x || reached_y) return true;
         for (const auto& d : dirs) {
             const int nx = x + d[0], ny = y + d[1];
             if (!in_bounds(nx, ny)) continue;
@@ -238,7 +236,7 @@ static bool can_reach_opposite_borders(
             }
         }
     }
-    return reached_x && reached_y;
+    return reached_x || reached_y;
 }
 
 
@@ -278,11 +276,12 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
         const int maxX = graph.getMaxX();
         const int maxY = graph.getMaxY();
         const int eps = safe_passage_ignore_outer_layers;
-        // if (n.coordX <= eps || n.coordX >= maxX - eps || n.coordY <= eps || n.coordY >= maxY - eps) {
-            
-        // }
-        return can_reach_opposite_borders(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
-        // return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
+        return can_reach_opposite_borders(n, occupied_nodes_after_map, maxX+1, maxY+1, safe_passage_ignore_outer_layers);
+        
+        if (n.coordX <= eps || n.coordX >= maxX - eps || n.coordY <= eps || n.coordY >= maxY - eps) {
+            return has_entry_path_from_border(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
+        }
+        return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
     };
 
     std::unordered_set<int> cnot_nodes_requiring_access;

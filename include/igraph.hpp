@@ -155,7 +155,7 @@ public:
 
 
     inline const bool is_occupied(int id) const {
-        return get_node(id).occupied;
+        return get_node(id).occupied || is_magic(id);
     }
 
     const bool is_magic(int node_id) const {
@@ -167,7 +167,7 @@ public:
     const std::vector<Node> get_occupied_nodes() const {
         std::vector<Node> occupied_nodes;
         for (const Node& node : nodes) {
-            if (node.occupied || is_magic(node.id)) {
+            if (is_occupied(node.id)) {
                 occupied_nodes.push_back(node);
             }
         }
