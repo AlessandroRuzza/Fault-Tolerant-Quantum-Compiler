@@ -351,14 +351,16 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
     GaussianMappingVisualization::save_gaussian_frame(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, qubit, externalWeight);
 
     // Compute the combined Gaussian influence for each node and select the best one
-    const std::vector<Node> nodes = graph.get_nodes();
+    std::vector<Node> nodes = graph.get_nodes();
     if (nodes.empty()) {
         throw std::runtime_error("Graph has no nodes");
     }
 
-    const std::vector<int> magic_ids = graph.get_magic_state_ids();
-    const std::unordered_set<int> magic_id_set(magic_ids.begin(), magic_ids.end());
-    const std::vector<Node> occupied_nodes = graph.get_occupied_nodes();
+    // Remove occupied nodes
+    nodes.erase(std::remove_if(nodes.begin(), nodes.end(), 
+        [&graph](const Node& node) { return graph.is_occupied(node.id); }), 
+        nodes.end()
+    );
 
     struct CandidateScore {
         const Node* node = nullptr;
@@ -366,18 +368,13 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
         std::size_t order = 0;
     };
 
+    const std::vector<Node> occupied_nodes = graph.get_occupied_nodes();
     std::vector<CandidateScore> candidates;
     candidates.reserve(nodes.size());
 
     for (std::size_t order = 0; order < nodes.size(); ++order) {
         const Node& node = nodes[order];
-        if (node.occupied) {
-            continue;
-        }
-        if (magic_id_set.find(node.id) != magic_id_set.end()) {
-            continue;
-        }
-
+     
         double score = 0.0;
         for (const Gaussian& g : mapped_gaussians) {
             score += g.gaussian_at(node.coordX, node.coordY);
@@ -414,6 +411,10 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
 
     for (const CandidateScore& candidate : candidates) {
         if (check_safe_passage(*candidate.node, qubit, occupied_nodes)) {
+            if (PRINT_SAFE_PASSAGE) {
+                std::cout << "Accepted map qubit " << qubit.getQubitID() << " into node " << candidate.node->id
+                << ": passes safe passage" << std::endl; 
+            }
             return *candidate.node;
         } else {
             if (PRINT_SAFE_PASSAGE) {
