@@ -1,16 +1,31 @@
 #!/usr/bin/env python3
 
 import argparse
+import ctypes
 import csv
+import gc
 import glob
+import json
 import math
 import os
 import re
 import statistics
+import subprocess
+import sys
+import tempfile
 import warnings
 from collections import Counter, defaultdict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+
+try:
+    _libc = ctypes.CDLL("libc.so.6")
+    def _trim_heap():
+        gc.collect()
+        _libc.malloc_trim(0)
+except OSError:
+    def _trim_heap():
+        gc.collect()
 
 if "MPLCONFIGDIR" not in os.environ:
     os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib-cache"
@@ -18,6 +33,8 @@ os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
 
 def importMatplotlib():
     global plt, np, Line2D, TwoSlopeNorm
+    import matplotlib
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
     from matplotlib.colors import TwoSlopeNorm
@@ -1089,7 +1106,10 @@ def save_fig(fig, output_dir, filename, generated, dpi=160, tight=True, subfolde
         bbox_inches="tight" if tight else None,
         pad_inches=0.2 if tight else 0.1,
     )
+    fig.clear()
     plt.close(fig)
+    plt.close("all")
+    _trim_heap()
     generated.append(path)
 
 
@@ -2281,6 +2301,7 @@ def plot_gaussian_relative_weight_gap_heatmap(entries, output_dir, generated, sk
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, filename)
     fig.savefig(path, dpi=160, bbox_inches="tight", pad_inches=0.25)
+    fig.clf()
     plt.close(fig)
     generated.append(path)
 
@@ -2992,25 +3013,25 @@ def plot_image_dashboard(
     header_height = 92
     resampling = getattr(Image, "Resampling", Image).LANCZOS
 
-    rendered_panels = []
+    # Pass 1: collect panel metadata (title, path, missing_reason, pixel height)
+    # without keeping any images in memory.
+    panel_meta = []
     for item, source_path, missing_reason in source_panels:
         panel_title = dashboard_panel_title(item, panel_title_mode)
         if source_path is None:
-            rendered_panels.append((panel_title, None, missing_reason, placeholder_height))
+            panel_meta.append((panel_title, None, missing_reason, placeholder_height))
             continue
-
-        with Image.open(source_path) as original:
-            image = original.convert("RGBA")
-            scale = panel_pixel_width / image.width
-            target_height = max(1, int(round(image.height * scale)))
-            resized = image.resize((panel_pixel_width, target_height), resampling)
-        rendered_panels.append((panel_title, resized, None, resized.height))
+        with Image.open(source_path) as img:
+            orig_w, orig_h = img.size
+        scale = panel_pixel_width / orig_w
+        target_height = max(1, int(round(orig_h * scale)))
+        panel_meta.append((panel_title, source_path, None, target_height))
 
     row_heights = []
     for row_index in range(row_count):
         start = row_index * columns
-        end = min(start + columns, len(rendered_panels))
-        row_heights.append(title_height + max(panel[3] for panel in rendered_panels[start:end]))
+        end = min(start + columns, len(panel_meta))
+        row_heights.append(title_height + max(m[3] for m in panel_meta[start:end]))
 
     canvas_width = outer_pad * 2 + columns * panel_pixel_width + (columns - 1) * gap
     canvas_height = outer_pad * 2 + header_height + sum(row_heights) + (row_count - 1) * gap
@@ -3028,18 +3049,19 @@ def plot_image_dashboard(
         "#111827",
     )
 
+    # Pass 2: load one panel at a time, composite, immediately free.
     y = outer_pad + header_height
     for row_index, row_height in enumerate(row_heights):
         for col_index in range(columns):
             panel_index = row_index * columns + col_index
-            if panel_index >= len(rendered_panels):
+            if panel_index >= len(panel_meta):
                 continue
 
-            panel_title, image, missing_reason, image_height = rendered_panels[panel_index]
+            panel_title, source_path, missing_reason, image_height = panel_meta[panel_index]
             x = outer_pad + col_index * (panel_pixel_width + gap)
             centered_multiline_text(draw, (x, y, panel_pixel_width), panel_title, panel_font, "#111827")
             image_y = y + title_height
-            if image is None:
+            if source_path is None:
                 bottom = image_y + image_height
                 draw.rectangle(
                     (x, image_y, x + panel_pixel_width, bottom),
@@ -3055,7 +3077,14 @@ def plot_image_dashboard(
                     "#64748B",
                 )
             else:
-                canvas.alpha_composite(image, (x, image_y))
+                with Image.open(source_path) as original:
+                    img_rgba = original.convert("RGBA")
+                resized = img_rgba.resize((panel_pixel_width, image_height), resampling)
+                img_rgba.close()
+                del img_rgba
+                canvas.alpha_composite(resized, (x, image_y))
+                resized.close()
+                del resized
 
         y += row_height + gap
 
@@ -3063,6 +3092,8 @@ def plot_image_dashboard(
     os.makedirs(target_dir, exist_ok=True)
     path = os.path.join(target_dir, filename)
     canvas.convert("RGB").save(path, "PNG", optimize=True)
+    canvas.close()
+    del canvas
     generated.append(path)
 
 
@@ -4508,14 +4539,95 @@ def plot_circuit_coverage_table(rows, col_key, col_label, title, filename, outpu
     save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
 
 
-def plot_requested_heatmaps(
+def _process_single_heatmap_item(
+    item,
     rows,
-    rows_success_with_routing,
-    rows_with_duration,
+    heatmap_rows_by_metric,
+    axis_boxplot_rows_by_metric,
     output_dir,
     generated,
-    skipped=None,
+    skipped,
 ):
+    if item["kind"] == "heatmap":
+        metric_rows = heatmap_rows_by_metric[item["metric"]]
+        heatmap_rows = filter_heatmap_rows(metric_rows, item["row_key"], item["col_key"])
+        if item.get("median"):
+            value_fn = requested_heatmap_value_fn_median(item["metric"])
+            value_label_suffix = "mediana"
+        elif item.get("no_outliers"):
+            value_fn = requested_heatmap_value_fn_no_outliers(item["metric"])
+            value_label_suffix = "no out"
+        else:
+            value_fn = requested_heatmap_value_fn(item["metric"])
+            value_label_suffix = ""
+
+        make_pair_heatmap(
+            heatmap_rows,
+            item["row_key"],
+            item["col_key"],
+            value_fn,
+            value_label_suffix,
+            item["title"],
+            item["colorbar_label"],
+            item["filename"],
+            output_dir,
+            generated,
+            skipped,
+            value_format=item["value_format"],
+            subfolder=item.get("subfolder"),
+        )
+        return
+
+    if item["kind"] in {"triplet_dashboard", "x_axis_dashboard"}:
+        plot_image_dashboard(
+            item["source_items"],
+            item["title"],
+            item["filename"],
+            output_dir,
+            generated,
+            skipped,
+            columns=item.get("columns", 3),
+            panel_title_mode=item.get("panel_title_mode", "metric"),
+            panel_width=item.get("panel_width", 6.2),
+            panel_height=item.get("panel_height", 5.3),
+            dpi=item.get("dpi", 220),
+            subfolder=item.get("subfolder"),
+        )
+        return
+
+    if item["kind"] == "axis_barplot":
+        metric_rows = axis_boxplot_rows_by_metric[item["metric"]]
+        plot_axis_barplot(
+            metric_rows,
+            item["axis_key"],
+            item["metric"],
+            item["title"],
+            item["ylabel"],
+            item["filename"],
+            output_dir,
+            generated,
+            skipped,
+            value_format=item["value_format"],
+            color=item["color"],
+            subfolder=item.get("subfolder"),
+        )
+        return
+
+    if item["kind"] == "circuit_table":
+        plot_circuit_coverage_table(
+            rows,
+            item["col_key"],
+            item["col_label"],
+            item["title"],
+            item["filename"],
+            output_dir,
+            generated,
+            skipped,
+            subfolder=item.get("subfolder"),
+        )
+
+
+def _build_heatmap_rows_by_metric(rows, rows_success_with_routing):
     rows_success_with_duration = [
         row for row in rows if row["success"] and row["duration_s_f"] is not None
     ]
@@ -4524,94 +4636,112 @@ def plot_requested_heatmaps(
         "routing_steps": rows_success_with_routing,
         "execution_time": rows_success_with_duration,
     }
-    axis_boxplot_rows_by_metric = {
-        "success_rate": rows,
-        "routing_steps": rows_success_with_routing,
-        "execution_time": rows_success_with_duration,
-    }
+    axis_boxplot_rows_by_metric = dict(heatmap_rows_by_metric)
+    return heatmap_rows_by_metric, axis_boxplot_rows_by_metric
 
-    for item in REQUESTED_HEATMAP_ITEMS:
-        if item["kind"] == "heatmap":
-            metric_rows = heatmap_rows_by_metric[item["metric"]]
-            heatmap_rows = filter_heatmap_rows(metric_rows, item["row_key"], item["col_key"])
-            if item.get("median"):
-                value_fn = requested_heatmap_value_fn_median(item["metric"])
-                value_label_suffix = "mediana"
-            elif item.get("no_outliers"):
-                value_fn = requested_heatmap_value_fn_no_outliers(item["metric"])
-                value_label_suffix = "no out"
-            else:
-                value_fn = requested_heatmap_value_fn(item["metric"])
-                value_label_suffix = ""
-            
-            subfolder = item.get("subfolder")
-            
-            make_pair_heatmap(
-                heatmap_rows,
-                item["row_key"],
-                item["col_key"],
-                value_fn,
-                value_label_suffix,
-                item["title"],
-                item["colorbar_label"],
-                item["filename"],
-                output_dir,
-                generated,
-                skipped,
-                value_format=item["value_format"],
-                subfolder=subfolder,
-            )
-            continue
 
-        if item["kind"] in {"triplet_dashboard", "x_axis_dashboard"}:
-            plot_image_dashboard(
-                item["source_items"],
-                item["title"],
-                item["filename"],
-                output_dir,
-                generated,
-                skipped,
-                columns=item.get("columns", 3),
-                panel_title_mode=item.get("panel_title_mode", "metric"),
-                panel_width=item.get("panel_width", 6.2),
-                panel_height=item.get("panel_height", 5.3),
-                dpi=item.get("dpi", 220),
-                subfolder=item.get("subfolder"),
-            )
-            continue
+def run_heatmap_worker(args):
+    """Subprocess entry point: process REQUESTED_HEATMAP_ITEMS[start:end] and exit."""
+    importMatplotlib()
+    plt.style.use("seaborn-v0_8-whitegrid")
 
-        if item["kind"] == "axis_barplot":
-            metric_rows = axis_boxplot_rows_by_metric[item["metric"]]
-            subfolder = item.get("subfolder")
+    start, end = (int(x) for x in args.worker_heatmap_batch.split(":"))
+    raw_rows, _, _ = load_raw_rows_from_files([args.worker_csv])
+    rows_all = prepare_rows_for_analysis(raw_rows)
+    del raw_rows
+    register_extra_statuses(rows_all)
+    rows_no_timeout = exclude_timeout_rows(rows_all)
+    rows_success_with_routing = [
+        r for r in rows_no_timeout if r["success"] and r["routing_steps_f"] is not None
+    ]
+    rows_with_duration = [r for r in rows_no_timeout if r["duration_s_f"] is not None]
+    heatmap_rows_by_metric, axis_boxplot_rows_by_metric = _build_heatmap_rows_by_metric(
+        rows_no_timeout, rows_success_with_routing
+    )
 
-            plot_axis_barplot(
-                metric_rows,
-                item["axis_key"],
-                item["metric"],
-                item["title"],
-                item["ylabel"],
-                item["filename"],
-                output_dir,
-                generated,
-                skipped,
-                value_format=item["value_format"],
-                color=item["color"],
-                subfolder=subfolder,
-            )
-            continue
+    generated = []
+    skipped = []
+    items_slice = REQUESTED_HEATMAP_ITEMS[start:end]
+    for item in items_slice:
+        _process_single_heatmap_item(
+            item,
+            rows_no_timeout,
+            heatmap_rows_by_metric,
+            axis_boxplot_rows_by_metric,
+            args.worker_output_dir,
+            generated,
+            skipped,
+        )
 
-        if item["kind"] == "circuit_table":
-            plot_circuit_coverage_table(
+    with open(args.worker_result, "w") as f:
+        json.dump({"generated": generated, "skipped": skipped}, f)
+
+
+def plot_requested_heatmaps(
+    rows,
+    rows_success_with_routing,
+    rows_with_duration,
+    output_dir,
+    generated,
+    skipped=None,
+    csv_path=None,
+    batch_size=50,
+):
+    """Orchestrate heatmap generation via subprocess batches to release memory between batches."""
+    if csv_path is None:
+        # Fallback: in-process generation (slower but no subprocess).
+        heatmap_rows_by_metric, axis_boxplot_rows_by_metric = _build_heatmap_rows_by_metric(
+            rows, rows_success_with_routing
+        )
+        for idx, item in enumerate(REQUESTED_HEATMAP_ITEMS):
+            _process_single_heatmap_item(
+                item,
                 rows,
-                item["col_key"],
-                item["col_label"],
-                item["title"],
-                item["filename"],
+                heatmap_rows_by_metric,
+                axis_boxplot_rows_by_metric,
                 output_dir,
                 generated,
                 skipped,
-                subfolder=item.get("subfolder"),
             )
+            if (idx + 1) % 10 == 0:
+                _trim_heap()
+        return
+
+    total = len(REQUESTED_HEATMAP_ITEMS)
+    batches = [(s, min(s + batch_size, total)) for s in range(0, total, batch_size)]
+    print(f"Generating {total} heatmap items in {len(batches)} subprocess batches of up to {batch_size}", flush=True)
+    if skipped is None:
+        skipped = []
+
+    for batch_idx, (start, end) in enumerate(batches, 1):
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
+            result_path = f.name
+        cmd = [
+            sys.executable,
+            os.path.abspath(__file__),
+            "--worker-heatmap-batch", f"{start}:{end}",
+            "--worker-csv", csv_path,
+            "--worker-output-dir", output_dir,
+            "--worker-result", result_path,
+        ]
+        print(f"[batch {batch_idx}/{len(batches)}] items {start}:{end}", flush=True)
+        try:
+            subprocess.run(cmd, check=True)
+            with open(result_path) as f:
+                result = json.load(f)
+            generated.extend(result.get("generated", []))
+            skipped.extend(result.get("skipped", []))
+        except subprocess.CalledProcessError as exc:
+            print(f"[batch {batch_idx}] failed with exit {exc.returncode}", flush=True)
+            for item in REQUESTED_HEATMAP_ITEMS[start:end]:
+                record_skipped_plot(
+                    skipped, item["filename"], f"subprocess batch failed (exit {exc.returncode})"
+                )
+        finally:
+            try:
+                os.unlink(result_path)
+            except OSError:
+                pass
 
 
 def plot_summary_tables(rows, output_dir, generated):
@@ -5311,7 +5441,26 @@ def main():
             "and exported to merging_duplicates.csv."
         ),
     )
+    parser.add_argument("--worker-heatmap-batch", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-csv", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-output-dir", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-result", default=None, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--no-subprocess-heatmaps",
+        action="store_true",
+        help="Disable subprocess batching for heatmap generation (slower memory release).",
+    )
+    parser.add_argument(
+        "--heatmap-batch-size",
+        type=int,
+        default=50,
+        help="Number of heatmap items processed per subprocess batch (default: 50).",
+    )
     args = parser.parse_args()
+
+    if args.worker_heatmap_batch is not None:
+        run_heatmap_worker(args)
+        return
 
     importMatplotlib()
 
@@ -5431,6 +5580,15 @@ def main():
         skipped,
     )
     plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped)
+    heatmap_csv_path = (
+        os.path.abspath(input_files[0])
+        if (
+            not args.no_subprocess_heatmaps
+            and not args.distinct
+            and len(input_files) == 1
+        )
+        else None
+    )
     plot_requested_heatmaps(
         rows_no_timeout,
         rows_success_with_routing,
@@ -5438,6 +5596,8 @@ def main():
         output_dir,
         generated,
         skipped,
+        csv_path=heatmap_csv_path,
+        batch_size=args.heatmap_batch_size,
     )
     plot_axis_barplots_by_circuit(
         rows_no_timeout,
