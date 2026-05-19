@@ -203,8 +203,8 @@ static bool can_reach_opposite_borders(
     };
     std::priority_queue<std::pair<int,int>, std::vector<std::pair<int,int>>, decltype(cmp)> queue(cmp);
 
-    const auto in_bounds = [minX, minY, maxX, maxY](int x, int y) {
-        return x >= minX && x <= maxX && y >= minY && y <= maxY;
+    const auto in_bounds = [width, height](int x, int y) {
+        return x >= 0 && x < width && y >= 0 && y < height;
     };
 
     // The node itself is occupied; seed from its free neighbours.
