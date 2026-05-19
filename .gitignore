@@ -65,6 +65,8 @@ config/__bench_*.json
 benchmarks/logs/
 benchmarks/results/*
 benchmarks/old_results_13may/**/
+benchmarks/old_size_confidence_newgaussian/**/
+
 !*.csv
 merged_distinct*
 
