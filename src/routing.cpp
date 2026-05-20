@@ -10,6 +10,7 @@ void draw_routing_layer(
     const Layer& layer_gates,
     const Routing& routing
 );
+std::string gate_on_graph_string(const Gate& gate, const Mapping& mapping);
 
 namespace {
 void print_non_routed_histogram(const std::map<std::size_t, std::size_t>& non_routed_histogram) {
@@ -307,7 +308,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             // Two-qubit gate: find path between the 2 qubits
             int qubit1 = gate.qubits[0];
             int qubit2 = gate.qubits[1];
-            
+
             int node1 = mapping.get_mapped_node(qubit1);
             int node2 = mapping.get_mapped_node(qubit2);
             if (node1 < 0 || node2 < 0) {
@@ -318,6 +319,11 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
 
             // TODO: route better (improve heuristic) (congestion-avoidance?)
             path = pathStrategy->find_shortest_path(node1, node2, used_nodes);
+            if (path.size() == 0) {
+                std::cout << "  [route_layer] BFS(" << node1 << "->" << node2
+                          << ") returned EMPTY (used_nodes.size()="
+                          << used_nodes.size() << ")\n";
+            }
         }
         else if(gate.name == "t"){ // path to closest magic state 
             path = tGateRoutingStrategy->find_t_gate_path(
@@ -361,7 +367,8 @@ void QubitRouter::route_circuit() {
             std::cout << "Routing, " << circuit.getNumLayers() << " Layers remaining...\n";
             std::cout << "TopLayer gates (" << topLayer.size() << "):\n";
             for (const auto& gate : topLayer) {
-                std::cout << "  " << gate.to_string() << "\n";
+                std::cout << "  " << gate.to_string()
+                          << "  on graph: " << gate_on_graph_string(gate, mapping) << "\n";
             }
         }        
         
@@ -395,24 +402,69 @@ void QubitRouter::route_circuit() {
         */
 
         Routing computed_route;
+        bool was_cache_hit = false;
+        bool fingerprint_collision = false;
         if (cached_route != nullptr) {
             // Cache hit: the stored Routing maps Gate objects from the first occurrence of
             // this layer. Gate::operator== includes the gate ID, so those stale Gate objects
             // would not match the current layer's gates in update_layers(), causing it to
             // silently skip removal and loop forever. Rebuild the Routing by matching each
             // cached entry to the current topLayer gate with the same name+qubits.
-            for (const auto& [cached_gate, path] : *cached_route) {
-                for (const Gate& cur : topLayer) {
-                    if (cur.name == cached_gate.name && cur.qubits == cached_gate.qubits) {
-                        computed_route.emplace(cur, path);
-                        break;
+            //
+            // The fingerprint is a 64-bit hash so collisions are possible: two different
+            // layers can map to the same key. We require every cached gate to match a
+            // topLayer gate (and vice versa); otherwise treat it as a miss and re-route.
+            if (cached_route->size() == topLayer.size()) {
+                Routing tentative;
+                bool all_matched = true;
+                for (const auto& [cached_gate, path] : *cached_route) {
+                    bool found = false;
+                    for (const Gate& cur : topLayer) {
+                        if (cur.name == cached_gate.name && cur.qubits == cached_gate.qubits) {
+                            tentative.emplace(cur, path);
+                            found = true;
+                            break;
+                        }
                     }
+                    if (!found) { all_matched = false; break; }
                 }
+                if (all_matched) {
+                    computed_route = std::move(tentative);
+                    was_cache_hit = true;
+                } else {
+                    fingerprint_collision = true;
+                }
+            } else {
+                fingerprint_collision = true;
             }
-        } else {
+        }
+        if (!was_cache_hit) {
             computed_route = route_layer(topLayer);
-            if (layer_routing_cache != nullptr) {
-                layer_routing_cache->emplace(layer_fp, computed_route);  // copy into cache
+            // Only insert on a real miss. On a collision, keep the existing entry —
+            // overwriting it would just trade one collision for another.
+            if (layer_routing_cache != nullptr && !fingerprint_collision) {
+                layer_routing_cache->emplace(layer_fp, computed_route);
+            }
+        }
+        if (computed_route.size() < topLayer.size()) {
+            std::cout << "  [route_circuit] partial/empty layer (cache_hit="
+                      << (was_cache_hit ? "yes" : "no")
+                      << ", cached.size=" << (cached_route ? cached_route->size() : 0)
+                      << ", got=" << computed_route.size()
+                      << ", topLayer=" << topLayer.size() << ")\n";
+            if (was_cache_hit && computed_route.size() == 0) {
+                std::cout << "    topLayer gates:\n";
+                for (const Gate& g : topLayer) {
+                    std::cout << "      " << g.to_string() << "  qubits=[";
+                    for (uint32_t q : g.qubits) std::cout << q << ",";
+                    std::cout << "]\n";
+                }
+                std::cout << "    cached gates:\n";
+                for (const auto& [cg, p] : *cached_route) {
+                    std::cout << "      " << cg.to_string() << "  qubits=[";
+                    for (uint32_t q : cg.qubits) std::cout << q << ",";
+                    std::cout << "] path.size=" << p.size() << "\n";
+                }
             }
         }
 
@@ -434,6 +486,21 @@ void QubitRouter::route_circuit() {
             std::cout << "ERROR trying to route layer with " << topLayer.size() << " gates:" << std::endl;
             for (const auto& gate : topLayer) {
                 std::cout << "  " << gate.to_string() << std::endl;
+            }
+            const auto& blocked = get_used_nodes();
+            std::cout << "  used_nodes.size() = " << blocked.size() << "\n";
+            for (const Gate& gate : topLayer) {
+                if (gate.qubits.size() < 2) continue;
+                const int n1 = mapping.get_mapped_node(gate.qubits[0]);
+                const int n2 = mapping.get_mapped_node(gate.qubits[1]);
+                std::cout << "  gate (" << n1 << "," << n2 << "):\n";
+                std::cout << "    neighbors(" << n1 << "): ";
+                for (int nb : graph.neighbors(n1))
+                    std::cout << nb << (blocked.count(nb) ? "*" : "") << " ";
+                std::cout << "\n    neighbors(" << n2 << "): ";
+                for (int nb : graph.neighbors(n2))
+                    std::cout << nb << (blocked.count(nb) ? "*" : "") << " ";
+                std::cout << "\n";
             }
             throw std::runtime_error(
                 "Routing made no progress at layer " + std::to_string(routing_steps.size() + 1) +
