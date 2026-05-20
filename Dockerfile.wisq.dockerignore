@@ -1,0 +1,41 @@
+# Version control — largest exclusion, never needed in the build context
+.git/
+.gitmodules
+
+# Build artifacts — rebuilt from source inside Docker
+build/
+
+# Python virtualenv (.env/ intentionally kept — this build copies it directly)
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE and local tooling
+.vscode/
+.claude/
+.codex
+
+# Large binary/generated outputs that belong to the runtime host
+benchmarks/logs/
+benchmarks/results/
+visualization/gaussian_frames/*.png
+visualization/gaussian_frames/*.dat
+visualization/gaussian_frames/*.gp
+
+# Temporary benchmark execution files
+config/__bench_*.json
+# Pre-expanded configs — generated, not needed at runtime
+config/*_expanded.json
+
+# QASMBench checkout (large, not needed)
+QASMBench-master/
+
+# Misc large files
+*.png
+*.svg
+*.ans
+*.mp4
+*.gif
+merged_distinct*
+tmp/

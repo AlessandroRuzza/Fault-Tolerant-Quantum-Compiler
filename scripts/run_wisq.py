@@ -16,7 +16,8 @@ from pathlib import Path
 from threading import Lock
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-WISQ = REPO_ROOT / ".env" / "bin" / "wisq"
+_local_wisq = REPO_ROOT / ".env" / "bin" / "wisq"
+WISQ = _local_wisq if _local_wisq.exists() else Path("wisq")
 
 # Columns that match the benchmark CSVs; tool-specific fields are left empty.
 CSV_COLUMNS = [
@@ -61,7 +62,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument(
         "--mr_timeout",
         type=int,
-        default=1800,
+        default=30*60,
         metavar="SECS",
         help="Mapping/routing timeout passed to wisq (default: 1800)",
     )
@@ -175,6 +176,8 @@ def write_row(row: dict, out_file: Path | None, first: bool, append: bool) -> No
 def main() -> int:
     args, extra = parse_args()
     out_file = Path(args.output) if args.output else None
+    if out_file is None:
+        print("#### WARNING: writing only to stdout. ########################à")
 
     qasm_paths = []
     for qasm_str in args.qasm:
