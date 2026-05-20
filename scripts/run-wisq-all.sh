@@ -8,6 +8,7 @@ QASM_DIR="${REPO_ROOT}/universal_set_qasms"
 
 output="${1:-${OUTPUT:-}}"
 mr_timeout="${2:-${MR_TIMEOUT:-}}"
+workers="${2:-${WORKERS:-}}"
 
 read_makeflag_var() {
     key="$1"
@@ -26,6 +27,10 @@ if [ -z "$output" ]; then
     output="$(read_makeflag_var OUTPUT || true)"
 fi
 
+if [ -z "$workers" ]; then
+    workers="$(read_makeflag_var WORKERS || true)"
+fi
+
 if [ -z "$mr_timeout" ]; then
     mr_timeout="$(read_makeflag_var MR_TIMEOUT || true)"
 fi
@@ -38,6 +43,10 @@ fi
 
 if [ -n "$mr_timeout" ]; then
     set -- "$@" --mr_timeout "$mr_timeout"
+fi
+
+if [ -n "$workers" ]; then
+    set -- "$@" --workers "$workers"
 fi
 
 exec "$@"

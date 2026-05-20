@@ -10,8 +10,10 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WISQ = REPO_ROOT / ".env" / "bin" / "wisq"
@@ -62,6 +64,13 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
         default=1800,
         metavar="SECS",
         help="Mapping/routing timeout passed to wisq (default: 1800)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Number of parallel wisq workers (default: 4)",
     )
     # Extra unknown args are forwarded to wisq
     return parser.parse_known_args()
@@ -167,15 +176,29 @@ def main() -> int:
     args, extra = parse_args()
     out_file = Path(args.output) if args.output else None
 
-    for i, qasm_str in enumerate(args.qasm):
+    qasm_paths = []
+    for qasm_str in args.qasm:
         qasm_path = Path(qasm_str).resolve()
         if not qasm_path.exists():
             print(f"error: QASM file not found: {qasm_path}", file=sys.stderr)
             return 1
+        qasm_paths.append(qasm_path)
+
+    lock = Lock()
+    first_written = [True]
+
+    def run_and_write(qasm_path: Path) -> None:
         row = run_one(qasm_path, args.mr_timeout, extra)
-        write_row(row, out_file, first=(i == 0), append=args.append)
-        if out_file:
-            print(f"result appended to {out_file}", file=sys.stderr)
+        with lock:
+            write_row(row, out_file, first=first_written[0], append=args.append)
+            first_written[0] = False
+            if out_file:
+                print(f"result appended to {out_file}", file=sys.stderr)
+
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = {executor.submit(run_and_write, p): p for p in qasm_paths}
+        for future in as_completed(futures):
+            future.result()
 
     return 0
 
