@@ -395,23 +395,44 @@ void QubitRouter::route_circuit() {
         */
 
         Routing computed_route;
+        bool was_cache_hit = false;
+        bool fingerprint_collision = false;
         if (cached_route != nullptr) {
             // Cache hit: the stored Routing maps Gate objects from the first occurrence of
             // this layer. Gate::operator== includes the gate ID, so those stale Gate objects
             // would not match the current layer's gates in update_layers(), causing it to
             // silently skip removal and loop forever. Rebuild the Routing by matching each
             // cached entry to the current topLayer gate with the same name+qubits.
-            for (const auto& [cached_gate, path] : *cached_route) {
-                for (const Gate& cur : topLayer) {
-                    if (cur.name == cached_gate.name && cur.qubits == cached_gate.qubits) {
-                        computed_route.emplace(cur, path);
-                        break;
+            // compute_layer_fingerprint is a 64-bit XOR hash and can collide: two different
+            // layers may share a fingerprint. Verify every cached gate matches a topLayer
+            // gate; if not, treat as cache miss and re-route without overwriting the entry.
+            if (cached_route->size() == topLayer.size()) {
+                Routing tentative;
+                bool all_matched = true;
+                for (const auto& [cached_gate, path] : *cached_route) {
+                    bool found = false;
+                    for (const Gate& cur : topLayer) {
+                        if (cur.name == cached_gate.name && cur.qubits == cached_gate.qubits) {
+                            tentative.emplace(cur, path);
+                            found = true;
+                            break;
+                        }
                     }
+                    if (!found) { all_matched = false; break; }
                 }
+                if (all_matched) {
+                    computed_route = std::move(tentative);
+                    was_cache_hit = true;
+                } else {
+                    fingerprint_collision = true;
+                }
+            } else {
+                fingerprint_collision = true;
             }
-        } else {
+        }
+        if (!was_cache_hit) {
             computed_route = route_layer(topLayer);
-            if (layer_routing_cache != nullptr) {
+            if (layer_routing_cache != nullptr && !fingerprint_collision) {
                 layer_routing_cache->emplace(layer_fp, computed_route);  // copy into cache
             }
         }
