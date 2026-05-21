@@ -1,7 +1,7 @@
 {
   "circuit": "qft_20",
 
-  "type": "gaussian",
+  "type": "random",
   "gaussian_strategy": "coarse",
   "safe_passage_strategy": "cube",
   "MagicStatePlacementStrategy": "center_circle",
@@ -22,7 +22,7 @@
   "SIZE_MOLTIPLIER": 0.7,
   "GAUSSIAN_CONFIDENCE": 0.99,
 
-  "routing_strategy": "boost",
+  "routing_strategy": "naive",
   "t-routing-mode": "smart_t_routing",
 
   "use_layer_cache": true
