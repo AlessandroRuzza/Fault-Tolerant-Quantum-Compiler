@@ -18,6 +18,10 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+
+WRITE_REPORT_MD = False
+
+
 try:
     _libc = ctypes.CDLL("libc.so.6")
     def _trim_heap():
@@ -73,6 +77,7 @@ HEATMAP_AXIS_SPECS = {
     "gaussian_confidence": ("gaussian_confidence_label", "gaussian confidence"),
     "use_layer_cache": ("use_layer_cache_norm", "use layer cache"),
 }
+
 HEATMAP_METRIC_SPECS = (
     ("success_rate", "success", "Success heatmap", "all runs", "success rate (%)", "{:.1f}"),
     ("routing_steps", "routing_steps", "Routing heatmap", "success only", "mean routing steps", "{:.2f}"),
@@ -5312,12 +5317,8 @@ def write_summary(rows, csv_files, output_dir, generated, skipped=None, distinct
             f.write(f"  - conflicting configurations: {distinct_info['conflicting_groups']}\n")
             f.write(f"  - rows written to duplicates csv: {distinct_info['conflicting_rows']}\n\n")
 
-        f.write("Generated plots:\n")
-        for p in generated:
-            f.write(f"  - {p}\n")
-
         if skipped:
-            f.write("\nSkipped plots:\n")
+            f.write("---\n\nSkipped plots:\n")
             for item in skipped:
                 f.write(f"  - {item['filename']}: {item['reason']}\n")
 
@@ -5698,62 +5699,26 @@ def main():
     )
     renumber_generated_pngs(output_dir, generated, skipped)
     write_summary(rows, csv_files, output_dir, generated, skipped, distinct_info=distinct_info)
-    write_report_markdown(
-        output_dir,
-        generated,
-        skipped,
-        top_gaussian_weight_entries,
-        top_gaussian_weight_csv_path,
-        best_gaussian_weight_profile_rows,
-        best_gaussian_weight_profile_csv_path,
-        gaussian_relative_weight_gap_rows,
-        gaussian_relative_weight_gap_csv_path,
-        gaussian_best_entries,
-        gaussian_best_csv_path,
-        best_mapping_entries,
-        best_mapping_csv_path,
-        best_mapping_exit0_entries,
-        best_mapping_exit0_csv_path,
-    )
-    print(f"Generated {len(generated)} plots in: {output_dir}")
-    if skipped:
-        print(f"Skipped {len(skipped)} plots:")
-        for item in skipped:
-            print(f"{item['filename']}: {item['reason']}")
-    for path in generated:
-        print(path)
-    print(best_gaussian_weight_profile_csv_path)
-    print(gaussian_relative_weight_gap_csv_path)
-    print(top_gaussian_weight_csv_path)
-    print(gaussian_best_csv_path)
-    print(best_mapping_csv_path)
-    print(best_mapping_exit0_csv_path)
-    if runtime_grouped_factors_csv_path is not None:
-        print(runtime_grouped_factors_csv_path)
-    if best_config_counts_csv_path is not None:
-        print(best_config_counts_csv_path)
-    if timeout_counts_csv_path is not None:
-        print(timeout_counts_csv_path)
-    if distinct_info is not None:
-        print(
-            "Repeated configurations found: "
-            f"{distinct_info['repeated_configuration_groups']}"
+    if WRITE_REPORT_MD:
+        write_report_markdown(
+            output_dir,
+            generated,
+            skipped,
+            top_gaussian_weight_entries,
+            top_gaussian_weight_csv_path,
+            best_gaussian_weight_profile_rows,
+            best_gaussian_weight_profile_csv_path,
+            gaussian_relative_weight_gap_rows,
+            gaussian_relative_weight_gap_csv_path,
+            gaussian_best_entries,
+            gaussian_best_csv_path,
+            best_mapping_entries,
+            best_mapping_csv_path,
+            best_mapping_exit0_entries,
+            best_mapping_exit0_csv_path,
         )
-        print(
-            "Repeated configurations with same result: "
-            f"{distinct_info['same_result_duplicate_groups']}"
-        )
-        print(
-            "Repeated configurations with different results: "
-            f"{distinct_info['different_result_duplicate_groups']}"
-        )
-        print(f"Exact duplicate rows removed: {distinct_info['duplicate_rows_removed']}")
-        print("CSV files used to build merged csv:")
-        for csv_file in csv_files:
-            print(csv_file)
-        print(distinct_info["merged_csv_path"])
-        print(distinct_info["duplicates_csv_path"])
-    print(os.path.join(output_dir, "summary.txt"))
+    skipped_msg = f", {len(skipped)} skipped" if skipped else ""
+    print(f"Created {len(generated)} plots{skipped_msg} in: {output_dir}")
 
 
 if __name__ == "__main__":
