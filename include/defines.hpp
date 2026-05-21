@@ -26,6 +26,7 @@ extern const bool ORDER_GATES_BY_MANHATTAN;
 extern const int LAYERING_LOOKAHEAD;
 
 extern const bool WRITE_UNIVERSAL_QASM;
+extern const bool WRITE_GRAPH_FOR_WISQ;
 
 }
 

@@ -182,6 +182,12 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     const int resolved_graph_y = graph.getMaxY() + 1;
     std::cout << "resolved graph dimensions: " << resolved_graph_x << "x" << resolved_graph_y << "\n";
 
+    output_path = std::filesystem::path(PROJECT_ROOT) /
+                "qasm_graphs" /
+                (original_name.string() + ".graph");
+    if (benchmark_artifacts_enabled() || WRITE_GRAPH_FOR_WISQ) {
+        graph.write_file(output_path.string());
+    }
 
     std::cout << "------- MAPPING ---------" << std::endl;
 

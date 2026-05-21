@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <fstream>
+#include <filesystem>
 #include <algorithm>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
@@ -102,7 +103,40 @@ public:
         int width
     );
 
+    
+    void write_file(const std::string& path) const {
+        std::filesystem::path output_path(path);
+        if (output_path.has_parent_path()) {
+            std::filesystem::create_directories(output_path.parent_path());
+        }
 
+        std::ofstream ofs(output_path);
+        if (!ofs) throw std::runtime_error("failed to open file for writing: " + path);
+
+        const int width = maxX + 1;
+        const int height = maxY + 1;
+
+        const std::unordered_set<int> magic_set(magic_states_ids.begin(), magic_states_ids.end());
+
+        std::vector<int> alg_qubits;
+        std::vector<int> magic_state_indices;
+        for (const Node& node : nodes) {
+            const int wisq_idx = node.coordY * width + node.coordX;
+            if (magic_set.count(node.id)) {
+                magic_state_indices.push_back(wisq_idx);
+            } else {
+                alg_qubits.push_back(wisq_idx);
+            }
+        }
+
+        json j;
+        j["width"] = width;
+        j["height"] = height;
+        j["alg_qubits"] = alg_qubits;
+        j["magic_states"] = magic_state_indices;
+
+        ofs << j.dump(2);
+    }
 };
 
 #endif // GRAPH_HPP
