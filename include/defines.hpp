@@ -17,6 +17,8 @@ extern const bool PRINT_ROUTING; // controls routing steps printing
 extern const bool PRINT_DRAW_ROUTING; // controls routing lattice drawing printing
 extern const bool PRINT_ROUTING_PROGRESS; // controls routing progress printing
 
+extern const bool PRINT_CACHE_METRICS; // controls routing progress printing
+
 /*
 ############ BEHAVIORAL FLAGS ######################
 */

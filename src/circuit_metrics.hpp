@@ -307,59 +307,61 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
         path_length_stddev = std::sqrt(var);
     }
 
-    // ====== PRINT ======
-    std::cout << "\n========== CIRCUIT CACHE METRICS ==========\n"
-              << std::fixed << std::setprecision(4);
+    if(PRINT_CACHE_METRICS)
+    { 
+        std::cout << "\n========== CIRCUIT CACHE METRICS ==========\n"
+                << std::fixed << std::setprecision(4);
 
-    std::cout << "[Gate Metrics]\n";
-    std::cout << "  Total routable gates:          " << total_gates             << "\n";
-    std::cout << "  Logical qubits:                " << num_qubits              << "\n";
-    std::cout << "  CNOT gates:                    " << num_cnot                << "\n";
-    std::cout << "  T/Tdg gates:                   " << num_t_tdg               << "\n";
-    std::cout << "  Other gates (h,rz,x,...):      " << num_other_gates         << "\n";
-    std::cout << "  T-count ratio:                 " << t_ratio                 << "\n";
-    std::cout << "  CNOT ratio:                    " << cnot_ratio              << "\n";
-    std::cout << "  Other-gate ratio:              " << other_gate_ratio        << "\n";
-    std::cout << "  Unique CNOT pairs:             " << num_unique_cnot_pairs   << "\n";
-    std::cout << "  Max CNOT pair repetition:      " << max_cnot_pair_rep       << "\n";
-    std::cout << "  Avg CNOT pair repetition:      " << avg_cnot_pair_rep       << "\n";
-    std::cout << "  CNOT interaction density:      " << cnot_interaction_density << "\n";
-    std::cout << "  Max CNOT degree (hub qubit):   " << max_cnot_degree         << "\n";
-    std::cout << "  T-qubit diversity:             " << t_qubit_diversity       << "\n";
+        std::cout << "[Gate Metrics]\n";
+        std::cout << "  Total routable gates:          " << total_gates             << "\n";
+        std::cout << "  Logical qubits:                " << num_qubits              << "\n";
+        std::cout << "  CNOT gates:                    " << num_cnot                << "\n";
+        std::cout << "  T/Tdg gates:                   " << num_t_tdg               << "\n";
+        std::cout << "  Other gates (h,rz,x,...):      " << num_other_gates         << "\n";
+        std::cout << "  T-count ratio:                 " << t_ratio                 << "\n";
+        std::cout << "  CNOT ratio:                    " << cnot_ratio              << "\n";
+        std::cout << "  Other-gate ratio:              " << other_gate_ratio        << "\n";
+        std::cout << "  Unique CNOT pairs:             " << num_unique_cnot_pairs   << "\n";
+        std::cout << "  Max CNOT pair repetition:      " << max_cnot_pair_rep       << "\n";
+        std::cout << "  Avg CNOT pair repetition:      " << avg_cnot_pair_rep       << "\n";
+        std::cout << "  CNOT interaction density:      " << cnot_interaction_density << "\n";
+        std::cout << "  Max CNOT degree (hub qubit):   " << max_cnot_degree         << "\n";
+        std::cout << "  T-qubit diversity:             " << t_qubit_diversity       << "\n";
 
-    std::cout << "[Layer Metrics]\n";
-    std::cout << "  Total layers (circuit depth):  " << num_layers           << "\n";
-    std::cout << "  Unique layers:                 " << num_unique_layers    << "\n";
-    std::cout << "  Layer reuse ratio:             " << layer_reuse_ratio    << "\n";
-    std::cout << "  Depth/width ratio:             " << depth_width_ratio    << "\n";
-    std::cout << "  Avg layer size (gates/layer):  " << avg_layer_size       << "\n";
-    std::cout << "  Max layer size:                " << max_layer_size       << "\n";
-    std::cout << "  Avg CNOT per layer:            " << avg_cnot_per_layer   << "\n";
-    std::cout << "  Avg T/Tdg per layer:           " << avg_t_per_layer      << "\n";
-    std::cout << "  Max T/Tdg in one layer:        " << max_t_in_layer       << "\n";
-    std::cout << "  Max CNOT in one layer:         " << max_cnot_in_layer    << "\n";
-    std::cout << "  T-depth (layers with T):       " << t_depth              << "\n";
-    std::cout << "  CNOT-depth (layers with CNOT): " << cnot_depth           << "\n";
-    std::cout << "  T-layer ratio:                 " << t_layer_ratio        << "\n";
-    std::cout << "  Layer size CV (parallelism):   " << congestion_score     << "\n";
-    std::cout << "  Max repeated seq length:       " << max_rep_seq          << "\n";
+        std::cout << "[Layer Metrics]\n";
+        std::cout << "  Total layers (circuit depth):  " << num_layers           << "\n";
+        std::cout << "  Unique layers:                 " << num_unique_layers    << "\n";
+        std::cout << "  Layer reuse ratio:             " << layer_reuse_ratio    << "\n";
+        std::cout << "  Depth/width ratio:             " << depth_width_ratio    << "\n";
+        std::cout << "  Avg layer size (gates/layer):  " << avg_layer_size       << "\n";
+        std::cout << "  Max layer size:                " << max_layer_size       << "\n";
+        std::cout << "  Avg CNOT per layer:            " << avg_cnot_per_layer   << "\n";
+        std::cout << "  Avg T/Tdg per layer:           " << avg_t_per_layer      << "\n";
+        std::cout << "  Max T/Tdg in one layer:        " << max_t_in_layer       << "\n";
+        std::cout << "  Max CNOT in one layer:         " << max_cnot_in_layer    << "\n";
+        std::cout << "  T-depth (layers with T):       " << t_depth              << "\n";
+        std::cout << "  CNOT-depth (layers with CNOT): " << cnot_depth           << "\n";
+        std::cout << "  T-layer ratio:                 " << t_layer_ratio        << "\n";
+        std::cout << "  Layer size CV (parallelism):   " << congestion_score     << "\n";
+        std::cout << "  Max repeated seq length:       " << max_rep_seq          << "\n";
 
-    std::cout << "[Layer Size Distribution]\n";
-    for (const std::pair<const int, int>& entry : size_dist)
-        std::cout << "  size=" << entry.first << ": " << entry.second << " layer(s)\n";
+        std::cout << "[Layer Size Distribution]\n";
+        for (const std::pair<const int, int>& entry : size_dist)
+            std::cout << "  size=" << entry.first << ": " << entry.second << " layer(s)\n";
 
-    std::cout << "[Top Layers by Frequency]\n";
-    const int show_n = std::min(static_cast<int>(fps_sorted.size()), 5);
-    for (int i = 0; i < show_n; i++)
-        std::cout << "  [" << (i + 1) << "] freq=" << fps_sorted[i].second
-                  << "  pattern: " << fps_sorted[i].first << "\n";
+        std::cout << "[Top Layers by Frequency]\n";
+        const int show_n = std::min(static_cast<int>(fps_sorted.size()), 5);
+        for (int i = 0; i < show_n; i++)
+            std::cout << "  [" << (i + 1) << "] freq=" << fps_sorted[i].second
+                    << "  pattern: " << fps_sorted[i].first << "\n";
 
-    std::cout << "[Path Length Metrics (post-mapping, Manhattan distance)]\n";
-    std::cout << "  Avg estimated path length:     " << avg_path_len       << "\n";
-    std::cout << "  Max estimated path length:     " << max_path_len       << "\n";
-    std::cout << "  Path length stddev:            " << path_length_stddev << "\n";
-    std::cout << "============================================\n\n";
-
+        std::cout << "[Path Length Metrics (post-mapping, Manhattan distance)]\n";
+        std::cout << "  Avg estimated path length:     " << avg_path_len       << "\n";
+        std::cout << "  Max estimated path length:     " << max_path_len       << "\n";
+        std::cout << "  Path length stddev:            " << path_length_stddev << "\n";
+        std::cout << "============================================\n\n";
+    }
+    
     // Build the result struct once via designated initializers. Field names must match
     // CircuitMetrics declaration; ordering follows the struct definition.
     CircuitMetrics metrics{
@@ -397,100 +399,98 @@ inline CircuitMetrics compute_and_print_circuit_metrics(
         .path_length_stddev         = path_length_stddev,
     };
 
-    if (!write_csv) {
-        return metrics;
-    }
+    if (write_csv) {
+        // ====== SINGLE CSV (update-or-insert) ======
+        const std::string circuit_name = fs::path(circuit_path).stem().string();
+        const fs::path csv_dir = fs::path(PROJECT_ROOT) / "benchmarks" / "results" / "cache_metrics";
+        fs::create_directories(csv_dir);
+        const fs::path csv_path = csv_dir / "all_circuits_cache_metrics.csv";
 
-    // ====== SINGLE CSV (update-or-insert) ======
-    const std::string circuit_name = fs::path(circuit_path).stem().string();
-    const fs::path csv_dir = fs::path(PROJECT_ROOT) / "benchmarks" / "results" / "cache_metrics";
-    fs::create_directories(csv_dir);
-    const fs::path csv_path = csv_dir / "all_circuits_cache_metrics.csv";
+        // Serialize layer size distribution and top-5 frequencies
+        std::ostringstream dist_ss, topfreq_ss;
+        for (const std::pair<const int, int>& entry : size_dist) dist_ss << entry.first << ':' << entry.second << ';';
+        const int top5 = std::min(static_cast<int>(fps_sorted.size()), 5);
+        for (int i = 0; i < top5; i++) {
+            topfreq_ss << fps_sorted[i].second;
+            if (i + 1 < top5) topfreq_ss << ';';
+        }
 
-    // Serialize layer size distribution and top-5 frequencies
-    std::ostringstream dist_ss, topfreq_ss;
-    for (const std::pair<const int, int>& entry : size_dist) dist_ss << entry.first << ':' << entry.second << ';';
-    const int top5 = std::min(static_cast<int>(fps_sorted.size()), 5);
-    for (int i = 0; i < top5; i++) {
-        topfreq_ss << fps_sorted[i].second;
-        if (i + 1 < top5) topfreq_ss << ';';
-    }
+        // Canonical header for the current metrics schema. If a stale CSV exists with a
+        // different header, its rows are discarded (different columns would misalign).
+        static constexpr const char* CANONICAL_HEADER =
+            "circuit,total_routable_gates,num_logical_qubits,"
+            "num_cnot,num_t_tdg,num_other_gates,"
+            "t_count_ratio,cnot_ratio,other_gate_ratio,"
+            "num_unique_cnot_pairs,max_cnot_pair_repetition,avg_cnot_pair_repetition,"
+            "cnot_interaction_density,max_cnot_degree,t_qubit_diversity,"
+            "total_layers,num_unique_layers,layer_reuse_ratio,depth_width_ratio,"
+            "avg_layer_size,max_layer_size,avg_cnot_per_layer,avg_t_per_layer,"
+            "max_t_in_layer,max_cnot_in_layer,t_depth,cnot_depth,t_layer_ratio,"
+            "layer_congestion_score,max_repeated_seq_len,"
+            "layer_size_distribution,top5_layer_frequencies,"
+            "avg_estimated_path_length,max_estimated_path_length,path_length_stddev";
 
-    // Canonical header for the current metrics schema. If a stale CSV exists with a
-    // different header, its rows are discarded (different columns would misalign).
-    static constexpr const char* CANONICAL_HEADER =
-        "circuit,total_routable_gates,num_logical_qubits,"
-        "num_cnot,num_t_tdg,num_other_gates,"
-        "t_count_ratio,cnot_ratio,other_gate_ratio,"
-        "num_unique_cnot_pairs,max_cnot_pair_repetition,avg_cnot_pair_repetition,"
-        "cnot_interaction_density,max_cnot_degree,t_qubit_diversity,"
-        "total_layers,num_unique_layers,layer_reuse_ratio,depth_width_ratio,"
-        "avg_layer_size,max_layer_size,avg_cnot_per_layer,avg_t_per_layer,"
-        "max_t_in_layer,max_cnot_in_layer,t_depth,cnot_depth,t_layer_ratio,"
-        "layer_congestion_score,max_repeated_seq_len,"
-        "layer_size_distribution,top5_layer_frequencies,"
-        "avg_estimated_path_length,max_estimated_path_length,path_length_stddev";
-
-    // Read existing CSV and filter out current circuit (if it exists). When the
-    // header doesn't match the canonical one, drop all old rows — they cannot be
-    // safely concatenated under a different column layout.
-    std::vector<std::string> csv_lines;
-    bool schema_match = true;
-    {
-        std::ifstream read_csv(csv_path);
-        std::string line;
-        int line_num = 0;
-        while (std::getline(read_csv, line)) {
-            line_num++;
-            if (line_num == 1) {
-                if (line != CANONICAL_HEADER) {
-                    schema_match = false;
-                    std::cout << "Cache-metrics CSV schema changed: regenerating from scratch.\n";
-                    break;
-                }
-            } else {
-                size_t comma_pos = line.find(',');
-                if (comma_pos != std::string::npos) {
-                    std::string existing_circuit = line.substr(0, comma_pos);
-                    if (existing_circuit != circuit_name) {
-                        csv_lines.push_back(line);
+        // Read existing CSV and filter out current circuit (if it exists). When the
+        // header doesn't match the canonical one, drop all old rows — they cannot be
+        // safely concatenated under a different column layout.
+        std::vector<std::string> csv_lines;
+        bool schema_match = true;
+        {
+            std::ifstream read_csv(csv_path);
+            std::string line;
+            int line_num = 0;
+            while (std::getline(read_csv, line)) {
+                line_num++;
+                if (line_num == 1) {
+                    if (line != CANONICAL_HEADER) {
+                        schema_match = false;
+                        std::cout << "Cache-metrics CSV schema changed: regenerating from scratch.\n";
+                        break;
+                    }
+                } else {
+                    size_t comma_pos = line.find(',');
+                    if (comma_pos != std::string::npos) {
+                        std::string existing_circuit = line.substr(0, comma_pos);
+                        if (existing_circuit != circuit_name) {
+                            csv_lines.push_back(line);
+                        }
                     }
                 }
             }
         }
+        (void)schema_match;  // value already used to decide whether to keep rows
+
+        // Write CSV with canonical header + existing (compatible) circuits + updated circuit
+        std::ofstream csv(csv_path, std::ios::out);
+        if (!csv.is_open()) {
+            std::cerr << "Warning: could not open " << csv_path << " for writing\n";
+            return CircuitMetrics{};
+        }
+
+        csv << CANONICAL_HEADER << '\n';
+
+        for (const std::string& line : csv_lines) {
+            csv << line << '\n';
+        }
+
+        // Write current circuit. Column order MUST match CANONICAL_HEADER.
+        csv << std::fixed << std::setprecision(6)
+            << circuit_name << ','
+            << total_gates << ',' << num_qubits << ','
+            << num_cnot << ',' << num_t_tdg << ',' << num_other_gates << ','
+            << t_ratio << ',' << cnot_ratio << ',' << other_gate_ratio << ','
+            << num_unique_cnot_pairs << ',' << max_cnot_pair_rep << ',' << avg_cnot_pair_rep << ','
+            << cnot_interaction_density << ',' << max_cnot_degree << ',' << t_qubit_diversity << ','
+            << num_layers << ',' << num_unique_layers << ',' << layer_reuse_ratio << ',' << depth_width_ratio << ','
+            << avg_layer_size << ',' << max_layer_size << ',' << avg_cnot_per_layer << ',' << avg_t_per_layer << ','
+            << max_t_in_layer << ',' << max_cnot_in_layer << ',' << t_depth << ',' << cnot_depth << ',' << t_layer_ratio << ','
+            << congestion_score << ',' << max_rep_seq << ','
+            << '"' << dist_ss.str() << '"' << ',' << '"' << topfreq_ss.str() << '"' << ','
+            << avg_path_len << ',' << max_path_len << ',' << path_length_stddev << '\n';
+
+        csv.close();
+        std::cout << "Cache metrics CSV written to: " << csv_path << "\n\n";
     }
-    (void)schema_match;  // value already used to decide whether to keep rows
-
-    // Write CSV with canonical header + existing (compatible) circuits + updated circuit
-    std::ofstream csv(csv_path, std::ios::out);
-    if (!csv.is_open()) {
-        std::cerr << "Warning: could not open " << csv_path << " for writing\n";
-        return CircuitMetrics{};
-    }
-
-    csv << CANONICAL_HEADER << '\n';
-
-    for (const std::string& line : csv_lines) {
-        csv << line << '\n';
-    }
-
-    // Write current circuit. Column order MUST match CANONICAL_HEADER.
-    csv << std::fixed << std::setprecision(6)
-        << circuit_name << ','
-        << total_gates << ',' << num_qubits << ','
-        << num_cnot << ',' << num_t_tdg << ',' << num_other_gates << ','
-        << t_ratio << ',' << cnot_ratio << ',' << other_gate_ratio << ','
-        << num_unique_cnot_pairs << ',' << max_cnot_pair_rep << ',' << avg_cnot_pair_rep << ','
-        << cnot_interaction_density << ',' << max_cnot_degree << ',' << t_qubit_diversity << ','
-        << num_layers << ',' << num_unique_layers << ',' << layer_reuse_ratio << ',' << depth_width_ratio << ','
-        << avg_layer_size << ',' << max_layer_size << ',' << avg_cnot_per_layer << ',' << avg_t_per_layer << ','
-        << max_t_in_layer << ',' << max_cnot_in_layer << ',' << t_depth << ',' << cnot_depth << ',' << t_layer_ratio << ','
-        << congestion_score << ',' << max_rep_seq << ','
-        << '"' << dist_ss.str() << '"' << ',' << '"' << topfreq_ss.str() << '"' << ','
-        << avg_path_len << ',' << max_path_len << ',' << path_length_stddev << '\n';
-
-    csv.close();
-    std::cout << "Cache metrics CSV written to: " << csv_path << "\n\n";
 
     return metrics;
 }
