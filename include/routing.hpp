@@ -69,6 +69,11 @@ public:
         const std::unordered_set<int>& blocked_nodes
     ) const;
 
+    // When the layer routing cache is active, call this once before routing begins so
+    // that node weights are computed once and never rebuilt. This ensures every cache
+    // hit uses the same weight basis as the original cache-miss routing.
+    void force_static_mode() { update_policy = CongestionUpdatePolicy::STATIC_GLOBAL; }
+
     Path find_shortest_path(int start_node, int end_node, const std::unordered_set<int>& used_nodes) const override;
 };
 

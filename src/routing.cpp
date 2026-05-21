@@ -284,14 +284,26 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     }
 
     /*** Order Layer Gates by node distance length ******/
+    // Layer is std::unordered_set<Gate>, whose iteration order depends on Gate::id
+    // (the Gate hash combines id and name). Sorting first by (name, qubits) — a key
+    // independent of Gate::id — gives a baseline order that's identical for any two
+    // layers with the same logical content. The subsequent stable_sort then breaks
+    // route-length ties on that baseline, so route_layer becomes deterministic for
+    // a given logical layer regardless of which concrete Gate IDs are present.
     std::vector<Gate> ordered_gates;
     ordered_gates.reserve(layer_gates.size());
     ordered_gates.insert(ordered_gates.end(), layer_gates.begin(), layer_gates.end());
-    auto ordering = [&](const Gate& a, const Gate& b) {
-        return minGateRouteLength(a) < minGateRouteLength(b);
-    };
 
-    std::sort(ordered_gates.begin(), ordered_gates.end(), ordering);
+    std::sort(ordered_gates.begin(), ordered_gates.end(),
+        [](const Gate& a, const Gate& b) {
+            if (a.name != b.name) return a.name < b.name;
+            return a.qubits < b.qubits;
+        });
+
+    std::stable_sort(ordered_gates.begin(), ordered_gates.end(),
+        [&](const Gate& a, const Gate& b) {
+            return minGateRouteLength(a) < minGateRouteLength(b);
+        });
 
 
     for (const Gate& gate : ordered_gates) {
@@ -353,6 +365,16 @@ void QubitRouter::route_circuit() {
     routing_steps.clear();
     routing_steps.reserve(circuit.getNumLayers());
     std::map<std::size_t, std::size_t> non_routed_histogram;
+
+    // When the layer cache is active and the path strategy is congestion-aware,
+    // force STATIC_GLOBAL so weights are computed once. Cache hits must replay
+    // the same routing basis as the original cache-miss routing.
+    if (layer_routing_cache != nullptr) {
+        if (auto* cong = dynamic_cast<CongestionAwareShortestPath*>(
+                const_cast<IPathStrategy*>(pathStrategy))) {
+            cong->force_static_mode();
+        }
+    }
 
     while(circuit.getNumLayers() > 0){
         const Layer& topLayer = circuit.getLayer(0);
