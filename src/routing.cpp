@@ -366,15 +366,10 @@ void QubitRouter::route_circuit() {
     routing_steps.reserve(circuit.getNumLayers());
     std::map<std::size_t, std::size_t> non_routed_histogram;
 
-    // When the layer cache is active and the path strategy is congestion-aware,
-    // force STATIC_GLOBAL so weights are computed once. Cache hits must replay
-    // the same routing basis as the original cache-miss routing.
-    if (layer_routing_cache != nullptr) {
-        if (auto* cong = dynamic_cast<CongestionAwareShortestPath*>(
-                const_cast<IPathStrategy*>(pathStrategy))) {
-            cong->force_static_mode();
-        }
-    }
+    // Per-gate first-exposure tracking for the non-routed-layer metric.
+    first_exposure_total = 0;
+    first_exposure_routed = 0;
+    std::unordered_set<Gate> seen_gates;
 
     while(circuit.getNumLayers() > 0){
         const Layer& topLayer = circuit.getLayer(0);
@@ -472,6 +467,18 @@ void QubitRouter::route_circuit() {
         const std::size_t non_routed = topLayer.size() - route.size();
         if(non_routed > 0)
             non_routed_histogram[non_routed]++;
+
+        // First-exposure accounting: a gate seen at the top layer for the first
+        // time counts once toward the total; it counts as "routed" only if it was
+        // routed in this very step (i.e. it did not force its layer to split).
+        for (const Gate& gate : topLayer) {
+            if (seen_gates.insert(gate).second) {
+                ++first_exposure_total;
+                if (route.find(gate) != route.end()) {
+                    ++first_exposure_routed;
+                }
+            }
+        }
 
         if(route.size() == 0){
             std::cout << "ERROR trying to route layer with " << topLayer.size() << " gates:" << std::endl;

@@ -17,6 +17,17 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
     "status,exit_code,duration_seconds,log_file,error_excerpt,"
     "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV11 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
     "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status";
 
 inline constexpr const char *kBenchmarkRunsCsvHeaderV10 =
@@ -341,7 +352,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV10 ||
+        (first_line == kBenchmarkRunsCsvHeaderV11 ||
+         first_line == kBenchmarkRunsCsvHeaderV10 ||
          first_line == kBenchmarkRunsCsvHeaderV9 ||
          first_line == kBenchmarkRunsCsvHeaderV8 ||
          first_line == kBenchmarkRunsCsvHeaderV7 ||
@@ -372,6 +384,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v11 = (first_line == kBenchmarkRunsCsvHeaderV11);
             const bool from_v10 = (first_line == kBenchmarkRunsCsvHeaderV10);
             const bool from_v9 = (first_line == kBenchmarkRunsCsvHeaderV9);
             const bool from_v8 = (first_line == kBenchmarkRunsCsvHeaderV8);
@@ -385,7 +398,11 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v10) {
+            if (from_v11) {
+                // V11 is the first 42 columns of V12; pass through unchanged.
+                migrated = parsed;
+                migrated.resize(42);
+            } else if (from_v10) {
                 migrated = {
                     at_or_empty(parsed, 0),   // id
                     at_or_empty(parsed, 1),   // run_date
@@ -826,10 +843,17 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             }
 
             // V10 → V11: inject 5 empty mid_* columns before lower_x.
-            // All branches above produce a V10-shaped vector (37 cols ending in lower_status),
-            // so we promote to V11 (42 cols) by inserting empties at position 32.
+            // All branches above (except from_v11) produce a V10-shaped vector
+            // (37 cols ending in lower_status), so we promote to V11 (42 cols)
+            // by inserting empties at position 32.
             if (migrated.size() == 37) {
                 migrated.insert(migrated.begin() + 32, 5, std::string{});
+            }
+
+            // V11 → V12: append 3 empty non_routed_layer_pct columns at the end
+            // (non_routed_layer_pct, mid_non_routed_layer_pct, lower_non_routed_layer_pct).
+            if (migrated.size() == 42) {
+                migrated.insert(migrated.end(), 3, std::string{});
             }
 
             out << render_row(migrated) << '\n';

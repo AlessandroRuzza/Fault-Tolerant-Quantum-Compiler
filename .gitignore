@@ -15,9 +15,11 @@
 *.gch
 *.pch
 
-# Images
+# Images and generated plots
 *.svg
 *.png
+benchmarks/**/*_plots/
+benchmarks/**/*_plots_*/
 
 # Linker files
 *.ilk
@@ -76,7 +78,6 @@ merged_distinct*
 tmp/
 scripts/__pycache__/
 QASMBench-master/
-*.png
 src/defines.cpp
 src/defines.h
 

@@ -137,6 +137,10 @@ public:
     virtual int  get_routing_length() const = 0;
     virtual void print_routing_steps() const = 0;
     virtual void reset() = 0;
+    // Percentage of gates that were NOT routed on the first step they appeared in
+    // the top layer (each gate counted once, denominator = total routable gates).
+    // 0 = every layer routed without splitting. Returns -1 when not tracked.
+    virtual double get_non_routed_layer_percentage() const { return -1.0; }
 };
 
 class QubitRouter : public IQubitRouter {
@@ -149,6 +153,12 @@ private:
     std::vector<Routing> routing_steps;
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
     std::unordered_map<size_t, Routing>* layer_routing_cache;
+
+    // Non-routed metric accumulators (see get_non_routed_layer_percentage).
+    // first_exposure_total: gates seen for the first time at the top layer (== total gates).
+    // first_exposure_routed: of those, how many were routed in that same first step.
+    std::size_t first_exposure_total = 0;
+    std::size_t first_exposure_routed = 0;
 
     mutable std::unordered_set<int> used_nodes_cache;
     mutable std::unordered_map<std::pair<int,int>, float, PairIntHash> min_gate_route_length_cache;
@@ -177,8 +187,19 @@ public:
     void precompute_magic_state_order();
     inline int get_routing_length() const override { return routing_steps.size(); }
 
+    inline double get_non_routed_layer_percentage() const override {
+        if (first_exposure_total == 0) return 0.0;
+        return 100.0 * static_cast<double>(first_exposure_total - first_exposure_routed)
+                     / static_cast<double>(first_exposure_total);
+    }
+
     void print_routing_steps() const override;
-    inline void reset() override { circuit.reset(); routing_steps.clear(); }
+    inline void reset() override {
+        circuit.reset();
+        routing_steps.clear();
+        first_exposure_total = 0;
+        first_exposure_routed = 0;
+    }
 
     inline const std::vector<Routing>& get_routing() const { return routing_steps; }
     inline const Routing& get_route_step(int i) const { return routing_steps[i]; }

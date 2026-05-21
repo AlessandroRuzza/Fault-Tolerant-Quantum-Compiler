@@ -204,6 +204,7 @@ def prepare_rows(raw_rows):
         dur_ms = _to_float(r.get("elapsed_ms"))
         r["duration_s_f"]    = dur_s if dur_s is not None else (dur_ms / 1000.0 if dur_ms is not None else None)
         r["routing_steps_f"] = _to_float(_pick_first(r, "routing_steps", "total_routing_steps"))
+        r["non_routed_layer_pct_f"] = _to_float(r.get("non_routed_layer_pct"))
         r["exit_code_i"]     = _to_int(r.get("exit_code"))
         r["success"]         = _normalize_text(r.get("status")) in SUCCESS_STATUSES
         r["placement_variant"] = _classify_placement(r)
@@ -355,11 +356,11 @@ def _make_heatmap(
 
 
 def _plot_pair_heatmaps(
-    rows_all, rows_routing, rows_duration,
+    rows_all, rows_routing, rows_duration, rows_non_routed,
     row_key, col_key, row_label, col_label,
     prefix, output_dir, generated, skipped=None, subfolder=None,
 ):
-    """Emit three heatmaps (success rate, routing steps, duration) for one axis pair."""
+    """Emit four heatmaps (success rate, routing steps, duration, non-routed layer %) for one axis pair."""
 
     def mean_routing(subset):
         vals = _non_empty([r["routing_steps_f"] for r in subset])
@@ -369,13 +370,18 @@ def _plot_pair_heatmaps(
         vals = _non_empty([r["duration_s_f"] for r in subset])
         return float(np.mean(vals)) if vals else None
 
+    def mean_non_routed(subset):
+        vals = _non_empty([r["non_routed_layer_pct_f"] for r in subset])
+        return float(np.mean(vals)) if vals else None
+
     def success_rate(subset):
         return (100.0 * sum(r["success"] for r in subset) / len(subset)) if subset else None
 
     specs = [
-        (rows_all,      "success_rate",  success_rate,  f"Success Rate: {row_label} × {col_label}",        "success rate (%)",   "{:.1f}"),
-        (rows_routing,  "routing_steps", mean_routing,  f"Routing Steps: {row_label} × {col_label}",       "mean routing steps", "{:.0f}"),
-        (rows_duration, "duration",      mean_duration, f"Duration (s): {row_label} × {col_label}",        "mean duration (s)",  "{:.2f}"),
+        (rows_all,         "success_rate",    success_rate,    f"Success Rate: {row_label} × {col_label}",          "success rate (%)",            "{:.1f}"),
+        (rows_routing,     "routing_steps",   mean_routing,    f"Routing Steps: {row_label} × {col_label}",         "mean routing steps",          "{:.0f}"),
+        (rows_duration,    "duration",        mean_duration,   f"Duration (s): {row_label} × {col_label}",          "mean duration (s)",           "{:.2f}"),
+        (rows_non_routed,  "non_routed_pct",  mean_non_routed, f"Non-routed Layer %: {row_label} × {col_label}",    "mean non-routed layer pct (%)", "{:.2f}"),
     ]
     for pool, tag, value_fn, title, cbar, fmt in specs:
         hm_rows = _filter_heatmap(pool, row_key, col_key)
@@ -585,8 +591,9 @@ def main():
     register_extra_statuses(rows)
     rows = exclude_timeouts(rows)
 
-    rows_routing  = [r for r in rows if r["success"] and r["routing_steps_f"] is not None]
-    rows_duration = [r for r in rows if r["success"] and r["duration_s_f"] is not None]
+    rows_routing     = [r for r in rows if r["success"] and r["routing_steps_f"] is not None]
+    rows_duration    = [r for r in rows if r["success"] and r["duration_s_f"] is not None]
+    rows_non_routed  = [r for r in rows if r["success"] and r["non_routed_layer_pct_f"] is not None]
 
     generated, skipped = [], []
 
@@ -598,19 +605,23 @@ def main():
     plot_boxplot(rows, "circuit_name", "duration_s_f",
                  "Duration by Circuit", "duration (s)",
                  "02_duration_by_circuit.png", output_dir, generated, skipped)
+    plot_boxplot(rows_non_routed, "circuit_name", "non_routed_layer_pct_f",
+                 "Non-routed Layer % by Circuit (success only)", "non-routed layer pct (%)",
+                 "03_non_routed_pct_by_circuit.png", output_dir, generated, skipped)
 
-    # heatmaps for each correlated pair (success rate + routing + duration)
-    for idx, (row_key, col_key, row_label, col_label, filter_fn) in enumerate(HEATMAP_PAIRS, start=3):
+    # heatmaps for each correlated pair (success rate + routing + duration + non-routed %)
+    for idx, (row_key, col_key, row_label, col_label, filter_fn) in enumerate(HEATMAP_PAIRS, start=4):
         if filter_fn is not None:
-            pair_all      = [r for r in rows if filter_fn(r)]
-            pair_routing  = [r for r in rows_routing if filter_fn(r)]
-            pair_duration = [r for r in rows_duration if filter_fn(r)]
+            pair_all         = [r for r in rows if filter_fn(r)]
+            pair_routing     = [r for r in rows_routing if filter_fn(r)]
+            pair_duration    = [r for r in rows_duration if filter_fn(r)]
+            pair_non_routed  = [r for r in rows_non_routed if filter_fn(r)]
         else:
-            pair_all, pair_routing, pair_duration = rows, rows_routing, rows_duration
+            pair_all, pair_routing, pair_duration, pair_non_routed = rows, rows_routing, rows_duration, rows_non_routed
 
         subfolder = f"pair_{idx:02d}_{row_key}"
         _plot_pair_heatmaps(
-            pair_all, pair_routing, pair_duration,
+            pair_all, pair_routing, pair_duration, pair_non_routed,
             row_key, col_key, row_label, col_label,
             f"{idx:02d}", output_dir, generated, skipped, subfolder=subfolder,
         )

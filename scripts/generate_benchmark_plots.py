@@ -77,11 +77,13 @@ HEATMAP_METRIC_SPECS = (
     ("success_rate", "success", "Success heatmap", "all runs", "success rate (%)", "{:.1f}"),
     ("routing_steps", "routing_steps", "Routing heatmap", "success only", "mean routing steps", "{:.2f}"),
     ("execution_time", "execution_time", "Execution-time heatmap", "success only", "mean duration (s)", "{:.2f}"),
+    ("non_routed_layer_pct", "non_routed_layer_pct", "Non-routed layer % heatmap", "success only", "mean non-routed layer pct (%)", "{:.2f}"),
 )
 AXIS_BARPLOT_METRIC_SPECS = (
     ("success_rate", "success", "Success Rate by", "all runs", "success rate (%)", "{:.1f}", "#2A9D8F"),
     ("routing_steps", "routing_steps", "Routing Steps by", "success only", "routing steps", "{:.2f}", "#577590"),
     ("execution_time", "execution_time", "Execution Time by", "success only", "duration (s)", "{:.2f}", "#E76F51"),
+    ("non_routed_layer_pct", "non_routed_layer_pct", "Non-routed Layer % by", "success only", "non-routed layer pct (%)", "{:.2f}", "#E9C46A"),
 )
 PER_CIRCUIT_BARPLOT_DIR = "barplots_by_circuit"
 HEATMAP_PAIR_GROUPS = (
@@ -241,7 +243,7 @@ def build_requested_heatmap_items(start_index=48):
                 "caption": f"Dashboard: {row_label} x {col_label}",
                 "title": f"{row_label} x {col_label}",
                 "source_items": triplet_items,
-                "columns": 3,
+                "columns": len(HEATMAP_METRIC_SPECS),
                 "panel_title_mode": "metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
@@ -257,7 +259,7 @@ def build_requested_heatmap_items(start_index=48):
                 "caption": f"Dashboard (no outliers): {row_label} x {col_label}",
                 "title": f"{row_label} x {col_label} (no outliers)",
                 "source_items": triplet_items_no_out,
-                "columns": 3,
+                "columns": len(HEATMAP_METRIC_SPECS),
                 "panel_title_mode": "metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
@@ -273,7 +275,7 @@ def build_requested_heatmap_items(start_index=48):
                 "caption": f"Dashboard (median): {row_label} x {col_label}",
                 "title": f"{row_label} x {col_label} (median)",
                 "source_items": triplet_items_median,
-                "columns": 3,
+                "columns": len(HEATMAP_METRIC_SPECS),
                 "panel_title_mode": "metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
@@ -406,6 +408,7 @@ REPORT_PLOTS = [
     ("02_circuit_summary_bars.png", "Circuit-level summary"),
     ("03_box_routing_by_circuit.png", "Routing steps by circuit"),
     ("04_box_elapsed_by_circuit.png", "Duration by circuit"),
+    ("05_box_non_routed_pct_by_circuit.png", "Non-routed layer % by circuit"),
     ("47_box_elapsed_by_gaussian_strategy.png", "Duration by gaussian strategy"),
     ("21_box_gaussian_weight_combinations_vs_routing.png", "Routing by gaussian weight combinations"),
     ("31_heatmap_best_gaussian_relative_weight_gaps.png", "Relative distances between best gaussian weights"),
@@ -1061,6 +1064,7 @@ def prepare_rows_for_analysis(raw_rows):
         else:
             row["duration_s_f"] = None
         row["routing_steps_f"] = to_float(pick_first(row, "routing_steps", "total_routing_steps"))
+        row["non_routed_layer_pct_f"] = to_float(row.get("non_routed_layer_pct"))
         row["interaction_pressure_f"] = to_float(row.get("interaction_pressure"))
         row["data_density_f"] = to_float(row.get("data_density"))
         row["overall_density_f"] = to_float(row.get("overall_density"))
@@ -2911,6 +2915,7 @@ def heatmap_metric_display_label(metric, sample_scope=None):
         "success_rate": "success rate",
         "routing_steps": "routing steps",
         "execution_time": "execution time",
+        "non_routed_layer_pct": "non-routed layer %",
     }
     label = metric_titles.get(metric, str(metric))
     if sample_scope:
@@ -3104,6 +3109,8 @@ def axis_boxplot_values(rows, metric):
         return non_empty([row["routing_steps_f"] for row in rows])
     if metric == "execution_time":
         return non_empty([row["duration_s_f"] for row in rows])
+    if metric == "non_routed_layer_pct":
+        return non_empty([row["non_routed_layer_pct_f"] for row in rows])
     raise ValueError(f"Unknown axis boxplot metric: {metric}")
 
 
@@ -3382,10 +3389,14 @@ def plot_axis_barplots_by_circuit(
     rows_success_with_duration = [
         row for row in rows if row["success"] and row["duration_s_f"] is not None
     ]
+    rows_success_with_non_routed = [
+        row for row in rows if row["success"] and row["non_routed_layer_pct_f"] is not None
+    ]
     rows_by_metric = {
         "success_rate": rows,
         "routing_steps": rows_success_with_routing,
         "execution_time": rows_success_with_duration,
+        "non_routed_layer_pct": rows_success_with_non_routed,
     }
     circuits = sorted({row["circuit_name"] for row in rows if row["circuit_name"]})
 
@@ -4631,10 +4642,14 @@ def _build_heatmap_rows_by_metric(rows, rows_success_with_routing):
     rows_success_with_duration = [
         row for row in rows if row["success"] and row["duration_s_f"] is not None
     ]
+    rows_success_with_non_routed = [
+        row for row in rows if row["success"] and row["non_routed_layer_pct_f"] is not None
+    ]
     heatmap_rows_by_metric = {
         "success_rate": rows,
         "routing_steps": rows_success_with_routing,
         "execution_time": rows_success_with_duration,
+        "non_routed_layer_pct": rows_success_with_non_routed,
     }
     axis_boxplot_rows_by_metric = dict(heatmap_rows_by_metric)
     return heatmap_rows_by_metric, axis_boxplot_rows_by_metric
@@ -5537,6 +5552,20 @@ def main():
         "Duration by Circuit",
         "duration_seconds",
         "04_box_elapsed_by_circuit.png",
+        output_dir,
+        generated,
+        skipped,
+    )
+    rows_success_with_non_routed = [
+        r for r in rows_no_timeout if r["success"] and r["non_routed_layer_pct_f"] is not None
+    ]
+    boxplot_by_category(
+        rows_success_with_non_routed,
+        "circuit_name",
+        "non_routed_layer_pct_f",
+        "Non-routed Layer % by Circuit (Success Only)",
+        "non-routed layer pct (%)",
+        "05_box_non_routed_pct_by_circuit.png",
         output_dir,
         generated,
         skipped,

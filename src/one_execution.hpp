@@ -35,6 +35,7 @@ struct benchmarkResult {
     int resolved_graph_y = -1;
     int num_qubits = -1;
     int max_interaction_degree = -1;
+    double non_routed_layer_pct = -1.0;
 };
 
 namespace {
@@ -316,6 +317,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         resolved_graph_x,
         resolved_graph_y,
         qubitsNumber,
-        max_deg
+        max_deg,
+        routerPtr->get_non_routed_layer_percentage()
     };
 }

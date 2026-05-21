@@ -144,6 +144,9 @@ void write_benchmark_result_file_if_requested(const benchmarkResult &result) {
     if (result.max_interaction_degree >= 0) {
         payload["max_interaction_degree"] = result.max_interaction_degree;
     }
+    if (result.non_routed_layer_pct >= 0.0) {
+        payload["non_routed_layer_pct"] = result.non_routed_layer_pct;
+    }
 
     write_benchmark_worker_payload_if_requested(payload);
 }
@@ -198,6 +201,9 @@ benchmarkResult benchmark_result_from_worker_payload(const json &payload) {
     }
     if (payload.contains("max_interaction_degree") && payload.at("max_interaction_degree").is_number_integer()) {
         result.max_interaction_degree = payload.at("max_interaction_degree").get<int>();
+    }
+    if (payload.contains("non_routed_layer_pct") && payload.at("non_routed_layer_pct").is_number()) {
+        result.non_routed_layer_pct = payload.at("non_routed_layer_pct").get<double>();
     }
     return result;
 }
@@ -879,6 +885,12 @@ int run_bench_mode(
             result.status = "success";
             result.exit_code = 0;
 
+            const auto format_pct = [](double value) {
+                std::ostringstream ss;
+                ss << std::fixed << std::setprecision(4) << value;
+                return ss.str();
+            };
+
             const auto start_tp = std::chrono::system_clock::now();
             const auto start_steady = std::chrono::steady_clock::now();
             const std::string run_date = format_now_date(start_tp);
@@ -898,6 +910,7 @@ int run_bench_mode(
             };
 
             std::string routing_steps;
+            std::string non_routed_pct;
             std::string error_excerpt;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
@@ -1018,6 +1031,9 @@ int run_bench_mode(
                     const benchmarkResult worker_result =
                         benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_result_path));
                     routing_steps = std::to_string(worker_result.routing_steps);
+                    if (worker_result.non_routed_layer_pct >= 0.0) {
+                        non_routed_pct = format_pct(worker_result.non_routed_layer_pct);
+                    }
                     if (worker_result.resolved_graph_x >= 0) {
                         resolved_graph_x = std::to_string(worker_result.resolved_graph_x);
                     }
@@ -1042,6 +1058,7 @@ int run_bench_mode(
             std::string mid_duration_str;
             std::string mid_routing_steps_str;
             std::string mid_status_str;
+            std::string mid_non_routed_pct_str;
 
             if (planned_x == "0" && result.status == "success" && dim_entry_ptr != nullptr
                 && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0
@@ -1115,6 +1132,9 @@ int run_bench_mode(
                         const benchmarkResult mid_worker =
                             benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_mid_result));
                         mid_routing_steps_str = std::to_string(mid_worker.routing_steps);
+                        if (mid_worker.non_routed_layer_pct >= 0.0) {
+                            mid_non_routed_pct_str = format_pct(mid_worker.non_routed_layer_pct);
+                        }
                         mid_status_str = "success";
                     } else if (mid_exit == 2) {
                         mid_status_str = "safe_passage_failed";
@@ -1135,6 +1155,7 @@ int run_bench_mode(
             std::string lower_duration_str;
             std::string lower_routing_steps_str;
             std::string lower_status_str;
+            std::string lower_non_routed_pct_str;
 
             if (planned_x == "0" && result.status == "success" && dim_entry_ptr != nullptr
                 && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0) {
@@ -1207,6 +1228,9 @@ int run_bench_mode(
                         const benchmarkResult lower_worker =
                             benchmark_result_from_worker_payload(read_benchmark_worker_payload(temp_lower_result));
                         lower_routing_steps_str = std::to_string(lower_worker.routing_steps);
+                        if (lower_worker.non_routed_layer_pct >= 0.0) {
+                            lower_non_routed_pct_str = format_pct(lower_worker.non_routed_layer_pct);
+                        }
                         lower_status_str = "success";
                     } else if (lower_exit == 2) {
                         lower_status_str = "safe_passage_failed";
@@ -1314,7 +1338,10 @@ int run_bench_mode(
                 lower_y_str,
                 lower_duration_str,
                 lower_routing_steps_str,
-                lower_status_str
+                lower_status_str,
+                non_routed_pct,
+                mid_non_routed_pct_str,
+                lower_non_routed_pct_str
             };
 
             std::ostringstream progress;
@@ -1322,6 +1349,7 @@ int run_bench_mode(
                 progress
                     << " id=" << empty_to_dash(plan.case_id)
                     << " routing_steps=" << empty_to_dash(routing_steps)
+                    << " non_routed_pct=" << empty_to_dash(non_routed_pct)
                     << " duration=" << duration_short_ss.str()
                     << " safe_passage_strategy=" << empty_to_dash(safe_passage_strategy_csv)
                     << " type=" << empty_to_dash(mapping_type_csv);

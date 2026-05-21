@@ -602,15 +602,13 @@ void apply_config_overrides(
         set_border_distance_percentage_from_config("BorderDistancePercentage");
     }
 
+    // Sentinels: x>0 explicit; 0 -> low/mid/high from dimensions.csv;
+    // -n (n>=1) -> compute_dimensions(...) + (n-1).
     if (config_json.contains("x")) {
         if (!config_json["x"].is_number_integer()) {
             throw std::runtime_error("Config key 'x' must be an integer");
         }
         x = config_json["x"].get<int>();
-        // -1 means compute from circuit dimensions
-        if (x <= 0 && x != -1) {
-            throw std::runtime_error("Config key 'x' must be > 0");
-        }
     }
 
     if (config_json.contains("y")) {
@@ -618,10 +616,6 @@ void apply_config_overrides(
             throw std::runtime_error("Config key 'y' must be an integer");
         }
         y = config_json["y"].get<int>();
-        // -1 means compute from circuit dimensions
-        if (y <= 0 && y != -1) {
-            throw std::runtime_error("Config key 'y' must be > 0");
-        }
     }
 
     if (config_json.contains("graph")) {

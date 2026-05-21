@@ -1,2 +1,0 @@
-guassian confidence is correlated only with gaussian size
-guassian size is correlated also with safe passage
