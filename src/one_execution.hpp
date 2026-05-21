@@ -85,6 +85,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     //----------circuit------------
 
+    const auto circ_init_start = std::chrono::steady_clock::now();
     Circuit circuit = Circuit();
 
     try {
@@ -99,6 +100,12 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         std::cerr << "Error: " << e.what() << std::endl;
         throw std::runtime_error("Error parsing QASM file");
     }
+
+    
+    
+    const auto circ_init_end = std::chrono::steady_clock::now();
+    const double circ_time_seconds =
+        std::chrono::duration<double>(circ_init_end - circ_init_start).count();
 
     if (PRINT_CIRCUIT) circuit.print_qubit_heap();
 
@@ -146,6 +153,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     //---------------graph----------------
 
+    const auto graph_init_start = std::chrono::steady_clock::now();
+
     const bool use_generated_graph = graph_path.empty();
     const int max_deg = circuit.getMaxInteractionDegree();
 
@@ -178,6 +187,11 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         graph_path
     );
 
+    
+    const auto graph_init_end = std::chrono::steady_clock::now();
+    const double graph_time_seconds =
+        std::chrono::duration<double>(graph_init_end - graph_init_start).count();
+
     if (graph.get_node_count() <= 0) {
         std::cerr << "Error: graph is empty or invalid.\n";
         throw std::runtime_error("Error: graph is empty or invalid");
@@ -203,6 +217,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
 
+    const auto mapping_start = std::chrono::steady_clock::now();
+
     Mapping mapping(
         circuit,
         graph,
@@ -223,7 +239,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         safe_passage_ignore_outer_layers
     );
 
-    const auto mapping_start = std::chrono::steady_clock::now();
     mapping.map();
     const auto mapping_end = std::chrono::steady_clock::now();
     const double mapping_time_seconds =
@@ -260,6 +275,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::unique_ptr<ITGateRoutingStrategy> tGateRoutingStrategyPtr;
     std::unique_ptr<IQubitRouter> routerPtr;
 
+    const auto routing_start = std::chrono::steady_clock::now();
+
     if (routing_strategy == "boost") {
 #if FTOQC_HAS_BOOST_ROUTER
         routerPtr = std::make_unique<Boost_QubitRouter>(mapping, layeredCircuit, graph);
@@ -292,7 +309,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         );
     }
 
-    const auto routing_start = std::chrono::steady_clock::now();
     routerPtr->route_circuit();
     const auto routing_end = std::chrono::steady_clock::now();
     const double routing_time_seconds =
@@ -304,10 +320,17 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double avg_parallelism = double(circuit.getNumGates()) / routerPtr->get_routing_length();
     std::cout << "Average Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
 
-    const double total_time_seconds = mapping_time_seconds + routing_time_seconds;
-    std::cout << "Mapping time: " << mapping_time_seconds << " s\n";
-    std::cout << "Routing time: " << routing_time_seconds << " s\n";
-    std::cout << "Total mapping + routing time: " << total_time_seconds << " s\n\n";
+
+    
+    const double total_mr_time_seconds = mapping_time_seconds + routing_time_seconds;
+    const double total_time_seconds = total_mr_time_seconds + circ_time_seconds + graph_time_seconds;
+    std::cout << "Circuit time:    " << circ_time_seconds << " s\n";
+    std::cout << "Graph init time: " << graph_time_seconds << " s\n";
+    std::cout << "Mapping time:    " << mapping_time_seconds << " s\n";
+    std::cout << "Routing time:    " << routing_time_seconds << " s\n";
+    
+    std::cout << "Total mapping + routing time: " << total_mr_time_seconds << " s\n\n";
+    std::cout << "Total time: " << total_time_seconds << " s\n\n";
 
     compute_and_print_circuit_metrics(layeredCircuit, path, false, &mapping, &graph);
 
