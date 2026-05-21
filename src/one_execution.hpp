@@ -79,8 +79,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double number_of_magic_states_multiplier,
     double border_distance_percentage, std::string routing_strategy,
     std::string t_routing_mode, int patience_threshold,
-    bool metrics_only,
-    bool use_layer_cache) {
+    bool use_layer_cache,
+    bool metrics_only) {
 
 
     //----------circuit------------

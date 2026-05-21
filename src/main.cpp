@@ -372,6 +372,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
     std::cout << "routing strategy: " << routing_strategy << std::endl;
     std::cout << "use_layer_cache: " << (use_layer_cache ? "true" : "false") << std::endl;
+    std::cout << "metrics_only: " << (metrics_only ? "true" : "false") << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
