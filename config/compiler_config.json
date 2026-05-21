@@ -3,7 +3,7 @@
 
   "type": "gaussian",
   "gaussian_strategy": "coarse",
-  "safe_passage_strategy": "connectivity",
+  "safe_passage_strategy": "cube",
   "MagicStatePlacementStrategy": "center_circle",
 
   "x": -1,
@@ -19,10 +19,10 @@
   "MAPPED_GAUSSIAN_WEIGHT": 1.2,
   "BASE_GAUSSIAN_WEIGHT": 1.4,
   "EXTERNAL_WEIGHT": 0.0,
-  "SIZE_MOLTIPLIER": 0.3,
-  "GAUSSIAN_CONFIDENCE": 0.66,
+  "SIZE_MOLTIPLIER": 0.7,
+  "GAUSSIAN_CONFIDENCE": 0.99,
 
-  "routing_strategy": "naive",
+  "routing_strategy": "boost",
   "t-routing-mode": "smart_t_routing",
 
   "use_layer_cache": true

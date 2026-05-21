@@ -57,6 +57,7 @@ env/
 
 visualization/
 universal_set_qasms
+qasm_graphs
 qasms/vqe_n24.qasm
 .codex
 
