@@ -709,13 +709,19 @@ void argument_parsing(
     std::string& routing_method,
     std::string& t_routing_mode,
     int& patience_threshold,
-    bool& use_layer_cache
+    bool& use_layer_cache,
+    bool& metrics_only
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--help") {
             print_usage(argv[0]);
             exit(0);
+        }
+
+        if (arg == "--metrics-only") {
+            metrics_only = true;
+            continue;
         }
 
         if (arg == "--config") {

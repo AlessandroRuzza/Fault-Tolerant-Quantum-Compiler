@@ -78,6 +78,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double number_of_magic_states_multiplier,
     double border_distance_percentage, std::string routing_strategy,
     std::string t_routing_mode, int patience_threshold,
+    bool metrics_only,
     bool use_layer_cache) {
 
 
@@ -107,6 +108,13 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         return benchmarkResult{0, 0};
     }
 
+    // --metrics-only: build layers from the parsed circuit, write CSV, then exit.
+    // Path-length metrics are skipped (no mapping is performed).
+    if (metrics_only) {
+        LayeredCircuit layeredCircuit(circuit, LAYERING_LOOKAHEAD);
+        compute_and_print_circuit_metrics(layeredCircuit, path, true);
+        return benchmarkResult{0, 0};
+    }
 
     std::cout << "Setting up circuit with " << qubitsNumber << " qubits." << std::endl;
 
@@ -238,7 +246,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     if (PRINT_LAYER) layeredCircuit.print_layered();
 
 
-    CircuitMetrics metrics = compute_and_print_circuit_metrics(layeredCircuit, mapping, graph, path, true);
+    CircuitMetrics metrics = compute_and_print_circuit_metrics(layeredCircuit, path, true, &mapping, &graph);
 
     // if(metrics.layer_reuse_ratio > 0.95){
     //     use_layer_cache = true;
@@ -300,7 +308,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Routing time: " << routing_time_seconds << " s\n";
     std::cout << "Total mapping + routing time: " << total_time_seconds << " s\n\n";
 
-    compute_and_print_circuit_metrics(layeredCircuit, mapping, graph, path, false);  // metrics available if needed
+    compute_and_print_circuit_metrics(layeredCircuit, path, false, &mapping, &graph);
 
     return benchmarkResult{
         routerPtr->get_routing_length(),

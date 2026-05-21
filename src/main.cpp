@@ -278,6 +278,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::string t_routing_mode = "normal_t_routing";
     int patience_threshold = 3;
     bool use_layer_cache = true;
+    bool metrics_only = false;
 
     apply_config_overrides(
         argc,
@@ -337,7 +338,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         routing_strategy,
         t_routing_mode,
         patience_threshold,
-        use_layer_cache
+        use_layer_cache,
+        metrics_only
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -396,7 +398,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         routing_strategy,
         t_routing_mode,
         patience_threshold,
-        use_layer_cache
+        use_layer_cache,
+        metrics_only
     );
     write_benchmark_result_file_if_requested(result);
 
