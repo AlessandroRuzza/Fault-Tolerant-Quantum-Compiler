@@ -8,6 +8,7 @@ SCRIPT="${REPO_ROOT}/scripts/run_wisq.py"
 qasm="${1:-${QASM:-}}"
 output="${2:-${OUTPUT:-}}"
 mr_timeout="${3:-${MR_TIMEOUT:-}}"
+same_graph="${4:-${SAMEGRAPH:-}}"
 
 read_makeflag_var() {
     key="$1"
@@ -32,6 +33,10 @@ fi
 
 if [ -z "$mr_timeout" ]; then
     mr_timeout="$(read_makeflag_var MR_TIMEOUT || true)"
+fi
+
+if [ -z "$same_graph" ]; then
+    same_graph="$(read_makeflag_var SAMEGRAPH || true)"
 fi
 
 if [ -z "$qasm" ]; then
@@ -60,6 +65,10 @@ fi
 
 if [ -n "$mr_timeout" ]; then
     set -- "$@" --mr_timeout "$mr_timeout"
+fi
+
+if [ -n "$same_graph" ]; then
+    set -- "$@" --samegraph
 fi
 
 exec "$@"

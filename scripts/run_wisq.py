@@ -60,6 +60,11 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
         help="Append to --output instead of overwriting",
     )
     parser.add_argument(
+        "--samegraph",
+        action="store_true",
+        help="Force using graphs from qasm_graphs/",
+    )
+    parser.add_argument(
         "--mr_timeout",
         type=int,
         default=30*60,
@@ -177,7 +182,7 @@ def main() -> int:
     args, extra = parse_args()
     out_file = Path(args.output) if args.output else None
     if out_file is None:
-        print("#### WARNING: writing only to stdout. ########################à")
+        print("####### WARNING: writing only to stdout. ########################")
 
     qasm_paths = []
     for qasm_str in args.qasm:
@@ -191,7 +196,15 @@ def main() -> int:
     first_written = [True]
 
     def run_and_write(qasm_path: Path) -> None:
-        row = run_one(qasm_path, args.mr_timeout, extra)
+        run_extra = list(extra)
+        if args.samegraph:
+            circ = circuit_name(qasm_path)
+            graph_path = REPO_ROOT / "qasm_graphs" / f"{circ}.graph"
+            if graph_path.exists():
+                run_extra = ["-arch", str(graph_path)] + run_extra
+            else:
+                print(f"warning: no graph found for {circ} at {graph_path}", file=sys.stderr)
+        row = run_one(qasm_path, args.mr_timeout, run_extra)
         with lock:
             write_row(row, out_file, first=first_written[0], append=args.append)
             first_written[0] = False
