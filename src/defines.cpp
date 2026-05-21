@@ -26,5 +26,6 @@ const int LAYERING_LOOKAHEAD = 5;
 
 const bool WRITE_UNIVERSAL_QASM = true;
 const bool WRITE_GRAPH_FOR_WISQ = true;
+const bool GRAPH_FOR_WISQ_USES_3x3_CUBE = true;
 
 }

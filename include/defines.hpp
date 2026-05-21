@@ -27,6 +27,7 @@ extern const int LAYERING_LOOKAHEAD;
 
 extern const bool WRITE_UNIVERSAL_QASM;
 extern const bool WRITE_GRAPH_FOR_WISQ;
+extern const bool GRAPH_FOR_WISQ_USES_3x3_CUBE;
 
 }
 
