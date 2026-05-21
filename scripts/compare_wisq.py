@@ -557,44 +557,7 @@ def main():
 
     if not (do_routing or do_duration):
         raise RuntimeError("Must do either routing, duration or both.")
-
-    # ── per-circuit subfolders ────────────────────────────────────────────────
-    for cg in common:
-        circuit_dir = os.path.join(args.output_dir, cg)
-        os.makedirs(circuit_dir, exist_ok=True)
-        cfg_map = our_agg.get(cg, {})
-        wisq_entry = wisq_agg.get(cg, {})
-        print(f"\n──── {cg} ────")
-
-        if do_routing:
-            plot_circuit_bars(
-                cg, cfg_map, wisq_entry.get("routing"),
-                "routing_min", "routing steps",
-                "Routing Steps: Our Configs vs WISQ  (ours = min over runs)",
-                "bars_routing_steps.png", circuit_dir, generated,
-            )
-            plot_circuit_ratio_bars(
-                cg, cfg_map, wisq_entry.get("routing"),
-                "routing_min", "routing steps ratio (our ÷ wisq)",
-                "Routing Steps Ratio: Ours ÷ WISQ",
-                "ratio_routing.png", circuit_dir, generated,
-            )
-
-        if do_duration:
-            plot_circuit_bars(
-                cg, cfg_map, wisq_entry.get("duration"),
-                "duration_median", "duration (s)",
-                "Execution Time: Our Configs vs WISQ  (ours = median over runs)",
-                "bars_duration.png", circuit_dir, generated,
-            )
-            plot_circuit_ratio_bars(
-                cg, cfg_map, wisq_entry.get("duration"),
-                "duration_median", "Speedup (wisq ÷ ours)",
-                "Speedup (WISQ_Time ÷ Our_Time)",
-                "ratio_duration.png", circuit_dir, generated, 
-                invertDiv=True
-            )
-
+    
     # ── cross-circuit summary: scatter + heatmaps in root ────────────────────
     print("\n──── Cross-circuit summary plots ────")
     if do_routing:
@@ -634,6 +597,44 @@ def main():
             log_scale=True,
         )
 
+    # ── per-circuit subfolders ────────────────────────────────────────────────
+    for cg in common:
+        circuit_dir = os.path.join(args.output_dir, cg)
+        os.makedirs(circuit_dir, exist_ok=True)
+        cfg_map = our_agg.get(cg, {})
+        wisq_entry = wisq_agg.get(cg, {})
+        print(f"\n──── {cg} ────")
+
+        if do_routing:
+            plot_circuit_bars(
+                cg, cfg_map, wisq_entry.get("routing"),
+                "routing_min", "routing steps",
+                "Routing Steps: Our Configs vs WISQ  (ours = min over runs)",
+                "bars_routing_steps.png", circuit_dir, generated,
+            )
+            plot_circuit_ratio_bars(
+                cg, cfg_map, wisq_entry.get("routing"),
+                "routing_min", "routing steps ratio (our ÷ wisq)",
+                "Routing Steps Ratio: Ours ÷ WISQ",
+                "ratio_routing.png", circuit_dir, generated,
+            )
+
+        if do_duration:
+            plot_circuit_bars(
+                cg, cfg_map, wisq_entry.get("duration"),
+                "duration_median", "duration (s)",
+                "Execution Time: Our Configs vs WISQ  (ours = median over runs)",
+                "bars_duration.png", circuit_dir, generated,
+            )
+            plot_circuit_ratio_bars(
+                cg, cfg_map, wisq_entry.get("duration"),
+                "duration_median", "Speedup (wisq ÷ ours)",
+                "Speedup (WISQ_Time ÷ Our_Time)",
+                "ratio_duration.png", circuit_dir, generated, 
+                invertDiv=True
+            )
+
+  
     print(f"\n{len(generated)} plots → {args.output_dir}/")
     # for p in generated:
     #     print(f"  {p}")
