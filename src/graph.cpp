@@ -453,21 +453,28 @@ void Graph::write_file(const std::string& path) const {
     if(GRAPH_FOR_WISQ_USES_3x3_CUBE)
         locked_qubits.reserve(maxX*maxY);
     std::vector<int> magic_state_indices;
+    
+    const auto update_locked = [&locked_qubits, width](int wisq_idx){
+        if(GRAPH_FOR_WISQ_USES_3x3_CUBE)
+            for (short i = -1; i <= 1; i++)
+            {
+                locked_qubits.insert(wisq_idx - width + i);
+                locked_qubits.insert(wisq_idx + i);
+                locked_qubits.insert(wisq_idx + width + i);
+            }
+    };
+    
     for (const Node& node : nodes) {
         const int wisq_idx = node.coordY * width + node.coordX;
         if (magic_set.count(node.id)) {
             magic_state_indices.push_back(wisq_idx);
+            update_locked(wisq_idx);
         } else if (locked_qubits.count(wisq_idx) == 0) {
             alg_qubits.push_back(wisq_idx);
-            
-            if(GRAPH_FOR_WISQ_USES_3x3_CUBE)
-                for (short i = -1; i <= 1; i++)
-                {
-                    locked_qubits.insert(wisq_idx - width + i);
-                    locked_qubits.insert(wisq_idx + i);
-                    locked_qubits.insert(wisq_idx + width + i);
-                }
+            update_locked(wisq_idx);
         }
+
+        
     }
 
     json j;

@@ -177,6 +177,7 @@ std::string normalize_magic_state_placement_strategy(std::string value) {
         return static_cast<char>(std::tolower(c));
     });
     std::replace(value.begin(), value.end(), '-', '_');
+    if (value == "passage_no_subgraph" || value == "no_subgraph" || value == "no_subgraphs" ) return "passage_no_subgraphs";
     return value;
 }
 
