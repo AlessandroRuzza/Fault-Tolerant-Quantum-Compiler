@@ -500,7 +500,7 @@ def main():
     )
     parser.add_argument("--our-csv", default=DEFAULT_OUR_GLOB,
                         help=f"Glob/file for our tool CSVs (default: {DEFAULT_OUR_GLOB})")
-    parser.add_argument("--wisq-csv", default=DEFAULT_WISQ_CSV,
+    parser.add_argument("--wisq-csv", required=True,
                         help=f"WISQ results CSV (default: {DEFAULT_WISQ_CSV})")
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR,
                         help=f"Plot output dir (default: {DEFAULT_OUTPUT_DIR})")
@@ -555,15 +555,18 @@ def main():
     do_routing = args.metric in ("routing", "both")
     do_duration = args.metric in ("duration", "both")
 
+    if not (do_routing or do_duration):
+        raise RuntimeError("Must do either routing, duration or both.")
+
     # ── per-circuit subfolders ────────────────────────────────────────────────
     for cg in common:
         circuit_dir = os.path.join(args.output_dir, cg)
         os.makedirs(circuit_dir, exist_ok=True)
         cfg_map = our_agg.get(cg, {})
         wisq_entry = wisq_agg.get(cg, {})
+        print(f"\n──── {cg} ────")
 
         if do_routing:
-            print(f"\n── {cg}: routing ──")
             plot_circuit_bars(
                 cg, cfg_map, wisq_entry.get("routing"),
                 "routing_min", "routing steps",
@@ -578,7 +581,6 @@ def main():
             )
 
         if do_duration:
-            print(f"\n── {cg}: duration ──")
             plot_circuit_bars(
                 cg, cfg_map, wisq_entry.get("duration"),
                 "duration_median", "duration (s)",
@@ -594,7 +596,7 @@ def main():
             )
 
     # ── cross-circuit summary: scatter + heatmaps in root ────────────────────
-    print("\n── Cross-circuit summary plots ──")
+    print("\n──── Cross-circuit summary plots ────")
     if do_routing:
         r_mat, r_cols = build_matrix(common, our_agg, wisq_agg, all_cfg_labels,
                                      "routing_min", "routing")
@@ -633,8 +635,8 @@ def main():
         )
 
     print(f"\n{len(generated)} plots → {args.output_dir}/")
-    for p in generated:
-        print(f"  {p}")
+    # for p in generated:
+    #     print(f"  {p}")
 
 
 if __name__ == "__main__":
