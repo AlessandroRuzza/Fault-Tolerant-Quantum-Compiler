@@ -16,6 +16,7 @@
   "magic_aware_strategy": ["distance", "center", "random"],
   "gaussian_strategy": ["coarse", "fine"],
   "safe_passage_strategy": ["connectivity", "cube", "passage_no_subgraphs"],
+  "T_states_proportional": [true, false],
 
   "magic_configs": [
     {
