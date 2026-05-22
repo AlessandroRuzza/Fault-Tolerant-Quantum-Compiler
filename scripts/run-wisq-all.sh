@@ -8,7 +8,8 @@ QASM_DIR="${REPO_ROOT}/universal_set_qasms"
 
 output="${1:-${OUTPUT:-}}"
 mr_timeout="${2:-${MR_TIMEOUT:-}}"
-workers="${2:-${WORKERS:-}}"
+workers="${3:-${WORKERS:-}}"
+same_graph="${4:-${SAMEGRAPH:-}}"
 
 read_makeflag_var() {
     key="$1"
@@ -35,6 +36,10 @@ if [ -z "$mr_timeout" ]; then
     mr_timeout="$(read_makeflag_var MR_TIMEOUT || true)"
 fi
 
+if [ -z "$same_graph" ]; then
+    same_graph="$(read_makeflag_var SAMEGRAPH || true)"
+fi
+
 set -- "$PYTHON" "$SCRIPT" --qasm "$QASM_DIR"/*.qasm
 
 if [ -n "$output" ]; then
@@ -47,6 +52,10 @@ fi
 
 if [ -n "$workers" ]; then
     set -- "$@" --workers "$workers"
+fi
+
+if [ -n "$same_graph" ]; then
+    set -- "$@" --samegraph
 fi
 
 exec "$@"
