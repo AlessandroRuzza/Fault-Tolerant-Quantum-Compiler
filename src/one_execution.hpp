@@ -244,8 +244,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         repetition_count = 1;
     }
 
+    constexpr bool print_reps = true;
+
     for (int repetition = 0; repetition < repetition_count; ++repetition) {
-        std::cout << "\n------- MAPPING & ROUTING #" << repetition+1 << " ---------" << std::endl;
+        if(print_reps) std::cout << "\n------- MAPPING & ROUTING #" << repetition+1 << " ---------" << std::endl;
         
         auto graph = std::make_unique<Graph>(graph_template);
 
@@ -349,7 +351,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             routerPtr->print_non_routed_histogram();
 
         if (routing_steps < best_routing_steps) {
-            std::cout << "NEW BEST!" << std::endl;
+            std::cout << "NEW BEST! #" << repetition << std::endl;
             best_routing_steps = routing_steps;
             best_avg_parallelism = avg_parallelism;
             best_non_routed_layer_pct = non_routed_layer_pct;
@@ -361,10 +363,12 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             best_t_gate_strategy = std::move(tGateRoutingStrategyPtr);
             best_route_metrics = std::move(route_metrics);
         }
-
-        std::cout << "Routing steps: " << routing_steps << "\n";
-        std::cout << "Avg parallelism: " << avg_parallelism << "\n";
-        std::cout << "Non-routed layer %: " << non_routed_layer_pct << "\n";
+            
+        if(print_reps) {
+            std::cout << "Routing steps: " << routing_steps << "\n";
+            std::cout << "Avg parallelism: " << avg_parallelism << "\n";
+            std::cout << "Non-routed layer %: " << non_routed_layer_pct << "\n";
+        }
     }
 
     if (!best_router || !best_mapping || !best_graph || !best_layered) {

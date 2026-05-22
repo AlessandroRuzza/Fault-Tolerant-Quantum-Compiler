@@ -360,7 +360,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
 }
 
 void QubitRouter::route_circuit() {
-    std::cout << "Starting qubit routing...\n";
+    // std::cout << "Starting qubit routing...\n";
 
     routing_steps.clear();
     routing_steps.reserve(circuit.getNumLayers());
@@ -494,9 +494,7 @@ void QubitRouter::route_circuit() {
         circuit.update_layers(used_gates);
     }
 
-
-    
-    std::cout << "Qubit routing completed.\n";
+    // std::cout << "Qubit routing completed.\n";
 }
 
 void QubitRouter::print_routing_steps() const {
