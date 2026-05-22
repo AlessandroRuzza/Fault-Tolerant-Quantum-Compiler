@@ -2,6 +2,7 @@
   "circuit": "qft_20",
 
   "type": "random",
+  "repetition": 300,
   "gaussian_strategy": "coarse",
   "safe_passage_strategy": "cube",
   "MagicStatePlacementStrategy": "center_circle",
