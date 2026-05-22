@@ -20,6 +20,7 @@ from decimal import Decimal, InvalidOperation
 
 
 WRITE_REPORT_MD = False
+ALIGN_HEATMAP_CONFIGS = True
 
 
 try:
@@ -364,6 +365,20 @@ def build_requested_heatmap_items(start_index=48):
                 "filename": f"{plot_index:02d}_best_config_count_by_{heatmap_slug(col_axis)}.png",
                 "caption": f"Best routing config count by {col_label}",
                 "title": f"Best routing config count by {col_label}",
+                "axis_slug": col_axis,
+                "axis_key": col_key,
+                "axis_label": col_label,
+                "subfolder": subfolder,
+            }
+        )
+        plot_index += 1
+
+        items.append(
+            {
+                "kind": "best_config_count_non_routed",
+                "filename": f"{plot_index:02d}_best_non_routed_count_by_{heatmap_slug(col_axis)}.png",
+                "caption": f"Best non-routed layer % config count by {col_label}",
+                "title": f"Best non-routed layer % config count by {col_label}",
                 "axis_slug": col_axis,
                 "axis_key": col_key,
                 "axis_label": col_label,
@@ -2846,6 +2861,7 @@ def make_pair_heatmap(
     value_format="{:.2f}",
     subset_transform=None,
     subfolder=None,
+    removed_counts=None,
 ):
     row_labels = sorted(
         {heatmap_axis_value(r, row_key) for r in rows},
@@ -2900,10 +2916,14 @@ def make_pair_heatmap(
             val = matrix[i, j]
             sample_count = count_matrix[i, j]
             metric_text = "-" if np.isnan(val) else value_format.format(val)
+            rk = row_labels[i]
+            ck = col_labels[j]
+            removed = removed_counts.get((rk, ck), 0) if removed_counts else 0
+            removed_text = f"\n(-{removed})" if removed > 0 else ""
             if value_label_suffix:
-                text = f"{metric_text}\n{value_label_suffix}\nn={sample_count}"
+                text = f"{metric_text}\n{value_label_suffix}\nn={sample_count}{removed_text}"
             else:
-                text = f"{metric_text}\nn={sample_count}"
+                text = f"{metric_text}\nn={sample_count}{removed_text}"
             if np.isnan(val):
                 color = "#999999"
             else:
@@ -3189,6 +3209,24 @@ def plot_axis_barplot(
             continue
         grouped[heatmap_axis_value(row, axis_key)].append(row)
 
+    removed_per_bar = {}
+    if ALIGN_HEATMAP_CONFIGS and metric != "success_rate" and len(grouped) > 1:
+        base_fields = heatmap_base_config_fields(axis_key, axis_key)
+        bar_configs = {
+            label: {
+                tuple(heatmap_axis_value(r, f) for f in base_fields)
+                for r in bar_rows
+            }
+            for label, bar_rows in grouped.items()
+        }
+        common = set.intersection(*bar_configs.values())
+        for label, configs in bar_configs.items():
+            removed_per_bar[label] = len(configs) - len(common)
+        grouped = {
+            label: [r for r in bar_rows if tuple(heatmap_axis_value(r, f) for f in base_fields) in common]
+            for label, bar_rows in grouped.items()
+        }
+
     labels = sorted(
         grouped.keys(),
         key=lambda label: heatmap_axis_sort_key(axis_key, label),
@@ -3216,6 +3254,7 @@ def plot_axis_barplot(
 
     display_labels = [
         label_with_sample_count(label, len(values))
+        + (f"\n(-{removed_per_bar[label]})" if removed_per_bar.get(label, 0) > 0 else "")
         for label, values in zip(valid_labels, value_groups)
     ]
     means = [float(np.mean(values)) for values in value_groups]
@@ -3500,6 +3539,43 @@ def filter_heatmap_rows(rows, row_key, col_key):
         for row in rows
         if has_heatmap_axis_value(row, row_key) and has_heatmap_axis_value(row, col_key)
     ]
+
+
+def heatmap_base_config_fields(row_key, col_key):
+    # A "configuration" is the set of independent sweep knobs (the candidate
+    # heatmap axes) plus the circuit. Derived columns (e.g. grid size, which is
+    # scaled by size_moltiplier) are intentionally excluded so they don't make
+    # otherwise-identical configs look different across the two varied axes.
+    identity = {field for field, _label in HEATMAP_AXIS_SPECS.values()}
+    identity.add("circuit_name")
+    return sorted(identity - {row_key, col_key})
+
+
+def align_rows_to_common_configs(rows, row_key, col_key):
+    # Keep only configurations present in *every* populated cell of the heatmap,
+    # so all cells aggregate over the same set of base configs. Without this, a
+    # config that fails (and is dropped) in one cell but survives in another
+    # makes per-cell means/medians incomparable.
+    # Returns (aligned_rows, removed_per_cell) where removed_per_cell maps
+    # (row_val, col_val) -> number of configs dropped from that cell.
+    base_fields = heatmap_base_config_fields(row_key, col_key)
+    base_keys = [
+        tuple(heatmap_axis_value(row, field) for field in base_fields)
+        for row in rows
+    ]
+    cell_configs = defaultdict(set)
+    for row, base_key in zip(rows, base_keys):
+        cell = (heatmap_axis_value(row, row_key), heatmap_axis_value(row, col_key))
+        cell_configs[cell].add(base_key)
+    no_removed = {cell: 0 for cell in cell_configs}
+    if len(cell_configs) <= 1:
+        return rows, no_removed
+    common = set.intersection(*cell_configs.values())
+    if not common:
+        return rows, no_removed
+    aligned = [row for row, base_key in zip(rows, base_keys) if base_key in common]
+    removed_per_cell = {cell: len(configs) - len(common) for cell, configs in cell_configs.items()}
+    return aligned, removed_per_cell
 
 
 def project_root():
@@ -4567,6 +4643,11 @@ def _process_single_heatmap_item(
     if item["kind"] == "heatmap":
         metric_rows = heatmap_rows_by_metric[item["metric"]]
         heatmap_rows = filter_heatmap_rows(metric_rows, item["row_key"], item["col_key"])
+        removed_counts = None
+        if ALIGN_HEATMAP_CONFIGS and item["metric"] != "success_rate":
+            heatmap_rows, removed_counts = align_rows_to_common_configs(
+                heatmap_rows, item["row_key"], item["col_key"]
+            )
         if item.get("median"):
             value_fn = requested_heatmap_value_fn_median(item["metric"])
             value_label_suffix = "mediana"
@@ -4591,6 +4672,7 @@ def _process_single_heatmap_item(
             skipped,
             value_format=item["value_format"],
             subfolder=item.get("subfolder"),
+            removed_counts=removed_counts,
         )
         return
 
@@ -4915,6 +4997,134 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
 
     csv_rows.sort(key=lambda row: (row["axis"], row["best_count"] * -1, row["axis_value"]))
     csv_path = os.path.join(output_dir, "best_config_counts_by_heatmap_axis.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "axis",
+                "axis_label",
+                "axis_value",
+                "best_count",
+                "strict_best_count",
+                "circuits",
+                "best_share",
+                "strict_best_share",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(csv_rows)
+
+    return csv_path
+
+
+def plot_best_non_routed_config_counts_by_heatmap_axis(rows_success_with_non_routed, output_dir, generated, skipped=None):
+    csv_rows = []
+    items = [
+        item for item in REQUESTED_HEATMAP_ITEMS if item.get("kind") == "best_config_count_non_routed"
+    ]
+
+    for item in items:
+        axis_slug = item["axis_slug"]
+        axis_key = item["axis_key"]
+        axis_label = item["axis_label"]
+        subfolder = item.get("subfolder", f"heatmap_{axis_slug}")
+        by_circuit = defaultdict(lambda: defaultdict(list))
+
+        for row in rows_success_with_non_routed:
+            circuit_name = row.get("circuit_name")
+            if not circuit_name:
+                continue
+            if not has_heatmap_axis_value(row, axis_key):
+                continue
+            axis_value = heatmap_axis_value(row, axis_key)
+            non_routed_pct = row.get("non_routed_layer_pct_f")
+            if non_routed_pct is None or (isinstance(non_routed_pct, float) and math.isnan(non_routed_pct)):
+                continue
+            by_circuit[circuit_name][axis_value].append(non_routed_pct)
+
+        counts = Counter()
+        strict_counts = Counter()
+        circuit_count = 0
+        for values_by_axis in by_circuit.values():
+            min_by_axis = {
+                axis_value: min(values)
+                for axis_value, values in values_by_axis.items()
+                if values
+            }
+            if not min_by_axis:
+                continue
+            best_value = min(min_by_axis.values())
+            best_axis_values = [
+                axis_value for axis_value, value in min_by_axis.items()
+                if math.isclose(value, best_value, rel_tol=1e-9, abs_tol=1e-9)
+            ]
+            is_sole_best = len(best_axis_values) == 1
+            for axis_value in best_axis_values:
+                counts[axis_value] += 1
+                if is_sole_best:
+                    strict_counts[axis_value] += 1
+            circuit_count += 1
+
+        filename = item["filename"]
+        if not counts:
+            save_empty_plot(
+                item["title"],
+                output_dir,
+                filename,
+                generated,
+                message=f"No data for {axis_label}",
+                subfolder=subfolder,
+                ylabel="best-count",
+            )
+            continue
+
+        labels = sorted(
+            counts.keys(),
+            key=lambda label: heatmap_axis_sort_key(axis_key, label),
+        )
+        strict_vals = [strict_counts.get(label, 0) for label in labels]
+        tied_vals = [counts[label] - strict_counts.get(label, 0) for label in labels]
+        fig, ax = plt.subplots(figsize=(max(8.5, len(labels) * 1.2), 6.5))
+        ax.bar(labels, strict_vals, color="#577590", label="strict best (sole winner)")
+        ax.bar(labels, tied_vals, bottom=strict_vals, color="#A8C5D8", label="tied best")
+        ax.set_title(
+            f"Best non-routed layer % config count by {axis_label} (n circuits={circuit_count})\n"
+            "lower non-routed layer % wins; stacked: strict (sole) vs tied"
+        )
+        ax.set_ylabel("best-count")
+        ax.tick_params(axis="x", rotation=35)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=2, fontsize=9, frameon=True)
+        for i, label in enumerate(labels):
+            total = counts[label]
+            strict = strict_counts.get(label, 0)
+            ax.text(
+                i, total + 0.15, f"{total}\n({strict})",
+                ha="center", va="bottom", fontsize=8, color="#333333",
+            )
+
+        save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
+
+        for label in labels:
+            count = counts[label]
+            strict = strict_counts.get(label, 0)
+            csv_rows.append(
+                {
+                    "axis": axis_slug,
+                    "axis_label": axis_label,
+                    "axis_value": label,
+                    "best_count": count,
+                    "strict_best_count": strict,
+                    "circuits": circuit_count,
+                    "best_share": (count / circuit_count) if circuit_count else 0.0,
+                    "strict_best_share": (strict / circuit_count) if circuit_count else 0.0,
+                }
+            )
+
+    if not csv_rows:
+        return None
+
+    csv_rows.sort(key=lambda row: (row["axis"], row["best_count"] * -1, row["axis_value"]))
+    csv_path = os.path.join(output_dir, "best_non_routed_config_counts_by_heatmap_axis.csv")
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
@@ -5638,6 +5848,12 @@ def main():
     )
     best_config_counts_csv_path = plot_best_config_counts_by_heatmap_axis(
         rows_success_with_routing,
+        output_dir,
+        generated,
+        skipped,
+    )
+    plot_best_non_routed_config_counts_by_heatmap_axis(
+        rows_success_with_non_routed,
         output_dir,
         generated,
         skipped,
