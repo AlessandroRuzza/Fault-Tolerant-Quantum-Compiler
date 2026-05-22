@@ -89,8 +89,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double total_mr_time_seconds = 0.0;
     double total_time_seconds = 0.0;
 
-    const auto actual_exec_start = std::chrono::steady_clock::now();
-
     //----------circuit------------
 
     const auto circ_init_start = std::chrono::steady_clock::now();
@@ -369,9 +367,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         std::cout << "Non-routed layer %: " << non_routed_layer_pct << "\n";
     }
 
-    const auto actual_exec_end = std::chrono::steady_clock::now();
-    const auto actual_exec_time_seconds = std::chrono::duration<double>(actual_exec_end - actual_exec_start).count();
-
     if (!best_router || !best_mapping || !best_graph || !best_layered) {
         throw std::runtime_error("Mapping/routing repetitions produced no result.");
     }
@@ -400,7 +395,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Routing time:    " << routing_time_seconds << " s\n";
     std::cout << "Total mapping + routing time: " << total_mr_time_seconds << " s\n\n";
     std::cout << "Total time: " << total_time_seconds << " s\n\n";
-    std::cout << "Total time (incl. instantiations and prints): " << actual_exec_time_seconds << " s\n\n";
     
     (void)best_layered;
     (void)best_path_strategy;

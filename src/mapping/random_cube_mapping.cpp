@@ -88,10 +88,6 @@ void Mapping::random_cube_mapping() {
                 }
             }
 
-
-
-
-
             for (int x = 0; x < width; x += 2) {
                 const int nid = y * width + x;
                 if (magic_set.count(nid +1)) {x -= 1; continue;}
@@ -101,15 +97,12 @@ void Mapping::random_cube_mapping() {
 
                 candidates.push_back(nid);
             }
-        
-
         }
 
         if (PRINT_MAPPING_GRAPH) {
             const std::unordered_set<int> cand_set(candidates.begin(), candidates.end());
             graph.print_rectangular(cand_set);
         }
-
 
         if (static_cast<int>(candidates.size()) < circuit.getNumQubits())
             throw SafePassageException(
