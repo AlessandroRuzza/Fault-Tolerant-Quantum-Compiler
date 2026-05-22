@@ -1,12 +1,15 @@
 {
   "circuit": [
     "t_test",
+    "adder_n4",
+    "53qubits_155gate_57layers",
     "t_test2",
-    "square_root_n45",
     "qft_20",
-    "seca_n11",
+    "19qubits_521gate_352layers",
     "wstate_n27",
-    "qaoa_n6"
+    "square_root_n45",
+    "multiplier_n75",
+    "ghz_state_n255"
   ],
 
   "type": ["gaussian", "magic_aware", "random"],
@@ -39,7 +42,7 @@
   "x": -1,
   "y": -1,
 
-  "routing_strategy": ["naive", "congestion"],
+  "routing_strategy": ["naive", "congestion", "boost"],
   "t-routing-mode": ["smart_t_routing", "normal_t_routing"],
   "use_layer_cache": [true, false],
 
