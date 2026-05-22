@@ -378,8 +378,8 @@ private:
             CNOT_threshold = 1;
         }
         
-        std::cout << "\ntotal_qubits:" << total_qubits << "\n";
         if(PRINT_MAPPING){
+            std::cout << "\ntotal_qubits:" << total_qubits << "\n";
             std::cout << "T gates per qubit - Mean: " << t_mean << ", Std: " << t_std << "\n";
             std::cout << "T_count lower bound: " << T_lower_bound << "\n";
             std::cout << "T_count upper bound: " << T_upper_bound << "\n";
