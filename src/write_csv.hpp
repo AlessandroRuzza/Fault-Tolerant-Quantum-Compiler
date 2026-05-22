@@ -18,6 +18,28 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "status,exit_code,duration_seconds,log_file,error_excerpt,"
     "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
     "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,t_states_proportional,resolved_n_magic";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV13 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,t_states_proportional";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV12 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,size_moltiplier,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
     "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct";
 
 inline constexpr const char *kBenchmarkRunsCsvHeaderV11 =
@@ -352,7 +374,9 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV11 ||
+        (first_line == kBenchmarkRunsCsvHeaderV13 ||
+         first_line == kBenchmarkRunsCsvHeaderV12 ||
+         first_line == kBenchmarkRunsCsvHeaderV11 ||
          first_line == kBenchmarkRunsCsvHeaderV10 ||
          first_line == kBenchmarkRunsCsvHeaderV9 ||
          first_line == kBenchmarkRunsCsvHeaderV8 ||
@@ -384,6 +408,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v13 = (first_line == kBenchmarkRunsCsvHeaderV13);
+            const bool from_v12 = (first_line == kBenchmarkRunsCsvHeaderV12);
             const bool from_v11 = (first_line == kBenchmarkRunsCsvHeaderV11);
             const bool from_v10 = (first_line == kBenchmarkRunsCsvHeaderV10);
             const bool from_v9 = (first_line == kBenchmarkRunsCsvHeaderV9);
@@ -398,7 +424,16 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v11) {
+            if (from_v13) {
+                // V13 is the first 46 columns; resolved_n_magic added at the end.
+                migrated = parsed;
+                migrated.resize(46);
+            } else if (from_v12) {
+                // V12 is the first 45 columns of the current header; the new
+                // t_states_proportional column is left empty for legacy rows.
+                migrated = parsed;
+                migrated.resize(45);
+            } else if (from_v11) {
                 // V11 is the first 42 columns of V12; pass through unchanged.
                 migrated = parsed;
                 migrated.resize(42);

@@ -127,7 +127,16 @@ void QubitRouter::precompute_magic_state_order() {
 
     const std::vector<int> magic_state_ids = graph.get_magic_state_ids();
     if (magic_state_ids.empty()) {
-        throw std::runtime_error("No magic states available in graph.");
+        // No magic-state nodes in the graph. This is only valid if the circuit
+        // also has no T/Tdg gates to route — otherwise routing cannot proceed.
+        for (const Gate& g : circuit.getGates()) {
+            if (g.name == "t" || g.name == "tdg") {
+                throw std::runtime_error(
+                    "No magic states available in graph, but circuit contains T/Tdg gates."
+                );
+            }
+        }
+        return;
     }
 
     std::unordered_set<int> blocked_nodes = get_used_nodes();

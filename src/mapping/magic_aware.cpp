@@ -96,9 +96,9 @@ void Mapping::one_iteration_magic_aware_mapping(Qubit* qubit, int* iterations) {
                     std::to_string(second_qubit_mapped_node) + ".\n");
             }
         } else {
-            int best_magic_state_id = graph.getBestMagicStateId();
             if (MAPPING_VERBOSE) std::cout << "Second qubit " << second_qubit << " is not mapped yet.\n";
             if (qubit->getTCount() > T_upper_bound) {
+                int best_magic_state_id = graph.getBestMagicStateId();
                 if (MAPPING_VERBOSE) std::cout
                     << "mapping near magic state because second qubit is not mapped and "
                        "T_count is high\n";

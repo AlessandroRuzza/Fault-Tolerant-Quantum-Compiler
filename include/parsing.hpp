@@ -33,7 +33,8 @@ void apply_config_overrides(
     std::string& t_routing_mode,
     int& patience_threshold,
     bool& use_layer_cache,
-    int& repetition_count
+    int& repetition_count,
+    bool& t_states_proportional
 );
 void argument_parsing(
     int argc,

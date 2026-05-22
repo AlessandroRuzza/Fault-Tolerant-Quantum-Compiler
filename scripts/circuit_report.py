@@ -113,6 +113,7 @@ CONFIG_COLS = [
     ("border_distance_percentage",      "Border %"),
     ("t_routing_mode",                  "T-routing"),
     ("use_layer_cache",                 "Cache"),
+    ("t_states_proportional",           "T-prop"),
     ("gaussian_strategy",               "Gaussian"),
     ("magic_aware_strategy",            "MA strategy"),
 ]
@@ -404,6 +405,14 @@ def save_top15_figure(circuit: str, top_rows: list,
                     pass
             elif key == "use_layer_cache":
                 v = "yes" if str(v).lower() == "true" else "no"
+            elif key == "t_states_proportional":
+                v = "yes" if str(v).lower() == "true" else "no"
+            elif key == "number_of_magic_states":
+                # Prefer the runtime-resolved value (after multiplier and
+                # T_states_proportional overrides) when the CSV provides it.
+                resolved = row.get("resolved_n_magic", "")
+                if resolved not in ("", None):
+                    v = resolved
             elif key == "magic_aware_strategy" and row.get("mapping_type") != "magic_aware":
                 v = "—"
             elif key == "gaussian_strategy" and row.get("mapping_type") != "gaussian":

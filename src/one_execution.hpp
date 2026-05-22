@@ -36,6 +36,7 @@ struct benchmarkResult {
     int num_qubits = -1;
     int max_interaction_degree = -1;
     double non_routed_layer_pct = -1.0;
+    int resolved_number_of_magic_states = -1;
 };
 
 namespace {
@@ -80,7 +81,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double border_distance_percentage, std::string routing_strategy,
     std::string t_routing_mode, int patience_threshold,
     bool use_layer_cache,
-    bool metrics_only, int repetition_count) {
+    bool metrics_only, int repetition_count,
+    bool t_states_proportional) {
 
     double circ_time_seconds = 0.0;
     double graph_time_seconds = 0.0;
@@ -142,6 +144,13 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     }
 
     std::cout << "Setting up circuit with " << qubitsNumber << " qubits." << std::endl;
+
+    if (t_states_proportional) {
+        number_of_magic_states = metrics.max_t_in_layer;
+        number_of_magic_states_multiplier = 0.0;
+        std::cout << "T_states_proportional: number_of_magic_states = " << number_of_magic_states
+                  << " (max_t_in_layer)\n";
+    }
 
     if (number_of_magic_states_multiplier > 0.0) {
         number_of_magic_states = static_cast<int>(std::round(static_cast<double>(qubitsNumber) * number_of_magic_states_multiplier));
@@ -212,7 +221,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         std::cerr << "Error: graph is empty or invalid.\n";
         throw std::runtime_error("Error: graph is empty or invalid");
     }
-    if (graph_template.get_magic_state_ids().empty()) {
+    if (graph_template.get_magic_state_ids().empty() && metrics.num_t_tdg > 0) {
         std::cerr << "Error: graph has no magic states.\n";
         throw std::runtime_error("Error: graph has no magic states");
     }
@@ -420,6 +429,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         resolved_graph_y,
         qubitsNumber,
         max_deg,
-        best_non_routed_layer_pct
+        best_non_routed_layer_pct,
+        number_of_magic_states
     };
 }

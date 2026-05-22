@@ -367,7 +367,8 @@ void apply_config_overrides(
     std::string& t_routing_mode,
     int& patience_threshold,
     bool& use_layer_cache,
-    int& repetition_count
+    int& repetition_count,
+    bool& t_states_proportional
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -687,6 +688,14 @@ void apply_config_overrides(
         if (repetition_count <= 0) {
             throw std::runtime_error(std::string("Config key '") + key + "' must be > 0");
         }
+    }
+
+    if (config_json.contains("T_states_proportional") || config_json.contains("t_states_proportional")) {
+        const char* key = config_json.contains("T_states_proportional") ? "T_states_proportional" : "t_states_proportional";
+        if (!config_json[key].is_boolean()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
+        }
+        t_states_proportional = config_json[key].get<bool>();
     }
 }
 

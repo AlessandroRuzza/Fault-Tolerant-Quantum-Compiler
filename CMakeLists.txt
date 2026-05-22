@@ -146,6 +146,7 @@ endif()
 add_executable(graph_viewer
     src/igraph.cpp
     src/graph.cpp
+    src/defines.cpp
     visualization/graph_viewer.cpp
 )
 
