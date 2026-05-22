@@ -382,13 +382,21 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     add_path_length_metrics(metrics, metrics_layered, *best_mapping, *best_graph);
     write_metrics_csv(metrics, path);
 
+    std::cout << "\n----- MAPPING RECAP -----\n";
+    std::cout << "Circuit name: " << original_name.string() << "\n";
+    std::cout << "Graph size: " << resolved_graph_x << " x " << resolved_graph_y << "\n";
+    std::cout << "Qubits: " << qubitsNumber << "\n";
+    std::cout << "Mapping type: " << type << "\n";
+    std::cout << "Mapping produced: " << (best_mapping ? "yes" : "no") << "\n";
+    std::cout << "Repetitions: " << repetition_count << "\n";
+    std::cout << "Safe passage strategy: " << (safe_passage_strategy.empty() ? "(none)" : safe_passage_strategy) << "\n";
+
     std::cout << "\n------- ROUTING ---------" << std::endl;
 
     if (PRINT_ROUTING) best_router->print_routing_steps();
+
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << best_routing_steps << "\n";
-
-    std::cout << "Average Parallelism (" << routing_strategy << "): " << best_avg_parallelism << "\n\n";
-
+    std::cout << "Average Parallelism (" << routing_strategy << "): " << best_avg_parallelism << "\n";
     std::cout << "Average non-routed % (" << routing_strategy << "): " << best_non_routed_layer_pct << "%\n\n";
 
     total_mr_time_seconds = mapping_time_seconds + routing_time_seconds;
