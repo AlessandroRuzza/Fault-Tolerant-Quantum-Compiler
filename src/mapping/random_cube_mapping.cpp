@@ -15,106 +15,108 @@ void Mapping::random_cube_mapping() {
 
     static thread_local std::mt19937 rng(std::random_device{}());
 
-    std::vector<int> candidates;
-    candidates.reserve(graph.get_node_count() / 4);
+    std::vector<int>& candidates = candidates_cache;
 
-    const auto row_has_magic_gt2 = [&](int row) {
-        if (row < 0 || row >= height) return false;
-        int acc = 0;
-        for (int x = 0; x < width; ++x)
-            if (magic_set.count(row * width + x)) acc++;
-        return acc > 2;
-    };
+    if(candidates.empty()){
+        candidates.reserve(graph.get_node_count() / 4);
 
-    const auto row_has_magic = [&](int row) {
-        if (row < 0 || row >= height) return false;
-        int acc = 0;
-        for (int x = 0; x < width; ++x)
-            if (magic_set.count(row * width + x)) acc++;
-        return acc > 0;
-    };
+        const auto row_has_magic_gt2 = [&](int row) {
+            if (row < 0 || row >= height) return false;
+            int acc = 0;
+            for (int x = 0; x < width; ++x)
+                if (magic_set.count(row * width + x)) acc++;
+            return acc > 2;
+        };
 
-    const auto is_magic_at = [&](int ny, int nx) -> bool {
-        if (ny < 0 || ny >= height || nx < 0 || nx >= width) return false;
-        return magic_set.count(ny * width + nx) > 0;
-    };
+        const auto row_has_magic = [&](int row) {
+            if (row < 0 || row >= height) return false;
+            int acc = 0;
+            for (int x = 0; x < width; ++x)
+                if (magic_set.count(row * width + x)) acc++;
+            return acc > 0;
+        };
 
-    // Returns true if any row or column of the 3x3 neighborhood of (cy,cx)
-    // contains 2 or more magic states (catches adjacent and opposite pairs).
-    const auto has_magic_alignment = [&](int cy, int cx) -> bool {
-        for (int dy = -1; dy <= 1; ++dy) {
-            int row_count = 0;
-            for (int dx = -1; dx <= 1; ++dx) {
-                if (dy == 0 && dx == 0) continue;
-                if (is_magic_at(cy + dy, cx + dx)) ++row_count;
-            }
-            if (row_count >= 2) return true;
-        }
-        for (int dx = -1; dx <= 1; ++dx) {
-            int col_count = 0;
+        const auto is_magic_at = [&](int ny, int nx) -> bool {
+            if (ny < 0 || ny >= height || nx < 0 || nx >= width) return false;
+            return magic_set.count(ny * width + nx) > 0;
+        };
+
+        // Returns true if any row or column of the 3x3 neighborhood of (cy,cx)
+        // contains 2 or more magic states (catches adjacent and opposite pairs).
+        const auto has_magic_alignment = [&](int cy, int cx) -> bool {
             for (int dy = -1; dy <= 1; ++dy) {
-                if (dy == 0 && dx == 0) continue;
-                if (is_magic_at(cy + dy, cx + dx)) ++col_count;
+                int row_count = 0;
+                for (int dx = -1; dx <= 1; ++dx) {
+                    if (dy == 0 && dx == 0) continue;
+                    if (is_magic_at(cy + dy, cx + dx)) ++row_count;
+                }
+                if (row_count >= 2) return true;
             }
-            if (col_count >= 2) return true;
-        }
-        return false;
-    };
+            for (int dx = -1; dx <= 1; ++dx) {
+                int col_count = 0;
+                for (int dy = -1; dy <= 1; ++dy) {
+                    if (dy == 0 && dx == 0) continue;
+                    if (is_magic_at(cy + dy, cx + dx)) ++col_count;
+                }
+                if (col_count >= 2) return true;
+            }
+            return false;
+        };
 
-    for (int y = 0; y < height; y += 2) {
-        if (y == 0 || y == height - 1){
-            if (row_has_magic(y+1)) {
-                y -= 1;
-                continue;
-            }
-            if (y > 0){
-                if (row_has_magic(y-1)) {
+        for (int y = 0; y < height; y += 2) {
+            if (y == 0 || y == height - 1){
+                if (row_has_magic(y+1)) {
                     y -= 1;
                     continue;
                 }
-            }
-        } else {
-            if (row_has_magic_gt2(y+1)) {
-                y -= 1;
-                continue;
-            }
-            if (y > 0){
-                if (row_has_magic_gt2(y-1)) {
+                if (y > 0){
+                    if (row_has_magic(y-1)) {
+                        y -= 1;
+                        continue;
+                    }
+                }
+            } else {
+                if (row_has_magic_gt2(y+1)) {
                     y -= 1;
                     continue;
                 }
+                if (y > 0){
+                    if (row_has_magic_gt2(y-1)) {
+                        y -= 1;
+                        continue;
+                    }
+                }
             }
+
+
+
+
+
+            for (int x = 0; x < width; x += 2) {
+                const int nid = y * width + x;
+                if (magic_set.count(nid +1)) {x -= 1; continue;}
+                if (magic_set.count(nid)) continue;
+                if (graph.is_occupied(nid)) continue;
+                if (has_magic_alignment(y, x)) continue;
+
+                candidates.push_back(nid);
+            }
+        
+
+        }
+
+        if (PRINT_MAPPING_GRAPH) {
+            const std::unordered_set<int> cand_set(candidates.begin(), candidates.end());
+            graph.print_rectangular(cand_set);
         }
 
 
-
-
-
-        for (int x = 0; x < width; x += 2) {
-            const int nid = y * width + x;
-            if (magic_set.count(nid +1)) {x -= 1; continue;}
-            if (magic_set.count(nid)) continue;
-            if (graph.is_occupied(nid)) continue;
-            if (has_magic_alignment(y, x)) continue;
-
-            candidates.push_back(nid);
-        }
-    
+        if (static_cast<int>(candidates.size()) < circuit.getNumQubits())
+            throw SafePassageException(
+                "Not enough cube-valid candidates (" + std::to_string(candidates.size()) +
+                ") for " + std::to_string(circuit.getNumQubits()) + " qubits in random_cube_mapping.");
 
     }
-
-    if (PRINT_MAPPING_GRAPH) {
-        const std::unordered_set<int> cand_set(candidates.begin(), candidates.end());
-        graph.print_rectangular(cand_set);
-    }
-
-
-    if (static_cast<int>(candidates.size()) < circuit.getNumQubits())
-        throw SafePassageException(
-            "Not enough cube-valid candidates (" + std::to_string(candidates.size()) +
-            ") for " + std::to_string(circuit.getNumQubits()) + " qubits in random_cube_mapping.");
-
-
 
     std::shuffle(candidates.begin(), candidates.end(), rng);
 

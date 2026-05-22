@@ -119,6 +119,7 @@ private:
     int safe_passage_ignore_outer_layers;
     std::vector<Gate> cnot_gates;
     std::vector<Gate> t_gates;
+    inline static std::vector<int> candidates_cache;
 
 public:
 
