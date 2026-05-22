@@ -92,6 +92,9 @@ AXIS_BARPLOT_METRIC_SPECS = (
     ("non_routed_layer_pct", "non_routed_layer_pct", "Non-routed Layer % by", "success only", "non-routed layer pct (%)", "{:.2f}", "#E9C46A"),
 )
 PER_CIRCUIT_BARPLOT_DIR = "barplots_by_circuit"
+HEATMAP_DIR = "heatmap"
+TIME_ANALYSIS_DIR = "time_analysis"
+GAUSSIAN_RELATIVE_GAP_PLOT = "heatmap_best_gaussian_relative_weight_gaps.png"
 HEATMAP_PAIR_GROUPS = (
     ("type", ("safe_passage", "placement_border", "n_magic_states")),
     ("gaussian_strategy", ("safe_passage", "placement_border", "n_magic_states")),
@@ -105,7 +108,6 @@ HEATMAP_PAIR_GROUPS = (
     ("use_layer_cache", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode")),
 )
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
-DEFAULT_CSV_GLOB = os.path.join(DEFAULT_RESULTS_DIR, "**", "*.csv")
 OBSOLETE_PLOT_FILENAMES = {
     "13_heatmap_success_safe_vs_placement.png",
     "23_heatmap_success_safe_vs_mapping_type.png",
@@ -156,7 +158,7 @@ def build_requested_heatmap_items(start_index=48):
     plot_index = start_index
     for col_axis, row_axes in HEATMAP_PAIR_GROUPS:
         col_key, col_label = HEATMAP_AXIS_SPECS[col_axis]
-        subfolder = f"heatmap_{heatmap_slug(col_axis)}"
+        subfolder = HEATMAP_DIR
         group_heatmap_items = []
         group_heatmap_items_no_out = []
         group_heatmap_items_median = []
@@ -1113,13 +1115,29 @@ def non_empty(values):
     return [v for v in values if v is not None and not math.isnan(v)]
 
 
+def strip_plot_number(filename):
+    """Drop a leading NN_ index from a plot filename for the on-disk name."""
+    return re.sub(r"^\d+_", "", filename)
+
+
+def default_plot_subfolder(filename):
+    output_name = strip_plot_number(filename)
+    if output_name == GAUSSIAN_RELATIVE_GAP_PLOT:
+        return None
+    if output_name.lower().endswith(".png"):
+        return TIME_ANALYSIS_DIR
+    return None
+
+
 def save_fig(fig, output_dir, filename, generated, dpi=160, tight=True, subfolder=None):
+    if subfolder is None:
+        subfolder = default_plot_subfolder(filename)
     if subfolder:
         target_dir = os.path.join(output_dir, subfolder)
     else:
         target_dir = output_dir
     os.makedirs(target_dir, exist_ok=True)
-    path = os.path.join(target_dir, filename)
+    path = os.path.join(target_dir, strip_plot_number(filename))
     if tight:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
@@ -1140,7 +1158,7 @@ def save_fig(fig, output_dir, filename, generated, dpi=160, tight=True, subfolde
 def record_skipped_plot(skipped, filename, reason):
     if skipped is None:
         return
-    skipped.append({"filename": filename, "reason": reason})
+    skipped.append({"filename": strip_plot_number(filename), "reason": reason})
 
 
 def save_empty_plot(title, output_dir, filename, generated, message="No data", subfolder=None, ylabel=None):
@@ -1179,6 +1197,8 @@ def remove_obsolete_plots(output_dir):
     filenames = set(OBSOLETE_PLOT_FILENAMES)
     if os.path.isdir(output_dir):
         for filename in os.listdir(output_dir):
+            if filename.lower().endswith(".png") and filename != GAUSSIAN_RELATIVE_GAP_PLOT:
+                filenames.add(filename)
             if any(filename.startswith(prefix) for prefix in OBSOLETE_PLOT_PREFIXES):
                 filenames.add(filename)
             if filename.lower().endswith(".png") and "_heatmap_" in filename:
@@ -1223,66 +1243,6 @@ def clear_per_circuit_barplot_dir(output_dir):
                 pass
 
 
-def renumber_generated_pngs(output_dir, generated, skipped):
-    numeric_items = []
-    seen_paths = set()
-    for path in generated:
-        if path in seen_paths:
-            continue
-        seen_paths.add(path)
-        name = os.path.basename(path)
-        match = re.match(r"(\d+)_", name)
-        if match:
-            numeric_items.append((int(match.group(1)), name, path))
-
-    if not numeric_items:
-        return
-
-    numeric_items.sort(key=lambda item: (item[0], item[1]))
-    width = max(2, len(str(len(numeric_items) - 1)))
-    path_mapping = {}
-    name_mapping = {}
-    for idx, (_, name, path) in enumerate(numeric_items):
-        suffix = name.split("_", 1)[1]
-        new_name = f"{idx:0{width}d}_{suffix}"
-        path_mapping[path] = os.path.join(os.path.dirname(path), new_name)
-        name_mapping[name] = new_name
-
-    if all(old_path == new_path for old_path, new_path in path_mapping.items()):
-        return
-
-    temp_moves = []
-    for old_path, new_path in path_mapping.items():
-        if old_path == new_path:
-            continue
-        if not os.path.exists(old_path):
-            continue
-        temp_path = os.path.join(
-            os.path.dirname(old_path),
-            f".tmp_{os.getpid()}_{os.path.basename(old_path)}",
-        )
-        os.rename(old_path, temp_path)
-        temp_moves.append((temp_path, new_path))
-
-    for temp_path, new_path in temp_moves:
-        os.rename(temp_path, new_path)
-
-    generated[:] = [
-        path_mapping.get(path, path)
-        for path in generated
-    ]
-
-    if skipped:
-        for item in skipped:
-            name = item.get("filename")
-            if name in name_mapping:
-                item["filename"] = name_mapping[name]
-
-    global REPORT_PLOTS
-    REPORT_PLOTS = [
-        (name_mapping.get(filename, filename), caption)
-        for filename, caption in REPORT_PLOTS
-    ]
 
 
 def category_color_map(labels):
@@ -2216,7 +2176,7 @@ def write_gaussian_relative_weight_gap_table(entries, output_dir, filename):
 
 
 def plot_gaussian_relative_weight_gap_heatmap(entries, output_dir, generated, skipped=None):
-    filename = "31_heatmap_best_gaussian_relative_weight_gaps.png"
+    filename = GAUSSIAN_RELATIVE_GAP_PLOT
     if not entries:
         record_skipped_plot(
             skipped,
@@ -3022,10 +2982,11 @@ def plot_image_dashboard(
     source_panels = []
     for item in source_items:
         source_subfolder = item.get("subfolder")
+        source_name = strip_plot_number(item["filename"])
         source_path = (
-            os.path.join(output_dir, source_subfolder, item["filename"])
+            os.path.join(output_dir, source_subfolder, source_name)
             if source_subfolder
-            else os.path.join(output_dir, item["filename"])
+            else os.path.join(output_dir, source_name)
         )
         if os.path.isfile(source_path):
             source_panels.append((item, source_path, None))
@@ -3429,6 +3390,7 @@ def plot_axis_barplots_by_circuit(
     output_dir,
     generated,
     skipped=None,
+    batch_size=50,
 ):
     rows_success_with_duration = [
         row for row in rows if row["success"] and row["duration_s_f"] is not None
@@ -3444,6 +3406,7 @@ def plot_axis_barplots_by_circuit(
     }
     circuits = sorted({row["circuit_name"] for row in rows if row["circuit_name"]})
 
+    tasks = []
     for axis_slug in heatmap_x_axis_slugs():
         axis_key, axis_label = HEATMAP_AXIS_SPECS[axis_slug]
         subfolder = os.path.join(PER_CIRCUIT_BARPLOT_DIR, heatmap_slug(axis_slug))
@@ -3467,20 +3430,40 @@ def plot_axis_barplots_by_circuit(
                     f"{heatmap_slug(axis_slug)}_{circuit_slug}.png"
                 )
                 title = f"{caption_prefix} {axis_label} ({sample_scope}) - {circuit}"
-                plot_axis_barplot(
-                    metric_rows,
-                    axis_key,
-                    metric_slug,
-                    title,
-                    ylabel,
-                    filename,
-                    output_dir,
-                    generated,
-                    skipped,
-                    value_format=value_format,
-                    color=color,
-                    subfolder=subfolder,
+                tasks.append(
+                    (metric_rows, axis_key, metric_slug, title, ylabel,
+                     filename, value_format, color, subfolder)
                 )
+
+    total = len(tasks)
+    if not total:
+        return
+    batches = [(s, min(s + batch_size, total)) for s in range(0, total, batch_size)]
+    print(
+        f"Generating {total} per-circuit barplots in {len(batches)} batches of up to {batch_size}",
+        flush=True,
+    )
+    for batch_idx, (start, end) in enumerate(batches, 1):
+        for (
+            metric_rows, axis_key, metric_slug, title, ylabel,
+            filename, value_format, color, subfolder,
+        ) in tasks[start:end]:
+            plot_axis_barplot(
+                metric_rows,
+                axis_key,
+                metric_slug,
+                title,
+                ylabel,
+                filename,
+                output_dir,
+                generated,
+                skipped,
+                value_format=value_format,
+                color=color,
+                subfolder=subfolder,
+            )
+        _trim_heap()
+        print(f"[barplot batch {batch_idx}/{len(batches)}] items {start}:{end} done", flush=True)
 
 
 def mean_of(values):
@@ -3831,7 +3814,7 @@ def aggregate_runtime_qubits_plus_gates(rows):
 
 
 def write_runtime_qubits_plus_gates_csv(entries, output_dir):
-    csv_path = os.path.join(output_dir, "32_runtime_vs_qubits_plus_gates_with_timeouts.csv")
+    csv_path = os.path.join(output_dir, "helpers", "32_runtime_vs_qubits_plus_gates_with_timeouts.csv")
     fieldnames = [
         "curve",
         "mapping_type",
@@ -3851,7 +3834,7 @@ def write_runtime_qubits_plus_gates_csv(entries, output_dir):
         "success_count",
         "timeout_count",
     ]
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
@@ -4249,7 +4232,7 @@ def runtime_group_sort_key(value):
 
 
 def write_runtime_grouped_factors_csv(all_entries, output_dir):
-    csv_path = os.path.join(output_dir, "36_runtime_grouped_factors.csv")
+    csv_path = os.path.join(output_dir, "helpers", "36_runtime_grouped_factors.csv")
     fieldnames = [
         "plot_filename",
         "series_type",
@@ -4264,7 +4247,7 @@ def write_runtime_grouped_factors_csv(all_entries, output_dir):
         "success_count",
         "timeout_count",
     ]
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
@@ -4826,13 +4809,13 @@ def plot_requested_heatmaps(
             "--worker-output-dir", output_dir,
             "--worker-result", result_path,
         ]
-        print(f"[batch {batch_idx}/{len(batches)}] items {start}:{end}", flush=True)
         try:
             subprocess.run(cmd, check=True)
             with open(result_path) as f:
                 result = json.load(f)
             generated.extend(result.get("generated", []))
             skipped.extend(result.get("skipped", []))
+            print(f"[heatmap batch {batch_idx}/{len(batches)}] items {start}:{end} done", flush=True)
         except subprocess.CalledProcessError as exc:
             print(f"[batch {batch_idx}] failed with exit {exc.returncode}", flush=True)
             for item in REQUESTED_HEATMAP_ITEMS[start:end]:
@@ -4996,7 +4979,8 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
         return None
 
     csv_rows.sort(key=lambda row: (row["axis"], row["best_count"] * -1, row["axis_value"]))
-    csv_path = os.path.join(output_dir, "best_config_counts_by_heatmap_axis.csv")
+    csv_path = os.path.join(output_dir, "csv", "best_config_counts_by_heatmap_axis.csv")
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
@@ -5124,7 +5108,8 @@ def plot_best_non_routed_config_counts_by_heatmap_axis(rows_success_with_non_rou
         return None
 
     csv_rows.sort(key=lambda row: (row["axis"], row["best_count"] * -1, row["axis_value"]))
-    csv_path = os.path.join(output_dir, "best_non_routed_config_counts_by_heatmap_axis.csv")
+    csv_path = os.path.join(output_dir, "csv", "best_non_routed_config_counts_by_heatmap_axis.csv")
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
@@ -5214,7 +5199,8 @@ def plot_timeout_counts_by_heatmap_axis(rows, output_dir, generated, skipped=Non
         return None
 
     csv_rows.sort(key=lambda row: (row["axis"], row["timeout_count"] * -1, row["axis_value"]))
-    csv_path = os.path.join(output_dir, "timeout_counts_by_heatmap_axis.csv")
+    csv_path = os.path.join(output_dir, "csv", "timeout_counts_by_heatmap_axis.csv")
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
@@ -5551,7 +5537,10 @@ def write_report_markdown(
     best_mapping_exit0_csv_path,
 ):
     report_path = os.path.join(output_dir, "report.md")
-    by_name = {os.path.basename(p): p for p in generated}
+    by_name = {
+        os.path.basename(p): os.path.relpath(p, output_dir).replace(os.sep, "/")
+        for p in generated
+    }
     skipped_by_name = {item["filename"]: item["reason"] for item in (skipped or [])}
 
     with open(report_path, "w", encoding="utf-8") as f:
@@ -5559,17 +5548,19 @@ def write_report_markdown(
         f.write("Generated plot set from benchmark CSV files.\n\n")
         f.write("See also `summary.txt` for aggregate metrics.\n\n")
         for filename, caption in REPORT_PLOTS:
-            if filename not in by_name:
+            output_name = strip_plot_number(filename)
+            if output_name not in by_name:
                 continue
             f.write(f"## {caption}\n\n")
-            f.write(f"![{caption}]({filename})\n\n")
+            f.write(f"![{caption}]({by_name[output_name]})\n\n")
 
         if skipped_by_name:
             f.write("## Skipped Plots\n\n")
             for filename, caption in REPORT_PLOTS:
-                if filename not in skipped_by_name:
+                output_name = strip_plot_number(filename)
+                if output_name not in skipped_by_name:
                     continue
-                f.write(f"- `{filename}` ({caption}): {skipped_by_name[filename]}\n")
+                f.write(f"- `{output_name}` ({caption}): {skipped_by_name[output_name]}\n")
             f.write("\n")
 
         if top_gaussian_weight_entries:
@@ -5642,15 +5633,16 @@ def main():
         help=(
             "Single CSV input file. Accepts a full path, a CSV filename, or a stem without "
             "the .csv extension. If set and --output-dir is omitted, plots are written to "
-            "<csv_dir>/<csv_name>_plots or <csv_name>_merge_plots when --distinct is used."
+            "<csv_dir>/<csv_name>_plots."
         ),
     )
     input_group.add_argument(
-        "--csv-glob",
-        default=DEFAULT_CSV_GLOB,
+        "--distinct",
+        action="store_true",
         help=(
-            "Glob for CSV inputs (default: benchmarks/results/**/*.csv). "
-            "With --distinct, only CSV files directly inside benchmarks/results are used."
+            "Analyze every CSV directly inside benchmarks/results, merging duplicate executions "
+            "by configuration only. Rows with the same configuration but different status or "
+            "routing_steps are all kept and exported to merging_duplicates.csv."
         ),
     )
     parser.add_argument(
@@ -5659,13 +5651,14 @@ def main():
         help="Output directory for generated plots",
     )
     parser.add_argument(
-        "--distinct",
+        "--heatmap",
         action="store_true",
-        help=(
-            "When loading multiple CSV rows, merge duplicate executions by configuration only. "
-            "Rows with the same configuration but different status or routing_steps are all kept "
-            "and exported to merging_duplicates.csv."
-        ),
+        help="Also generate the heatmap group under heatmap/.",
+    )
+    parser.add_argument(
+        "--circuit",
+        action="store_true",
+        help="Also generate the per-circuit barplots under barplots_by_circuit/.",
     )
     parser.add_argument("--worker-heatmap-batch", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--worker-csv", default=None, help=argparse.SUPPRESS)
@@ -5688,6 +5681,10 @@ def main():
         run_heatmap_worker(args)
         return
 
+    if not args.csv and not args.distinct:
+        print("No input specified. Pass --csv for one file or --distinct for the benchmarks/results CSVs.")
+        return
+
     importMatplotlib()
 
     plt.style.use("seaborn-v0_8-whitegrid")
@@ -5697,9 +5694,9 @@ def main():
         input_files = [csv_path]
         output_dir = args.output_dir or default_output_dir_for_single_csv(csv_path, args.distinct)
     else:
-        input_files = sorted(glob.glob(args.csv_glob, recursive=True))
-        if args.distinct:
-            input_files = filter_distinct_input_files(input_files)
+        input_files = filter_distinct_input_files(
+            sorted(glob.glob(os.path.join(DEFAULT_RESULTS_DIR, "*.csv")))
+        )
         output_dir = args.output_dir or default_output_dir_for_glob(args.distinct)
 
     raw_rows, raw_fieldnames, csv_files = load_raw_rows_from_files(input_files)
@@ -5707,7 +5704,7 @@ def main():
     if not raw_rows:
         if args.csv:
             raise RuntimeError(f"No valid rows found in CSV: {args.csv}")
-        raise RuntimeError(f"No valid rows found for glob: {args.csv_glob}")
+        raise RuntimeError(f"No valid rows found under {DEFAULT_RESULTS_DIR}")
 
     distinct_info = None
     if args.distinct:
@@ -5727,6 +5724,7 @@ def main():
     generated = []
     skipped = []
 
+    analysis_start = len(generated)
     plot_overview_dashboard(rows_no_timeout, output_dir, generated)
     plot_status_and_exit(rows, output_dir, generated)
     plot_summary_tables(rows_no_timeout, output_dir, generated)
@@ -5820,57 +5818,61 @@ def main():
         skipped,
     )
     plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped)
-    heatmap_csv_path = (
-        os.path.abspath(input_files[0])
-        if (
-            not args.no_subprocess_heatmaps
-            and not args.distinct
-            and len(input_files) == 1
+    print(f"[analysis plots] {len(generated) - analysis_start} done", flush=True)
+    if args.heatmap:
+        heatmap_csv_path = (
+            os.path.abspath(input_files[0])
+            if (
+                not args.no_subprocess_heatmaps
+                and not args.distinct
+                and len(input_files) == 1
+            )
+            else None
         )
-        else None
-    )
-    plot_requested_heatmaps(
-        rows_no_timeout,
-        rows_success_with_routing,
-        rows_with_duration,
-        output_dir,
-        generated,
-        skipped,
-        csv_path=heatmap_csv_path,
-        batch_size=args.heatmap_batch_size,
-    )
-    plot_axis_barplots_by_circuit(
-        rows_no_timeout,
-        rows_success_with_routing,
-        output_dir,
-        generated,
-        skipped,
-    )
-    best_config_counts_csv_path = plot_best_config_counts_by_heatmap_axis(
-        rows_success_with_routing,
-        output_dir,
-        generated,
-        skipped,
-    )
-    plot_best_non_routed_config_counts_by_heatmap_axis(
-        rows_success_with_non_routed,
-        output_dir,
-        generated,
-        skipped,
-    )
-    timeout_counts_csv_path = plot_timeout_counts_by_heatmap_axis(
-        rows,
-        output_dir,
-        generated,
-        skipped,
-    )
+        plot_requested_heatmaps(
+            rows_no_timeout,
+            rows_success_with_routing,
+            rows_with_duration,
+            output_dir,
+            generated,
+            skipped,
+            csv_path=heatmap_csv_path,
+            batch_size=args.heatmap_batch_size,
+        )
+        plot_best_config_counts_by_heatmap_axis(
+            rows_success_with_routing,
+            output_dir,
+            generated,
+            skipped,
+        )
+        plot_best_non_routed_config_counts_by_heatmap_axis(
+            rows_success_with_non_routed,
+            output_dir,
+            generated,
+            skipped,
+        )
+        plot_timeout_counts_by_heatmap_axis(
+            rows,
+            output_dir,
+            generated,
+            skipped,
+        )
+    if args.circuit:
+        plot_axis_barplots_by_circuit(
+            rows_no_timeout,
+            rows_success_with_routing,
+            output_dir,
+            generated,
+            skipped,
+            batch_size=args.heatmap_batch_size,
+        )
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,
         top_n=3,
     )
     top_gaussian_weight_entries, top_gaussian_weight_csv_path = write_top_gaussian_weight_config_table(
         top_gaussian_weight_entries,
-        output_dir,
+        os.path.join(output_dir, "helpers"),
         "top_gaussian_weight_configs_by_circuit_dimension.csv",
     )
     best_gaussian_weight_profile_rows = best_gaussian_weight_profile_entries(
@@ -5878,7 +5880,7 @@ def main():
     )
     best_gaussian_weight_profile_rows, best_gaussian_weight_profile_csv_path = write_best_gaussian_weight_profile_table(
         best_gaussian_weight_profile_rows,
-        output_dir,
+        os.path.join(output_dir, "helpers"),
         "best_gaussian_weight_profile_by_circuit_dimension.csv",
     )
     gaussian_relative_weight_gap_rows = gaussian_relative_weight_gap_entries(
@@ -5886,7 +5888,7 @@ def main():
     )
     gaussian_relative_weight_gap_rows, gaussian_relative_weight_gap_csv_path = write_gaussian_relative_weight_gap_table(
         gaussian_relative_weight_gap_rows,
-        output_dir,
+        os.path.join(output_dir, "helpers"),
         "best_gaussian_relative_weight_gaps.csv",
     )
     plot_gaussian_relative_weight_gap_heatmap(
@@ -5898,22 +5900,21 @@ def main():
     gaussian_best_entries = best_gaussian_execution_entries(rows)
     gaussian_best_entries, gaussian_best_csv_path = write_best_gaussian_execution_table(
         gaussian_best_entries,
-        output_dir,
+        os.path.join(output_dir, "csv"),
         "best_gaussian_execution_by_circuit_dimension.csv",
     )
     best_mapping_entries = best_mapping_table_entries(rows)
     best_mapping_entries, best_mapping_csv_path = write_best_mapping_table(
         best_mapping_entries,
-        output_dir,
+        os.path.join(output_dir, "csv"),
         "best_mapping_by_circuit_dimension.csv",
     )
     best_mapping_exit0_entries = best_mapping_table_entries_exit0_only(rows)
     best_mapping_exit0_entries, best_mapping_exit0_csv_path = write_best_mapping_table(
         best_mapping_exit0_entries,
-        output_dir,
+        os.path.join(output_dir, "csv"),
         "best_mapping_by_circuit_dimension_all_families_exit0.csv",
     )
-    renumber_generated_pngs(output_dir, generated, skipped)
     write_summary(rows, csv_files, output_dir, generated, skipped, distinct_info=distinct_info)
     if WRITE_REPORT_MD:
         write_report_markdown(

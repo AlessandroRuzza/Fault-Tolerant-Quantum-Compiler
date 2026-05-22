@@ -86,19 +86,19 @@ COMPOUND_PARAMS: List[Tuple[str, ...]] = []
 
 # ---------- I/O ----------
 
-def find_runs_csv(csv_arg: Optional[str]) -> List[str]:
-    """Resolve --csv argument: either a single file or a glob under benchmarks/results."""
-    if csv_arg:
-        if os.path.isfile(csv_arg):
-            return [csv_arg]
-        matches = sorted(glob.glob(csv_arg))
-        if matches:
-            return matches
-        raise FileNotFoundError(f"No CSV matched: {csv_arg}")
-    default_glob = os.path.join("benchmarks", "results", "*_runs.csv")
-    matches = sorted(glob.glob(default_glob))
+def resolve_runs_csv(csv_arg: str) -> str:
+    """Resolve --csv as one explicit CSV path."""
+    if os.path.isfile(csv_arg):
+        return csv_arg
+    raise FileNotFoundError(f"No CSV found: {csv_arg}")
+
+
+def distinct_runs_csvs() -> List[str]:
+    """--distinct mode: every *_runs.csv directly under benchmarks/results."""
+    pattern = os.path.join("benchmarks", "results", "*_runs.csv")
+    matches = sorted(glob.glob(pattern))
     if not matches:
-        raise FileNotFoundError(f"No CSV found under {default_glob}")
+        raise FileNotFoundError(f"No CSV found under {pattern}")
     return matches
 
 
@@ -428,7 +428,13 @@ def analyze_one_csv(csv_path: str, output_root: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Part-2 analysis: pairwise param comparison across low/mid/high dimensions.")
-    parser.add_argument("--csv", help="Path to a *_runs.csv file (default: every *_runs.csv under benchmarks/results)")
+    input_group = parser.add_mutually_exclusive_group()
+    input_group.add_argument("--csv", help="Path to one explicit *_runs.csv file")
+    input_group.add_argument(
+        "--distinct",
+        action="store_true",
+        help="Analyze every *_runs.csv directly under benchmarks/results.",
+    )
     parser.add_argument(
         "--output-root",
         default=os.path.join("benchmarks", "results"),
@@ -436,8 +442,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if not args.csv and not args.distinct:
+        print("No input specified. Pass --csv for one file or --distinct for every *_runs.csv.")
+        return 0
+
     try:
-        csvs = find_runs_csv(args.csv)
+        csvs = [resolve_runs_csv(args.csv)] if args.csv else distinct_runs_csvs()
     except FileNotFoundError as e:
         print(str(e), file=sys.stderr)
         return 1
