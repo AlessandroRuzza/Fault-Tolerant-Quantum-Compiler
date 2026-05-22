@@ -123,11 +123,23 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         return benchmarkResult{0, 0};
     }
 
-    // --metrics-only: build layers from the parsed circuit, write CSV, then exit.
-    // Path-length metrics are skipped (no mapping is performed).
+    // Layer the circuit right after parsing — needed both for the structural
+    // metrics (computed immediately, below) and as a baseline for any later
+    // mapping-dependent metrics. This LayeredCircuit is used only for metrics;
+    // each mapping/routing repetition builds its own (the router may mutate it).
+    std::cout << "\n------- LAYERING ---------" << std::endl;
+    LayeredCircuit metrics_layered(circuit, LAYERING_LOOKAHEAD);
+    if (PRINT_LAYER) metrics_layered.print_layered();
+
+    // Structural metrics: everything that doesn't need a mapping. The struct
+    // is kept around so add_path_length_metrics can fill the remaining fields
+    // after mapping completes.
+    CircuitMetrics metrics = compute_structural_metrics(metrics_layered);
+
+    // --metrics-only: no mapping/routing — write the (structural-only) CSV and exit.
+    // Path-length fields stay at 0.
     if (metrics_only) {
-        LayeredCircuit layeredCircuit(circuit, LAYERING_LOOKAHEAD);
-        compute_and_print_circuit_metrics(layeredCircuit, path, true);
+        write_metrics_csv(metrics, path);
         return benchmarkResult{0, 0};
     }
 
@@ -366,21 +378,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     if (PRINT_MAPPING_GRAPH) best_graph->print_rectangular();
 
-    std::cout << "\n------- LAYERING ---------" << std::endl;
-    LayeredCircuit metrics_layered = LayeredCircuit(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
-    if (PRINT_LAYER) metrics_layered.print_layered();
-
-    compute_and_print_circuit_metrics(
-        metrics_layered,
-        path,
-        PRINT_CIRCUIT_METRICS,
-        best_mapping.get(),
-        best_graph.get()
-    );
-
-    // if(metrics.layer_reuse_ratio > 0.95){
-    //     use_layer_cache = true;
-    // }
+    // Fill in the mapping-dependent metrics (path lengths) using the best
+    // repetition's mapping/graph, then update the CSV in a single write.
+    add_path_length_metrics(metrics, metrics_layered, *best_mapping, *best_graph);
+    write_metrics_csv(metrics, path);
 
     std::cout << "\n------- ROUTING ---------" << std::endl;
 
@@ -401,13 +402,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Total time: " << total_time_seconds << " s\n\n";
     std::cout << "Total time (incl. instantiations and prints): " << actual_exec_time_seconds << " s\n\n";
     
-    compute_and_print_circuit_metrics(
-        *best_layered,
-        path,
-        PRINT_CIRCUIT_METRICS,
-        best_mapping.get(),
-        best_graph.get()
-    );
     (void)best_layered;
     (void)best_path_strategy;
     (void)best_t_gate_strategy;
