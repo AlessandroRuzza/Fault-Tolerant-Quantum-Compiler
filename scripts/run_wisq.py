@@ -152,10 +152,10 @@ def run_one(qasm_path: Path, mr_timeout: int, extra: list[str]) -> dict:
         "graph_x": graph_x,
         "graph_y": graph_y,
         "circuit_graph_label": label,
-        "routing_steps": routing_steps,
         "timeout_reached": timeout_reached,
         "status": status,
         "exit_code": exit_code,
+        "routing_steps": routing_steps,
         "duration_seconds": f"{duration:.6f}",
     }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create a simplified CSV view from a benchmark CSV.
+Create a simplified, fixed-width CSV view from a benchmark CSV.
 Output is written under project_root/tmp by default.
 """
 
@@ -96,6 +96,30 @@ def resolve_input_csv(raw_input: Path, project_root: Path) -> Path:
     return raw_input
 
 
+def compute_column_widths(
+    rows: list[dict[str, str]], fields: list[str]
+) -> list[int]:
+    widths = [len(field) for field in fields]
+    for row in rows:
+        for index, field in enumerate(fields):
+            value = row.get(field, "") or ""
+            widths[index] = max(widths[index], len(value))
+    return widths
+
+
+def write_aligned_csv(
+    out_handle, fields: list[str], rows: list[dict[str, str]], widths: list[int]
+) -> None:
+    def format_row(values: list[str]) -> str:
+        padded = (value.ljust(width) for value, width in zip(values, widths))
+        return ", ".join(padded)
+
+    out_handle.write(format_row(fields) + "\n")
+    for row in rows:
+        values = [(row.get(field, "") or "") for field in fields]
+        out_handle.write(format_row(values) + "\n")
+
+
 def main() -> None:
     args = parse_args()
     project_root = Path(__file__).resolve().parent.parent
@@ -124,22 +148,19 @@ def main() -> None:
         "routing_strategy",
         "t_routing_mode",
         "routing_steps",
+        "time_duration",
         "error_excerpt",
     ]
 
     rows_written = 0
-    with input_csv.open("r", newline="", encoding="utf-8") as in_handle, output_csv.open(
-        "w", newline="", encoding="utf-8"
-    ) as out_handle:
+    rows: list[dict[str, str]] = []
+    with input_csv.open("r", newline="", encoding="utf-8") as in_handle:
         reader = csv.DictReader(in_handle)
         if not reader.fieldnames:
             raise ValueError("Il CSV in input non contiene intestazione.")
 
-        writer = csv.DictWriter(out_handle, fieldnames=output_fields)
-        writer.writeheader()
-
         for row in reader:
-            writer.writerow(
+            rows.append(
                 {
                     "circuit": pick_value(row, "circuit"),
                     "dimensions": build_dimensions(row),
@@ -161,7 +182,10 @@ def main() -> None:
                         row, "gaussian_confidence", "GAUSSIAN_CONFIDENCE"
                     ),
                     "safe_passage_strategy": pick_value(
-                        row, "safe_passage_strategy", "safe passage strategy", "safe passage startegy"
+                        row,
+                        "safe_passage_strategy",
+                        "safe passage strategy",
+                        "safe passage startegy",
                     ),
                     "magic_state_placement_strategy": pick_value(
                         row,
@@ -189,10 +213,21 @@ def main() -> None:
                         "t routing mode",
                     ),
                     "routing_steps": pick_value(row, "routing_steps", "routing steps"),
+                    "time_duration": pick_value(
+                        row,
+                        "time_duration",
+                        "time duration",
+                        "duration_seconds",
+                        "duration seconds",
+                    ),
                     "error_excerpt": pick_value(row, "error_excerpt", "error excerpt"),
                 }
             )
             rows_written += 1
+
+    widths = compute_column_widths(rows, output_fields)
+    with output_csv.open("w", newline="", encoding="utf-8") as out_handle:
+        write_aligned_csv(out_handle, output_fields, rows, widths)
 
     print(f"Input: {input_csv}")
     print(f"Output: {output_csv}")
