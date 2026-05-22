@@ -295,7 +295,7 @@ void Boost_QubitRouter::route_circuit() {
 
     routing_steps.clear();
     routing_steps.reserve(circuit.getNumLayers());
-    std::map<std::size_t, std::size_t> non_routed_histogram;
+    non_routed_histogram.clear();
 
     while (circuit.getNumLayers() > 0) {
         const Layer& top_layer = circuit.getLayer(0);
@@ -327,17 +327,6 @@ void Boost_QubitRouter::route_circuit() {
     }
 
     std::cout << "RRR qubit routing completed.\n";
-    if (!non_routed_histogram.empty()) {
-        const int col1w = 45, col2w = 8;
-        std::cout << "\n\033[35mNon-routed gates histogram (RRR, top layer per step)\033[0m\n";
-        std::cout << "\033[35m" << std::left
-                  << std::setw(col1w) << "number of non-routed gates in the top layer"
-                  << std::right << std::setw(col2w) << "count" << "\033[0m\n";
-        std::cout << "\033[35m" << std::string(col1w + col2w, '-') << "\033[0m\n";
-        for (const auto& [value, count] : non_routed_histogram)
-            std::cout << "\033[35m" << std::left << std::setw(col1w) << value
-                      << std::right << std::setw(col2w) << count << "\033[0m\n";
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -360,5 +349,22 @@ void Boost_QubitRouter::print_routing(int i) const {
             std::cout << path[k];
         }
         std::cout << "\n";
+    }
+}
+
+void Boost_QubitRouter::print_non_routed_histogram() const {
+    if (non_routed_histogram.empty()) return;
+
+    std::cout << "\n\033[35mNon-routed gates histogram (top layer per step)\033[0m\n";
+    const int col1w = 45;
+    const int col2w = 8;
+    std::cout << "\033[35m" << std::left
+              << std::setw(col1w) << "number of non routed gates in the top layer"
+              << std::right << std::setw(col2w) << "count"
+              << "\033[0m\n";
+    std::cout << "\033[35m" << std::string(col1w + col2w, '-') << "\033[0m\n";
+    for (const auto& [value, count] : non_routed_histogram) {
+        std::cout << "\033[35m" << std::left << std::setw(col1w) << value
+                  << std::right << std::setw(col2w) << count << "\033[0m\n";
     }
 }

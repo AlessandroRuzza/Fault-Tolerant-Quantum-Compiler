@@ -306,6 +306,7 @@ void print_usage(const char* executable) {
               << "[--circuit [circuit_name|circuit_name.qasm|full_path_to_qasm]]\n"
               << "[--magic-aware-strategy [" << Mapping::available_mapping_strategies() << "]]\n"
               << "[--type [" << Mapping::available_mapping_types() << "]]\n"
+              << "[--repetition <int>=1]\n"
               << "[--gaussian-strategy [" << Mapping::available_gaussian_strategies() << "]]\n"
               << "[--safe-passage [" << Mapping::available_safe_passage_strategies() << "]]\n"
               << "[--magic-state-placement-strategy [" << Graph::available_magic_state_placement_strategies() << "]]\n"
@@ -365,7 +366,8 @@ void apply_config_overrides(
     std::string& routing_method,
     std::string& t_routing_mode,
     int& patience_threshold,
-    bool& use_layer_cache
+    bool& use_layer_cache,
+    int& repetition_count
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -675,6 +677,17 @@ void apply_config_overrides(
         }
         use_layer_cache = config_json[key].get<bool>();
     }
+
+    if (config_json.contains("repetition") || config_json.contains("random_repetition") || config_json.contains("random-repetition")) {
+        const char* key = config_json.contains("repetition") ? "repetition" : config_json.contains("random_repetition") ? "random_repetition" : "random-repetition";
+        if (!config_json[key].is_number_integer()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
+        }
+        repetition_count = config_json[key].get<int>();
+        if (repetition_count <= 0) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be > 0");
+        }
+    }
 }
 
 void argument_parsing(
@@ -705,7 +718,8 @@ void argument_parsing(
     std::string& t_routing_mode,
     int& patience_threshold,
     bool& use_layer_cache,
-    bool& metrics_only
+    bool& metrics_only,
+    int& repetition
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -1009,7 +1023,25 @@ void argument_parsing(
             } else if (val == "false" || val == "0") {
                 use_layer_cache = false;
             } else {
-                throw std::runtime_error("Invalid boolean value for --use-layer-cache: " + val);
+                throw std::runtime_error("Invalid boolean value for --repetition: " + val);
+            }
+            
+            continue;
+        }
+        
+        if (arg == "--repetition" || arg == "--random_repetition" || arg == "--random-repetition"|| arg == "--repeat" || arg == "--rep") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --repetition\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --repetition");
+            }
+            try {
+                repetition = std::stoi(argv[++i]);
+            } catch (const std::exception&) {
+                throw std::runtime_error("Invalid integer value for --repetition: " + std::string(argv[i]));
+            }
+            if (repetition <= 0) {
+                throw std::runtime_error("--repetition must be > 0");
             }
             continue;
         }

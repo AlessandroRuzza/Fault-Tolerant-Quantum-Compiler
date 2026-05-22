@@ -136,6 +136,7 @@ public:
     virtual void route_circuit() = 0;
     virtual int  get_routing_length() const = 0;
     virtual void print_routing_steps() const = 0;
+    virtual void print_non_routed_histogram() const = 0;
     virtual void reset() = 0;
     // Percentage of gates that were NOT routed on the first step they appeared in
     // the top layer (each gate counted once, denominator = total routable gates).
@@ -153,6 +154,7 @@ private:
     std::vector<Routing> routing_steps;
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
     std::unordered_map<size_t, Routing>* layer_routing_cache;
+    std::unordered_map<std::size_t, std::size_t> non_routed_histogram;
 
     // Non-routed metric accumulators (see get_non_routed_layer_percentage).
     // first_exposure_total: gates seen for the first time at the top layer (== total gates).
@@ -204,6 +206,7 @@ public:
     inline const std::vector<Routing>& get_routing() const { return routing_steps; }
     inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
     void print_routing(int i) const;
+    void print_non_routed_histogram() const;
 
 };
 

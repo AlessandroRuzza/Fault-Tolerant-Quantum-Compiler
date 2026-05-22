@@ -39,6 +39,7 @@ private:
     LayeredCircuit&   circuit;
     const Graph&      graph;
     std::vector<Routing> routing_steps;
+    std::unordered_map<std::size_t, std::size_t> non_routed_histogram;
 
     int   max_rrr_iterations;
     float congestion_penalty;  // added weight per congestion count on a node
@@ -97,6 +98,7 @@ public:
     inline const std::vector<Routing>& get_routing()    const { return routing_steps; }
     inline const Routing& get_route_step(int i)         const { return routing_steps[i]; }
     void print_routing(int i)  const;
+    void print_non_routed_histogram() const;
 };
 
 #endif // BOOST_ROUTER_HPP

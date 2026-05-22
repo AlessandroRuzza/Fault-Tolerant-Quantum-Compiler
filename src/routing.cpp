@@ -11,8 +11,9 @@ void draw_routing_layer(
     const Routing& routing
 );
 
-namespace {
-void print_non_routed_histogram(const std::map<std::size_t, std::size_t>& non_routed_histogram) {
+void QubitRouter::print_non_routed_histogram() const {
+    if (non_routed_histogram.empty()) return;
+
     std::cout << "\n\033[35mNon-routed gates histogram (top layer per step)\033[0m\n";
     const int col1w = 45;
     const int col2w = 8;
@@ -25,7 +26,6 @@ void print_non_routed_histogram(const std::map<std::size_t, std::size_t>& non_ro
         std::cout << "\033[35m" << std::left << std::setw(col1w) << value
                   << std::right << std::setw(col2w) << count << "\033[0m\n";
     }
-}
 }
 
 Path NormalTGateRouting::find_t_gate_path(
@@ -364,7 +364,7 @@ void QubitRouter::route_circuit() {
 
     routing_steps.clear();
     routing_steps.reserve(circuit.getNumLayers());
-    std::map<std::size_t, std::size_t> non_routed_histogram;
+    non_routed_histogram.clear();
 
     // Per-gate first-exposure tracking for the non-routed-layer metric.
     first_exposure_total = 0;
@@ -400,16 +400,6 @@ void QubitRouter::route_circuit() {
                 cached_route = &it->second;
             }
         }
-
-        /*
-        *   Optimization for LayeredCircuit (?)
-        *       Since this only needs the first layer,
-        *       no need to construct all layers at each routing step.
-        *       Only the first can be made and rebuilt from scratch after routing.
-        *
-        *   OR (better): change LayeredCircuit::update_layers to not rebuild from scratch,
-        *                instead scan the 2nd layer and move gates to first layer.
-        */
 
         Routing computed_route;
         bool was_cache_hit = false;
@@ -507,9 +497,6 @@ void QubitRouter::route_circuit() {
 
     
     std::cout << "Qubit routing completed.\n";
-    if (!non_routed_histogram.empty()) {
-        print_non_routed_histogram(non_routed_histogram);
-    }
 }
 
 void QubitRouter::print_routing_steps() const {

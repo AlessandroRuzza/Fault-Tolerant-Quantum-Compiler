@@ -369,20 +369,21 @@ private:
         const double t_std = circuit.getTStd();
         const double cnot_mean = circuit.getCNOTMean();
 
-        std::cout << "\n\ntotal_qubits:" << total_qubits << "\n";
-        std::cout << "T gates per qubit - Mean: " << t_mean << ", Std: " << t_std << "\n";
-
         T_lower_bound = static_cast<int>(std::floor(t_mean - t_std));
         T_upper_bound = static_cast<int>(std::ceil(t_mean + t_std));
-
+        
         CNOT_threshold = static_cast<int>(std::ceil(cnot_mean));
         if (CNOT_threshold < 1) {
             CNOT_threshold = 1;
         }
-
-        std::cout << "T_count lower bound: " << T_lower_bound << "\n";
-        std::cout << "T_count upper bound: " << T_upper_bound << "\n";
-        std::cout << "CNOT_count threshold: " << CNOT_threshold << "\n\n";
+        
+        std::cout << "\ntotal_qubits:" << total_qubits << "\n";
+        if(PRINT_MAPPING){
+            std::cout << "T gates per qubit - Mean: " << t_mean << ", Std: " << t_std << "\n";
+            std::cout << "T_count lower bound: " << T_lower_bound << "\n";
+            std::cout << "T_count upper bound: " << T_upper_bound << "\n";
+            std::cout << "CNOT_count threshold: " << CNOT_threshold << "\n\n";
+        }
     }
 
 

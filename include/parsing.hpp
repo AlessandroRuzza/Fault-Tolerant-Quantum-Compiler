@@ -32,7 +32,8 @@ void apply_config_overrides(
     std::string& routing_method,
     std::string& t_routing_mode,
     int& patience_threshold,
-    bool& use_layer_cache
+    bool& use_layer_cache,
+    int& repetition_count
 );
 void argument_parsing(
     int argc,
@@ -62,7 +63,8 @@ void argument_parsing(
     std::string& t_routing_mode,
     int& patience_threshold,
     bool& use_layer_cache,
-    bool& metrics_only
+    bool& metrics_only,
+    int& repetition
 );
 
 #endif // PARSING_HPP

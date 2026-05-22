@@ -80,8 +80,16 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double border_distance_percentage, std::string routing_strategy,
     std::string t_routing_mode, int patience_threshold,
     bool use_layer_cache,
-    bool metrics_only) {
+    bool metrics_only, int repetition_count) {
 
+    double circ_time_seconds = 0.0;
+    double graph_time_seconds = 0.0;
+    double mapping_time_seconds = 0.0;
+    double routing_time_seconds = 0.0;
+    double total_mr_time_seconds = 0.0;
+    double total_time_seconds = 0.0;
+
+    const auto actual_exec_start = std::chrono::steady_clock::now();
 
     //----------circuit------------
 
@@ -104,8 +112,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     
     
     const auto circ_init_end = std::chrono::steady_clock::now();
-    const double circ_time_seconds =
-        std::chrono::duration<double>(circ_init_end - circ_init_start).count();
+    circ_time_seconds += std::chrono::duration<double>(circ_init_end - circ_init_start).count();
 
     if (PRINT_CIRCUIT) circuit.print_qubit_heap();
 
@@ -176,7 +183,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     int safe_passage_ignore_outer_layers = std::max(1, static_cast<int>(std::min(x, y) / 2.5));
 
-    Graph graph(
+    Graph graph_template(
         use_generated_graph,
         100,
         number_of_magic_states,
@@ -189,158 +196,230 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     
     const auto graph_init_end = std::chrono::steady_clock::now();
-    const double graph_time_seconds =
-        std::chrono::duration<double>(graph_init_end - graph_init_start).count();
+    graph_time_seconds += std::chrono::duration<double>(graph_init_end - graph_init_start).count();
 
-    if (graph.get_node_count() <= 0) {
+    if (graph_template.get_node_count() <= 0) {
         std::cerr << "Error: graph is empty or invalid.\n";
         throw std::runtime_error("Error: graph is empty or invalid");
     }
-    if (graph.get_magic_state_ids().empty()) {
+    if (graph_template.get_magic_state_ids().empty()) {
         std::cerr << "Error: graph has no magic states.\n";
         throw std::runtime_error("Error: graph has no magic states");
     }
 
-    const int resolved_graph_x = graph.getMaxX() + 1;
-    const int resolved_graph_y = graph.getMaxY() + 1;
+    const int resolved_graph_x = graph_template.getMaxX() + 1;
+    const int resolved_graph_y = graph_template.getMaxY() + 1;
     std::cout << "resolved graph dimensions: " << resolved_graph_x << "x" << resolved_graph_y << "\n";
 
     output_path = std::filesystem::path(PROJECT_ROOT) /
                 "qasm_graphs" /
                 (original_name.string() + ".graph");
     if (benchmark_artifacts_enabled() || WRITE_GRAPH_FOR_WISQ) {
-        graph.write_file(output_path.string());
+        graph_template.write_file(output_path.string());
     }
 
-    std::cout << "------- MAPPING ---------" << std::endl;
 
+    std::unique_ptr<Graph> best_graph;
+    std::unique_ptr<Mapping> best_mapping;
+    std::unique_ptr<LayeredCircuit> best_layered;
+    std::unique_ptr<IQubitRouter> best_router;
+    std::unique_ptr<IPathStrategy> best_path_strategy;
+    std::unique_ptr<ITGateRoutingStrategy> best_t_gate_strategy;
+    std::unique_ptr<CircuitMetrics> best_route_metrics;
+    int best_routing_steps = std::numeric_limits<int>::max();
+    double best_avg_parallelism = 0.0;
+    double best_non_routed_layer_pct = -1.0;
 
-    if (PRINT_MAPPING_GRAPH) graph.print_rectangular();
+    if (repetition_count < 1) {
+        repetition_count = 1;
+    }
 
-    const auto mapping_start = std::chrono::steady_clock::now();
+    for (int repetition = 0; repetition < repetition_count; ++repetition) {
+        std::cout << "\n------- MAPPING & ROUTING #" << repetition+1 << " ---------" << std::endl;
+        
+        auto graph = std::make_unique<Graph>(graph_template);
 
-    Mapping mapping(
-        circuit,
-        graph,
-        magic_aware_strategy,
-        type,
-        gaussian_strategy,
-        safe_passage_strategy,
-        magic_high,
-        magic_low,
-        cnot_high,
-        cnot_low,
-        mapped_gaussian_weight,
-        base_gaussian_weight,
-        size_moltiplier,
-        gaussian_confidence,
-        external_weight,
-        circuit.getNumQubits()*2,
-        safe_passage_ignore_outer_layers
-    );
+        const auto mapping_start = std::chrono::steady_clock::now();
 
-    mapping.map();
-    const auto mapping_end = std::chrono::steady_clock::now();
-    const double mapping_time_seconds =
-        std::chrono::duration<double>(mapping_end - mapping_start).count();
+        auto mapping = std::make_unique<Mapping>(
+            circuit,
+            *graph,
+            magic_aware_strategy,
+            type,
+            gaussian_strategy,
+            safe_passage_strategy,
+            magic_high,
+            magic_low,
+            cnot_high,
+            cnot_low,
+            mapped_gaussian_weight,
+            base_gaussian_weight,
+            size_moltiplier,
+            gaussian_confidence,
+            external_weight,
+            circuit.getNumQubits()*2,
+            safe_passage_ignore_outer_layers
+        );
 
-    for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
-        if (circuit.getQubit(qubit) == nullptr) {
-            continue;
+        mapping->map();
+        const auto mapping_end = std::chrono::steady_clock::now();
+        mapping_time_seconds +=
+            std::chrono::duration<double>(mapping_end - mapping_start).count();
+
+        for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
+            if (circuit.getQubit(qubit) == nullptr) {
+                continue;
+            }
+            if (mapping->get_mapped_node(qubit) < 0) {
+                throw std::runtime_error(
+                    "Incomplete mapping: qubit " + std::to_string(qubit) + " was not mapped."
+                );
+            }
         }
-        if (mapping.get_mapped_node(qubit) < 0) {
+
+        auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
+
+        // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr
+        // (QubitRouter holds raw pointers into them).
+        std::unique_ptr<IPathStrategy> pathStrategyPtr;
+        std::unique_ptr<ITGateRoutingStrategy> tGateRoutingStrategyPtr;
+        std::unique_ptr<IQubitRouter> routerPtr;
+        auto route_metrics = std::make_unique<CircuitMetrics>();
+        std::unordered_map<size_t, Routing>* cache_ptr = use_layer_cache ? &route_metrics->layer_routing_cache : nullptr;
+
+        const auto routing_start = std::chrono::steady_clock::now();
+
+        if (routing_strategy == "boost") {
+#if FTOQC_HAS_BOOST_ROUTER
+            routerPtr = std::make_unique<Boost_QubitRouter>(*mapping, *layeredCircuit, *graph);
+#else
             throw std::runtime_error(
-                "Incomplete mapping: qubit " + std::to_string(qubit) + " was not mapped."
+                "Routing strategy 'boost' requires Boost support, but this binary was built without Boost."
+            );
+#endif
+        } else {
+            constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
+            constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
+            if (routing_strategy == "naive") {
+                pathStrategyPtr = std::make_unique<NaiveShortestPath>(*graph);
+            } else { // default to congestion-aware
+                pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(
+                    *graph,
+                    CONGESTION_PENALTY_SCALE,
+                    CONGESTION_UPDATE_POLICY
+                );
+            }
+            if (t_routing_mode == "smart_t_routing") {
+                tGateRoutingStrategyPtr = std::make_unique<SmartTGateRouting>(patience_threshold);
+            } else {
+                tGateRoutingStrategyPtr = std::make_unique<NormalTGateRouting>();
+            }
+            routerPtr = std::make_unique<QubitRouter>(
+                *mapping,
+                *layeredCircuit,
+                *graph,
+                pathStrategyPtr.get(),
+                tGateRoutingStrategyPtr.get(),
+                cache_ptr
             );
         }
+
+        routerPtr->route_circuit();
+        const auto routing_end = std::chrono::steady_clock::now();
+        routing_time_seconds +=
+            std::chrono::duration<double>(routing_end - routing_start).count();
+
+        const int routing_steps = routerPtr->get_routing_length();
+        const double avg_parallelism = routing_steps > 0
+            ? static_cast<double>(circuit.getNumGates()) / routing_steps
+            : 0.0;
+        const double non_routed_layer_pct = routerPtr->get_non_routed_layer_percentage();
+
+        if(PRINT_CIRCUIT_METRICS || PRINT_CACHE_METRICS)
+            routerPtr->print_non_routed_histogram();
+
+        if (routing_steps < best_routing_steps) {
+            std::cout << "NEW BEST!" << std::endl;
+            best_routing_steps = routing_steps;
+            best_avg_parallelism = avg_parallelism;
+            best_non_routed_layer_pct = non_routed_layer_pct;
+            best_graph = std::move(graph);
+            best_mapping = std::move(mapping);
+            best_layered = std::move(layeredCircuit);
+            best_router = std::move(routerPtr);
+            best_path_strategy = std::move(pathStrategyPtr);
+            best_t_gate_strategy = std::move(tGateRoutingStrategyPtr);
+            best_route_metrics = std::move(route_metrics);
+        }
+
+        std::cout << "Routing steps: " << routing_steps << "\n";
+        std::cout << "Avg parallelism: " << avg_parallelism << "\n";
+        std::cout << "Non-routed layer %: " << non_routed_layer_pct << "\n";
     }
 
-    graph.print_rectangular();
+    const auto actual_exec_end = std::chrono::steady_clock::now();
+    const auto actual_exec_time_seconds = std::chrono::duration<double>(actual_exec_end - actual_exec_start).count();
 
-    std::cout << "------- LAYERING ---------" << std::endl;
-    LayeredCircuit layeredCircuit = LayeredCircuit(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
-    if (PRINT_LAYER) layeredCircuit.print_layered();
+    if (!best_router || !best_mapping || !best_graph || !best_layered) {
+        throw std::runtime_error("Mapping/routing repetitions produced no result.");
+    }
 
+    if (PRINT_MAPPING_GRAPH) best_graph->print_rectangular();
 
-    CircuitMetrics metrics = compute_and_print_circuit_metrics(layeredCircuit, path, true, &mapping, &graph);
+    std::cout << "\n------- LAYERING ---------" << std::endl;
+    LayeredCircuit metrics_layered = LayeredCircuit(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
+    if (PRINT_LAYER) metrics_layered.print_layered();
+
+    compute_and_print_circuit_metrics(
+        metrics_layered,
+        path,
+        PRINT_CIRCUIT_METRICS,
+        best_mapping.get(),
+        best_graph.get()
+    );
 
     // if(metrics.layer_reuse_ratio > 0.95){
     //     use_layer_cache = true;
     // }
 
-    std::cout << "------- ROUTING ---------" << std::endl;
-    // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr
-    // (QubitRouter holds raw pointers into them).
-    std::unique_ptr<IPathStrategy> pathStrategyPtr;
-    std::unique_ptr<ITGateRoutingStrategy> tGateRoutingStrategyPtr;
-    std::unique_ptr<IQubitRouter> routerPtr;
+    std::cout << "\n------- ROUTING ---------" << std::endl;
 
-    const auto routing_start = std::chrono::steady_clock::now();
+    if (PRINT_ROUTING) best_router->print_routing_steps();
+    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << best_routing_steps << "\n";
 
-    if (routing_strategy == "boost") {
-#if FTOQC_HAS_BOOST_ROUTER
-        routerPtr = std::make_unique<Boost_QubitRouter>(mapping, layeredCircuit, graph);
-#else
-        throw std::runtime_error(
-            "Routing strategy 'boost' requires Boost support, but this binary was built without Boost."
-        );
-#endif
-    } else {
-        constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
-        constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
-        if (routing_strategy == "naive") {
-            pathStrategyPtr = std::make_unique<NaiveShortestPath>(graph);
-        } else { // default to congestion-aware
-            pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(graph, CONGESTION_PENALTY_SCALE, CONGESTION_UPDATE_POLICY);
-        }
-        if (t_routing_mode == "smart_t_routing") {
-            tGateRoutingStrategyPtr = std::make_unique<SmartTGateRouting>(patience_threshold);
-        } else {
-            tGateRoutingStrategyPtr = std::make_unique<NormalTGateRouting>();
-        }
-        std::unordered_map<size_t, Routing>* cache_ptr = use_layer_cache ? &metrics.layer_routing_cache : nullptr;
-        routerPtr = std::make_unique<QubitRouter>(
-            mapping,
-            layeredCircuit,
-            graph,
-            pathStrategyPtr.get(),
-            tGateRoutingStrategyPtr.get(),
-            cache_ptr
-        );
-    }
+    std::cout << "Average Parallelism (" << routing_strategy << "): " << best_avg_parallelism << "\n\n";
 
-    routerPtr->route_circuit();
-    const auto routing_end = std::chrono::steady_clock::now();
-    const double routing_time_seconds =
-        std::chrono::duration<double>(routing_end - routing_start).count();
+    std::cout << "Average non-routed % (" << routing_strategy << "): " << best_non_routed_layer_pct << "%\n\n";
 
-    if (PRINT_ROUTING) routerPtr->print_routing_steps();
-    std::cout << "\nTotal routing steps (" << routing_strategy << "): " << routerPtr->get_routing_length() << "\n";
-
-    double avg_parallelism = double(circuit.getNumGates()) / routerPtr->get_routing_length();
-    std::cout << "Average Parallelism (" << routing_strategy << "): " << avg_parallelism << "\n\n";
-
-
-    
-    const double total_mr_time_seconds = mapping_time_seconds + routing_time_seconds;
-    const double total_time_seconds = total_mr_time_seconds + circ_time_seconds + graph_time_seconds;
+    total_mr_time_seconds = mapping_time_seconds + routing_time_seconds;
+    total_time_seconds = total_mr_time_seconds + circ_time_seconds + graph_time_seconds;
     std::cout << "Circuit time:    " << circ_time_seconds << " s\n";
     std::cout << "Graph init time: " << graph_time_seconds << " s\n";
     std::cout << "Mapping time:    " << mapping_time_seconds << " s\n";
     std::cout << "Routing time:    " << routing_time_seconds << " s\n";
-    
     std::cout << "Total mapping + routing time: " << total_mr_time_seconds << " s\n\n";
     std::cout << "Total time: " << total_time_seconds << " s\n\n";
-
-    compute_and_print_circuit_metrics(layeredCircuit, path, false, &mapping, &graph);
+    std::cout << "Total time (incl. instantiations and prints): " << actual_exec_time_seconds << " s\n\n";
+    
+    compute_and_print_circuit_metrics(
+        *best_layered,
+        path,
+        PRINT_CIRCUIT_METRICS,
+        best_mapping.get(),
+        best_graph.get()
+    );
+    (void)best_layered;
+    (void)best_path_strategy;
+    (void)best_t_gate_strategy;
+    (void)best_route_metrics;
 
     return benchmarkResult{
-        routerPtr->get_routing_length(),
-        avg_parallelism,
+        best_routing_steps,
+        best_avg_parallelism,
         resolved_graph_x,
         resolved_graph_y,
         qubitsNumber,
         max_deg,
-        routerPtr->get_non_routed_layer_percentage()
+        best_non_routed_layer_pct
     };
 }

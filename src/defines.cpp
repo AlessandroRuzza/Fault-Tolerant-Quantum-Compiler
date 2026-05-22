@@ -17,6 +17,7 @@ const bool PRINT_DRAW_ROUTING = false;
 const bool PRINT_ROUTING_PROGRESS = false;
 
 const bool PRINT_CACHE_METRICS = false; 
+const bool PRINT_CIRCUIT_METRICS = false; 
 
 /*
 ############ BEHAVIORAL FLAGS ######################
