@@ -155,13 +155,13 @@ def heatmap_slug(axis_slug):
 
 def build_requested_heatmap_items(start_index=48):
     items = []
-    plot_index = start_index
     for col_axis, row_axes in HEATMAP_PAIR_GROUPS:
         col_key, col_label = HEATMAP_AXIS_SPECS[col_axis]
-        subfolder = HEATMAP_DIR
+        subfolder = os.path.join(HEATMAP_DIR, heatmap_slug(col_axis))
         group_heatmap_items = []
         group_heatmap_items_no_out = []
         group_heatmap_items_median = []
+        subfolder_index = 1
         for row_axis in row_axes:
             row_key, row_label = HEATMAP_AXIS_SPECS[row_axis]
             triplet_items = []
@@ -169,7 +169,7 @@ def build_requested_heatmap_items(start_index=48):
             triplet_items_median = []
             for metric_slug, metric_filename_part, caption_prefix, sample_scope, colorbar_label, value_format in HEATMAP_METRIC_SPECS:
                 filename = (
-                    f"{plot_index:02d}_heatmap_{metric_filename_part}_"
+                    f"{subfolder_index:02d}_heatmap_{metric_filename_part}_"
                     f"{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}.png"
                 )
                 spec = {
@@ -191,11 +191,11 @@ def build_requested_heatmap_items(start_index=48):
                 items.append(spec)
                 triplet_items.append(spec)
                 group_heatmap_items.append(spec)
-                plot_index += 1
+                subfolder_index += 1
 
                 no_out_scope = f"{sample_scope}, no outliers"
                 no_out_filename = (
-                    f"{plot_index:02d}_heatmap_{metric_filename_part}_"
+                    f"{subfolder_index:02d}_heatmap_{metric_filename_part}_"
                     f"{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_no_out.png"
                 )
                 no_out_spec = {
@@ -217,11 +217,11 @@ def build_requested_heatmap_items(start_index=48):
                 items.append(no_out_spec)
                 triplet_items_no_out.append(no_out_spec)
                 group_heatmap_items_no_out.append(no_out_spec)
-                plot_index += 1
+                subfolder_index += 1
 
                 median_scope = f"{sample_scope}, median"
                 median_filename = (
-                    f"{plot_index:02d}_heatmap_{metric_filename_part}_"
+                    f"{subfolder_index:02d}_heatmap_{metric_filename_part}_"
                     f"{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_median.png"
                 )
                 median_spec = {
@@ -243,11 +243,11 @@ def build_requested_heatmap_items(start_index=48):
                 items.append(median_spec)
                 triplet_items_median.append(median_spec)
                 group_heatmap_items_median.append(median_spec)
-                plot_index += 1
+                subfolder_index += 1
 
             triplet_dashboard = {
                 "kind": "triplet_dashboard",
-                "filename": f"{plot_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}.png",
+                "filename": f"{subfolder_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}.png",
                 "caption": f"Dashboard: {row_label} x {col_label}",
                 "title": f"{row_label} x {col_label}",
                 "source_items": triplet_items,
@@ -259,11 +259,11 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard)
-            plot_index += 1
+            subfolder_index += 1
 
             triplet_dashboard_no_out = {
                 "kind": "triplet_dashboard",
-                "filename": f"{plot_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_no_out.png",
+                "filename": f"{subfolder_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_no_out.png",
                 "caption": f"Dashboard (no outliers): {row_label} x {col_label}",
                 "title": f"{row_label} x {col_label} (no outliers)",
                 "source_items": triplet_items_no_out,
@@ -275,11 +275,11 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard_no_out)
-            plot_index += 1
+            subfolder_index += 1
 
             triplet_dashboard_median = {
                 "kind": "triplet_dashboard",
-                "filename": f"{plot_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_median.png",
+                "filename": f"{subfolder_index:02d}_dashboard_{heatmap_slug(row_axis)}_vs_{heatmap_slug(col_axis)}_median.png",
                 "caption": f"Dashboard (median): {row_label} x {col_label}",
                 "title": f"{row_label} x {col_label} (median)",
                 "source_items": triplet_items_median,
@@ -291,12 +291,12 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard_median)
-            plot_index += 1
+            subfolder_index += 1
 
         items.append(
             {
                 "kind": "x_axis_dashboard",
-                "filename": f"{plot_index:02d}_dashboard_x_{heatmap_slug(col_axis)}.png",
+                "filename": f"{subfolder_index:02d}_dashboard_x_{heatmap_slug(col_axis)}.png",
                 "caption": f"Dashboard: all y axes x {col_label}",
                 "title": f"All y axes x {col_label}",
                 "source_items": group_heatmap_items,
@@ -308,12 +308,12 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
         )
-        plot_index += 1
+        subfolder_index += 1
 
         items.append(
             {
                 "kind": "x_axis_dashboard",
-                "filename": f"{plot_index:02d}_dashboard_x_{heatmap_slug(col_axis)}_no_out.png",
+                "filename": f"{subfolder_index:02d}_dashboard_x_{heatmap_slug(col_axis)}_no_out.png",
                 "caption": f"Dashboard (no outliers): all y axes x {col_label}",
                 "title": f"All y axes x {col_label} (no outliers)",
                 "source_items": group_heatmap_items_no_out,
@@ -325,12 +325,12 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
         )
-        plot_index += 1
+        subfolder_index += 1
 
         items.append(
             {
                 "kind": "x_axis_dashboard",
-                "filename": f"{plot_index:02d}_dashboard_x_{heatmap_slug(col_axis)}_median.png",
+                "filename": f"{subfolder_index:02d}_dashboard_x_{heatmap_slug(col_axis)}_median.png",
                 "caption": f"Dashboard (median): all y axes x {col_label}",
                 "title": f"All y axes x {col_label} (median)",
                 "source_items": group_heatmap_items_median,
@@ -342,13 +342,13 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
         )
-        plot_index += 1
+        subfolder_index += 1
 
         for metric_slug, metric_filename_part, caption_prefix, sample_scope, ylabel, value_format, color in AXIS_BARPLOT_METRIC_SPECS:
             items.append(
                 {
                     "kind": "axis_barplot",
-                    "filename": f"{plot_index:02d}_barplot_{metric_filename_part}_by_{heatmap_slug(col_axis)}.png",
+                    "filename": f"{subfolder_index:02d}_barplot_{metric_filename_part}_by_{heatmap_slug(col_axis)}.png",
                     "caption": f"{caption_prefix} {col_label} ({sample_scope})",
                     "title": f"{caption_prefix} {col_label} ({sample_scope})",
                     "axis_key": col_key,
@@ -359,12 +359,12 @@ def build_requested_heatmap_items(start_index=48):
                     "subfolder": subfolder,
                 }
             )
-            plot_index += 1
+            subfolder_index += 1
 
         items.append(
             {
                 "kind": "best_config_count",
-                "filename": f"{plot_index:02d}_best_config_count_by_{heatmap_slug(col_axis)}.png",
+                "filename": f"{subfolder_index:02d}_best_config_count_by_{heatmap_slug(col_axis)}.png",
                 "caption": f"Best routing config count by {col_label}",
                 "title": f"Best routing config count by {col_label}",
                 "axis_slug": col_axis,
@@ -373,12 +373,12 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
         )
-        plot_index += 1
+        subfolder_index += 1
 
         items.append(
             {
                 "kind": "best_config_count_non_routed",
-                "filename": f"{plot_index:02d}_best_non_routed_count_by_{heatmap_slug(col_axis)}.png",
+                "filename": f"{subfolder_index:02d}_best_non_routed_count_by_{heatmap_slug(col_axis)}.png",
                 "caption": f"Best non-routed layer % config count by {col_label}",
                 "title": f"Best non-routed layer % config count by {col_label}",
                 "axis_slug": col_axis,
@@ -387,12 +387,12 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
         )
-        plot_index += 1
+        subfolder_index += 1
 
         items.append(
             {
                 "kind": "timeout_count",
-                "filename": f"{plot_index:02d}_timeout_count_by_{heatmap_slug(col_axis)}.png",
+                "filename": f"{subfolder_index:02d}_timeout_count_by_{heatmap_slug(col_axis)}.png",
                 "caption": f"Timeout count by {col_label}",
                 "title": f"Timeout count by {col_label}",
                 "axis_slug": col_axis,
@@ -401,12 +401,12 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
         )
-        plot_index += 1
+        subfolder_index += 1
 
         items.append(
             {
                 "kind": "circuit_table",
-                "filename": f"{plot_index:02d}_circuit_table_x_{heatmap_slug(col_axis)}.png",
+                "filename": f"{subfolder_index:02d}_circuit_table_x_{heatmap_slug(col_axis)}.png",
                 "caption": f"Circuits tested by {col_label}",
                 "title": f"Circuits tested by {col_label}",
                 "col_key": col_key,
@@ -414,7 +414,7 @@ def build_requested_heatmap_items(start_index=48):
                 "subfolder": subfolder,
             }
         )
-        plot_index += 1
+        subfolder_index += 1
     return items
 
 
@@ -1137,7 +1137,9 @@ def save_fig(fig, output_dir, filename, generated, dpi=160, tight=True, subfolde
     else:
         target_dir = output_dir
     os.makedirs(target_dir, exist_ok=True)
-    path = os.path.join(target_dir, strip_plot_number(filename))
+    in_heatmap = subfolder and (subfolder == HEATMAP_DIR or subfolder.startswith(HEATMAP_DIR + os.sep))
+    disk_name = filename if in_heatmap else strip_plot_number(filename)
+    path = os.path.join(target_dir, disk_name)
     if tight:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
@@ -1243,6 +1245,27 @@ def clear_per_circuit_barplot_dir(output_dir):
                 pass
 
 
+def clear_heatmap_dir(output_dir):
+    target_dir = os.path.join(output_dir, HEATMAP_DIR)
+    if not os.path.isdir(target_dir):
+        return
+
+    for root, dirs, files in os.walk(target_dir, topdown=False):
+        for filename in files:
+            if not filename.lower().endswith(".png"):
+                continue
+            path = os.path.join(root, filename)
+            try:
+                os.remove(path)
+            except OSError as exc:
+                warnings.warn(f"Could not remove obsolete heatmap plot {path}: {exc}")
+        for dirname in dirs:
+            path = os.path.join(root, dirname)
+            try:
+                if not os.listdir(path):
+                    os.rmdir(path)
+            except OSError:
+                pass
 
 
 def category_color_map(labels):
@@ -2982,7 +3005,8 @@ def plot_image_dashboard(
     source_panels = []
     for item in source_items:
         source_subfolder = item.get("subfolder")
-        source_name = strip_plot_number(item["filename"])
+        in_heatmap = source_subfolder and (source_subfolder == HEATMAP_DIR or source_subfolder.startswith(HEATMAP_DIR + os.sep))
+        source_name = item["filename"] if in_heatmap else strip_plot_number(item["filename"])
         source_path = (
             os.path.join(output_dir, source_subfolder, source_name)
             if source_subfolder
@@ -3081,7 +3105,9 @@ def plot_image_dashboard(
 
     target_dir = os.path.join(output_dir, subfolder) if subfolder else output_dir
     os.makedirs(target_dir, exist_ok=True)
-    path = os.path.join(target_dir, filename)
+    in_heatmap = subfolder and (subfolder == HEATMAP_DIR or subfolder.startswith(HEATMAP_DIR + os.sep))
+    disk_name = filename if in_heatmap else strip_plot_number(filename)
+    path = os.path.join(target_dir, disk_name)
     canvas.convert("RGB").save(path, "PNG", optimize=True)
     canvas.close()
     del canvas
@@ -3814,7 +3840,7 @@ def aggregate_runtime_qubits_plus_gates(rows):
 
 
 def write_runtime_qubits_plus_gates_csv(entries, output_dir):
-    csv_path = os.path.join(output_dir, "helpers", "32_runtime_vs_qubits_plus_gates_with_timeouts.csv")
+    csv_path = os.path.join(output_dir, "helpers", "runtime_vs_qubits_plus_gates_with_timeouts.csv")
     fieldnames = [
         "curve",
         "mapping_type",
@@ -4232,7 +4258,7 @@ def runtime_group_sort_key(value):
 
 
 def write_runtime_grouped_factors_csv(all_entries, output_dir):
-    csv_path = os.path.join(output_dir, "helpers", "36_runtime_grouped_factors.csv")
+    csv_path = os.path.join(output_dir, "helpers", "runtime_grouped_factors.csv")
     fieldnames = [
         "plot_filename",
         "series_type",
@@ -5538,7 +5564,7 @@ def write_report_markdown(
 ):
     report_path = os.path.join(output_dir, "report.md")
     by_name = {
-        os.path.basename(p): os.path.relpath(p, output_dir).replace(os.sep, "/")
+        strip_plot_number(os.path.basename(p)): os.path.relpath(p, output_dir).replace(os.sep, "/")
         for p in generated
     }
     skipped_by_name = {item["filename"]: item["reason"] for item in (skipped or [])}
@@ -5820,6 +5846,7 @@ def main():
     plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped)
     print(f"[analysis plots] {len(generated) - analysis_start} done", flush=True)
     if args.heatmap:
+        clear_heatmap_dir(output_dir)
         heatmap_csv_path = (
             os.path.abspath(input_files[0])
             if (
