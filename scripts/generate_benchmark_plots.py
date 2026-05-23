@@ -21,7 +21,6 @@ from decimal import Decimal, InvalidOperation
 
 
 WRITE_REPORT_MD = False
-ALIGN_HEATMAP_CONFIGS = True
 
 
 try:
@@ -3190,6 +3189,7 @@ def plot_axis_barplot(
     value_format="{:.2f}",
     color="#577590",
     subfolder=None,
+    align=False,
 ):
     grouped = defaultdict(list)
     for row in rows:
@@ -3198,7 +3198,7 @@ def plot_axis_barplot(
         grouped[heatmap_axis_value(row, axis_key)].append(row)
 
     removed_per_bar = {}
-    if ALIGN_HEATMAP_CONFIGS and metric != "success_rate" and len(grouped) > 1:
+    if align and metric != "success_rate" and len(grouped) > 1:
         base_fields = heatmap_base_config_fields(axis_key, axis_key)
         bar_configs = {
             label: {
@@ -3418,6 +3418,7 @@ def plot_axis_barplots_by_circuit(
     generated,
     skipped=None,
     batch_size=50,
+    align=False,
 ):
     rows_success_with_duration = [
         row for row in rows if row["success"] and row["duration_s_f"] is not None
@@ -3488,6 +3489,7 @@ def plot_axis_barplots_by_circuit(
                 value_format=value_format,
                 color=color,
                 subfolder=subfolder,
+                align=align,
             )
         _trim_heap()
         print(f"[barplot batch {batch_idx}/{len(batches)}] items {start}:{end} done", flush=True)
@@ -4649,12 +4651,13 @@ def _process_single_heatmap_item(
     output_dir,
     generated,
     skipped,
+    align=False,
 ):
     if item["kind"] == "heatmap":
         metric_rows = heatmap_rows_by_metric[item["metric"]]
         heatmap_rows = filter_heatmap_rows(metric_rows, item["row_key"], item["col_key"])
         removed_counts = None
-        if ALIGN_HEATMAP_CONFIGS and item["metric"] != "success_rate":
+        if align and item["metric"] != "success_rate":
             heatmap_rows, removed_counts = align_rows_to_common_configs(
                 heatmap_rows, item["row_key"], item["col_key"]
             )
@@ -4718,6 +4721,7 @@ def _process_single_heatmap_item(
             value_format=item["value_format"],
             color=item["color"],
             subfolder=item.get("subfolder"),
+            align=align,
         )
         return
 
@@ -4783,13 +4787,14 @@ def run_heatmap_worker(args):
             args.worker_output_dir,
             generated,
             skipped,
+            align=args.align,
         )
 
     with open(args.worker_result, "w") as f:
         json.dump({"generated": generated, "skipped": skipped}, f)
 
 
-def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir):
+def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir, align=False):
     """Spawn a heatmap worker subprocess for items [start:end] and return its handle."""
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
         result_path = f.name
@@ -4801,6 +4806,8 @@ def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir):
         "--worker-output-dir", output_dir,
         "--worker-result", result_path,
     ]
+    if align:
+        cmd.append("--align")
     proc = subprocess.Popen(cmd)
     return {
         "batch_idx": batch_idx,
@@ -4847,6 +4854,7 @@ def plot_requested_heatmaps(
     csv_path=None,
     batch_size=50,
     parallel=1,
+    align=False,
 ):
     """Orchestrate heatmap generation via subprocess batches to release memory between batches."""
     if csv_path is None:
@@ -4863,6 +4871,7 @@ def plot_requested_heatmaps(
                 output_dir,
                 generated,
                 skipped,
+                align=align,
             )
             if (idx + 1) % 10 == 0:
                 _trim_heap()
@@ -4886,7 +4895,7 @@ def plot_requested_heatmaps(
         while next_batch < total_batches and len(running) < parallel:
             start, end = batches[next_batch]
             running.append(
-                _launch_heatmap_batch(next_batch + 1, start, end, csv_path, output_dir)
+                _launch_heatmap_batch(next_batch + 1, start, end, csv_path, output_dir, align=align)
             )
             next_batch += 1
         still_running = []
@@ -5752,6 +5761,15 @@ def main():
         default=1,
         help="Number of heatmap subprocess batches to run concurrently (default: 1).",
     )
+    parser.add_argument(
+        "--align",
+        action="store_true",
+        help=(
+            "Align heatmap/barplot cells to the configs common to every populated cell "
+            "(non-success metrics only). When omitted, each cell aggregates over all its "
+            "own configs."
+        ),
+    )
     args = parser.parse_args()
 
     if args.worker_heatmap_batch is not None:
@@ -5917,6 +5935,7 @@ def main():
             csv_path=heatmap_csv_path,
             batch_size=args.heatmap_batch_size,
             parallel=args.parallel,
+            align=args.align,
         )
         plot_best_config_counts_by_heatmap_axis(
             rows_success_with_routing,
@@ -5944,6 +5963,7 @@ def main():
             generated,
             skipped,
             batch_size=args.heatmap_batch_size,
+            align=args.align,
         )
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,
