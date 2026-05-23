@@ -13,6 +13,7 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import time
 import warnings
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -4788,6 +4789,54 @@ def run_heatmap_worker(args):
         json.dump({"generated": generated, "skipped": skipped}, f)
 
 
+def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir):
+    """Spawn a heatmap worker subprocess for items [start:end] and return its handle."""
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
+        result_path = f.name
+    cmd = [
+        sys.executable,
+        os.path.abspath(__file__),
+        "--worker-heatmap-batch", f"{start}:{end}",
+        "--worker-csv", csv_path,
+        "--worker-output-dir", output_dir,
+        "--worker-result", result_path,
+    ]
+    proc = subprocess.Popen(cmd)
+    return {
+        "batch_idx": batch_idx,
+        "start": start,
+        "end": end,
+        "result_path": result_path,
+        "proc": proc,
+    }
+
+
+def _collect_heatmap_batch(entry, total_batches, generated, skipped):
+    """Gather results of a finished heatmap worker subprocess."""
+    batch_idx = entry["batch_idx"]
+    start, end = entry["start"], entry["end"]
+    result_path = entry["result_path"]
+    returncode = entry["proc"].returncode
+    try:
+        if returncode == 0:
+            with open(result_path) as f:
+                result = json.load(f)
+            generated.extend(result.get("generated", []))
+            skipped.extend(result.get("skipped", []))
+            print(f"[heatmap batch {batch_idx}/{total_batches}] items {start}:{end} done", flush=True)
+        else:
+            print(f"[batch {batch_idx}] failed with exit {returncode}", flush=True)
+            for item in REQUESTED_HEATMAP_ITEMS[start:end]:
+                record_skipped_plot(
+                    skipped, item["filename"], f"subprocess batch failed (exit {returncode})"
+                )
+    finally:
+        try:
+            os.unlink(result_path)
+        except OSError:
+            pass
+
+
 def plot_requested_heatmaps(
     rows,
     rows_success_with_routing,
@@ -4797,6 +4846,7 @@ def plot_requested_heatmaps(
     skipped=None,
     csv_path=None,
     batch_size=50,
+    parallel=1,
 ):
     """Orchestrate heatmap generation via subprocess batches to release memory between batches."""
     if csv_path is None:
@@ -4820,39 +4870,34 @@ def plot_requested_heatmaps(
 
     total = len(REQUESTED_HEATMAP_ITEMS)
     batches = [(s, min(s + batch_size, total)) for s in range(0, total, batch_size)]
-    print(f"Generating {total} heatmap items in {len(batches)} subprocess batches of up to {batch_size}", flush=True)
+    total_batches = len(batches)
+    parallel = max(1, parallel)
+    print(
+        f"Generating {total} heatmap items in {total_batches} subprocess batches of up to "
+        f"{batch_size} ({parallel} in parallel)",
+        flush=True,
+    )
     if skipped is None:
         skipped = []
 
-    for batch_idx, (start, end) in enumerate(batches, 1):
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
-            result_path = f.name
-        cmd = [
-            sys.executable,
-            os.path.abspath(__file__),
-            "--worker-heatmap-batch", f"{start}:{end}",
-            "--worker-csv", csv_path,
-            "--worker-output-dir", output_dir,
-            "--worker-result", result_path,
-        ]
-        try:
-            subprocess.run(cmd, check=True)
-            with open(result_path) as f:
-                result = json.load(f)
-            generated.extend(result.get("generated", []))
-            skipped.extend(result.get("skipped", []))
-            print(f"[heatmap batch {batch_idx}/{len(batches)}] items {start}:{end} done", flush=True)
-        except subprocess.CalledProcessError as exc:
-            print(f"[batch {batch_idx}] failed with exit {exc.returncode}", flush=True)
-            for item in REQUESTED_HEATMAP_ITEMS[start:end]:
-                record_skipped_plot(
-                    skipped, item["filename"], f"subprocess batch failed (exit {exc.returncode})"
-                )
-        finally:
-            try:
-                os.unlink(result_path)
-            except OSError:
-                pass
+    running = []
+    next_batch = 0
+    while next_batch < total_batches or running:
+        while next_batch < total_batches and len(running) < parallel:
+            start, end = batches[next_batch]
+            running.append(
+                _launch_heatmap_batch(next_batch + 1, start, end, csv_path, output_dir)
+            )
+            next_batch += 1
+        still_running = []
+        for entry in running:
+            if entry["proc"].poll() is None:
+                still_running.append(entry)
+            else:
+                _collect_heatmap_batch(entry, total_batches, generated, skipped)
+        running = still_running
+        if running and (next_batch >= total_batches or len(running) >= parallel):
+            time.sleep(0.2)
 
 
 def plot_summary_tables(rows, output_dir, generated):
@@ -5701,6 +5746,12 @@ def main():
         default=50,
         help="Number of heatmap items processed per subprocess batch (default: 50).",
     )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of heatmap subprocess batches to run concurrently (default: 1).",
+    )
     args = parser.parse_args()
 
     if args.worker_heatmap_batch is not None:
@@ -5865,6 +5916,7 @@ def main():
             skipped,
             csv_path=heatmap_csv_path,
             batch_size=args.heatmap_batch_size,
+            parallel=args.parallel,
         )
         plot_best_config_counts_by_heatmap_axis(
             rows_success_with_routing,
