@@ -1,3 +1,6 @@
 [submodule "external/json"]
 	path = external/nlohmann_json
 	url = https://github.com/nlohmann/json
+[submodule "data"]
+	path = data
+	url = https://github.com/FedericoQuartieri/Fault-Tolerant-Quantum-Compiler-Data.git
