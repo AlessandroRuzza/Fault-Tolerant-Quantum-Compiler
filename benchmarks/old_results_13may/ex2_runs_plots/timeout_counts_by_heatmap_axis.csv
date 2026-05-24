@@ -1,8 +1,0 @@
-axis,axis_label,axis_value,timeout_count,total_runs,timeout_rate
-placement_border,magic placement x border distance,center_circle(0%),320,2560,0.125
-placement_border,magic placement x border distance,center_circle(5%),257,2560,0.100390625
-routing_strategy,routing strategy,congestion,577,5120,0.1126953125
-safe_passage,safe passage,connectivity,320,2560,0.125
-safe_passage,safe passage,cube,257,2560,0.100390625
-t_routing_mode,t routing mode,normal_t_routing,577,5120,0.1126953125
-type,type,gaussian,577,5120,0.1126953125
