@@ -21,6 +21,7 @@ from decimal import Decimal, InvalidOperation
 
 
 WRITE_REPORT_MD = False
+HEATMAP_BATCH_SIZE = 50
 
 
 try:
@@ -4775,9 +4776,14 @@ def run_heatmap_worker(args):
         rows_no_timeout, rows_success_with_routing
     )
 
+    _DASHBOARD_KINDS = {"triplet_dashboard", "x_axis_dashboard"}
+    phase = getattr(args, "worker_heatmap_phase", "source")
     generated = []
     skipped = []
-    items_slice = REQUESTED_HEATMAP_ITEMS[start:end]
+    items_slice = [
+        item for item in REQUESTED_HEATMAP_ITEMS[start:end]
+        if (item["kind"] in _DASHBOARD_KINDS) == (phase == "dashboard")
+    ]
     for item in items_slice:
         _process_single_heatmap_item(
             item,
@@ -4794,7 +4800,7 @@ def run_heatmap_worker(args):
         json.dump({"generated": generated, "skipped": skipped}, f)
 
 
-def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir, align=False):
+def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir, align=False, phase="source"):
     """Spawn a heatmap worker subprocess for items [start:end] and return its handle."""
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
         result_path = f.name
@@ -4802,6 +4808,7 @@ def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir, align=Fal
         sys.executable,
         os.path.abspath(__file__),
         "--worker-heatmap-batch", f"{start}:{end}",
+        "--worker-heatmap-phase", phase,
         "--worker-csv", csv_path,
         "--worker-output-dir", output_dir,
         "--worker-result", result_path,
@@ -4852,7 +4859,7 @@ def plot_requested_heatmaps(
     generated,
     skipped=None,
     csv_path=None,
-    batch_size=50,
+    batch_size=HEATMAP_BATCH_SIZE,
     parallel=1,
     align=False,
 ):
@@ -4877,36 +4884,63 @@ def plot_requested_heatmaps(
                 _trim_heap()
         return
 
+    _DASHBOARD_KINDS = {"triplet_dashboard", "x_axis_dashboard"}
     total = len(REQUESTED_HEATMAP_ITEMS)
     batches = [(s, min(s + batch_size, total)) for s in range(0, total, batch_size)]
     total_batches = len(batches)
     parallel = max(1, parallel)
+
+    # Phase 1: source items (heatmaps, barplots, etc.) — exclude dashboard kinds so they
+    # don't run before their source images are on disk.
+    # Phase 2: dashboard items — run only after all phase-1 batches are complete.
+    dashboard_batch_indices = {
+        i for i, (s, e) in enumerate(batches)
+        if any(item["kind"] in _DASHBOARD_KINDS for item in REQUESTED_HEATMAP_ITEMS[s:e])
+    }
+
+    n_source_items = sum(1 for it in REQUESTED_HEATMAP_ITEMS if it["kind"] not in _DASHBOARD_KINDS)
+    n_dash_items = total - n_source_items
     print(
         f"Generating {total} heatmap items in {total_batches} subprocess batches of up to "
-        f"{batch_size} ({parallel} in parallel)",
+        f"{batch_size} ({parallel} in parallel) — "
+        f"{n_source_items} source items then {n_dash_items} dashboard items",
         flush=True,
     )
     if skipped is None:
         skipped = []
 
-    running = []
-    next_batch = 0
-    while next_batch < total_batches or running:
-        while next_batch < total_batches and len(running) < parallel:
-            start, end = batches[next_batch]
-            running.append(
-                _launch_heatmap_batch(next_batch + 1, start, end, csv_path, output_dir, align=align)
-            )
-            next_batch += 1
-        still_running = []
-        for entry in running:
-            if entry["proc"].poll() is None:
-                still_running.append(entry)
-            else:
-                _collect_heatmap_batch(entry, total_batches, generated, skipped)
-        running = still_running
-        if running and (next_batch >= total_batches or len(running) >= parallel):
-            time.sleep(0.2)
+    def _run_batches(phase):
+        running = []
+        next_batch = 0
+        while next_batch < total_batches or running:
+            while next_batch < total_batches and len(running) < parallel:
+                if phase == "source" or next_batch in dashboard_batch_indices:
+                    start, end = batches[next_batch]
+                    running.append(
+                        _launch_heatmap_batch(
+                            next_batch + 1, start, end, csv_path, output_dir,
+                            align=align, phase=phase,
+                        )
+                    )
+                next_batch += 1
+            still_running = []
+            for entry in running:
+                if entry["proc"].poll() is None:
+                    still_running.append(entry)
+                else:
+                    _collect_heatmap_batch(entry, total_batches, generated, skipped)
+            running = still_running
+            if running and (next_batch >= total_batches or len(running) >= parallel):
+                time.sleep(0.2)
+
+    _run_batches("source")
+    if dashboard_batch_indices:
+        print(
+            f"Phase 2: generating {n_dash_items} dashboard items "
+            f"({len(dashboard_batch_indices)} batches)",
+            flush=True,
+        )
+        _run_batches("dashboard")
 
 
 def plot_summary_tables(rows, output_dir, generated):
@@ -5741,6 +5775,7 @@ def main():
         help="Also generate the per-circuit barplots under barplots_by_circuit/.",
     )
     parser.add_argument("--worker-heatmap-batch", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-heatmap-phase", default="source", choices=["source", "dashboard"], help=argparse.SUPPRESS)
     parser.add_argument("--worker-csv", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--worker-output-dir", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--worker-result", default=None, help=argparse.SUPPRESS)
@@ -5752,8 +5787,8 @@ def main():
     parser.add_argument(
         "--heatmap-batch-size",
         type=int,
-        default=50,
-        help="Number of heatmap items processed per subprocess batch (default: 50).",
+        default=HEATMAP_BATCH_SIZE,
+        help=f"Number of heatmap items processed per subprocess batch (default: {HEATMAP_BATCH_SIZE}).",
     )
     parser.add_argument(
         "--parallel",
