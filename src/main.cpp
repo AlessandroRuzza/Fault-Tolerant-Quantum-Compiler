@@ -276,7 +276,6 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double mapped_gaussian_weight = 0.8;
     double base_gaussian_weight = 1.0;
     double external_weight = 0.0;
-    double size_moltiplier = 1.0;
     double gaussian_confidence = 0.95;
     std::string config_path = "../config/0_compiler_config.json";
     std::string graph_path = "";
@@ -309,7 +308,6 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        size_moltiplier,
         gaussian_confidence,
         external_weight,
         config_path,
@@ -342,7 +340,6 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        size_moltiplier,
         gaussian_confidence,
         external_weight,
         x,
@@ -371,7 +368,6 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "MAPPED_GAUSSIAN_WEIGHT: " << mapped_gaussian_weight << std::endl;
     std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
     std::cout << "EXTERNAL_WEIGHT: " << external_weight << std::endl;
-    std::cout << "size_moltiplier: " << size_moltiplier << std::endl;
     std::cout << "gaussian_confidence: " << gaussian_confidence << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
@@ -405,7 +401,6 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        size_moltiplier,
         gaussian_confidence,
         external_weight,
         x,
@@ -740,22 +735,21 @@ int run_bench_mode(
                 {13, plan_field(entry, {"CNOT_LOW", "cnot_low"})},
                 {14, plan_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"})},
                 {15, plan_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"})},
-                {16, plan_field(entry, {"SIZE_MOLTIPLIER", "size_moltiplier", "SIZE_MULTIPLIER", "size_multiplier"})},
-                {17, plan_field(entry, {"GAUSSIAN_CONFIDENCE", "gaussian_confidence"})},
-                {18, plan_field(entry, {"safe_passage_strategy"})},
-                {19, plan_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"})},
-                {20, plan_field(entry, {"border_distance_percentage"})},
-                {21, plan_field(entry, {"number_of_magic_states"})},
-                {22, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
-                {23, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")},
-                {24, plan_field(entry, {"use_layer_cache", "use-layer-cache"}, "true")},
-                {45, plan_field(entry, {"T_states_proportional", "t_states_proportional"}, "false")}
+                {16, plan_field(entry, {"GAUSSIAN_CONFIDENCE", "gaussian_confidence"})},
+                {17, plan_field(entry, {"safe_passage_strategy"})},
+                {18, plan_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"})},
+                {19, plan_field(entry, {"border_distance_percentage"})},
+                {20, plan_field(entry, {"number_of_magic_states"})},
+                {21, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
+                {22, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")},
+                {23, plan_field(entry, {"use_layer_cache", "use-layer-cache"}, "true")},
+                {44, plan_field(entry, {"T_states_proportional", "t_states_proportional"}, "false")}
             };
 
             for (const auto &[index, expected] : comparisons) {
                 std::string fallback;
-                if (index == 23)      fallback = "normal_t_routing";
-                else if (index == 45) fallback = "false";  // T_states_proportional
+                if (index == 22)      fallback = "normal_t_routing";
+                else if (index == 44) fallback = "false";  // T_states_proportional
                 if (csv_field(row, index, fallback) != expected) {
                     return false;
                 }
@@ -1310,7 +1304,6 @@ int run_bench_mode(
 
             const std::string mw = get_json_field(plan.entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
             const std::string bw = get_json_field(plan.entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
-            const std::string sm = get_json_field(plan.entry, {"SIZE_MOLTIPLIER", "size_moltiplier", "SIZE_MULTIPLIER", "size_multiplier"});
             const std::string gc = get_json_field(plan.entry, {"GAUSSIAN_CONFIDENCE", "gaussian_confidence"});
             const std::string mh = get_json_field(plan.entry, {"MAGIC_HIGH", "magic_high"});
             const std::string ml = get_json_field(plan.entry, {"MAGIC_LOW", "magic_low"});
@@ -1336,7 +1329,6 @@ int run_bench_mode(
                 cl,
                 mw,
                 bw,
-                sm,
                 gc,
                 safe_passage_strategy_csv,
                 get_json_field(plan.entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),

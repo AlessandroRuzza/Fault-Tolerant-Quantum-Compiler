@@ -108,7 +108,6 @@ private:
     double cnotLow;
     double mappedGaussianWeight;
     double baseGaussianWeight;
-    double sizeMoltiplier;
     double gaussianConfidence;
     double externalWeight;
     int T_lower_bound;
@@ -136,7 +135,6 @@ public:
         double cnot_low,
         double mapped_gaussian_weight,
         double base_gaussian_weight,
-        double size_moltiplier,
         double gaussian_confidence,
         double external_weight,
         int maximum_iterations,
@@ -150,7 +148,6 @@ public:
     cnotLow(cnot_low),
     mappedGaussianWeight(mapped_gaussian_weight),
     baseGaussianWeight(base_gaussian_weight),
-    sizeMoltiplier(size_moltiplier),
     gaussianConfidence(gaussian_confidence),
     externalWeight(external_weight),
     maximum_iterations(maximum_iterations),
@@ -289,7 +286,6 @@ public:
     inline double getCnotLow() const { return cnotLow; }
     inline double getMappedGaussianWeight() const { return mappedGaussianWeight; }
     inline double getBaseGaussianWeight() const { return baseGaussianWeight; }
-    inline double getSizeMoltiplier() const { return sizeMoltiplier; }
     inline double getGaussianConfidence() const { return gaussianConfidence; }
     inline double getExternalWeight() const { return externalWeight; }
 
@@ -499,7 +495,6 @@ private:
         validate_non_negative_finite(cnotLow, "CNOT_LOW");
         validate_non_negative_finite(mappedGaussianWeight, "MAPPED_GAUSSIAN_WEIGHT");
         validate_non_negative_finite(baseGaussianWeight, "BASE_GAUSSIAN_WEIGHT");
-        validate_non_negative_finite(sizeMoltiplier, "SIZE_MOLTIPLIER");
         if (!std::isfinite(externalWeight)) {
             throw std::invalid_argument("EXTERNAL_WEIGHT must be a finite number");
         }

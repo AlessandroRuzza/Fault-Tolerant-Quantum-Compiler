@@ -23,7 +23,8 @@ Gaussian::Gaussian(int mean_x, int mean_y, double sigma_x, double sigma_y, int s
 	  weight(weight),
 	  invTwoSigmaXSq(compute_inv_two_sigma_sq(sigmaX, "sigma_x")),
 	  invTwoSigmaYSq(compute_inv_two_sigma_sq(sigmaY, "sigma_y")),
-	  inverse(inverse) {
+	  inverse(inverse),
+	  exponent_cutoff(compute_exponent_cutoff(weight)) {
 }
 
 double Gaussian::gaussian_at(int x, int y) const {
@@ -35,6 +36,7 @@ double Gaussian::gaussian_at(int x, int y) const {
 	const double dy = static_cast<double>(y - mean_y);
 
 	const double exponent = -(dx * dx) * invTwoSigmaXSq - (dy * dy) * invTwoSigmaYSq;
+	if (exponent < exponent_cutoff) return inverse ? weight : 0.0;
 	const double gaussianValue = std::exp(exponent) * weight;
 
 	if (!inverse) {

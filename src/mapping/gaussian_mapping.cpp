@@ -105,7 +105,6 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
         graph,
         mapped_node,
         mappedGaussianWeight,
-        sizeMoltiplier,
         gaussianConfidence
     ));
 
@@ -120,10 +119,10 @@ void Mapping::gaussian_mapping() {
     std::vector<Gaussian> mapped_gaussians;
     std::vector<Gaussian> magic_gaussians;
 
-    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight, sizeMoltiplier, gaussianConfidence);
+    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight, gaussianConfidence);
     
     for (int node_id : graph.get_magic_state_ids()) {
-        magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id, sizeMoltiplier, gaussianConfidence));
+        magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id, gaussianConfidence));
     }
     
     int total_qubits = circuit.getNumQubits();
@@ -211,7 +210,6 @@ void update_gaussians_coarse(
                     second_qubit_mapped_node,
                     cnot_high,
                     false,
-                    mapping.getSizeMoltiplier(),
                     mapping.getGaussianConfidence()
                 ));
             }
@@ -334,7 +332,6 @@ void update_gaussians_fine(
                 mapped_node,
                 weight,
                 inverse,
-                mapping.getSizeMoltiplier(),
                 mapping.getGaussianConfidence()
             ));
         }

@@ -352,7 +352,6 @@ void apply_config_overrides(
     double& cnot_low,
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
-    double& size_moltiplier,
     double& gaussian_confidence,
     double& external_weight,
     std::string& config_path,
@@ -491,27 +490,6 @@ void apply_config_overrides(
     };
     if (!load_finite_double_from_config("EXTERNAL_WEIGHT", external_weight)) {
         load_finite_double_from_config("external_weight", external_weight);
-    }
-
-    const auto load_size_moltiplier_from_config = [&](const char* key) {
-        if (!config_json.contains(key)) {
-            return false;
-        }
-        if (!config_json[key].is_number()) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
-        }
-        const double value = config_json[key].get<double>();
-        if (!std::isfinite(value) || value < 0.0) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be a finite number >= 0");
-        }
-        size_moltiplier = value;
-        return true;
-    };
-
-    if (!load_size_moltiplier_from_config("SIZE_MOLTIPLIER") &&
-        !load_size_moltiplier_from_config("size_moltiplier") &&
-        !load_size_moltiplier_from_config("SIZE_MULTIPLIER")) {
-        load_size_moltiplier_from_config("size_multiplier");
     }
 
     const auto load_gaussian_confidence_from_config = [&](const char* key) {
@@ -713,7 +691,6 @@ void argument_parsing(
     double& cnot_low,
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
-    double& size_moltiplier,
     double& gaussian_confidence,
     double& external_weight,
     int& x,
@@ -863,17 +840,6 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --external-weight");
             }
             external_weight = parse_finite_double(argv[++i], "--external-weight");
-            continue;
-        }
-
-        if (arg == "--size-moltiplier" || arg == "--size_moltiplier" ||
-            arg == "--size-multiplier" || arg == "--size_multiplier") {
-            if (i + 1 >= argc) {
-                std::cerr << "Missing value for --size-moltiplier\n";
-                print_usage(argv[0]);
-                throw std::runtime_error("Missing value for --size-moltiplier");
-            }
-            size_moltiplier = parse_non_negative_double(argv[++i], "--size-moltiplier");
             continue;
         }
 

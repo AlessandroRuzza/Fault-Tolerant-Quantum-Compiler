@@ -1,13 +1,18 @@
 #ifndef GAUSSIAN_HPP
 #define GAUSSIAN_HPP
 
+#include <cmath>
+
 class Gaussian {
 public:
     Gaussian(int mean_x, int mean_y, double sigma_x, double sigma_y, int size_x, int size_y, double weight, bool inverse);
 
     double gaussian_at(int x, int y) const;
 
-    inline void update_weight(double new_weight) { weight = new_weight; }
+    inline void update_weight(double new_weight) {
+        weight = new_weight;
+        exponent_cutoff = compute_exponent_cutoff(new_weight);
+    }
 
     inline void update_inverse(bool new_inverse) { inverse = new_inverse; }
 
@@ -22,6 +27,13 @@ public:
     inline double get_peak_value() const { return weight; }
 
 private:
+    static constexpr double kCutoffAbs = 1e-3;
+
+    static double compute_exponent_cutoff(double w) {
+        if (w == 0.0) return 0.0;
+        return std::log(kCutoffAbs / std::abs(w));
+    }
+
     const int mean_x;
     const int mean_y;
     const double sigmaX;
@@ -32,6 +44,7 @@ private:
     const double invTwoSigmaYSq;
     bool inverse;
     double weight;
+    double exponent_cutoff;
 };
 
 

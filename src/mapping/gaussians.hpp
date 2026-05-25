@@ -29,7 +29,7 @@ namespace Gaussians {
         return static_cast<int>(scaled);
     }
 
-    Gaussian baseline_gaussian(const Graph& graph, double base_gaussian_weight, double size_moltiplier, double gaussian_confidence){
+    Gaussian baseline_gaussian(const Graph& graph, double base_gaussian_weight, double gaussian_confidence){
         return Gaussian (
             //mean
             graph.get_maxX() / 2,
@@ -39,9 +39,9 @@ namespace Gaussians {
             compute_sigma(graph.get_maxX() / 2, gaussian_confidence),
             compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
 
-            //size
-            scaled_gaussian_size(graph.get_maxX() + 1, size_moltiplier),
-            scaled_gaussian_size(graph.get_maxY() + 1, size_moltiplier),
+            //size — full grid so gaussian_at has no artificial cutoff inside the grid
+            graph.get_maxX() + 1,
+            graph.get_maxY() + 1,
 
             //weight
             base_gaussian_weight,
@@ -52,7 +52,7 @@ namespace Gaussians {
     }
 
 
-    Gaussian mapped_gaussian(const Graph& graph, const Node& node, double mapped_gaussian_weight, double size_moltiplier, double gaussian_confidence) {
+    Gaussian mapped_gaussian(const Graph& graph, const Node& node, double mapped_gaussian_weight, double gaussian_confidence) {
         return Gaussian(
             //mean
             node.coordX,
@@ -63,8 +63,8 @@ namespace Gaussians {
             compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
 
             //size
-            scaled_gaussian_size(graph.get_maxX() + 1, size_moltiplier),
-            scaled_gaussian_size(graph.get_maxY() + 1, size_moltiplier),
+            graph.get_maxX() + 1,
+            graph.get_maxY() + 1,
 
             //weight
             mapped_gaussian_weight,
@@ -75,7 +75,7 @@ namespace Gaussians {
 
     }
 
-    Gaussian magic_gaussian(const Graph& graph, int node_id, double size_moltiplier, double gaussian_confidence) {
+    Gaussian magic_gaussian(const Graph& graph, int node_id, double gaussian_confidence) {
         return Gaussian(
             //mean
             graph.get_coordX(node_id),
@@ -86,8 +86,8 @@ namespace Gaussians {
             compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
 
             //size
-            scaled_gaussian_size(graph.get_maxX() + 1, size_moltiplier),
-            scaled_gaussian_size(graph.get_maxY() + 1, size_moltiplier),
+            graph.get_maxX() + 1,
+            graph.get_maxY() + 1,
 
             //weight
             0,
@@ -100,20 +100,19 @@ namespace Gaussians {
     }
 
 
-    Gaussian cnot_gaussian(const Graph& graph, int node_id, double weight, bool inverse, double size_moltiplier, double gaussian_confidence) {
+    Gaussian cnot_gaussian(const Graph& graph, int node_id, double weight, bool inverse, double gaussian_confidence) {
         return Gaussian(
             //mean
             graph.get_coordX(node_id),
             graph.get_coordY(node_id),
 
-
             //sigma
-            compute_sigma(graph.get_maxX() / 2 , gaussian_confidence),
-            compute_sigma(graph.get_maxY() / 2 , gaussian_confidence),
+            compute_sigma(graph.get_maxX() / 2, gaussian_confidence),
+            compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
 
             //size
-            scaled_gaussian_size(graph.get_maxX() + 1, size_moltiplier),
-            scaled_gaussian_size(graph.get_maxY() + 1, size_moltiplier),
+            graph.get_maxX() + 1,
+            graph.get_maxY() + 1,
 
             //weight
             weight,
