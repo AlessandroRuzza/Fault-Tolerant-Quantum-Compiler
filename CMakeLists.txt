@@ -125,6 +125,10 @@ add_custom_target(run-wisq-all
 # Suppress deprecated enum-enum conversion warning
 target_compile_options(FaultTolerantQuantumCompiler PRIVATE -Wno-deprecated-enum-enum-conversion)
 
+# Optimization: default build carries no flags, which leaves the binary
+# unoptimized (~3-5x slower). -O2 without -DNDEBUG keeps asserts enabled.
+target_compile_options(FaultTolerantQuantumCompiler PRIVATE -O2)
+
 find_package(Eigen3 3.3 QUIET)
 if(Eigen3_FOUND)
     target_link_libraries(FaultTolerantQuantumCompiler PRIVATE Eigen3::Eigen)

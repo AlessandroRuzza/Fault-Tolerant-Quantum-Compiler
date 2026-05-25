@@ -5,11 +5,11 @@ Path NaiveShortestPath::find_shortest_path(int start_node, int end_node, const s
     if (start_node == end_node) return {start_node};
 
     std::unordered_map<int, int> parent;
-    auto cmp = [&](int a, int b){ 
-        Node aNode = this->graph.get_node(a);
-        Node bNode = this->graph.get_node(b);
-        Node target = this->graph.get_node(end_node);
-        return aNode.distance(target) > bNode.distance(target); 
+    const Node& target = this->graph.get_node(end_node);
+    auto cmp = [&](int a, int b){
+        const Node& aNode = this->graph.get_node(a);
+        const Node& bNode = this->graph.get_node(b);
+        return aNode.distance(target) > bNode.distance(target);
     };
     std::priority_queue<int, std::vector<int>, decltype(cmp)> q(cmp);
 

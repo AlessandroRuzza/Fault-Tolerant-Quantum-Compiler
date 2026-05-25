@@ -20,7 +20,7 @@ struct Node {
     Node(int node_id, int x = 0, int y = 0);
 
     
-    float distance(Node b) const {
+    float distance(const Node& b) const {
         float distX = std::abs(coordX - b.coordX);
         float distY = std::abs(coordY - b.coordY);
         return distX + distY; // Manhattan distance
