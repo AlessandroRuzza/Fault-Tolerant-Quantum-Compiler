@@ -1,0 +1,5 @@
+confidence:
+- with cube: 0.99
+- with connectivity and no subgraph: 0.9999
+- 
+

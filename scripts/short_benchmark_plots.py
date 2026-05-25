@@ -59,7 +59,7 @@ HEATMAP_PAIRS = [
     ("placement_detail",          "safe_passage_norm",     "magic placement",    "safe passage",    None),
     ("gaussian_strategy_norm",    "safe_passage_norm",     "gaussian strategy",  "safe passage",    lambda r: r.get("mapping_type_norm") == "gaussian"),
     ("magic_aware_strategy_norm", "safe_passage_norm",     "magic-aware strat",  "safe passage",    lambda r: r.get("mapping_type_norm") == "magic_aware"),
-    ("gaussian_confidence_label", "size_moltiplier_label", "gaussian conf",      "size multiplier", lambda r: r.get("mapping_type_norm") == "gaussian"),
+    ("gaussian_confidence_label", "safe_passage_norm",     "gaussian conf",      "safe passage",    lambda r: r.get("mapping_type_norm") == "gaussian"),
     ("use_layer_cache_norm",      "safe_passage_norm",     "layer cache",        "safe passage",    None),
 ]
 
@@ -121,6 +121,20 @@ def _format_label(value):
     if math.isnan(value):
         return "n/a"
     return str(int(round(value))) if abs(value - round(value)) < 1e-9 else f"{value:.3g}"
+
+def _format_gaussian_confidence_label(value):
+    if value is None:
+        return "n/a"
+    if isinstance(value, str):
+        parsed = _to_float(value)
+        if parsed is None:
+            return value.strip() or "n/a"
+        value = parsed
+    if math.isnan(value):
+        return "n/a"
+    if 0.0 < value < 1.0:
+        return f"{value:.10f}".rstrip("0").rstrip(".")
+    return _format_label(value)
 
 def _classify_placement(row):
     p = _normalize_placement(row.get("placement"))
@@ -196,10 +210,8 @@ def prepare_rows(raw_rows):
         r["x_i"] = _to_int(_pick_first(r, "graph_x", "x"))
         r["y_i"] = _to_int(_pick_first(r, "graph_y", "y"))
         r["border_pct_f"]            = _to_float(r.get("border_distance_percentage"))
-        r["size_moltiplier_f"]       = _to_float(r.get("size_moltiplier"))
         r["gaussian_confidence_f"]   = _to_float(r.get("gaussian_confidence"))
-        r["size_moltiplier_label"]   = _format_label(r["size_moltiplier_f"]) if r["size_moltiplier_f"] is not None else ""
-        r["gaussian_confidence_label"] = _format_label(r["gaussian_confidence_f"]) if r["gaussian_confidence_f"] is not None else ""
+        r["gaussian_confidence_label"] = _format_gaussian_confidence_label(r["gaussian_confidence_f"]) if r["gaussian_confidence_f"] is not None else ""
         dur_s  = _to_float(r.get("duration_seconds"))
         dur_ms = _to_float(r.get("elapsed_ms"))
         r["duration_s_f"]    = dur_s if dur_s is not None else (dur_ms / 1000.0 if dur_ms is not None else None)
@@ -284,7 +296,7 @@ def _axis_value(row, key):
     return str(v).strip() if v is not None and str(v).strip() else "unknown"
 
 def _axis_sort_key(key, label):
-    if key in {"size_moltiplier_label", "gaussian_confidence_label", "magic_states_label"}:
+    if key in {"gaussian_confidence_label", "magic_states_label"}:
         n = _to_float(label)
         if n is not None:
             return (0, n, label)

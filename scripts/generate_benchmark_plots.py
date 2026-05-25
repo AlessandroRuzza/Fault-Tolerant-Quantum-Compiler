@@ -22,6 +22,9 @@ from decimal import Decimal, InvalidOperation
 
 WRITE_REPORT_MD = False
 HEATMAP_BATCH_SIZE = 50
+DASHBOARD_OUTPUT_DPI = 300
+DASHBOARD_SOURCE_PLOT_DPI = 300
+AXIS_BARPLOT_OUTPUT_DPI = 300
 
 
 try:
@@ -62,7 +65,6 @@ RUNTIME_GROUPED_X_SPECS = (
     ("graph_nodes", "graph size (#nodes = graph_x * graph_y)", "graph_nodes"),
 )
 RUNTIME_GROUPED_FACTOR_SPECS = (
-    ("size_moltiplier_f", "size_moltiplier", "size multiplier", "size_moltiplier"),
     ("gaussian_confidence_f", "gaussian_confidence", "gaussian confidence", "gaussian_confidence"),
     ("safe_passage_norm", "safe_passage_strategy", "safe passage strategy", "safe_passage_strategy"),
 )
@@ -75,7 +77,6 @@ HEATMAP_AXIS_SPECS = {
     "mapping_strategy": ("magic_aware_strategy_norm", "mapping strategy"),
     "routing_strategy": ("routing_strategy_norm", "routing strategy"),
     "t_routing_mode": ("t_routing_mode_norm", "t routing mode"),
-    "size_moltiplier": ("size_moltiplier_label", "size multiplier"),
     "gaussian_confidence": ("gaussian_confidence_label", "gaussian confidence"),
     "use_layer_cache": ("use_layer_cache_norm", "use layer cache"),
 }
@@ -104,8 +105,7 @@ HEATMAP_PAIR_GROUPS = (
     ("placement_border", ("safe_passage", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
     ("routing_strategy", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
     ("t_routing_mode", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy")),
-    ("size_moltiplier", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode", "gaussian_confidence")),
-    ("gaussian_confidence", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode", "size_moltiplier")),
+    ("gaussian_confidence", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode")),
     ("use_layer_cache", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode")),
 )
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
@@ -256,7 +256,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_title_mode": "metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
-                "dpi": 180,
+                "dpi": DASHBOARD_OUTPUT_DPI,
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard)
@@ -272,7 +272,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_title_mode": "metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
-                "dpi": 180,
+                "dpi": DASHBOARD_OUTPUT_DPI,
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard_no_out)
@@ -288,7 +288,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_title_mode": "metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
-                "dpi": 180,
+                "dpi": DASHBOARD_OUTPUT_DPI,
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard_median)
@@ -305,7 +305,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_title_mode": "axis_and_metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
-                "dpi": 180,
+                "dpi": DASHBOARD_OUTPUT_DPI,
                 "subfolder": subfolder,
             }
         )
@@ -322,7 +322,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_title_mode": "axis_and_metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
-                "dpi": 180,
+                "dpi": DASHBOARD_OUTPUT_DPI,
                 "subfolder": subfolder,
             }
         )
@@ -339,7 +339,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_title_mode": "axis_and_metric",
                 "panel_width": 6.4,
                 "panel_height": 5.0,
-                "dpi": 180,
+                "dpi": DASHBOARD_OUTPUT_DPI,
                 "subfolder": subfolder,
             }
         )
@@ -469,13 +469,10 @@ REPORT_PLOTS = [
         "35_runtime_vs_graph_nodes_connectivity_with_timeouts.png",
         "Duration vs graph size: connectivity median points",
     ),
-    ("36_runtime_vs_qubits_by_size_moltiplier.png", "Duration vs qubits by size multiplier"),
     ("37_runtime_vs_qubits_by_gaussian_confidence.png", "Duration vs qubits by gaussian confidence"),
     ("38_runtime_vs_qubits_by_safe_passage_strategy.png", "Duration vs qubits by safe passage"),
-    ("39_runtime_vs_gates_by_size_moltiplier.png", "Duration vs gates by size multiplier"),
     ("40_runtime_vs_gates_by_gaussian_confidence.png", "Duration vs gates by gaussian confidence"),
     ("41_runtime_vs_gates_by_safe_passage_strategy.png", "Duration vs gates by safe passage"),
-    ("42_runtime_vs_graph_nodes_by_size_moltiplier.png", "Duration vs graph size by size multiplier"),
     ("43_runtime_vs_graph_nodes_by_gaussian_confidence.png", "Duration vs graph size by gaussian confidence"),
     ("44_runtime_vs_graph_nodes_by_safe_passage_strategy.png", "Duration vs graph size by safe passage"),
     ("17_experiment_set_routing_gaussian_homogeneous.png", "Experiment set: gaussian + homogeneous"),
@@ -731,6 +728,22 @@ def format_number_label(value):
     if abs(value - round(value)) < 1e-9:
         return str(int(round(value)))
     return f"{value:.3g}"
+
+
+def format_gaussian_confidence_label(value):
+    if value is None:
+        return "n/a"
+    if isinstance(value, str):
+        parsed = to_float(value)
+        if parsed is None:
+            text = value.strip()
+            return text or "n/a"
+        value = parsed
+    if math.isnan(value):
+        return "n/a"
+    if 0.0 < value < 1.0:
+        return f"{value:.10f}".rstrip("0").rstrip(".")
+    return format_number_label(value)
 
 
 def placement_detail_label(row):
@@ -1068,14 +1081,9 @@ def prepare_rows_for_analysis(raw_rows):
         row["cnot_low_f"] = to_float(row.get("cnot_low"))
         row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
         row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
-        row["size_moltiplier_f"] = to_float(row.get("size_moltiplier"))
-        if row["size_moltiplier_f"] is not None:
-            row["size_moltiplier_label"] = format_number_label(row["size_moltiplier_f"])
-        else:
-            row["size_moltiplier_label"] = ""
         row["gaussian_confidence_f"] = to_float(row.get("gaussian_confidence"))
         if row["gaussian_confidence_f"] is not None:
-            row["gaussian_confidence_label"] = format_number_label(row["gaussian_confidence_f"])
+            row["gaussian_confidence_label"] = format_gaussian_confidence_label(row["gaussian_confidence_f"])
         else:
             row["gaussian_confidence_label"] = ""
         duration_seconds = to_float(row.get("duration_seconds"))
@@ -1164,7 +1172,7 @@ def record_skipped_plot(skipped, filename, reason):
     skipped.append({"filename": strip_plot_number(filename), "reason": reason})
 
 
-def save_empty_plot(title, output_dir, filename, generated, message="No data", subfolder=None, ylabel=None):
+def save_empty_plot(title, output_dir, filename, generated, message="No data", subfolder=None, ylabel=None, dpi=None):
     fig, ax = plt.subplots(figsize=(8.5, 5.2))
     ax.set_title(title, fontsize=14, pad=14)
     if ylabel:
@@ -1184,7 +1192,14 @@ def save_empty_plot(title, output_dir, filename, generated, message="No data", s
     ax.grid(False)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
+    save_fig(
+        fig,
+        output_dir,
+        filename,
+        generated,
+        dpi=dpi if dpi is not None else 160,
+        subfolder=subfolder,
+    )
 
 
 def compact_labels(labels, limit=8):
@@ -1396,7 +1411,7 @@ def plot_overview_dashboard(rows, output_dir, generated):
     axs[5].set_ylabel("routing_steps")
     axs[5].legend(fontsize=8)
 
-    save_fig(fig, output_dir, "00_overview_dashboard.png", generated)
+    save_fig(fig, output_dir, "00_overview_dashboard.png", generated, dpi=DASHBOARD_OUTPUT_DPI)
 
 
 def plot_status_and_exit(rows, output_dir, generated):
@@ -2863,6 +2878,7 @@ def make_pair_heatmap(
             generated,
             message=f"No data for {row_key} x {col_key}",
             subfolder=subfolder,
+            dpi=DASHBOARD_SOURCE_PLOT_DPI,
         )
         return
 
@@ -2916,7 +2932,7 @@ def make_pair_heatmap(
                 color = "white" if luminance < 0.45 else "#111111"
             ax.text(j, i, text, ha="center", va="center", color=color, fontsize=7, linespacing=0.9)
 
-    save_fig(fig, output_dir, filename, generated, subfolder=subfolder)
+    save_fig(fig, output_dir, filename, generated, dpi=DASHBOARD_SOURCE_PLOT_DPI, subfolder=subfolder)
 
 
 def heatmap_metric_display_label(metric, sample_scope=None):
@@ -2983,7 +2999,7 @@ def plot_image_dashboard(
     panel_title_mode="metric",
     panel_width=6.2,
     panel_height=5.3,
-    dpi=220,
+    dpi=DASHBOARD_OUTPUT_DPI,
     subfolder=None,
 ):
     from PIL import Image, ImageDraw, ImageFont
@@ -2996,6 +3012,7 @@ def plot_image_dashboard(
             generated,
             message="No source plots",
             subfolder=subfolder,
+            dpi=dpi,
         )
         return
 
@@ -3238,6 +3255,7 @@ def plot_axis_barplot(
             message=f"No data for {axis_key}",
             subfolder=subfolder,
             ylabel=ylabel,
+            dpi=AXIS_BARPLOT_OUTPUT_DPI,
         )
         return
 
@@ -3392,7 +3410,7 @@ def plot_axis_barplot(
         fontsize=10,
     )
 
-    save_fig(fig, output_dir, filename, generated, dpi=200, subfolder=subfolder)
+    save_fig(fig, output_dir, filename, generated, dpi=AXIS_BARPLOT_OUTPUT_DPI, subfolder=subfolder)
 
 
 def heatmap_x_axis_slugs():
@@ -3531,7 +3549,7 @@ def heatmap_axis_value(row, key):
 
 
 def heatmap_axis_sort_key(key, label):
-    if key in {"magic_states_label", "size_moltiplier_label", "gaussian_confidence_label", "x_i", "y_i", "graph_nodes"}:
+    if key in {"magic_states_label", "gaussian_confidence_label", "x_i", "y_i", "graph_nodes"}:
         numeric = to_float(label)
         if numeric is not None:
             return (0, numeric, label)
@@ -3556,9 +3574,9 @@ def filter_heatmap_rows(rows, row_key, col_key):
 
 def heatmap_base_config_fields(row_key, col_key):
     # A "configuration" is the set of independent sweep knobs (the candidate
-    # heatmap axes) plus the circuit. Derived columns (e.g. grid size, which is
-    # scaled by size_moltiplier) are intentionally excluded so they don't make
-    # otherwise-identical configs look different across the two varied axes.
+    # heatmap axes) plus the circuit. Derived columns (e.g. grid size) are
+    # intentionally excluded so they don't make otherwise-identical configs
+    # look different across the two varied axes.
     identity = {field for field, _label in HEATMAP_AXIS_SPECS.values()}
     identity.add("circuit_name")
     return sorted(identity - {row_key, col_key})
@@ -4130,6 +4148,8 @@ def runtime_group_value(row, factor_key):
     if isinstance(value, float) and math.isnan(value):
         return None
 
+    if factor_key == "gaussian_confidence_f":
+        return format_gaussian_confidence_label(value), float(value)
     if factor_key.endswith("_f"):
         return format_number_label(value), float(value)
 
@@ -4402,7 +4422,7 @@ def plot_runtime_grouped_factors(rows, output_dir, generated, skipped=None):
     if not entries:
         record_skipped_plot(
             skipped,
-            "36_runtime_vs_qubits_by_size_moltiplier.png",
+            "36_runtime_vs_qubits_by_gaussian_confidence.png",
             "no rows with duration data and resolvable QASM metrics",
         )
         return None
@@ -4503,47 +4523,6 @@ def plot_gaussian_confidence_safe_passage_routing_heatmap(rows, output_dir, gene
         "Mean Routing Steps by Safe Passage and Gaussian Confidence (no outliers)",
         "mean routing steps (no outliers)",
         "45_heatmap_routing_safe_passage_vs_gaussian_confidence_no_out.png",
-        output_dir,
-        generated,
-        skipped,
-        value_format="{:.0f}",
-    )
-
-
-def plot_gaussian_confidence_size_moltiplier_routing_heatmap(rows, output_dir, generated, skipped=None):
-    heatmap_rows = [
-        row
-        for row in rows
-        if row.get("mapping_type_norm") == "gaussian"
-        and row.get("gaussian_confidence_label")
-        and row.get("size_moltiplier_label")
-        and row.get("success")
-        and row.get("routing_steps_f") is not None
-    ]
-
-    make_pair_heatmap(
-        heatmap_rows,
-        "gaussian_confidence_label",
-        "size_moltiplier_label",
-        lambda subset: mean_of([r["routing_steps_f"] for r in subset]),
-        "",
-        "Mean Routing Steps by Gaussian Confidence and Size Multiplier",
-        "mean routing steps",
-        "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier.png",
-        output_dir,
-        generated,
-        skipped,
-        value_format="{:.0f}",
-    )
-    make_pair_heatmap(
-        heatmap_rows,
-        "gaussian_confidence_label",
-        "size_moltiplier_label",
-        lambda subset: mean_of(boxplot_non_outlier_values([r["routing_steps_f"] for r in subset])),
-        "no out",
-        "Mean Routing Steps by Gaussian Confidence and Size Multiplier (no outliers)",
-        "mean routing steps (no outliers)",
-        "46_heatmap_routing_gaussian_confidence_vs_size_moltiplier_no_out.png",
         output_dir,
         generated,
         skipped,
@@ -4702,7 +4681,7 @@ def _process_single_heatmap_item(
             panel_title_mode=item.get("panel_title_mode", "metric"),
             panel_width=item.get("panel_width", 6.2),
             panel_height=item.get("panel_height", 5.3),
-            dpi=item.get("dpi", 220),
+            dpi=item.get("dpi", DASHBOARD_OUTPUT_DPI),
             subfolder=item.get("subfolder"),
         )
         return
