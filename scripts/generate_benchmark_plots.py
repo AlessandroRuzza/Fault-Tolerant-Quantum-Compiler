@@ -108,6 +108,19 @@ HEATMAP_PAIR_GROUPS = (
     ("gaussian_confidence", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode")),
     ("use_layer_cache", ("safe_passage", "placement_border", "n_magic_states", "type", "gaussian_strategy", "mapping_strategy", "routing_strategy", "t_routing_mode")),
 )
+HEATMAP_X_AXIS_SLUGS = tuple(axis_slug for axis_slug, _ in HEATMAP_PAIR_GROUPS)
+HEATMAP_AXIS_FLAG_SPECS = (
+    (("--type",), "plot_axis_type", "type", "type"),
+    (("--safe-passage",), "plot_axis_safe_passage", "safe_passage", "safe passage"),
+    (("--placement-border",), "plot_axis_placement_border", "placement_border", "magic placement x border distance"),
+    (("--magic-states",), "plot_axis_magic_states", "n_magic_states", "n magic states"),
+    (("--gaussian-strategy",), "plot_axis_gaussian_strategy", "gaussian_strategy", "gaussian strategy"),
+    (("--mapping-strategy",), "plot_axis_mapping_strategy", "mapping_strategy", "mapping strategy"),
+    (("--routing-strategy",), "plot_axis_routing_strategy", "routing_strategy", "routing strategy"),
+    (("--t-routing-mode",), "plot_axis_t_routing_mode", "t_routing_mode", "t routing mode"),
+    (("--confidence", "--gaussian-confidence"), "plot_axis_gaussian_confidence", "gaussian_confidence", "gaussian confidence"),
+    (("--cache", "--use-layer-cache"), "plot_axis_use_layer_cache", "use_layer_cache", "use layer cache"),
+)
 DEFAULT_RESULTS_DIR = os.path.join("benchmarks", "results")
 OBSOLETE_PLOT_FILENAMES = {
     "13_heatmap_success_safe_vs_placement.png",
@@ -187,6 +200,7 @@ def build_requested_heatmap_items(start_index=48):
                     "colorbar_label": colorbar_label,
                     "value_format": value_format,
                     "no_outliers": False,
+                    "axis_slug": col_axis,
                     "subfolder": subfolder,
                 }
                 items.append(spec)
@@ -213,6 +227,7 @@ def build_requested_heatmap_items(start_index=48):
                     "colorbar_label": f"{colorbar_label} (no outliers)",
                     "value_format": value_format,
                     "no_outliers": True,
+                    "axis_slug": col_axis,
                     "subfolder": subfolder,
                 }
                 items.append(no_out_spec)
@@ -239,6 +254,7 @@ def build_requested_heatmap_items(start_index=48):
                     "colorbar_label": f"{colorbar_label} (median)",
                     "value_format": value_format,
                     "median": True,
+                    "axis_slug": col_axis,
                     "subfolder": subfolder,
                 }
                 items.append(median_spec)
@@ -257,6 +273,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": DASHBOARD_OUTPUT_DPI,
+                "axis_slug": col_axis,
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard)
@@ -273,6 +290,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": DASHBOARD_OUTPUT_DPI,
+                "axis_slug": col_axis,
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard_no_out)
@@ -289,6 +307,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": DASHBOARD_OUTPUT_DPI,
+                "axis_slug": col_axis,
                 "subfolder": subfolder,
             }
             items.append(triplet_dashboard_median)
@@ -306,6 +325,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": DASHBOARD_OUTPUT_DPI,
+                "axis_slug": col_axis,
                 "subfolder": subfolder,
             }
         )
@@ -323,6 +343,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": DASHBOARD_OUTPUT_DPI,
+                "axis_slug": col_axis,
                 "subfolder": subfolder,
             }
         )
@@ -340,6 +361,7 @@ def build_requested_heatmap_items(start_index=48):
                 "panel_width": 6.4,
                 "panel_height": 5.0,
                 "dpi": DASHBOARD_OUTPUT_DPI,
+                "axis_slug": col_axis,
                 "subfolder": subfolder,
             }
         )
@@ -357,6 +379,7 @@ def build_requested_heatmap_items(start_index=48):
                     "ylabel": ylabel,
                     "value_format": value_format,
                     "color": color,
+                    "axis_slug": col_axis,
                     "subfolder": subfolder,
                 }
             )
@@ -410,6 +433,7 @@ def build_requested_heatmap_items(start_index=48):
                 "filename": f"{subfolder_index:02d}_circuit_table_x_{heatmap_slug(col_axis)}.png",
                 "caption": f"Circuits tested by {col_label}",
                 "title": f"Circuits tested by {col_label}",
+                "axis_slug": col_axis,
                 "col_key": col_key,
                 "col_label": col_label,
                 "subfolder": subfolder,
@@ -423,6 +447,23 @@ REQUESTED_HEATMAP_ITEMS = build_requested_heatmap_items()
 REQUESTED_HEATMAP_SPECS = [
     item for item in REQUESTED_HEATMAP_ITEMS if item["kind"] == "heatmap"
 ]
+
+
+def filter_heatmap_items_by_axes(items, axis_slugs=None):
+    if not axis_slugs:
+        return list(items)
+    axis_set = set(axis_slugs)
+    return [item for item in items if item.get("axis_slug") in axis_set]
+
+
+def selected_heatmap_axis_slugs(args):
+    selected = set()
+    worker_axes = getattr(args, "worker_heatmap_axes", "") or ""
+    selected.update(axis.strip() for axis in worker_axes.split(",") if axis.strip())
+    for _flags, dest, axis_slug, _label in HEATMAP_AXIS_FLAG_SPECS:
+        if getattr(args, dest, False):
+            selected.add(axis_slug)
+    return [axis_slug for axis_slug in HEATMAP_X_AXIS_SLUGS if axis_slug in selected]
 
 
 REPORT_PLOTS = [
@@ -1261,11 +1302,9 @@ def clear_per_circuit_barplot_dir(output_dir):
                 pass
 
 
-def clear_heatmap_dir(output_dir):
-    target_dir = os.path.join(output_dir, HEATMAP_DIR)
+def clear_plot_tree(target_dir, warning_label):
     if not os.path.isdir(target_dir):
         return
-
     for root, dirs, files in os.walk(target_dir, topdown=False):
         for filename in files:
             if not filename.lower().endswith(".png"):
@@ -1274,7 +1313,7 @@ def clear_heatmap_dir(output_dir):
             try:
                 os.remove(path)
             except OSError as exc:
-                warnings.warn(f"Could not remove obsolete heatmap plot {path}: {exc}")
+                warnings.warn(f"Could not remove obsolete {warning_label} plot {path}: {exc}")
         for dirname in dirs:
             path = os.path.join(root, dirname)
             try:
@@ -1282,6 +1321,17 @@ def clear_heatmap_dir(output_dir):
                     os.rmdir(path)
             except OSError:
                 pass
+
+
+def clear_heatmap_dir(output_dir, axis_slugs=None):
+    if axis_slugs:
+        for axis_slug in axis_slugs:
+            clear_plot_tree(
+                os.path.join(output_dir, HEATMAP_DIR, heatmap_slug(axis_slug)),
+                "heatmap",
+            )
+        return
+    clear_plot_tree(os.path.join(output_dir, HEATMAP_DIR), "heatmap")
 
 
 def category_color_map(labels):
@@ -3414,11 +3464,7 @@ def plot_axis_barplot(
 
 
 def heatmap_x_axis_slugs():
-    axis_slugs = []
-    for axis_slug, _ in HEATMAP_PAIR_GROUPS:
-        if axis_slug not in axis_slugs:
-            axis_slugs.append(axis_slug)
-    return axis_slugs
+    return list(HEATMAP_X_AXIS_SLUGS)
 
 
 def safe_filename_component(value, default="unknown"):
@@ -3438,7 +3484,9 @@ def plot_axis_barplots_by_circuit(
     skipped=None,
     batch_size=50,
     align=False,
+    axis_slugs=None,
 ):
+    axis_slugs = set(axis_slugs or [])
     rows_success_with_duration = [
         row for row in rows if row["success"] and row["duration_s_f"] is not None
     ]
@@ -3455,6 +3503,8 @@ def plot_axis_barplots_by_circuit(
 
     tasks = []
     for axis_slug in heatmap_x_axis_slugs():
+        if axis_slugs and axis_slug not in axis_slugs:
+            continue
         axis_key, axis_label = HEATMAP_AXIS_SPECS[axis_slug]
         subfolder = os.path.join(PER_CIRCUIT_BARPLOT_DIR, heatmap_slug(axis_slug))
         for circuit in circuits:
@@ -4742,6 +4792,10 @@ def run_heatmap_worker(args):
     plt.style.use("seaborn-v0_8-whitegrid")
 
     start, end = (int(x) for x in args.worker_heatmap_batch.split(":"))
+    heatmap_items = filter_heatmap_items_by_axes(
+        REQUESTED_HEATMAP_ITEMS,
+        selected_heatmap_axis_slugs(args),
+    )
     raw_rows, _, _ = load_raw_rows_from_files([args.worker_csv])
     rows_all = prepare_rows_for_analysis(raw_rows)
     del raw_rows
@@ -4760,7 +4814,7 @@ def run_heatmap_worker(args):
     generated = []
     skipped = []
     items_slice = [
-        item for item in REQUESTED_HEATMAP_ITEMS[start:end]
+        item for item in heatmap_items[start:end]
         if (item["kind"] in _DASHBOARD_KINDS) == (phase == "dashboard")
     ]
     for item in items_slice:
@@ -4779,7 +4833,17 @@ def run_heatmap_worker(args):
         json.dump({"generated": generated, "skipped": skipped}, f)
 
 
-def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir, align=False, phase="source"):
+def _launch_heatmap_batch(
+    batch_idx,
+    start,
+    end,
+    csv_path,
+    output_dir,
+    align=False,
+    phase="source",
+    axis_slugs=None,
+    items_batch=None,
+):
     """Spawn a heatmap worker subprocess for items [start:end] and return its handle."""
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
         result_path = f.name
@@ -4792,6 +4856,8 @@ def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir, align=Fal
         "--worker-output-dir", output_dir,
         "--worker-result", result_path,
     ]
+    if axis_slugs:
+        cmd.extend(["--worker-heatmap-axes", ",".join(axis_slugs)])
     if align:
         cmd.append("--align")
     proc = subprocess.Popen(cmd)
@@ -4799,6 +4865,7 @@ def _launch_heatmap_batch(batch_idx, start, end, csv_path, output_dir, align=Fal
         "batch_idx": batch_idx,
         "start": start,
         "end": end,
+        "items": list(items_batch or []),
         "result_path": result_path,
         "proc": proc,
     }
@@ -4819,7 +4886,7 @@ def _collect_heatmap_batch(entry, total_batches, generated, skipped):
             print(f"[heatmap batch {batch_idx}/{total_batches}] items {start}:{end} done", flush=True)
         else:
             print(f"[batch {batch_idx}] failed with exit {returncode}", flush=True)
-            for item in REQUESTED_HEATMAP_ITEMS[start:end]:
+            for item in entry.get("items") or REQUESTED_HEATMAP_ITEMS[start:end]:
                 record_skipped_plot(
                     skipped, item["filename"], f"subprocess batch failed (exit {returncode})"
                 )
@@ -4841,14 +4908,18 @@ def plot_requested_heatmaps(
     batch_size=HEATMAP_BATCH_SIZE,
     parallel=1,
     align=False,
+    heatmap_items=None,
+    axis_slugs=None,
 ):
     """Orchestrate heatmap generation via subprocess batches to release memory between batches."""
+    heatmap_items = list(REQUESTED_HEATMAP_ITEMS if heatmap_items is None else heatmap_items)
+    axis_slugs = list(axis_slugs or [])
     if csv_path is None:
         # Fallback: in-process generation (slower but no subprocess).
         heatmap_rows_by_metric, axis_boxplot_rows_by_metric = _build_heatmap_rows_by_metric(
             rows, rows_success_with_routing
         )
-        for idx, item in enumerate(REQUESTED_HEATMAP_ITEMS):
+        for idx, item in enumerate(heatmap_items):
             _process_single_heatmap_item(
                 item,
                 rows,
@@ -4864,7 +4935,9 @@ def plot_requested_heatmaps(
         return
 
     _DASHBOARD_KINDS = {"triplet_dashboard", "x_axis_dashboard"}
-    total = len(REQUESTED_HEATMAP_ITEMS)
+    total = len(heatmap_items)
+    if not total:
+        return
     batches = [(s, min(s + batch_size, total)) for s in range(0, total, batch_size)]
     total_batches = len(batches)
     parallel = max(1, parallel)
@@ -4874,10 +4947,10 @@ def plot_requested_heatmaps(
     # Phase 2: dashboard items — run only after all phase-1 batches are complete.
     dashboard_batch_indices = {
         i for i, (s, e) in enumerate(batches)
-        if any(item["kind"] in _DASHBOARD_KINDS for item in REQUESTED_HEATMAP_ITEMS[s:e])
+        if any(item["kind"] in _DASHBOARD_KINDS for item in heatmap_items[s:e])
     }
 
-    n_source_items = sum(1 for it in REQUESTED_HEATMAP_ITEMS if it["kind"] not in _DASHBOARD_KINDS)
+    n_source_items = sum(1 for it in heatmap_items if it["kind"] not in _DASHBOARD_KINDS)
     n_dash_items = total - n_source_items
     print(
         f"Generating {total} heatmap items in {total_batches} subprocess batches of up to "
@@ -4898,7 +4971,10 @@ def plot_requested_heatmaps(
                     running.append(
                         _launch_heatmap_batch(
                             next_batch + 1, start, end, csv_path, output_dir,
-                            align=align, phase=phase,
+                            align=align,
+                            phase=phase,
+                            axis_slugs=axis_slugs,
+                            items_batch=heatmap_items[start:end],
                         )
                     )
                 next_batch += 1
@@ -4965,10 +5041,17 @@ def plot_summary_tables(rows, output_dir, generated):
     save_fig(fig, output_dir, "02_circuit_summary_bars.png", generated)
 
 
-def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_dir, generated, skipped=None):
+def plot_best_config_counts_by_heatmap_axis(
+    rows_success_with_routing,
+    output_dir,
+    generated,
+    skipped=None,
+    heatmap_items=None,
+):
     csv_rows = []
+    heatmap_items = REQUESTED_HEATMAP_ITEMS if heatmap_items is None else heatmap_items
     best_count_items = [
-        item for item in REQUESTED_HEATMAP_ITEMS if item.get("kind") == "best_config_count"
+        item for item in heatmap_items if item.get("kind") == "best_config_count"
     ]
 
     for item in best_count_items:
@@ -5094,10 +5177,17 @@ def plot_best_config_counts_by_heatmap_axis(rows_success_with_routing, output_di
     return csv_path
 
 
-def plot_best_non_routed_config_counts_by_heatmap_axis(rows_success_with_non_routed, output_dir, generated, skipped=None):
+def plot_best_non_routed_config_counts_by_heatmap_axis(
+    rows_success_with_non_routed,
+    output_dir,
+    generated,
+    skipped=None,
+    heatmap_items=None,
+):
     csv_rows = []
+    heatmap_items = REQUESTED_HEATMAP_ITEMS if heatmap_items is None else heatmap_items
     items = [
-        item for item in REQUESTED_HEATMAP_ITEMS if item.get("kind") == "best_config_count_non_routed"
+        item for item in heatmap_items if item.get("kind") == "best_config_count_non_routed"
     ]
 
     for item in items:
@@ -5223,10 +5313,11 @@ def plot_best_non_routed_config_counts_by_heatmap_axis(rows_success_with_non_rou
     return csv_path
 
 
-def plot_timeout_counts_by_heatmap_axis(rows, output_dir, generated, skipped=None):
+def plot_timeout_counts_by_heatmap_axis(rows, output_dir, generated, skipped=None, heatmap_items=None):
     csv_rows = []
+    heatmap_items = REQUESTED_HEATMAP_ITEMS if heatmap_items is None else heatmap_items
     timeout_count_items = [
-        item for item in REQUESTED_HEATMAP_ITEMS if item.get("kind") == "timeout_count"
+        item for item in heatmap_items if item.get("kind") == "timeout_count"
     ]
 
     for item in timeout_count_items:
@@ -5748,6 +5839,17 @@ def main():
         action="store_true",
         help="Also generate the heatmap group under heatmap/.",
     )
+    axis_group = parser.add_argument_group("heatmap x-axis filters")
+    for flags, dest, _axis_slug, label in HEATMAP_AXIS_FLAG_SPECS:
+        axis_group.add_argument(
+            *flags,
+            dest=dest,
+            action="store_true",
+            help=(
+                f"Generate heatmap/dashboard/barplot items for x-axis '{label}' only; "
+                "can be combined with other x-axis filters and implies --heatmap."
+            ),
+        )
     parser.add_argument(
         "--circuit",
         action="store_true",
@@ -5758,6 +5860,7 @@ def main():
     parser.add_argument("--worker-csv", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--worker-output-dir", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--worker-result", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-heatmap-axes", default="", help=argparse.SUPPRESS)
     parser.add_argument(
         "--no-subprocess-heatmaps",
         action="store_true",
@@ -5789,6 +5892,12 @@ def main():
     if args.worker_heatmap_batch is not None:
         run_heatmap_worker(args)
         return
+
+    selected_heatmap_axes = selected_heatmap_axis_slugs(args)
+    selected_heatmap_items = filter_heatmap_items_by_axes(
+        REQUESTED_HEATMAP_ITEMS,
+        selected_heatmap_axes,
+    )
 
     if not args.csv and not args.distinct:
         print("No input specified. Pass --csv for one file or --distinct for the benchmarks/results CSVs.")
@@ -5928,7 +6037,7 @@ def main():
     )
     plot_requested_comparisons(rows_success_with_routing, output_dir, generated, skipped)
     print(f"[analysis plots] {len(generated) - analysis_start} done", flush=True)
-    if args.heatmap:
+    if args.heatmap or selected_heatmap_axes:
         clear_heatmap_dir(output_dir)
         heatmap_csv_path = (
             os.path.abspath(input_files[0])
@@ -5950,24 +6059,29 @@ def main():
             batch_size=args.heatmap_batch_size,
             parallel=args.parallel,
             align=args.align,
+            heatmap_items=selected_heatmap_items,
+            axis_slugs=selected_heatmap_axes,
         )
         plot_best_config_counts_by_heatmap_axis(
             rows_success_with_routing,
             output_dir,
             generated,
             skipped,
+            heatmap_items=selected_heatmap_items,
         )
         plot_best_non_routed_config_counts_by_heatmap_axis(
             rows_success_with_non_routed,
             output_dir,
             generated,
             skipped,
+            heatmap_items=selected_heatmap_items,
         )
         plot_timeout_counts_by_heatmap_axis(
             rows,
             output_dir,
             generated,
             skipped,
+            heatmap_items=selected_heatmap_items,
         )
     if args.circuit:
         plot_axis_barplots_by_circuit(
@@ -5978,6 +6092,7 @@ def main():
             skipped,
             batch_size=args.heatmap_batch_size,
             align=args.align,
+            axis_slugs=selected_heatmap_axes,
         )
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,

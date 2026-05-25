@@ -1,5 +1,10 @@
 confidence:
-- with cube: 0.99
+- overall: 0.99999
+- with cube: 0.999999
 - with connectivity and no subgraph: 0.9999
-- 
 
+
+confidence-high-dim: are good 0.9999 and 0.999999
+
+
+kept: 0.9999, 0.99999, 0.999999
