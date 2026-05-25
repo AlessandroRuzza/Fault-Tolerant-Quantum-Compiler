@@ -48,6 +48,23 @@ std::vector<int> high_cnot_qubits(int threshold) const {
     return high_qubits;
 }
 
+// Partners that share a CNOT but fall below the "high" threshold: weakly but
+// genuinely interacting. They still need routing, so callers can pull them in
+// with a mild attraction instead of letting the universal mapped-qubit repulsion
+// treat them like non-interacting strangers. Zero-CNOT partners are excluded.
+std::vector<int> low_cnot_qubits(int threshold) const {
+    std::vector<int> low_qubits;
+    for (size_t i = 0; i < CNOT_count.size(); ++i) {
+        if (static_cast<int>(i) == qubit_id) {
+            continue;
+        }
+        if (CNOT_count[i] > 0 && CNOT_count[i] < threshold) {
+            low_qubits.push_back(i);
+        }
+    }
+    return low_qubits;
+}
+
 
 public:
 
@@ -60,6 +77,10 @@ public:
 
     std::vector<int> highCnotQubits(int threshold) const {
         return high_cnot_qubits(threshold);
+    }
+
+    std::vector<int> lowCnotQubits(int threshold) const {
+        return low_cnot_qubits(threshold);
     }
 
     int getMaxCNOTCountIndex() const {

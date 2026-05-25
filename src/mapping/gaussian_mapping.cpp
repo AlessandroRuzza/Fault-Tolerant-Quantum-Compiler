@@ -320,47 +320,68 @@ void update_gaussians_fine(
         update_inverse(magic_gaussians, false);
     }
 
-    std::vector<int> high_cnot_qubits = qubit->highCnotQubits(CNOT_threshold);
+    // Mirror coarse's dominant-regime split: only cluster on CNOT partners when the
+    // qubit is CNOT-dominated. For a T-dominated qubit (T_count > maxCNOTCount),
+    // adding the CNOT pull on top of the magic pull dilutes both forces and lands
+    // it in a mediocre spot — part of why fine underperformed coarse. The magic
+    // interpolation above always runs, as coarse also touches magic in both regimes.
+    if (qubit->getTCount() <= qubit->getMaxCNOTCount()) {
+        std::vector<int> high_cnot_qubits = qubit->highCnotQubits(CNOT_threshold);
 
-    for (int q_id : high_cnot_qubits){
-        const double cnot_count = static_cast<double>(circuit.getCNOTCount(qubit->getQubitID(), q_id));
-        double weight = 0.0;
-        bool inverse = false;
+        for (int q_id : high_cnot_qubits){
+            const double cnot_count = static_cast<double>(circuit.getCNOTCount(qubit->getQubitID(), q_id));
 
-        if (cnot_count == CNOT_mean || CNOT_std <= 0.0) {
-            weight = 0.0;
-            inverse = false;
-        } else if (cnot_count < CNOT_mean - CNOT_std) {
-            weight = cnot_high;
-            inverse = true;
-        } else if (cnot_count > CNOT_mean + CNOT_std) {
-            weight = cnot_high;
-            inverse = false;
+            // These partners are pre-filtered by CNOT_threshold = ceil(CNOT_mean), so
+            // they all interact at least as much as average. A shared CNOT must always
+            // *attract* (never repel) and at no less than full strength: interpolating
+            // the weight down toward cnot_low — as the previous code did — made fine's
+            // CNOT pull systematically weaker than coarse's flat cnot_high, scattering
+            // interacting qubits and inflating routing steps. So cnot_high is the floor
+            // (matching coarse), and the heaviest partners (beyond mean+std) get an
+            // extra boost, which is where fine adds genuine granularity over coarse.
+            double weight = cnot_high;
+            if (CNOT_std > 0.0 && cnot_count > CNOT_mean + CNOT_std) {
+                weight = cnot_high + (cnot_high - cnot_low) *
+                         std::clamp((cnot_count - (CNOT_mean + CNOT_std)) / CNOT_std, 0.0, 1.0);
+            }
 
-        } else if (cnot_count >= CNOT_mean - CNOT_std && 
-                   cnot_count <= CNOT_mean) {
+            const int mapped_node = mapping.get_mapped_node(q_id);
+            if (mapped_node != -1) {
+                cnot_gaussians.push_back(Gaussians::cnot_gaussian(
+                    graph,
+                    mapped_node,
+                    weight,
+                    false,
+                    mapping.getGaussianConfidence()
+                ));
+            }
 
-            weight = interpolate_weight(cnot_low, cnot_high, (cnot_count - (CNOT_mean - CNOT_std)) / CNOT_std);
-            inverse = true;
-
-        } else if (cnot_count > CNOT_mean && 
-                   cnot_count <= CNOT_mean + CNOT_std) {
-
-            weight = interpolate_weight(cnot_low, cnot_high, (cnot_count - CNOT_mean) / CNOT_std);
-            inverse = false;
         }
 
-        const int mapped_node = mapping.get_mapped_node(q_id);
-        if (mapped_node != -1 && weight > 0.0) {
+        // Partners below the threshold still share real CNOTs, but they get no
+        // cnot_gaussian above, so the universal repulsion from their mapped_gaussian
+        // (inverse, weight mappedGaussianWeight) treats them exactly like
+        // non-interacting strangers and pushes the qubit away from them. Add a mild
+        // attraction, scaled by how much they interact, to partially cancel that
+        // repulsion: the more CNOTs shared, the less they are pushed away. Stays
+        // below cnot_high so genuinely strong partners keep priority, and zero-CNOT
+        // qubits (excluded by lowCnotQubits) remain fully repelled.
+        for (int q_id : qubit->lowCnotQubits(CNOT_threshold)) {
+            const int mapped_node = mapping.get_mapped_node(q_id);
+            if (mapped_node == -1) continue;
+
+            const double cnot_count = static_cast<double>(circuit.getCNOTCount(qubit->getQubitID(), q_id));
+            const double weight = cnot_low * (cnot_count / static_cast<double>(CNOT_threshold));
+            if (weight <= 0.0) continue;
+
             cnot_gaussians.push_back(Gaussians::cnot_gaussian(
                 graph,
                 mapped_node,
                 weight,
-                inverse,
+                false,
                 mapping.getGaussianConfidence()
             ));
         }
-
     }
 
     
