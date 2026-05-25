@@ -316,11 +316,21 @@ void Graph::add_magic_states_center_circle(
         return ring;
     };
 
-    // "one yes, one no" — every other cell along the ring path, so adjacent
-    // placed magic states are at least one empty cell apart along the ring.
+    // Spread the magic states evenly around the ring (circle) instead of
+    // filling consecutive cells from the start. "One yes, one no" is enforced
+    // as a *minimum* separation: we cap the count at every-other-cell (n/2) so
+    // the even-distribution step is always >= 2, keeping neighbors at least one
+    // empty cell apart. With few magic states this distributes them around the
+    // whole circle rather than clustering them on one side.
     auto place_alternating = [&](const std::vector<int>& ring) {
-        for (size_t i = 0; i < ring.size() && needs_more(); i += 2) {
-            try_add_magic_id(ring[i]);
+        const size_t n = ring.size();
+        if (n == 0 || !needs_more()) return;
+        const size_t remaining =
+            static_cast<size_t>(number_of_magic_states) - magic_states_ids.size();
+        const size_t max_on_ring = std::max<size_t>(1, n / 2);
+        const size_t to_place = std::min(remaining, max_on_ring);
+        for (size_t k = 0; k < to_place && needs_more(); ++k) {
+            try_add_magic_id(ring[(k * n) / to_place]);
         }
     };
 
