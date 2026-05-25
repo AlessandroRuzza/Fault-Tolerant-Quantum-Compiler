@@ -60,8 +60,12 @@ public:
         return nodes[id];
     }
 
-    inline std::vector<Node> get_nodes() const { 
-        return nodes; 
+    inline std::vector<Node> get_nodes() const {
+        return nodes;
+    }
+
+    inline const std::vector<Node>& get_nodes_ref() const {
+        return nodes;
     }
 
 

@@ -46,7 +46,7 @@ void update_gaussians_fine(
     double cnot_high,
     double cnot_low
 );
-Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit);
+Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit, const std::vector<double>& baseline_cache, const std::vector<double>& mapped_cache);
 void update_weight(std::vector<Gaussian>& gaussians, double new_weight);
 void update_inverse(std::vector<Gaussian>& gaussians, bool inverse);
 
@@ -54,13 +54,25 @@ namespace {
 double interpolate_weight(double low, double high, double ratio) {
     return low + (high - low) * std::clamp(ratio, 0.0, 1.0);
 }
+
+// Fold a gaussian's per-node contribution into a cache (cache[id] += g(node)).
+// Used for the contributions that stay constant across iterations: the baseline
+// (added once) and the mapped gaussians (append-only, one added per iteration),
+// so computeNextMappingNode never re-sums them from scratch.
+void add_gaussian_to_cache(const Graph& graph, std::vector<double>& cache, const Gaussian& g) {
+    const int node_count = graph.get_node_count();
+    for (int id = 0; id < node_count; ++id) {
+        const Node& node = graph.get_node(id);
+        cache[id] += g.gaussian_at(node.coordX, node.coordY);
+    }
+}
 } // namespace
 
 
 
 
-void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, Gaussian& baseline_gaussian) {
-    
+void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, Gaussian& baseline_gaussian, const std::vector<double>& baseline_cache, std::vector<double>& mapped_cache) {
+
     std::vector<Gaussian> cnot_gaussians;
 
     switch (gaussianStrategy) {
@@ -97,7 +109,7 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
             break;
     }
 
-    Node best_node = computeNextMappingNode(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, *qubit);
+    Node best_node = computeNextMappingNode(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, *qubit, baseline_cache, mapped_cache);
 
     const int mapped_node_id = map_qubit_to_node(qubit->getQubitID(), best_node.id, 0);
     const Node& mapped_node = graph.get_node(mapped_node_id);
@@ -107,6 +119,9 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
         mappedGaussianWeight,
         gaussianConfidence
     ));
+
+    // mapped gaussians are append-only, so fold the new one into the running cache.
+    add_gaussian_to_cache(graph, mapped_cache, mapped_gaussians.back());
 
     (*iterations)++;
 
@@ -120,11 +135,21 @@ void Mapping::gaussian_mapping() {
     std::vector<Gaussian> magic_gaussians;
 
     Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight, gaussianConfidence);
-    
+
+    // Per-node caches for the contributions that don't vary across the inner
+    // candidate loop. baseline_cache is constant (computed once); mapped_cache is
+    // a running sum grown by one gaussian per iteration. Kept separate so the
+    // score sum reproduces the original order (mapped, then magic/cnot, then
+    // baseline) bit-for-bit.
+    const int node_count = graph.get_node_count();
+    std::vector<double> baseline_cache(node_count, 0.0);
+    std::vector<double> mapped_cache(node_count, 0.0);
+    add_gaussian_to_cache(graph, baseline_cache, baseline_gaussian);
+
     for (int node_id : graph.get_magic_state_ids()) {
         magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id, gaussianConfidence));
     }
-    
+
     int total_qubits = circuit.getNumQubits();
     int iterations = 0;
 
@@ -138,7 +163,7 @@ void Mapping::gaussian_mapping() {
             continue; // already mapped as a side effect of mapping a related qubit
         }
         try {
-            one_iteration_gaussian_mapping(qubit, &iterations, mapped_gaussians, magic_gaussians, baseline_gaussian);
+            one_iteration_gaussian_mapping(qubit, &iterations, mapped_gaussians, magic_gaussians, baseline_gaussian, baseline_cache, mapped_cache);
         } catch (const SafePassageException& e) {
             throw SafePassageException(
                 "Failed to map qubit " + std::to_string(qubit->getQubitID()) + ": " + e.what()
@@ -343,21 +368,15 @@ void update_gaussians_fine(
 
 
 
-Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit) {
-    
+Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit, const std::vector<double>& baseline_cache, const std::vector<double>& mapped_cache) {
+
     GaussianMappingVisualization::save_gaussian_frame(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, qubit, externalWeight);
 
     // Compute the combined Gaussian influence for each node and select the best one
-    std::vector<Node> nodes = graph.get_nodes();
+    const std::vector<Node>& nodes = graph.get_nodes_ref();
     if (nodes.empty()) {
         throw std::runtime_error("Graph has no nodes");
     }
-
-    // Remove occupied nodes
-    nodes.erase(std::remove_if(nodes.begin(), nodes.end(), 
-        [&graph](const Node& node) { return graph.is_occupied(node.id); }), 
-        nodes.end()
-    );
 
     struct CandidateScore {
         const Node* node = nullptr;
@@ -371,11 +390,13 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
 
     for (std::size_t order = 0; order < nodes.size(); ++order) {
         const Node& node = nodes[order];
+
+        if (graph.is_occupied(node.id)) continue;
      
-        double score = 0.0;
-        for (const Gaussian& g : mapped_gaussians) {
-            score += g.gaussian_at(node.coordX, node.coordY);
-        }
+        // Same summation order as before (mapped, then magic, then cnot, then
+        // baseline) so the result is bit-for-bit identical, but mapped and
+        // baseline are read from their caches instead of being recomputed.
+        double score = mapped_cache[node.id];
         for (const Gaussian& g : magic_gaussians) {
             score += g.gaussian_at(node.coordX, node.coordY);
         }
@@ -383,7 +404,7 @@ Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, st
             score += g.gaussian_at(node.coordX, node.coordY);
         }
 
-        score += baseline_gaussian.gaussian_at(node.coordX, node.coordY);
+        score += baseline_cache[node.id];
 
         const double ext_w = this->getExternalWeight();
         if (ext_w != 0.0) {

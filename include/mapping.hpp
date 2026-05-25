@@ -344,7 +344,7 @@ private:
 
     void one_iteration_magic_aware_mapping(Qubit* qubit, int* iterations);
 
-    void one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, Gaussian& baseline_gaussian);
+    void one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, Gaussian& baseline_gaussian, const std::vector<double>& baseline_cache, std::vector<double>& mapped_cache);
     
     void random_mapping(Qubit* qubit, int second_qubit);
 
@@ -352,7 +352,7 @@ private:
 
     void distance_mapping(Qubit* qubit, int second_qubit);
 
-    Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit);
+    Node computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit, const std::vector<double>& baseline_cache, const std::vector<double>& mapped_cache);
 
 
 
