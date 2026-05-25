@@ -68,8 +68,10 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
 #endif
 
     const std::filesystem::path config_dir = project_root / "config";
+    const std::filesystem::path executed_dir = config_dir / "executed";
+    std::filesystem::create_directories(executed_dir);
     const std::filesystem::path input_path = config_dir / (json_name + ".json");
-    const std::filesystem::path output_path = config_dir / (json_name + "_expanded.json");
+    const std::filesystem::path output_path = executed_dir / (json_name + "_expanded.json");
 
     std::ifstream input_stream(input_path);
     if (!input_stream.is_open()) {

@@ -1,7 +1,26 @@
-guassian confidence is correlated only with gaussian size
-guassian size is correlated also with safe passage
+-------------------size-confidence---------------------
 
-best confidence: 0.99
-best size: 0.7
-size : 1 bad for fine and cube, good for connectivity
+confidence 0.66 and size 0.3 worst
+confidence 0.8 and size 0.5 good for execution time
+for routing better 0.99, 0.95 better compromise between execution and routing
 
+for routing better 1, 0.7 doabble, the rest too high, while they have similar edxecution time
+with cube 0.7 has better routing performance
+coarse could be better for 1
+with no subraph and connectivity the higher size the lower routing steps so 1 in size is the best
+with cube the higher size the higher routing steps so 0.7 in cube is better (0.5 has routing too low)
+
+final result:
+size: 0.7 with cube, 1 the rest
+confidence: for only routing steps 0.99, taking into account also execution 0.95
+
+next test: 
+- confidence: [0.85, 0.87, 0.90, 0.93, 0.95, 0.99, 0.995, 0.999]
+- size: [0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+
+
+-----------size-confidence-high-dim---------------------
+
+more clear that 0.99 is better because time is similar
+size: 0.7 for only routing steps, 0.5 has good execution time with 0.99
+no more correlation with cube, 0.7 is better for all safe passage

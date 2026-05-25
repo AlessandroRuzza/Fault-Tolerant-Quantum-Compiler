@@ -116,7 +116,7 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
 
 void Mapping::gaussian_mapping() {
     if (PRINT_MAPPING) std::cout << "\n\n";
-    
+
     std::vector<Gaussian> mapped_gaussians;
     std::vector<Gaussian> magic_gaussians;
 

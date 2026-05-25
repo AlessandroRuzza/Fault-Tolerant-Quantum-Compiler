@@ -91,8 +91,8 @@ add_custom_target(run-main
 )
 
 add_custom_target(clearexpanded
-    COMMAND sh -c "rm -f ${CMAKE_SOURCE_DIR}/config/*_expanded.json"
-    COMMENT "Removing config/*_expanded.json files"
+    COMMAND sh -c "rm -f ${CMAKE_SOURCE_DIR}/config/executed/*_expanded.json ${CMAKE_SOURCE_DIR}/config/executed/*_expanded.status.jsonl"
+    COMMENT "Removing config/executed/*_expanded.json and *.status.jsonl files"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 

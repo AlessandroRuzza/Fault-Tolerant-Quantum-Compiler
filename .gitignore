@@ -71,8 +71,7 @@ benchmarks/old_results_13may/**/
 benchmarks/old_size_confidence_newgaussian/**/
 
 #Exluded execution files
-config/best_params_benchmark_expanded.json
-config/best_params_benchmark_expanded.status.jsonl
+config/executed/
 
 !*.csv
 merged_distinct*

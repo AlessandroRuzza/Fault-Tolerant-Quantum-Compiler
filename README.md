@@ -115,21 +115,21 @@ You can add other strategy flags as needed, for example:
 
 ## Run a single config JSON
 
-Single-run config files are JSON objects (for example `config/compiler_config.json`).
+Single-run config files are JSON objects (for example `config/0_compiler_config.json`).
 
 Use benchmark-style configs with arrays (for example `config/ex1.json`) only in benchmark mode.
 
 From `build/`:
 
 ```bash
-./FaultTolerantQuantumCompiler --config ../config/compiler_config.json
+./FaultTolerantQuantumCompiler --config ../config/0_compiler_config.json
 ```
 
 You can still override config values from CLI:
 
 ```bash
 ./FaultTolerantQuantumCompiler \
-	--config ../config/compiler_config.json \
+	--config ../config/0_compiler_config.json \
 	--circuit dnn_n16 \
 	--routing-strategy naive
 ```
@@ -231,7 +231,7 @@ Same output locations as single QASM run:
 Benchmark mode writes persistent artifacts in three places:
 
 - Expanded benchmark definition with execution state:
-	- `config/<bench_name>_expanded.json`
+	- `config/executed/<bench_name>_expanded.json`
 	- Includes fields like `id`, `executed`, and `timeout_reached` per expanded case.
 
 - Per-run logs:
@@ -254,7 +254,7 @@ Example benchmark file:
 
 Expansion output:
 
-- `config/ex1_expanded.json`
+- `config/executed/ex1_expanded.json`
 
 Each expanded case is executed once unless already marked `executed=true`.
 
@@ -342,7 +342,7 @@ Single config:
 
 ```bash
 cd build
-./FaultTolerantQuantumCompiler --config ../config/compiler_config.json
+./FaultTolerantQuantumCompiler --config ../config/0_compiler_config.json
 ```
 
 Benchmark from config JSON:

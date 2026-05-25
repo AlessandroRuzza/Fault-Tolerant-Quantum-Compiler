@@ -278,7 +278,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double external_weight = 0.0;
     double size_moltiplier = 1.0;
     double gaussian_confidence = 0.95;
-    std::string config_path = "../config/compiler_config.json";
+    std::string config_path = "../config/0_compiler_config.json";
     std::string graph_path = "";
     std::string magic_state_placement_strategy = "center_circle";
     int number_of_magic_states = 10;
