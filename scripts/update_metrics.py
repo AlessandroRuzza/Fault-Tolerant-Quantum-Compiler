@@ -13,7 +13,7 @@ is performed; all structural metrics (gate counts, layer structure, etc.) are
 fully populated.
 
 Usage:
-  python3 src/update_metrics.py [--binary <path>] [--qasm-dir <path>] [--jobs <n>]
+  python3 scripts/update_metrics.py [--binary <path>] [--qasm-dir <path>] [--jobs <n>]
 """
 
 import argparse

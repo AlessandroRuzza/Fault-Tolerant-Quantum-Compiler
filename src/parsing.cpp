@@ -100,8 +100,17 @@ void assign_magic_state_count_or_multiplier(
     double parsed_value,
     const std::string& source_name,
     int& number_of_magic_states,
-    double& number_of_magic_states_multiplier
+    double& number_of_magic_states_multiplier,
+    bool t_states_proportional = false
 ) {
+    // When T_states_proportional is true, number_of_magic_states is computed
+    // at runtime from the circuit; a placeholder value of 0 in the config is valid.
+    if (t_states_proportional && parsed_value == 0.0) {
+        number_of_magic_states = 0;
+        number_of_magic_states_multiplier = 0.0;
+        return;
+    }
+
     if (!std::isfinite(parsed_value) || parsed_value <= 0.0) {
         throw std::runtime_error(source_name + " must be a finite number > 0");
     }
@@ -542,6 +551,14 @@ void apply_config_overrides(
         set_magic_state_placement_strategy_from_config("magic_state_placement_strategy");
     }
 
+    if (config_json.contains("T_states_proportional") || config_json.contains("t_states_proportional")) {
+        const char* key = config_json.contains("T_states_proportional") ? "T_states_proportional" : "t_states_proportional";
+        if (!config_json[key].is_boolean()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
+        }
+        t_states_proportional = config_json[key].get<bool>();
+    }
+
     const auto set_number_of_magic_states_from_config = [&](const char* key) {
         if (!config_json.contains(key)) {
             return false;
@@ -554,7 +571,8 @@ void apply_config_overrides(
             parsed_value,
             std::string("Config key '") + key + "'",
             number_of_magic_states,
-            number_of_magic_states_multiplier
+            number_of_magic_states_multiplier,
+            t_states_proportional
         );
         return true;
     };
@@ -668,13 +686,6 @@ void apply_config_overrides(
         }
     }
 
-    if (config_json.contains("T_states_proportional") || config_json.contains("t_states_proportional")) {
-        const char* key = config_json.contains("T_states_proportional") ? "T_states_proportional" : "t_states_proportional";
-        if (!config_json[key].is_boolean()) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
-        }
-        t_states_proportional = config_json[key].get<bool>();
-    }
 }
 
 void argument_parsing(

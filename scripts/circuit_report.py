@@ -277,7 +277,7 @@ def save_metrics_figure(circuit: str, rankings: dict,
         ax.axis("off")
         ax.text(0.5, 0.5,
                 f"No metrics available for  '{circuit}'.\n"
-                "Run:  python3 src/update_metrics.py",
+                "Run:  python3 scripts/update_metrics.py",
                 ha="center", va="center", transform=ax.transAxes,
                 fontsize=13, color="#888888")
         fig.suptitle(f"Circuit Metrics — {circuit}", fontsize=14,
@@ -340,7 +340,7 @@ def save_metrics_figure(circuit: str, rankings: dict,
         f"Comparing against {n_metrics_circuits} circuit(s) in the database"
         if n_metrics_circuits > 1
         else "⚠  Only 1 circuit in the metrics database — "
-             "run  python3 src/update_metrics.py  for meaningful comparison"
+             "run  python3 scripts/update_metrics.py  for meaningful comparison"
     )
     ax.set_title(title, fontsize=13, fontweight="bold", pad=14)
     fig.text(0.5, 0.995, subtitle, ha="center", va="top",

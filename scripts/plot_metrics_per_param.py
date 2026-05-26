@@ -175,7 +175,7 @@ def main() -> None:
 
     if not args.csv.exists():
         print(f"ERROR: CSV not found at {args.csv}", file=sys.stderr)
-        print("Run: python3 src/update_metrics.py", file=sys.stderr)
+        print("Run: python3 scripts/update_metrics.py", file=sys.stderr)
         sys.exit(1)
 
     rows = load_csv(args.csv)
