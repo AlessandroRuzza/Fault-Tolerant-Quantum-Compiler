@@ -459,8 +459,8 @@ def make_reports(circuit: str, runs: list, rankings: dict,
         print(f"    Skip {circuit}: no successful runs")
         return
 
-    top_steps = sorted(circ_runs, key=lambda r: r["routing_steps"])[:15]
-    top_time  = sorted(circ_runs, key=lambda r: r["duration_seconds"])[:15]
+    top_steps = sorted(circ_runs, key=lambda r: (r["routing_steps"], r["duration_seconds"]))[:15]
+    top_time  = sorted(circ_runs, key=lambda r: (r["duration_seconds"], r["routing_steps"]))[:15]
 
     save_metrics_figure(
         circuit, rankings, n_metrics_circuits,
