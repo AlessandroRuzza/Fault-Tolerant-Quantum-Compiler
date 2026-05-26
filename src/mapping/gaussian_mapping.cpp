@@ -333,15 +333,16 @@ void update_gaussians_fine(
 
             // These partners are pre-filtered by CNOT_threshold = ceil(CNOT_mean), so
             // they all interact at least as much as average. A shared CNOT must always
-            // *attract* (never repel) and at no less than full strength: interpolating
-            // the weight down toward cnot_low — as the previous code did — made fine's
-            // CNOT pull systematically weaker than coarse's flat cnot_high, scattering
-            // interacting qubits and inflating routing steps. So cnot_high is the floor
-            // (matching coarse), and the heaviest partners (beyond mean+std) get an
-            // extra boost, which is where fine adds genuine granularity over coarse.
+            // *attract* (never repel) and at no less than full strength: cnot_high is
+            // the floor (matching coarse). The heaviest partners (beyond mean+std) get
+            // a strong extra boost — empirically, the stronger this pull, the tighter
+            // the heavily-interacting qubits cluster, which sharply cuts non-routed
+            // layers (the primary metric). A sweep of the boost factor showed
+            // non_routed mean(no-out) drops monotonically up to ~4x and then plateaus,
+            // so the factor is fixed at 4 (peak weight ≈ cnot_high + 4*(cnot_high-cnot_low)).
             double weight = cnot_high;
             if (CNOT_std > 0.0 && cnot_count > CNOT_mean + CNOT_std) {
-                weight = cnot_high + (cnot_high - cnot_low) *
+                weight = cnot_high + 4.0 * (cnot_high - cnot_low) *
                          std::clamp((cnot_count - (CNOT_mean + CNOT_std)) / CNOT_std, 0.0, 1.0);
             }
 
