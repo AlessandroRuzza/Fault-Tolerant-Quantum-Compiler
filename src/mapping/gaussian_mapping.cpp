@@ -227,13 +227,21 @@ void update_gaussians_coarse(
             std::cout << "\n";
         }
         
+        // Coarse-native clustering boost: keep the flat cnot_high for all partners,
+        // but pull hard toward the single *dominant* CNOT partner (the one coarse
+        // already uses for its T-vs-CNOT regime decision). This is a binary
+        // distinction (dominant vs rest), not fine's continuous per-partner scaling,
+        // so coarse stays coarse — it just anchors each qubit tightly to its busiest
+        // neighbour, which cuts non-routed layers.
+        const int dominant_partner = qubit->getMaxCNOTCountIndex();
         for (int i : highCnotQubits) {
             int second_qubit_mapped_node = mapping.get_mapped_node(i);
             if (second_qubit_mapped_node != -1){
+                const double weight = (i == dominant_partner) ? cnot_high * 3.0 : cnot_high;
                 cnot_gaussians.push_back(Gaussians::cnot_gaussian(
                     graph,
                     second_qubit_mapped_node,
-                    cnot_high,
+                    weight,
                     false,
                     mapping.getGaussianConfidence()
                 ));
