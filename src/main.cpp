@@ -627,7 +627,6 @@ int run_bench_mode(
 
     struct BenchCasePlan {
         std::size_t index = 0;
-        json entry;
         std::string case_id;
         int processor = 0;
         double timeout_seconds = -1.0;
@@ -798,15 +797,15 @@ int run_bench_mode(
                 throw std::runtime_error("Bench entry " + std::to_string(i + 1) + " must be a JSON object.");
             }
 
+            const json &entry = bench_data.at(i);
             BenchCasePlan plan;
             plan.index = i;
-            plan.entry = bench_data.at(i);
-            plan.processor = parse_entry_processor(plan.entry);
-            plan.timeout_seconds = parse_timeout_seconds(plan.entry);
+            plan.processor = parse_entry_processor(entry);
+            plan.timeout_seconds = parse_timeout_seconds(entry);
             plan.timeout_enabled = plan.timeout_seconds >= 0.0;
-            plan.case_id = get_json_field(plan.entry, {"case_id"});
+            plan.case_id = get_json_field(entry, {"case_id"});
             if (plan.case_id.empty()) {
-                plan.case_id = get_json_field(plan.entry, {"id"});
+                plan.case_id = get_json_field(entry, {"id"});
             }
             {
                 const auto sc_it = sidecar.find(i);
@@ -815,17 +814,17 @@ int run_bench_mode(
                     plan.timeout_reached_before = sc_it->second.timeout_reached;
                 } else {
                     plan.already_executed =
-                        plan.entry.contains("executed") && plan.entry["executed"].is_boolean() && plan.entry["executed"].get<bool>();
+                        entry.contains("executed") && entry["executed"].is_boolean() && entry["executed"].get<bool>();
                     plan.timeout_reached_before =
-                        plan.entry.contains("timeout_reached") &&
-                        plan.entry["timeout_reached"].is_boolean() &&
-                        plan.entry["timeout_reached"].get<bool>();
+                        entry.contains("timeout_reached") &&
+                        entry["timeout_reached"].is_boolean() &&
+                        entry["timeout_reached"].get<bool>();
                 }
             }
             plan.rerun_timeout_case = rerun_timeouts && plan.already_executed && plan.timeout_reached_before;
 
-            const std::string plan_type = plan_field(plan.entry, {"mapping_type", "type"});
-            const std::string plan_safe_passage_strategy = plan_field(plan.entry, {"safe_passage_strategy"});
+            const std::string plan_type = plan_field(entry, {"mapping_type", "type"});
+            const std::string plan_safe_passage_strategy = plan_field(entry, {"safe_passage_strategy"});
 
             if (plan.processor != processor) {
                 std::cout
@@ -860,8 +859,9 @@ int run_bench_mode(
         std::size_t reusable_interrupted_rows = 0;
         for (std::size_t plan_index : runnable_indices) {
             BenchCasePlan &plan = plans[plan_index];
+            const json &entry = bench_data.at(plan.index);
             for (InterruptedCsvRow &interrupted_row : interrupted_csv_rows) {
-                if (interrupted_row.used || !csv_row_matches_plan(interrupted_row.row, plan.entry)) {
+                if (interrupted_row.used || !csv_row_matches_plan(interrupted_row.row, entry)) {
                     continue;
                 }
 
@@ -890,6 +890,7 @@ int run_bench_mode(
         }
 
         const auto execute_case = [&](const BenchCasePlan &plan, int execution_id) {
+            const json &entry = bench_data.at(plan.index);
             BenchCaseResult result;
             result.completed = true;
             result.index = plan.index;
@@ -930,8 +931,8 @@ int run_bench_mode(
             std::string resolved_n_magic;
             int resolved_num_qubits = -1;
             int resolved_max_degree = -1;
-            const std::string planned_x = plan_field(plan.entry, {"x", "graph_x"});
-            const std::string planned_y = plan_field(plan.entry, {"y", "graph_y"});
+            const std::string planned_x = plan_field(entry, {"x", "graph_x"});
+            const std::string planned_y = plan_field(entry, {"y", "graph_y"});
             if (!planned_x.empty() && !is_sentinel_dim(planned_x)) {
                 resolved_graph_x = planned_x;
             }
@@ -943,7 +944,7 @@ int run_bench_mode(
             // If the circuit is missing or has invalid dimensions, skip the run.
             const DimCsvEntry *dim_entry_ptr = nullptr;
             if (planned_x == "0") {
-                const std::string circuit_key = get_json_field(plan.entry, {"circuit"});
+                const std::string circuit_key = get_json_field(entry, {"circuit"});
                 const auto it = dim_csv.find(circuit_key);
                 if (it == dim_csv.end()) {
                     result.status = "skipped";
@@ -962,7 +963,7 @@ int run_bench_mode(
             }
 
             try {
-                json run_entry = plan.entry;
+                json run_entry = entry;
                 if (planned_x == "0" && dim_entry_ptr) {
                     run_entry["x"] = dim_entry_ptr->max_x;
                     run_entry["y"] = dim_entry_ptr->max_y;
@@ -1099,7 +1100,7 @@ int run_bench_mode(
                 };
 
                 try {
-                    json mid_entry = plan.entry;
+                    json mid_entry = entry;
                     mid_entry["x"] = mid_dim_x;
                     mid_entry["y"] = mid_dim_y;
 
@@ -1195,7 +1196,7 @@ int run_bench_mode(
                 };
 
                 try {
-                    json lower_entry = plan.entry;
+                    json lower_entry = entry;
                     lower_entry["x"] = lower_dim_x;
                     lower_entry["y"] = lower_dim_y;
 
@@ -1275,42 +1276,42 @@ int run_bench_mode(
 
             result.mark_entry_as_executed = (result.status != "interrupted");
 
-            const std::string circuit = get_json_field(plan.entry, {"circuit"});
+            const std::string circuit = get_json_field(entry, {"circuit"});
             if (resolved_graph_x.empty() && !planned_x.empty() && !is_sentinel_dim(planned_x)) {
                 resolved_graph_x = planned_x;
             }
             if (resolved_graph_y.empty() && !planned_y.empty() && !is_sentinel_dim(planned_y)) {
                 resolved_graph_y = planned_y;
             }
-            std::string circuit_graph_label = get_json_field(plan.entry, {"circuit_graph_label"});
+            std::string circuit_graph_label = get_json_field(entry, {"circuit_graph_label"});
             if (circuit_graph_label.empty() && !circuit.empty() && !resolved_graph_x.empty() && !resolved_graph_y.empty()) {
                 circuit_graph_label = circuit + "-" + resolved_graph_x + "x" + resolved_graph_y;
             }
 
             std::string routing_strategy_csv = get_json_field(
-                plan.entry,
+                entry,
                 {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}
             );
             if (routing_strategy_csv.empty()) {
                 routing_strategy_csv = "congestion";
             }
             std::string t_routing_mode_csv = get_json_field(
-                plan.entry,
+                entry,
                 {"t_routing_mode", "t-routing-mode"}
             );
             if (t_routing_mode_csv.empty()) {
                 t_routing_mode_csv = "normal_t_routing";
             }
 
-            const std::string mw = get_json_field(plan.entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
-            const std::string bw = get_json_field(plan.entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
-            const std::string gc = get_json_field(plan.entry, {"GAUSSIAN_CONFIDENCE", "gaussian_confidence"});
-            const std::string mh = get_json_field(plan.entry, {"MAGIC_HIGH", "magic_high"});
-            const std::string ml = get_json_field(plan.entry, {"MAGIC_LOW", "magic_low"});
-            const std::string ch = get_json_field(plan.entry, {"CNOT_HIGH", "cnot_high"});
-            const std::string cl = get_json_field(plan.entry, {"CNOT_LOW", "cnot_low"});
-            const std::string mapping_type_csv = get_json_field(plan.entry, {"mapping_type", "type"});
-            const std::string safe_passage_strategy_csv = get_json_field(plan.entry, {"safe_passage_strategy"});
+            const std::string mw = get_json_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
+            const std::string bw = get_json_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
+            const std::string gc = get_json_field(entry, {"GAUSSIAN_CONFIDENCE", "gaussian_confidence"});
+            const std::string mh = get_json_field(entry, {"MAGIC_HIGH", "magic_high"});
+            const std::string ml = get_json_field(entry, {"MAGIC_LOW", "magic_low"});
+            const std::string ch = get_json_field(entry, {"CNOT_HIGH", "cnot_high"});
+            const std::string cl = get_json_field(entry, {"CNOT_LOW", "cnot_low"});
+            const std::string mapping_type_csv = get_json_field(entry, {"mapping_type", "type"});
+            const std::string safe_passage_strategy_csv = get_json_field(entry, {"safe_passage_strategy"});
 
             result.csv_row = {
                 plan.case_id.empty() ? std::to_string(plan.index + 1) : plan.case_id,
@@ -1321,8 +1322,8 @@ int run_bench_mode(
                 resolved_graph_y,
                 circuit_graph_label,
                 mapping_type_csv,
-                get_json_field(plan.entry, {"magic_aware_strategy"}),
-                get_json_field(plan.entry, {"gaussian_strategy"}),
+                get_json_field(entry, {"magic_aware_strategy"}),
+                get_json_field(entry, {"gaussian_strategy"}),
                 mh,
                 ml,
                 ch,
@@ -1331,12 +1332,12 @@ int run_bench_mode(
                 bw,
                 gc,
                 safe_passage_strategy_csv,
-                get_json_field(plan.entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
-                get_json_field(plan.entry, {"border_distance_percentage"}),
-                get_json_field(plan.entry, {"number_of_magic_states"}),
+                get_json_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
+                get_json_field(entry, {"border_distance_percentage"}),
+                get_json_field(entry, {"number_of_magic_states"}),
                 routing_strategy_csv,
                 t_routing_mode_csv,
-                get_json_field(plan.entry, {"use_layer_cache", "use-layer-cache"}).empty() ? "true" : get_json_field(plan.entry, {"use_layer_cache", "use-layer-cache"}),
+                get_json_field(entry, {"use_layer_cache", "use-layer-cache"}).empty() ? "true" : get_json_field(entry, {"use_layer_cache", "use-layer-cache"}),
                 routing_steps,
                 result.timeout_reached ? "true" : "false",
                 result.status,
@@ -1357,9 +1358,9 @@ int run_bench_mode(
                 non_routed_pct,
                 mid_non_routed_pct_str,
                 lower_non_routed_pct_str,
-                get_json_field(plan.entry, {"T_states_proportional", "t_states_proportional"}).empty()
+                get_json_field(entry, {"T_states_proportional", "t_states_proportional"}).empty()
                     ? "false"
-                    : get_json_field(plan.entry, {"T_states_proportional", "t_states_proportional"}),
+                    : get_json_field(entry, {"T_states_proportional", "t_states_proportional"}),
                 resolved_n_magic
             };
 

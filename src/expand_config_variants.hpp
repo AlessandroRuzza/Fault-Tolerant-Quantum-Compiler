@@ -85,8 +85,8 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
         return key == "id" || key == "executed" || key == "process";
     };
 
-    std::function<std::vector<json>(const json &)> expand_entry_variants;
-    expand_entry_variants = [&](const json &entry) -> std::vector<json> {
+    std::function<void(const json &, const std::function<void(const json &)> &)> expand_entry_variants;
+    expand_entry_variants = [&](const json &entry, const std::function<void(const json &)> &sink) -> void {
         if (!entry.is_object()) {
             throw std::invalid_argument("Each benchmark entry must be a JSON object.");
         }
@@ -121,17 +121,14 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
 
             json base_entry = entry;
             base_entry.erase(key);
-            std::vector<json> expanded_group;
             for (const auto &obj_override : it.value()) {
                 json merged_entry = base_entry;
                 for (auto override_it = obj_override.begin(); override_it != obj_override.end(); ++override_it) {
                     merged_entry[override_it.key()] = override_it.value();
                 }
-
-                std::vector<json> nested = expand_entry_variants(merged_entry);
-                expanded_group.insert(expanded_group.end(), nested.begin(), nested.end());
+                expand_entry_variants(merged_entry, sink);
             }
-            return expanded_group;
+            return;
         }
 
         std::vector<std::string> keys;
@@ -160,11 +157,10 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
             keys.push_back(key);
         }
 
-        std::vector<json> generated_entries;
         json current = json::object();
         std::function<void(std::size_t)> build = [&](std::size_t idx) {
             if (idx == keys.size()) {
-                generated_entries.push_back(current);
+                sink(current);
                 return;
             }
 
@@ -176,28 +172,22 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
         };
 
         build(0);
-        return generated_entries;
     };
 
-    json generated = json::array();
-    const auto append_expanded_entries = [&](const json &entry) {
-        const std::vector<json> expanded_entries = expand_entry_variants(entry);
-        for (const auto &expanded_entry : expanded_entries) {
-            generated.push_back(expanded_entry);
-        }
+    // Existing per-case state (id / executed / timeout_reached) is preserved
+    // across runs so resuming a partially-executed sweep keeps stable ids and
+    // skip flags. Only this lightweight state is kept in the map; the full
+    // existing DOM is read inside a scoped block so it frees before generation,
+    // keeping peak memory to a single copy of the expanded structure.
+    struct ExistingState {
+        int id = 0;
+        bool has_id = false;
+        bool executed = false;
+        bool has_executed = false;
+        bool timeout_reached = false;
+        bool has_timeout = false;
     };
-
-    if (source.is_object()) {
-        append_expanded_entries(source);
-    } else if (source.is_array()) {
-        for (const auto &entry : source) {
-            append_expanded_entries(entry);
-        }
-    } else {
-        throw std::invalid_argument("Input JSON must be an object or an array of objects.");
-    }
-
-    std::unordered_map<std::string, json> existing_by_signature;
+    std::unordered_map<std::string, ExistingState> existing_by_signature;
     std::size_t next_id = 1;
 
     if (std::filesystem::exists(output_path)) {
@@ -211,20 +201,27 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
                         if (!existing_entry.is_object()) {
                             continue;
                         }
-
                         const std::string signature = make_signature(existing_entry);
                         if (signature.empty()) {
                             continue;
                         }
-
-                        existing_by_signature[signature] = existing_entry;
-
+                        ExistingState state;
                         if (existing_entry.contains("id") && existing_entry["id"].is_number_integer()) {
-                            const int id_value = existing_entry["id"].get<int>();
-                            if (id_value >= 1) {
-                                next_id = std::max(next_id, static_cast<std::size_t>(id_value + 1));
+                            state.id = existing_entry["id"].get<int>();
+                            state.has_id = true;
+                            if (state.id >= 1) {
+                                next_id = std::max(next_id, static_cast<std::size_t>(state.id + 1));
                             }
                         }
+                        if (existing_entry.contains("executed") && existing_entry["executed"].is_boolean()) {
+                            state.executed = existing_entry["executed"].get<bool>();
+                            state.has_executed = true;
+                        }
+                        if (existing_entry.contains("timeout_reached") && existing_entry["timeout_reached"].is_boolean()) {
+                            state.timeout_reached = existing_entry["timeout_reached"].get<bool>();
+                            state.has_timeout = true;
+                        }
+                        existing_by_signature[signature] = state;
                     }
                 }
             } catch (const std::exception &) {
@@ -232,28 +229,29 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
         }
     }
 
-    json expanded = json::array();
-    for (std::size_t generated_index = 0; generated_index < generated.size(); ++generated_index) {
-        const auto &generated_entry = generated[generated_index];
+    // Stream each expanded entry straight to disk so the full set of generated
+    // entries is never held in memory at once. Write to a temp file and rename
+    // so an interrupted expansion never leaves a truncated output behind.
+    const std::filesystem::path tmp_path = output_path.string() + ".tmp";
+    std::ofstream output_stream(tmp_path, std::ios::trunc);
+    if (!output_stream.is_open()) {
+        throw std::runtime_error("Cannot open output file: " + tmp_path.string());
+    }
+
+    output_stream << "[";
+    std::size_t generated_index = 0;
+    bool first_entry = true;
+    const std::function<void(const json &)> sink = [&](const json &generated_entry) {
         json final_entry = generated_entry;
         const std::string signature = make_signature(generated_entry);
 
         auto it = existing_by_signature.find(signature);
         if (it != existing_by_signature.end()) {
-            const json &existing_entry = it->second;
-            if (existing_entry.contains("id") && existing_entry["id"].is_number_integer()) {
-                final_entry["id"] = existing_entry["id"].get<int>();
-            } else {
-                final_entry["id"] = static_cast<int>(next_id++);
-            }
-            if (existing_entry.contains("executed") && existing_entry["executed"].is_boolean()) {
-                final_entry["executed"] = existing_entry["executed"].get<bool>();
-            } else {
-                final_entry["executed"] = false;
-            }
-
-            if (existing_entry.contains("timeout_reached") && existing_entry["timeout_reached"].is_boolean()) {
-                final_entry["timeout_reached"] = existing_entry["timeout_reached"].get<bool>();
+            const ExistingState &state = it->second;
+            final_entry["id"] = state.has_id ? state.id : static_cast<int>(next_id++);
+            final_entry["executed"] = state.has_executed ? state.executed : false;
+            if (state.has_timeout) {
+                final_entry["timeout_reached"] = state.timeout_reached;
             } else if (!final_entry.contains("timeout_reached")) {
                 final_entry["timeout_reached"] = false;
             }
@@ -266,14 +264,29 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
         }
 
         final_entry["process"] = static_cast<int>(generated_index % static_cast<std::size_t>(process_count));
-        expanded.push_back(final_entry);
+        ++generated_index;
+
+        output_stream << (first_entry ? "\n" : ",\n");
+        first_entry = false;
+        output_stream << final_entry.dump(2);
+    };
+
+    if (source.is_object()) {
+        expand_entry_variants(source, sink);
+    } else if (source.is_array()) {
+        for (const auto &entry : source) {
+            expand_entry_variants(entry, sink);
+        }
+    } else {
+        throw std::invalid_argument("Input JSON must be an object or an array of objects.");
     }
 
-    std::ofstream output_stream(output_path);
-    if (!output_stream.is_open()) {
-        throw std::runtime_error("Cannot open output file: " + output_path.string());
+    output_stream << "\n]\n";
+    output_stream.close();
+    if (!output_stream) {
+        throw std::runtime_error("Failed while writing output file: " + tmp_path.string());
     }
 
-    output_stream << expanded.dump(2) << '\n';
+    std::filesystem::rename(tmp_path, output_path);
     return output_path.string();
 }
