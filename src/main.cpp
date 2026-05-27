@@ -27,8 +27,11 @@
 
 #include <cerrno>
 #include <mutex>
+#include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+extern char **environ;
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -84,23 +87,31 @@ void handle_bench_interrupt(int signal_number) {
     }
 }
 
-// fork/exec/waitpid wrapper that mirrors std::system() but exposes the worker
-// PID to the signal handler via the worker registry. Returns the same
-// integer std::system() would (waitpid-style status on success, -1 on fork
-// or exec setup error).
+// Spawn `/bin/sh -c "command"` and wait, exposing the worker PID to the signal
+// handler via the worker registry. Returns the same integer std::system()
+// would (waitpid-style status on success, -1 on spawn setup error).
+//
+// Uses posix_spawn() rather than fork()+exec(): the benchmark parent holds a
+// multi-GB JSON DOM (all expanded cases), and a plain fork() of such a large
+// address space is expensive and serializes on the kernel mm lock — which caps
+// parallel scaling when many OpenMP threads spawn workers at once. glibc's
+// posix_spawn() uses clone(CLONE_VM|CLONE_VFORK), so it does NOT copy the page
+// tables and stays cheap regardless of parent size.
 int spawn_worker_and_wait(const std::string &command) {
-    const pid_t pid = fork();
-    if (pid < 0) {
+    // /bin/sh -c "command" keeps shell semantics (redirection, timeout
+    // chaining, env prefix) intact, identical to the previous execl() child.
+    char arg_sh[] = "sh";
+    char arg_c[] = "-c";
+    std::vector<char> cmd_buf(command.begin(), command.end());
+    cmd_buf.push_back('\0');
+    char *const argv[] = {arg_sh, arg_c, cmd_buf.data(), nullptr};
+
+    pid_t pid = 0;
+    const int spawn_rc =
+        posix_spawn(&pid, "/bin/sh", nullptr, nullptr, argv, environ);
+    if (spawn_rc != 0) {
         return -1;
     }
-    if (pid == 0) {
-        // Child: replace with /bin/sh -c "command" to keep shell semantics
-        // (redirection, timeout chaining, env prefix) intact.
-        execl("/bin/sh", "sh", "-c", command.c_str(), static_cast<char *>(nullptr));
-        // Only reached if execl failed.
-        _exit(127);
-    }
-    // Parent.
     register_worker_pid(pid);
     int status = 0;
     pid_t waited;
@@ -513,6 +524,30 @@ int run_bench_mode(
     write_csv::ensure_initialized(csv_path, write_csv::kBenchmarkRunsCsvHeader);
     int next_execution_id = write_csv::read_max_execution_id(csv_path) + 1;
 
+    // Per-case worker config/result files are transient (written, read by the
+    // worker subprocess, then removed). Default them to a local temp dir
+    // (node-local on clusters) so thousands of tiny writes don't hammer shared
+    // storage and serialize the parallel loop; BENCH_TMPDIR overrides. Falls
+    // back to the bench dir only if no temp dir is usable.
+    const std::filesystem::path runtime_dir = [&]() -> std::filesystem::path {
+        std::error_code ec;
+        if (const char *env = std::getenv("BENCH_TMPDIR"); env != nullptr && *env != '\0') {
+            std::filesystem::path p(env);
+            std::filesystem::create_directories(p, ec);
+            if (!ec) {
+                return p;
+            }
+        }
+        const std::filesystem::path tmp = std::filesystem::temp_directory_path(ec);
+        if (!ec && !tmp.empty()) {
+            std::filesystem::create_directories(tmp, ec);
+            if (!ec) {
+                return tmp;
+            }
+        }
+        return expanded_path.parent_path();
+    }();
+
     auto persist_expanded = [&]() {
         std::ofstream out(expanded_path);
         if (!out.is_open()) {
@@ -918,10 +953,10 @@ int run_bench_mode(
             const std::string run_datetime = format_now_datetime(start_tp);
 
             const std::filesystem::path temp_config_path =
-                expanded_path.parent_path() /
+                runtime_dir /
                 ("__bench_runtime_config_" + std::to_string(execution_id) + ".json");
             const std::filesystem::path temp_result_path =
-                expanded_path.parent_path() /
+                runtime_dir /
                 ("__bench_runtime_result_" + std::to_string(execution_id) + ".json");
 
             const auto cleanup_temp = [&]() {
@@ -1094,10 +1129,10 @@ int run_bench_mode(
                 mid_y_str = std::to_string(mid_dim_y);
 
                 const std::filesystem::path temp_mid_config =
-                    expanded_path.parent_path() /
+                    runtime_dir /
                     ("__bench_runtime_mid_config_" + std::to_string(execution_id) + ".json");
                 const std::filesystem::path temp_mid_result =
-                    expanded_path.parent_path() /
+                    runtime_dir /
                     ("__bench_runtime_mid_result_" + std::to_string(execution_id) + ".json");
 
                 const auto cleanup_mid = [&]() {
@@ -1190,10 +1225,10 @@ int run_bench_mode(
                 lower_y_str = std::to_string(lower_dim_y);
 
                 const std::filesystem::path temp_lower_config =
-                    expanded_path.parent_path() /
+                    runtime_dir /
                     ("__bench_runtime_lower_config_" + std::to_string(execution_id) + ".json");
                 const std::filesystem::path temp_lower_result =
-                    expanded_path.parent_path() /
+                    runtime_dir /
                     ("__bench_runtime_lower_result_" + std::to_string(execution_id) + ".json");
 
                 const auto cleanup_lower = [&]() {
@@ -1417,6 +1452,14 @@ int run_bench_mode(
 
         const long long runnable_count = static_cast<long long>(runnable_indices.size());
 
+        // The sidecar is only a resume log: flushing it on every case forces an
+        // fsync inside the serial critical section, which throttles scaling.
+        // Flush in batches instead; a hard kill loses at most one batch, which
+        // just re-runs those cases next time. A final flush after the loop makes
+        // graceful stops (SIGTERM) fully durable.
+        long long commits_since_flush = 0;
+        constexpr long long kSidecarFlushInterval = 64;
+
 #pragma omp parallel for schedule(dynamic, 1) if(runnable_count > 1)
         for (long long runnable_idx = 0; runnable_idx < runnable_count; ++runnable_idx) {
             if (fatal_error.load() || g_bench_interrupt_requested != 0) {
@@ -1440,7 +1483,10 @@ int run_bench_mode(
                                      {"e", result.mark_entry_as_executed},
                                      {"t", result.timeout_reached}}).dump()
                             << '\n';
-                        sidecar_out.flush();
+                        if (++commits_since_flush >= kSidecarFlushInterval) {
+                            sidecar_out.flush();
+                            commits_since_flush = 0;
+                        }
                         const BenchCasePlan &committed_plan = plans[result.index];
                         if (committed_plan.replace_interrupted_csv_row) {
                             write_csv::replace_row(
@@ -1466,6 +1512,8 @@ int run_bench_mode(
                 }
             }
         }
+
+        sidecar_out.flush();
 
         if (fatal_error.load()) {
             throw std::runtime_error(fatal_error_message);
