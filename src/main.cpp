@@ -293,6 +293,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     bool metrics_only = false;
     int repetition_count = 1;
     bool t_states_proportional = false;
+    bool use_layer_cache_explicit = false;
+    bool t_states_proportional_explicit = false;
 
     apply_config_overrides(
         argc,
@@ -323,7 +325,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         patience_threshold,
         use_layer_cache,
         repetition_count,
-        t_states_proportional
+        t_states_proportional,
+        use_layer_cache_explicit,
+        t_states_proportional_explicit
     );
 
     argument_parsing(
@@ -354,7 +358,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         patience_threshold,
         use_layer_cache,
         metrics_only,
-        repetition_count
+        repetition_count,
+        use_layer_cache_explicit
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -416,7 +421,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         use_layer_cache,
         metrics_only,
         repetition_count,
-        t_states_proportional
+        t_states_proportional,
+        use_layer_cache_explicit,
+        t_states_proportional_explicit
     );
     write_benchmark_result_file_if_requested(result);
 

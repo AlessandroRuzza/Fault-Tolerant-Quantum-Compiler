@@ -376,7 +376,9 @@ void apply_config_overrides(
     int& patience_threshold,
     bool& use_layer_cache,
     int& repetition_count,
-    bool& t_states_proportional
+    bool& t_states_proportional,
+    bool& use_layer_cache_explicit,
+    bool& t_states_proportional_explicit
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -557,6 +559,7 @@ void apply_config_overrides(
             throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
         }
         t_states_proportional = config_json[key].get<bool>();
+        t_states_proportional_explicit = true;
     }
 
     const auto set_number_of_magic_states_from_config = [&](const char* key) {
@@ -673,6 +676,7 @@ void apply_config_overrides(
             throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
         }
         use_layer_cache = config_json[key].get<bool>();
+        use_layer_cache_explicit = true;
     }
 
     if (config_json.contains("repetition") || config_json.contains("random_repetition") || config_json.contains("random-repetition")) {
@@ -716,7 +720,8 @@ void argument_parsing(
     int& patience_threshold,
     bool& use_layer_cache,
     bool& metrics_only,
-    int& repetition
+    int& repetition,
+    bool& use_layer_cache_explicit
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -1011,7 +1016,8 @@ void argument_parsing(
             } else {
                 throw std::runtime_error("Invalid boolean value for --repetition: " + val);
             }
-            
+            use_layer_cache_explicit = true;
+
             continue;
         }
         

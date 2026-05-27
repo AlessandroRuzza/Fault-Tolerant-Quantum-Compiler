@@ -448,6 +448,102 @@ def save_top15_figure(circuit: str, top_rows: list,
 
 
 # ---------------------------------------------------------------------------
+# Plot 4 & 5: global parameter frequency across best configs
+# ---------------------------------------------------------------------------
+
+FREQ_PARAMS = [
+    ("mapping_type",                   "Mapping",         None),
+    ("safe_passage_strategy",          "Safe passage",    None),
+    ("routing_strategy",               "Routing",         None),
+    ("t_routing_mode",                 "T-routing",       None),
+    ("use_layer_cache",                "Cache",           None),
+    ("t_states_proportional",          "T-prop",          None),
+    ("magic_state_placement_strategy", "Magic placement", None),
+    ("gaussian_strategy",              "Gaussian",        "gaussian"),
+    ("magic_aware_strategy",           "MA strategy",     "magic_aware"),
+]
+
+FREQ_COLORS = [
+    "#4e79a7", "#f28e2b", "#e15759", "#76b7b2",
+    "#59a14f", "#edc948", "#b07aa1", "#ff9da7", "#9c755f",
+]
+
+
+def save_param_frequency_figure(best_rows: list, sort_label: str, out_path: Path):
+    """Bar-chart grid: for each parameter, how many times each value
+    appears as the best configuration across all circuits."""
+    if not best_rows:
+        return
+
+    from collections import Counter
+
+    n_params = len(FREQ_PARAMS)
+    ncols = 3
+    nrows = (n_params + ncols - 1) // ncols
+
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(ncols * 6, nrows * 3.8),
+                             facecolor="white")
+    axes_flat = axes.flatten()
+
+    for idx, (key, label, mapping_filter) in enumerate(FREQ_PARAMS):
+        ax = axes_flat[idx]
+
+        subset = best_rows
+        if mapping_filter is not None:
+            subset = [r for r in best_rows if r.get("mapping_type") == mapping_filter]
+
+        counts = Counter()
+        for r in subset:
+            v = r.get(key, "")
+            if key in ("use_layer_cache", "t_states_proportional"):
+                v = "yes" if str(v).lower() == "true" else "no"
+            else:
+                v = _abbrev(str(v)) if v else "—"
+            counts[v] += 1
+
+        if not counts:
+            ax.axis("off")
+            ax.set_title(label, fontsize=11, fontweight="bold")
+            continue
+
+        labels_sorted = sorted(counts.keys(), key=lambda x: -counts[x])
+        values = [counts[l] for l in labels_sorted]
+        colors = [FREQ_COLORS[i % len(FREQ_COLORS)] for i in range(len(labels_sorted))]
+
+        bars = ax.bar(labels_sorted, values, color=colors,
+                      edgecolor="white", zorder=2)
+        ax.bar_label(bars, padding=3, fontsize=9, fontweight="bold")
+
+        title = label
+        if mapping_filter:
+            title += f" (only {mapping_filter})"
+        ax.set_title(title, fontsize=11, fontweight="bold", pad=8)
+        ax.set_ylabel("# circuits", fontsize=9)
+        ax.set_ylim(0, max(values) * 1.25)
+        ax.tick_params(axis="x", labelsize=9)
+        ax.tick_params(axis="y", labelsize=8)
+        ax.grid(axis="y", color="#eeeeee", zorder=0)
+        ax.set_axisbelow(True)
+
+        for spine in ["top", "right"]:
+            ax.spines[spine].set_visible(False)
+
+    # Hide unused subplots
+    for idx in range(n_params, len(axes_flat)):
+        axes_flat[idx].axis("off")
+
+    n = len(best_rows)
+    fig.suptitle(
+        f"Parameter frequency in best configs — sorted by {sort_label}  ({n} circuits)",
+        fontsize=14, fontweight="bold", y=1.01,
+    )
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=130, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
 # Per-circuit entry point
 # ---------------------------------------------------------------------------
 
@@ -529,7 +625,29 @@ def main():
         print(f"  {circ}")
         make_reports(circ, runs, rankings, n_metrics, out_dir)
 
-    total = len(circuits) * 3
+    # Global frequency plots: best config per circuit (steps / time)
+    print("\nGenerating global parameter frequency plots...")
+    all_circ_runs = {c: [r for r in runs if r["circuit"] == c] for c in circuits}
+
+    best_by_steps = [
+        sorted(rows, key=lambda r: (r["routing_steps"], r["duration_seconds"]))[0]
+        for rows in all_circ_runs.values() if rows
+    ]
+    best_by_time = [
+        sorted(rows, key=lambda r: (r["duration_seconds"], r["routing_steps"]))[0]
+        for rows in all_circ_runs.values() if rows
+    ]
+
+    save_param_frequency_figure(
+        best_by_steps, "routing steps",
+        out_dir / "param_frequency_steps.png",
+    )
+    save_param_frequency_figure(
+        best_by_time, "execution time",
+        out_dir / "param_frequency_time.png",
+    )
+
+    total = len(circuits) * 3 + 2
     print(f"\nDone — {total} files written to {args.out}/")
 
 

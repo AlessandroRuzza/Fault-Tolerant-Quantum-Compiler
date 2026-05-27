@@ -82,7 +82,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::string t_routing_mode, int patience_threshold,
     bool use_layer_cache,
     bool metrics_only, int repetition_count,
-    bool t_states_proportional) {
+    bool t_states_proportional,
+    bool use_layer_cache_explicit = false,
+    bool t_states_proportional_explicit = false) {
 
     double circ_time_seconds = 0.0;
     double graph_time_seconds = 0.0;
@@ -144,6 +146,21 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     }
 
     std::cout << "Setting up circuit with " << qubitsNumber << " qubits." << std::endl;
+
+    // Defaults applied unless the config/CLI explicitly forced a value.
+    // T_states_proportional defaults to true: magic states scale with the
+    // circuit's peak per-layer T demand.
+    if (!t_states_proportional_explicit) {
+        t_states_proportional = true;
+    }
+
+    // The layer routing cache only pays off when layers repeat heavily;
+    // otherwise lookup overhead dominates. Auto-select from the reuse ratio.
+    if (!use_layer_cache_explicit) {
+        use_layer_cache = metrics.layer_reuse_ratio > 0.94;
+        std::cout << "Layer cache auto-set to " << (use_layer_cache ? "true" : "false")
+                  << " (layer_reuse_ratio = " << metrics.layer_reuse_ratio << ")\n";
+    }
 
     if (t_states_proportional) {
         number_of_magic_states = metrics.max_t_in_layer;
