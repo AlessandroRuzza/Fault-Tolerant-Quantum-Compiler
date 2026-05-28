@@ -1,0 +1,46 @@
+# Version control
+.git/
+.gitmodules
+
+# Build artifacts — rebuilt from source inside Docker
+build/
+
+# Python virtualenv
+.env/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE and local tooling
+.vscode/
+.claude/
+.codex
+
+# Large generated outputs (mounted at runtime instead)
+benchmarks/logs/
+benchmarks/results/
+qasm_graphs/
+
+# Visualization frames
+visualization/gaussian_frames/*.png
+visualization/gaussian_frames/*.dat
+visualization/gaussian_frames/*.gp
+
+# Pre-expanded / temporary benchmark configs
+config/__bench_*.json
+config/*_expanded.json
+data/config/executed/
+
+# QASMBench checkout
+QASMBench-master/
+
+# Misc
+*.png
+*.svg
+*.ans
+*.mp4
+*.gif
+merged_distinct*
+tmp/
+callgrind*.out
