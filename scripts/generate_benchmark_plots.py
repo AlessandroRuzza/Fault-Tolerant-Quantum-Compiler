@@ -97,6 +97,16 @@ PER_CIRCUIT_BARPLOT_DIR = "barplots_by_circuit"
 HEATMAP_DIR = "heatmap"
 TIME_ANALYSIS_DIR = "time_analysis"
 GAUSSIAN_RELATIVE_GAP_PLOT = "heatmap_best_gaussian_relative_weight_gaps.png"
+GAUSSIAN_DIR = "gaussian_relative_weight_gaps"
+# Config dimensions the --gaussian breakdown slices the relative-weight-gap
+# heatmap over. (row field on the prepared rows, human label, folder/file slug).
+GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS = (
+    ("gaussian_strategy_norm", "gaussian strategy", "gaussian_strategy"),
+    ("safe_passage_norm", "safe passage", "safe_passage"),
+    ("magic_states_label", "n magic states", "n_magic_states"),
+    ("gaussian_confidence_label", "gaussian confidence", "gaussian_confidence"),
+    ("placement", "magic state placement", "placement"),
+)
 HEATMAP_PAIR_GROUPS = (
     ("type", ("safe_passage", "placement_border", "n_magic_states")),
     ("gaussian_strategy", ("safe_passage", "placement_border", "n_magic_states")),
@@ -2264,13 +2274,17 @@ def write_gaussian_relative_weight_gap_table(entries, output_dir, filename):
     return entries, csv_path
 
 
-def plot_gaussian_relative_weight_gap_heatmap(entries, output_dir, generated, skipped=None):
-    filename = GAUSSIAN_RELATIVE_GAP_PLOT
+def plot_gaussian_relative_weight_gap_heatmap(
+    entries, output_dir, generated, skipped=None, filename=None, slice_label=None
+):
+    if filename is None:
+        filename = GAUSSIAN_RELATIVE_GAP_PLOT
     if not entries:
         record_skipped_plot(
             skipped,
             filename,
-            "no best gaussian weight profile rows available",
+            f"no best gaussian weight profile rows available"
+            + (f" for {slice_label}" if slice_label else ""),
         )
         return
 
@@ -2291,13 +2305,6 @@ def plot_gaussian_relative_weight_gap_heatmap(entries, output_dir, generated, sk
         ],
         dtype=float,
     )
-    absolute = np.array(
-        [
-            [by_pair[(row_label, col_label)]["mean_abs_gap"] for col_label in labels]
-            for row_label in labels
-        ],
-        dtype=float,
-    )
     total_profiles = max(
         [
             by_pair[(label, label)]["equal_count"]
@@ -2306,10 +2313,14 @@ def plot_gaussian_relative_weight_gap_heatmap(entries, output_dir, generated, sk
         default=0,
     )
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6.8), constrained_layout=False)
-    fig.subplots_adjust(left=0.13, right=0.94, top=0.76, bottom=0.17, wspace=0.34)
+    fig, ax = plt.subplots(figsize=(7.5, 6.8), constrained_layout=False)
+    fig.subplots_adjust(left=0.16, right=0.9, top=0.76, bottom=0.17)
+    title = "Relative Distances Between Weights in Best Gaussian Configurations"
+    if slice_label:
+        title += f"\n{slice_label}"
+    title += f" (n={total_profiles})"
     fig.suptitle(
-        f"Relative Distances Between Weights in Best Gaussian Configurations (n={total_profiles})",
+        title,
         fontsize=15,
         y=0.96,
     )
@@ -2324,59 +2335,89 @@ def plot_gaussian_relative_weight_gap_heatmap(entries, output_dir, generated, sk
     )
 
     max_signed = float(np.max(np.abs(signed))) if signed.size else 1.0
-    max_abs_gap = float(np.max(absolute)) if absolute.size else 1.0
     signed_norm = TwoSlopeNorm(vmin=-max_signed, vcenter=0, vmax=max_signed)
-    images = [
-        axes[0].imshow(signed, cmap="RdBu_r", norm=signed_norm),
-        axes[1].imshow(absolute, cmap="YlGnBu", vmin=0, vmax=max_abs_gap),
-    ]
-    titles = ["Mean Signed Gap", "Mean Absolute Distance"]
-    colorbar_labels = ["row - column", "|row - column|"]
+    image = ax.imshow(signed, cmap="RdBu_r", norm=signed_norm)
 
-    for ax_idx, ax in enumerate(axes):
-        matrix = signed if ax_idx == 0 else absolute
-        ax.set_title(titles[ax_idx], fontsize=12, pad=12)
-        ax.set_xticks(range(len(labels)))
-        ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=8.5)
-        ax.set_yticks(range(len(labels)))
-        ax.set_yticklabels(labels, fontsize=8.5)
-        ax.set_xticks(np.arange(-0.5, len(labels), 1), minor=True)
-        ax.set_yticks(np.arange(-0.5, len(labels), 1), minor=True)
-        ax.grid(which="minor", color="white", linewidth=1.25)
-        ax.tick_params(axis="both", length=0)
-        ax.tick_params(which="minor", bottom=False, left=False)
+    ax.set_title("Mean Signed Gap", fontsize=12, pad=12)
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=8.5)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels, fontsize=8.5)
+    ax.set_xticks(np.arange(-0.5, len(labels), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(labels), 1), minor=True)
+    ax.grid(which="minor", color="white", linewidth=1.25)
+    ax.tick_params(axis="both", length=0)
+    ax.tick_params(which="minor", bottom=False, left=False)
 
-        max_value = float(np.max(np.abs(matrix))) if matrix.size else 0.0
-        for row_idx in range(matrix.shape[0]):
-            for col_idx in range(matrix.shape[1]):
-                value = matrix[row_idx, col_idx]
-                if row_idx == col_idx:
-                    text = "-"
-                    color = "#64748B"
-                else:
-                    text = f"{value:+.2f}" if ax_idx == 0 else f"{value:.2f}".rstrip("0").rstrip(".")
-                    color = "white" if max_value and abs(value) / max_value > 0.55 else "#0F172A"
-                ax.text(
-                    col_idx,
-                    row_idx,
-                    text,
-                    ha="center",
-                    va="center",
-                    fontsize=9,
-                    fontweight="bold" if row_idx != col_idx else "normal",
-                    color=color,
-                )
+    max_value = float(np.max(np.abs(signed))) if signed.size else 0.0
+    for row_idx in range(signed.shape[0]):
+        for col_idx in range(signed.shape[1]):
+            value = signed[row_idx, col_idx]
+            if row_idx == col_idx:
+                text = "-"
+                color = "#64748B"
+            else:
+                text = f"{value:+.2f}"
+                color = "white" if max_value and abs(value) / max_value > 0.55 else "#0F172A"
+            ax.text(
+                col_idx,
+                row_idx,
+                text,
+                ha="center",
+                va="center",
+                fontsize=9,
+                fontweight="bold" if row_idx != col_idx else "normal",
+                color=color,
+            )
 
-        cbar = fig.colorbar(images[ax_idx], ax=ax, fraction=0.046, pad=0.035)
-        cbar.ax.tick_params(labelsize=8)
-        cbar.set_label(colorbar_labels[ax_idx], fontsize=9)
+    cbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.035)
+    cbar.ax.tick_params(labelsize=8)
+    cbar.set_label("row - column", fontsize=9)
 
-    os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, filename)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     fig.savefig(path, dpi=160, bbox_inches="tight", pad_inches=0.25)
     fig.clf()
     plt.close(fig)
     generated.append(path)
+
+
+def gaussian_gap_value_slug(value):
+    text = re.sub(r"[^a-z0-9]+", "_", normalize_text(str(value)).lower()).strip("_")
+    return text or "unknown"
+
+
+def plot_gaussian_relative_weight_gap_breakdown(rows, output_dir, generated, skipped=None):
+    target_dir = os.path.join(output_dir, GAUSSIAN_DIR)
+    clear_plot_tree(target_dir, "gaussian relative weight gap")
+    for field, display_name, dim_slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS:
+        values = sorted(
+            {
+                row.get(field)
+                for row in rows
+                if row.get("mapping_type_norm") == "gaussian"
+                and row.get(field) not in (None, "")
+            },
+            key=str,
+        )
+        for value in values:
+            slice_rows = [r for r in rows if r.get(field) == value]
+            top_entries, _ = top_gaussian_weight_config_entries(slice_rows, top_n=3)
+            best_entries = best_gaussian_weight_profile_entries(top_entries)
+            gap_entries = gaussian_relative_weight_gap_entries(best_entries)
+            value_slug = gaussian_gap_value_slug(value)
+            filename = os.path.join(
+                dim_slug,
+                f"heatmap_best_gaussian_relative_weight_gaps_{dim_slug}_{value_slug}.png",
+            )
+            plot_gaussian_relative_weight_gap_heatmap(
+                gap_entries,
+                target_dir,
+                generated,
+                skipped,
+                filename=filename,
+                slice_label=f"{display_name} = {value}",
+            )
 
 
 def plot_top_gaussian_weight_config_table(grouped_ranked_entries, output_dir, generated, skipped=None):
@@ -5855,6 +5896,15 @@ def main():
         action="store_true",
         help="Also generate the per-circuit barplots under barplots_by_circuit/.",
     )
+    parser.add_argument(
+        "--gaussian",
+        action="store_true",
+        help=(
+            "Also generate per-configuration gaussian relative-weight-gap heatmaps "
+            f"under {GAUSSIAN_DIR}/ (one slice per gaussian strategy, safe passage, "
+            "n magic states, confidence, placement value)."
+        ),
+    )
     parser.add_argument("--worker-heatmap-batch", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--worker-heatmap-phase", default="source", choices=["source", "dashboard"], help=argparse.SUPPRESS)
     parser.add_argument("--worker-csv", default=None, help=argparse.SUPPRESS)
@@ -6094,6 +6144,8 @@ def main():
             align=args.align,
             axis_slugs=selected_heatmap_axes,
         )
+    if args.gaussian:
+        plot_gaussian_relative_weight_gap_breakdown(rows, output_dir, generated, skipped)
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,
         top_n=3,
