@@ -1,7 +1,0 @@
-guassian confidence is correlated only with gaussian size
-guassian size is correlated also with safe passage
-
-best confidence: 0.99
-best size: 0.7
-size : 1 bad for fine and cube, good for connectivity
-

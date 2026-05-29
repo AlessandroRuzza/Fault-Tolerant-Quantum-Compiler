@@ -784,13 +784,15 @@ int run_bench_mode(
                 {21, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
                 {22, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")},
                 {23, plan_field(entry, {"use_layer_cache", "use-layer-cache"}, "true")},
-                {44, plan_field(entry, {"T_states_proportional", "t_states_proportional"}, "false")}
+                {44, plan_field(entry, {"T_states_proportional", "t_states_proportional"}, "false")},
+                {46, plan_field(entry, {"EXTERNAL_WEIGHT", "external_weight"}, "0")}
             };
 
             for (const auto &[index, expected] : comparisons) {
                 std::string fallback;
                 if (index == 22)      fallback = "normal_t_routing";
                 else if (index == 44) fallback = "false";  // T_states_proportional
+                else if (index == 46) fallback = "0";      // external_weight
                 if (csv_field(row, index, fallback) != expected) {
                     return false;
                 }
@@ -1352,6 +1354,7 @@ int run_bench_mode(
             const std::string ml = get_json_field(entry, {"MAGIC_LOW", "magic_low"});
             const std::string ch = get_json_field(entry, {"CNOT_HIGH", "cnot_high"});
             const std::string cl = get_json_field(entry, {"CNOT_LOW", "cnot_low"});
+            const std::string ew = get_json_field(entry, {"EXTERNAL_WEIGHT", "external_weight"});
             const std::string mapping_type_csv = get_json_field(entry, {"mapping_type", "type"});
             const std::string safe_passage_strategy_csv = get_json_field(entry, {"safe_passage_strategy"});
 
@@ -1403,7 +1406,8 @@ int run_bench_mode(
                 get_json_field(entry, {"T_states_proportional", "t_states_proportional"}).empty()
                     ? "false"
                     : get_json_field(entry, {"T_states_proportional", "t_states_proportional"}),
-                resolved_n_magic
+                resolved_n_magic,
+                ew.empty() ? "0" : ew
             };
 
             std::ostringstream progress;

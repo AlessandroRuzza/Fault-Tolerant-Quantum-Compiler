@@ -1,4 +1,4 @@
-confidence:
+------------confidence-----------
 - overall: 0.99999
 - with cube: 0.999999
 - with connectivity and no subgraph: 0.9999
@@ -8,3 +8,21 @@ confidence-high-dim: are good 0.9999 and 0.999999
 
 
 kept: 0.9999, 0.99999, 0.999999
+
+--------gaussian-weights------------
+
+coarse_nocube:
+- trascurable difference between all diferences except number of magic states
+- [1.05-1.23], [0], [1.36-1.46], [0], [0.91, 1.12]
+
+coarse_cube:
+- big difference between magic states, and center circle vs right row
+- [0.89-1.15], [0], [1.04-1.42], [0], [0.63-0.78]
+
+
+fine_nocube:
+- difference between confidence trascurable (keep 0.cinque9 for next analysis), other differences big (keep both safe passage)
+- [1.35-1.43], [0.50-0.68], [1.38-1.47], [0.66-0.81], [1.04-1.32]
+
+
+

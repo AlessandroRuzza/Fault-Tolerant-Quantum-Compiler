@@ -18,6 +18,18 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "status,exit_code,duration_seconds,log_file,error_excerpt,"
     "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
     "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,t_states_proportional,resolved_n_magic,"
+    "external_weight";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV15 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
     "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,t_states_proportional,resolved_n_magic";
 
 inline constexpr const char *kBenchmarkRunsCsvHeaderV14 =
@@ -385,7 +397,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV14 ||
+        (first_line == kBenchmarkRunsCsvHeaderV15 ||
+         first_line == kBenchmarkRunsCsvHeaderV14 ||
          first_line == kBenchmarkRunsCsvHeaderV13 ||
          first_line == kBenchmarkRunsCsvHeaderV12 ||
          first_line == kBenchmarkRunsCsvHeaderV11 ||
@@ -420,6 +433,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v15 = (first_line == kBenchmarkRunsCsvHeaderV15);
             const bool from_v14 = (first_line == kBenchmarkRunsCsvHeaderV14);
             const bool from_v13 = (first_line == kBenchmarkRunsCsvHeaderV13);
             const bool from_v12 = (first_line == kBenchmarkRunsCsvHeaderV12);
@@ -437,7 +451,10 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v14) {
+            if (from_v15) {
+                migrated = parsed;
+                migrated.resize(46);
+            } else if (from_v14) {
                 migrated = parsed;
             } else if (from_v13) {
                 // V13 is the first 46 columns; resolved_n_magic added at the end.
@@ -906,9 +923,17 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 migrated.insert(migrated.end(), 3, std::string{});
             }
 
-            // Remove size_moltiplier (was column 16) from all legacy rows.
-            if (migrated.size() > 16) {
+            // Remove size_moltiplier (was column 16) from legacy rows before V15.
+            if (!from_v15 && migrated.size() > 16) {
                 migrated.erase(migrated.begin() + 16);
+            }
+            if (migrated.size() < 46) {
+                migrated.resize(46);
+            }
+            // V15 -> current: append external_weight. Empty means unavailable
+            // in already-recorded runs; new executions write the configured value.
+            if (migrated.size() == 46) {
+                migrated.push_back("");
             }
 
             out << render_row(migrated) << '\n';
