@@ -1,0 +1,65 @@
+#!/bin/bash
+#PBS -q cpu
+#PBS -l walltime=24:00:00
+#PBS -N ftqc
+#PBS -j oe
+
+cd "$PBS_O_WORKDIR"
+
+mkdir -p benchmarks/results benchmarks/logs config universal_set_qasms qasm_graphs logs
+
+LOG_FILE="logs/ftqc_${PBS_JOBID}.log"
+
+echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
+
+{
+echo "JOBID=$PBS_JOBID"
+echo "HOSTNAME=$(hostname)"
+echo "WORKDIR=$(pwd)"
+echo "BENCH_PATH=$BENCH_PATH"
+echo "BENCH_JOBS=$BENCH_JOBS"
+echo "OMP_NUM_THREADS_BEFORE=$OMP_NUM_THREADS"
+date
+} >> "$LOG_FILE" 2>&1
+
+apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
+
+apptainer exec --bind "$PWD/benchmarks/results:/host_results" ftqc.sif bash -lc 'cp -an /app/benchmarks/results/. /host_results/' >> "$LOG_FILE" 2>&1
+
+RESOURCE_LOG="logs/resources_${PBS_JOBID}.log"
+
+(
+  while true; do
+    echo "------"
+    date
+    qstat -f "$PBS_JOBID" | egrep "job_state|resources_used.cpupercent|resources_used.cput|resources_used.mem|resources_used.vmem|resources_used.walltime|exec_host"
+    echo "Processes:"
+    ps -u "$USER" -o pid,ppid,comm,pcpu,nlwp,etime,args --sort=-pcpu | grep -E "FaultTolerantQuantumCompiler|apptainer|timeout|sh -c" | head -100
+    echo "Worker count:"
+    pgrep -u "$USER" -fc "FaultTolerantQuantumCompiler --config" || true
+    sleep 20
+  done
+) >> "$RESOURCE_LOG" 2>&1 &
+
+MONITOR_PID=$!
+
+
+apptainer run \
+  --env BENCH_PATH="$BENCH_PATH" \
+  --env BENCH_JOBS="$BENCH_JOBS" \
+  --env OMP_DISPLAY_ENV=TRUE \
+  --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
+  --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
+  --bind "$PWD/config:/app/config" \
+  --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
+  --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
+  ftqc.sif >> "$LOG_FILE" 2>&1
+
+{
+echo "END_JOB=$PBS_JOBID"
+date
+} >> "$LOG_FILE" 2>&1
+
+
+
+kill "$MONITOR_PID" 2>/dev/null

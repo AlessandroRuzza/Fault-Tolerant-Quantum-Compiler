@@ -86,3 +86,7 @@ src/defines.cpp
 src/defines.h
 
 docker-wheels/
+
+# Large QASM circuits (exceed GitHub 100MB limit)
+qasms/1000.qasm
+qasms/random_QAOA_angles_k3_N100_p1000.qasm
