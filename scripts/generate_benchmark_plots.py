@@ -5,10 +5,12 @@ import ctypes
 import csv
 import gc
 import glob
+import hashlib
 import json
 import math
 import os
 import re
+import sqlite3
 import statistics
 import subprocess
 import sys
@@ -626,7 +628,13 @@ DISTINCT_NUMERIC_FIELDS = {
 def normalize_text(value):
     if value is None:
         return ""
-    return str(value).strip().lower()
+    return sys.intern(str(value).strip().lower())
+
+
+def intern_csv_text(value):
+    if value is None:
+        return ""
+    return sys.intern(str(value).strip())
 
 
 def normalize_csv_text(value):
@@ -920,14 +928,14 @@ def default_output_dir_for_single_csv(csv_path, distinct):
     )
 
 
-def default_output_dir_for_glob(distinct):
+def default_output_dir_for_glob(distinct, input_dir=DEFAULT_RESULTS_DIR):
     if distinct:
-        return os.path.join(DEFAULT_RESULTS_DIR, "merge_plots")
-    return os.path.join(DEFAULT_RESULTS_DIR, "plots")
+        return os.path.join(input_dir, "merge_plots")
+    return os.path.join(input_dir, "plots")
 
 
-def filter_distinct_input_files(files):
-    results_dir = os.path.abspath(DEFAULT_RESULTS_DIR)
+def filter_distinct_input_files(files, input_dir=DEFAULT_RESULTS_DIR):
+    results_dir = os.path.abspath(input_dir)
     filtered = []
     seen = set()
     for path in files:
@@ -941,11 +949,11 @@ def filter_distinct_input_files(files):
     return filtered
 
 
-def load_raw_rows_from_files(files):
-    rows = []
+def csv_file_metadata(files):
     fieldnames = []
     seen_fieldnames = set()
     accepted_files = []
+    metadata = []
 
     for path in files:
         with open(path, newline="", encoding="utf-8") as f:
@@ -969,6 +977,7 @@ def load_raw_rows_from_files(files):
                 continue
 
             accepted_files.append(path)
+            metadata.append((path, normalized_fieldnames, normalized_to_original))
             for fieldname in normalized_fieldnames:
                 if fieldname in seen_fieldnames:
                     continue
@@ -981,6 +990,15 @@ def load_raw_rows_from_files(files):
                 fieldnames.append(fieldname)
                 seen_fieldnames.add(fieldname)
 
+    return fieldnames, accepted_files, metadata
+
+
+def iter_raw_rows_from_metadata(metadata):
+    merge_order = 0
+    for path, normalized_fieldnames, normalized_to_original in metadata:
+        source_csv_name = os.path.basename(path)
+        with open(path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
             for row_index, raw in enumerate(reader):
                 row = {
                     fieldname: raw.get(normalized_to_original[fieldname], "")
@@ -989,10 +1007,16 @@ def load_raw_rows_from_files(files):
                 if "run_id" not in row and "id" in row:
                     row["run_id"] = row.get("id", "")
                 row["source_csv"] = path
-                row["source_csv_name"] = os.path.basename(path)
-                row["_merge_order"] = len(rows)
+                row["source_csv_name"] = source_csv_name
+                row["_merge_order"] = merge_order
                 row["_source_row_index"] = row_index
-                rows.append(row)
+                merge_order += 1
+                yield row
+
+
+def load_raw_rows_from_files(files):
+    fieldnames, accepted_files, metadata = csv_file_metadata(files)
+    rows = list(iter_raw_rows_from_metadata(metadata))
 
     return rows, fieldnames, accepted_files
 
@@ -1034,6 +1058,15 @@ def distinct_identity_key(row, identity_fields):
     )
 
 
+def distinct_identity_digest(row, identity_fields):
+    payload = json.dumps(
+        distinct_identity_key(row, identity_fields),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def distinct_result_signature(row):
     return (
         normalize_distinct_value("status", row.get("status")),
@@ -1052,6 +1085,77 @@ def write_csv_rows(path, fieldnames, rows):
         writer.writeheader()
         for row in rows:
             writer.writerow({fieldname: row.get(fieldname, "") for fieldname in fieldnames})
+
+
+COMPACT_ROW_FIELDS = (
+    "run_id",
+    "circuit",
+    "circuit_name",
+    "circuit_graph_label",
+    "status",
+    "success",
+    "mapping_type_norm",
+    "safe_passage_norm",
+    "magic_aware_strategy_norm",
+    "gaussian_strategy_norm",
+    "routing_strategy_norm",
+    "t_routing_mode_norm",
+    "use_layer_cache_norm",
+    "placement",
+    "placement_variant",
+    "placement_detail",
+    "x_i",
+    "y_i",
+    "total_nodes_i",
+    "grid_label",
+    "magic_states_f",
+    "magic_states_label",
+    "border_pct_f",
+    "magic_high_f",
+    "magic_low_f",
+    "cnot_high_f",
+    "cnot_low_f",
+    "mapped_gaussian_weight_f",
+    "base_gaussian_weight_f",
+    "external_weight_f",
+    "gaussian_confidence_f",
+    "gaussian_confidence_label",
+    "duration_s_f",
+    "routing_steps_f",
+    "non_routed_layer_pct_f",
+    "interaction_pressure_f",
+    "data_density_f",
+    "overall_density_f",
+    "exit_code_i",
+    "gaussian_weight_combo_label",
+)
+COMPACT_ROW_INDEX = {field: idx for idx, field in enumerate(COMPACT_ROW_FIELDS)}
+
+
+class CompactRow:
+    __slots__ = ("values",)
+
+    def __init__(self, values):
+        self.values = values
+
+    def get(self, key, default=None):
+        idx = COMPACT_ROW_INDEX.get(key)
+        if idx is None:
+            return default
+        return self.values[idx]
+
+    def __getitem__(self, key):
+        idx = COMPACT_ROW_INDEX.get(key)
+        if idx is None:
+            raise KeyError(key)
+        return self.values[idx]
+
+
+def compact_prepared_rows(rows):
+    return [
+        CompactRow(tuple(row.get(field) for field in COMPACT_ROW_FIELDS))
+        for row in rows
+    ]
 
 
 def merge_rows_distinct(raw_rows, fieldnames, output_dir, merged_file_count):
@@ -1115,6 +1219,198 @@ def merge_rows_distinct(raw_rows, fieldnames, output_dir, merged_file_count):
     }
 
 
+def load_rows_distinct_from_files(files, output_dir):
+    fieldnames, accepted_files, metadata = csv_file_metadata(files)
+    identity_fields = distinct_identity_fieldnames(fieldnames)
+    os.makedirs(output_dir, exist_ok=True)
+
+    fd, db_path = tempfile.mkstemp(
+        prefix=".distinct_merge_",
+        suffix=".sqlite",
+        dir=output_dir,
+    )
+    os.close(fd)
+
+    input_rows = 0
+    exact_duplicates_removed = 0
+    merged_rows = []
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA journal_mode = OFF")
+        conn.execute("PRAGMA synchronous = OFF")
+        conn.execute("PRAGMA temp_store = FILE")
+        conn.execute("PRAGMA cache_size = -65536")
+        conn.execute(
+            """
+            CREATE TABLE rows (
+                identity_hash TEXT NOT NULL,
+                result_signature TEXT NOT NULL,
+                merge_order INTEGER NOT NULL,
+                row_json TEXT NOT NULL,
+                PRIMARY KEY (identity_hash, result_signature)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE sig_counts (
+                identity_hash TEXT NOT NULL,
+                result_signature TEXT NOT NULL,
+                count INTEGER NOT NULL,
+                PRIMARY KEY (identity_hash, result_signature)
+            )
+            """
+        )
+        insert_count_sql = (
+            "INSERT INTO sig_counts(identity_hash, result_signature, count) VALUES (?, ?, 1) "
+            "ON CONFLICT(identity_hash, result_signature) DO UPDATE SET count = count + 1"
+        )
+        insert_row_sql = (
+            "INSERT OR IGNORE INTO rows(identity_hash, result_signature, merge_order, row_json) "
+            "VALUES (?, ?, ?, ?)"
+        )
+
+        with conn:
+            for row in iter_raw_rows_from_metadata(metadata):
+                input_rows += 1
+                identity_hash = distinct_identity_digest(row, identity_fields)
+                result_signature = json.dumps(
+                    distinct_result_signature(row),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                conn.execute(insert_count_sql, (identity_hash, result_signature))
+                cur = conn.execute(
+                    insert_row_sql,
+                    (
+                        identity_hash,
+                        result_signature,
+                        row.get("_merge_order", input_rows - 1),
+                        json.dumps(row, ensure_ascii=False, separators=(",", ":")),
+                    ),
+                )
+                if cur.rowcount == 0:
+                    exact_duplicates_removed += 1
+                if input_rows % 50000 == 0:
+                    conn.commit()
+                    _trim_heap()
+
+        def scalar(sql):
+            return conn.execute(sql).fetchone()[0]
+
+        repeated_configuration_groups = scalar(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT identity_hash
+                FROM sig_counts
+                GROUP BY identity_hash
+                HAVING SUM(count) > 1
+            )
+            """
+        )
+        same_result_duplicate_groups = scalar(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT identity_hash
+                FROM sig_counts
+                WHERE count > 1
+                GROUP BY identity_hash
+            )
+            """
+        )
+        different_result_duplicate_groups = scalar(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT identity_hash
+                FROM sig_counts
+                GROUP BY identity_hash
+                HAVING COUNT(*) > 1
+            )
+            """
+        )
+        conflicting_groups = scalar(
+            """
+            SELECT COUNT(*) FROM (
+                SELECT identity_hash
+                FROM rows
+                GROUP BY identity_hash
+                HAVING COUNT(*) > 1
+            )
+            """
+        )
+        conflicting_row_count = scalar(
+            """
+            SELECT COUNT(*)
+            FROM rows
+            WHERE identity_hash IN (
+                SELECT identity_hash
+                FROM rows
+                GROUP BY identity_hash
+                HAVING COUNT(*) > 1
+            )
+            """
+        )
+        merged_row_count = scalar("SELECT COUNT(*) FROM rows")
+
+        def iter_json_rows(sql):
+            for (row_json,) in conn.execute(sql):
+                yield json.loads(row_json)
+
+        output_fieldnames = csv_output_fieldnames(fieldnames)
+        merged_csv_path = os.path.join(output_dir, f"merged_distinct_{len(accepted_files)}.csv")
+        duplicates_csv_path = os.path.join(output_dir, "merging_duplicates.csv")
+        write_csv_rows(
+            merged_csv_path,
+            output_fieldnames,
+            iter_json_rows("SELECT row_json FROM rows ORDER BY merge_order"),
+        )
+        write_csv_rows(
+            duplicates_csv_path,
+            output_fieldnames,
+            iter_json_rows(
+                """
+                SELECT row_json
+                FROM rows
+                WHERE identity_hash IN (
+                    SELECT identity_hash
+                    FROM rows
+                    GROUP BY identity_hash
+                    HAVING COUNT(*) > 1
+                )
+                ORDER BY merge_order
+                """
+            ),
+        )
+
+        merged_rows = [
+            prepare_row_for_analysis(json.loads(row_json))
+            for (row_json,) in conn.execute("SELECT row_json FROM rows ORDER BY merge_order")
+        ]
+        _trim_heap()
+
+        return merged_rows, fieldnames, accepted_files, {
+            "merged_csv_path": merged_csv_path,
+            "duplicates_csv_path": duplicates_csv_path,
+            "identity_fields": identity_fields,
+            "input_rows": input_rows,
+            "merged_rows": merged_row_count,
+            "repeated_configuration_groups": repeated_configuration_groups,
+            "same_result_duplicate_groups": same_result_duplicate_groups,
+            "different_result_duplicate_groups": different_result_duplicate_groups,
+            "duplicate_rows_removed": exact_duplicates_removed,
+            "conflicting_groups": conflicting_groups,
+            "conflicting_rows": conflicting_row_count,
+        }
+    finally:
+        if conn is not None:
+            conn.close()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
 # Raw CSV columns we can drop after prepare_rows_for_analysis because:
 #  - they are never read by any plot/aggregation (mid_*, lower_*, log_file, ...)
 #  - OR they only feed a derived field on the row (e.g. duration_seconds → duration_s_f)
@@ -1126,7 +1422,13 @@ _DROP_RAW_FIELDS_AFTER_PREP = (
     "mid_non_routed_layer_pct", "lower_non_routed_layer_pct",
     "t_states_proportional", "resolved_n_magic",
     "log_file", "error_excerpt", "run_date", "run_datetime",
+    "source_csv", "source_csv_name",
+    "_merge_order", "_source_row_index",
     "timeout_reached",
+    # normalized into *_norm / placement
+    "mapping_type", "safe_passage_strategy", "magic_aware_strategy",
+    "gaussian_strategy", "magic_state_placement_strategy",
+    "routing_strategy", "t_routing_mode", "use_layer_cache",
     # only used to derive _f / _i fields in prepare_rows_for_analysis
     "duration_seconds", "elapsed_ms",
     "number_of_magic_states",
@@ -1142,69 +1444,76 @@ _DROP_RAW_FIELDS_AFTER_PREP = (
 )
 
 
-def prepare_rows_for_analysis(raw_rows):
-    # Mutate raw_rows in place to avoid temporarily doubling the dict count
-    # (and the working set) on huge CSVs.
-    for row in raw_rows:
-        row["circuit_name"] = os.path.basename(row.get("circuit", ""))
-        row["placement"] = normalize_placement(
-            pick_first(row, "magic_state_placement_strategy", "placement")
+def prepare_row_for_analysis(row):
+    row["circuit"] = intern_csv_text(row.get("circuit"))
+    row["circuit_name"] = sys.intern(os.path.basename(row.get("circuit", "")))
+    if row.get("circuit_graph_label"):
+        row["circuit_graph_label"] = intern_csv_text(row.get("circuit_graph_label"))
+    else:
+        row["circuit_graph_label"] = ""
+    row["status"] = normalize_text(row.get("status"))
+    row["placement"] = normalize_placement(
+        pick_first(row, "magic_state_placement_strategy", "placement")
+    )
+    row["mapping_type_norm"] = normalize_text(row.get("mapping_type"))
+    row["safe_passage_norm"] = normalize_text(row.get("safe_passage_strategy"))
+    row["magic_aware_strategy_norm"] = normalize_text(row.get("magic_aware_strategy"))
+    row["gaussian_strategy_norm"] = normalize_text(row.get("gaussian_strategy"))
+    row["routing_strategy_norm"] = normalize_text(row.get("routing_strategy"))
+    row["t_routing_mode_norm"] = normalize_text(row.get("t_routing_mode"))
+    row["use_layer_cache_norm"] = normalize_text(row.get("use_layer_cache"))
+    row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
+    row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
+    row["total_nodes_i"] = to_int(row.get("total_nodes"))
+    row["magic_states_f"] = to_float(row.get("number_of_magic_states"))
+    if row["magic_states_f"] is not None:
+        row["magic_states_label"] = sys.intern(format_number_label(row["magic_states_f"]))
+    else:
+        row["magic_states_label"] = ""
+    row["border_pct_f"] = to_float(row.get("border_distance_percentage"))
+    row["magic_high_f"] = to_float(row.get("magic_high"))
+    row["magic_low_f"] = to_float(row.get("magic_low"))
+    row["cnot_high_f"] = to_float(row.get("cnot_high"))
+    row["cnot_low_f"] = to_float(row.get("cnot_low"))
+    row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
+    row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
+    row["external_weight_f"] = to_float(row.get("external_weight"))
+    row["gaussian_confidence_f"] = to_float(row.get("gaussian_confidence"))
+    if row["gaussian_confidence_f"] is not None:
+        row["gaussian_confidence_label"] = sys.intern(
+            format_gaussian_confidence_label(row["gaussian_confidence_f"])
         )
-        row["mapping_type_norm"] = normalize_text(row.get("mapping_type"))
-        row["safe_passage_norm"] = normalize_text(row.get("safe_passage_strategy"))
-        row["magic_aware_strategy_norm"] = normalize_text(row.get("magic_aware_strategy"))
-        row["gaussian_strategy_norm"] = normalize_text(row.get("gaussian_strategy"))
-        row["routing_strategy_norm"] = normalize_text(row.get("routing_strategy"))
-        row["t_routing_mode_norm"] = normalize_text(row.get("t_routing_mode"))
-        row["use_layer_cache_norm"] = normalize_text(row.get("use_layer_cache"))
-        row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
-        row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
-        row["total_nodes_i"] = to_int(row.get("total_nodes"))
-        row["magic_states_f"] = to_float(row.get("number_of_magic_states"))
-        if row["magic_states_f"] is not None:
-            row["magic_states_label"] = format_number_label(row["magic_states_f"])
-        else:
-            row["magic_states_label"] = ""
-        row["border_pct_f"] = to_float(row.get("border_distance_percentage"))
-        row["magic_high_f"] = to_float(row.get("magic_high"))
-        row["magic_low_f"] = to_float(row.get("magic_low"))
-        row["cnot_high_f"] = to_float(row.get("cnot_high"))
-        row["cnot_low_f"] = to_float(row.get("cnot_low"))
-        row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
-        row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
-        row["external_weight_f"] = to_float(row.get("external_weight"))
-        row["gaussian_confidence_f"] = to_float(row.get("gaussian_confidence"))
-        if row["gaussian_confidence_f"] is not None:
-            row["gaussian_confidence_label"] = format_gaussian_confidence_label(row["gaussian_confidence_f"])
-        else:
-            row["gaussian_confidence_label"] = ""
-        duration_seconds = to_float(row.get("duration_seconds"))
-        elapsed_ms = to_float(row.get("elapsed_ms"))
-        if duration_seconds is not None:
-            row["duration_s_f"] = duration_seconds
-        elif elapsed_ms is not None:
-            row["duration_s_f"] = elapsed_ms / 1000.0
-        else:
-            row["duration_s_f"] = None
-        row["routing_steps_f"] = to_float(pick_first(row, "routing_steps", "total_routing_steps"))
-        row["non_routed_layer_pct_f"] = to_float(row.get("non_routed_layer_pct"))
-        row["interaction_pressure_f"] = to_float(row.get("interaction_pressure"))
-        row["data_density_f"] = to_float(row.get("data_density"))
-        row["overall_density_f"] = to_float(row.get("overall_density"))
-        row["exit_code_i"] = to_int(row.get("exit_code"))
-        row["success"] = normalize_text(row.get("status")) in SUCCESS_STATUSES
+    else:
+        row["gaussian_confidence_label"] = ""
+    duration_seconds = to_float(row.get("duration_seconds"))
+    elapsed_ms = to_float(row.get("elapsed_ms"))
+    if duration_seconds is not None:
+        row["duration_s_f"] = duration_seconds
+    elif elapsed_ms is not None:
+        row["duration_s_f"] = elapsed_ms / 1000.0
+    else:
+        row["duration_s_f"] = None
+    row["routing_steps_f"] = to_float(pick_first(row, "routing_steps", "total_routing_steps"))
+    row["non_routed_layer_pct_f"] = to_float(row.get("non_routed_layer_pct"))
+    row["interaction_pressure_f"] = to_float(row.get("interaction_pressure"))
+    row["data_density_f"] = to_float(row.get("data_density"))
+    row["overall_density_f"] = to_float(row.get("overall_density"))
+    row["exit_code_i"] = to_int(row.get("exit_code"))
+    row["success"] = normalize_text(row.get("status")) in SUCCESS_STATUSES
 
-        if row["x_i"] is not None and row["y_i"] is not None:
-            row["grid_label"] = f"{row['x_i']}x{row['y_i']}"
-        else:
-            row["grid_label"] = "unknown"
-        row["placement_variant"] = classify_placement_variant(row)
-        row["placement_detail"] = placement_detail_label(row)
-        row["gaussian_weight_combo_label"] = gaussian_weight_combo_label(row)
-        for _drop_key in _DROP_RAW_FIELDS_AFTER_PREP:
-            row.pop(_drop_key, None)
+    if row["x_i"] is not None and row["y_i"] is not None:
+        row["grid_label"] = sys.intern(f"{row['x_i']}x{row['y_i']}")
+    else:
+        row["grid_label"] = "unknown"
+    row["placement_variant"] = classify_placement_variant(row)
+    row["placement_detail"] = sys.intern(placement_detail_label(row))
+    gaussian_label = gaussian_weight_combo_label(row)
+    row["gaussian_weight_combo_label"] = sys.intern(gaussian_label) if gaussian_label else None
+    return CompactRow(tuple(row.get(field) for field in COMPACT_ROW_FIELDS))
 
-    return raw_rows
+
+def prepare_rows_for_analysis(raw_rows):
+    return [prepare_row_for_analysis(row) for row in raw_rows]
 
 
 def load_rows_from_files(files):
@@ -2536,12 +2845,7 @@ def _gaussian_best_profile_by_metric(rows, metric_field):
     return best_entries
 
 
-def _gaussian_weight_profile_means_normalized(rows_subset, metric_field="routing_steps_f"):
-    """For a row subset: compute the per-best-config means of the weights,
-    then normalize so gauss_base == 1.0. Best config is the one minimizing
-    metric_field per (circuit, x, y). Returns (sample_count, dict[field] -> float)
-    or (0, None) if no usable best entries exist."""
-    best_entries = _gaussian_best_profile_by_metric(rows_subset, metric_field)
+def _gaussian_weight_profile_means_from_best_entries(best_entries):
     if not best_entries:
         return 0, None
     means = {}
@@ -2558,36 +2862,168 @@ def _gaussian_weight_profile_means_normalized(rows_subset, metric_field="routing
     return len(best_entries), normalized
 
 
+def _gaussian_weight_profile_means_normalized(rows_subset, metric_field="routing_steps_f"):
+    """For a row subset: compute the per-best-config means of the weights,
+    then normalize so gauss_base == 1.0. Best config is the one minimizing
+    metric_field per (circuit, x, y). Returns (sample_count, dict[field] -> float)
+    or (0, None) if no usable best entries exist."""
+    best_entries = _gaussian_best_profile_by_metric(rows_subset, metric_field)
+    return _gaussian_weight_profile_means_from_best_entries(best_entries)
+
+
+def _gaussian_weight_entry_from_combo(combo):
+    magic_high, magic_low, cnot_high, cnot_low, mapped_weight, base_weight, external_weight = combo
+    return {
+        "magic_high": magic_high,
+        "magic_low": magic_low,
+        "cnot_high": cnot_high,
+        "cnot_low": cnot_low,
+        "mapped_gaussian_weight": mapped_weight,
+        "base_gaussian_weight": base_weight,
+        "external_weight": external_weight,
+    }
+
+
+def _summary_border_key(row):
+    border = row.get("border_pct_f")
+    if border is None or math.isnan(border):
+        return None
+    return ("border", float(border))
+
+
+def _update_gaussian_summary_stats(section_configs, section_key, x_key, combo, metric_value, duration):
+    combo_stats = section_configs[section_key][x_key]
+    stats = combo_stats.get(combo)
+    if stats is None:
+        combo_stats[combo] = [1, metric_value, metric_value, duration]
+        return
+    stats[0] += 1
+    stats[1] += metric_value
+    if metric_value < stats[2]:
+        stats[2] = metric_value
+        stats[3] = duration
+    elif metric_value == stats[2] and duration is not None:
+        if stats[3] is None or duration < stats[3]:
+            stats[3] = duration
+
+
+def _gaussian_summary_result_from_configs(configs_by_x_key):
+    best_entries = []
+    for x_key in sorted(configs_by_x_key.keys(), key=lambda item: (item[0], item[1], item[2])):
+        config_metrics = []
+        for combo, stats in configs_by_x_key[x_key].items():
+            count, metric_sum, best_metric, best_duration = stats
+            config_metrics.append((
+                combo,
+                best_metric,
+                metric_sum / count,
+                best_duration,
+            ))
+        if not config_metrics:
+            continue
+        config_metrics.sort(key=lambda item: (
+            item[1],
+            item[2],
+            item[3] if item[3] is not None else math.inf,
+            gaussian_weight_sort_key(item[0]),
+        ))
+        best_entries.append(_gaussian_weight_entry_from_combo(config_metrics[0][0]))
+    return _gaussian_weight_profile_means_from_best_entries(best_entries)
+
+
+def _gaussian_summary_profiles_by_section(rows, metric_field):
+    section_configs = defaultdict(lambda: defaultdict(dict))
+    dimension_values = {field: set() for field, _display_name, _slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS}
+    border_values = set()
+
+    for row in rows:
+        if row.get("mapping_type_norm") != "gaussian":
+            continue
+
+        dimension_keys = []
+        for field, _display_name, _slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS:
+            value = row.get(field)
+            if value in (None, ""):
+                continue
+            dimension_values[field].add(value)
+            dimension_keys.append(("dimension", field, value))
+
+        border_key = _summary_border_key(row)
+        if border_key is not None:
+            border_values.add(border_key[1])
+
+        metric_value = row.get(metric_field)
+        if not row.get("success") or metric_value is None:
+            continue
+
+        x_key = requested_x_key(row)
+        combo = gaussian_weight_tuple(row)
+        if x_key is None or combo is None:
+            continue
+
+        section_keys = [("overall",)]
+        section_keys.extend(dimension_keys)
+        if border_key is not None:
+            section_keys.append(border_key)
+
+        duration = row.get("duration_s_f")
+        for section_key in section_keys:
+            _update_gaussian_summary_stats(
+                section_configs,
+                section_key,
+                x_key,
+                combo,
+                metric_value,
+                duration,
+            )
+
+    section_results = {
+        section_key: _gaussian_summary_result_from_configs(configs_by_x_key)
+        for section_key, configs_by_x_key in section_configs.items()
+    }
+    return section_results, dimension_values, border_values
+
+
 def _plot_gaussian_weight_summary_for_metric(
     rows, output_dir, generated, skipped, metric_field, filename, title_suffix
 ):
     """Render one summary heatmap; rows = OVERALL + per-dimension slices; cells
     are mean weight value with gauss_base normalized to 1, where 'best' for each
     (circuit, x, y) is chosen by minimizing metric_field."""
-    sections = []  # list of (group_label_or_None, row_label, sample_count, values_dict)
+    # list of (group_label_or_None, row_label, sample_count, values_dict)
+    sections = []
 
-    overall_count, overall_vals = _gaussian_weight_profile_means_normalized(rows, metric_field)
+    section_results, dimension_values, border_values = _gaussian_summary_profiles_by_section(
+        rows,
+        metric_field,
+    )
+
+    overall_count, overall_vals = section_results.get(("overall",), (0, None))
     if overall_vals is not None:
         sections.append((None, "OVERALL", overall_count, overall_vals))
 
     for field, display_name, _slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS:
-        values = sorted(
-            {
-                row.get(field)
-                for row in rows
-                if row.get("mapping_type_norm") == "gaussian"
-                and row.get(field) not in (None, "")
-            },
-            key=str,
-        )
         first_in_group = True
-        for value in values:
-            subset = [r for r in rows if r.get(field) == value]
-            cnt, vals = _gaussian_weight_profile_means_normalized(subset, metric_field)
+        for value in sorted(dimension_values[field], key=str):
+            cnt, vals = section_results.get(("dimension", field, value), (0, None))
             if vals is None:
                 continue
             sections.append((display_name if first_in_group else "", f"{display_name} = {value}", cnt, vals))
             first_in_group = False
+
+    first_border_row = True
+    for border_value in sorted(border_values):
+        cnt, vals = section_results.get(("border", border_value), (0, None))
+        if vals is None:
+            continue
+        display_name = "border percentage"
+        sections.append((
+            display_name if first_border_row else "",
+            f"{display_name} = {format_number_label(border_value)}",
+            cnt,
+            vals,
+        ))
+        first_border_row = False
 
     if not sections:
         record_skipped_plot(skipped, filename, "no gaussian best entries available")
@@ -5914,7 +6350,7 @@ def best_gaussian_execution_entries(rows):
                 "mapped_gaussian_weight": best.get("mapped_gaussian_weight_f"),
                 "base_gaussian_weight": best.get("base_gaussian_weight_f"),
                 "external_weight": best.get("external_weight_f"),
-                "routing_strategy": best.get("routing_strategy", "") or "n/a",
+                "routing_strategy": best.get("routing_strategy_norm", "") or "n/a",
             }
         )
 
@@ -5995,7 +6431,7 @@ def write_summary(rows, csv_files, output_dir, generated, skipped=None, distinct
         if r["success"] and r["routing_steps_f"] is not None:
             key = (
                 routing_combo_label(r),
-                r.get("safe_passage_strategy", "unknown"),
+                r.get("safe_passage_norm", "unknown"),
                 r.get("placement", "unknown"),
             )
             combo_scores[key].append(r["routing_steps_f"])
@@ -6180,15 +6616,25 @@ def main():
         "--distinct",
         action="store_true",
         help=(
-            "Analyze every CSV directly inside benchmarks/results, merging duplicate executions "
-            "by configuration only. Rows with the same configuration but different status or "
-            "routing_steps are all kept and exported to merging_duplicates.csv."
+            "Analyze every CSV directly inside the distinct input directory, merging duplicate "
+            "executions by configuration only. Rows with the same configuration but different "
+            "status or routing_steps are all kept and exported to merging_duplicates.csv."
         ),
     )
     parser.add_argument(
         "--output-dir",
         default=None,
         help="Output directory for generated plots",
+    )
+    parser.add_argument(
+        "--distinct-dir",
+        "--input-dir",
+        dest="distinct_dir",
+        default=None,
+        help=(
+            "Directory containing CSV files to merge with --distinct. "
+            f"Defaults to {DEFAULT_RESULTS_DIR}."
+        ),
     )
     parser.add_argument(
         "--heatmap",
@@ -6237,7 +6683,18 @@ def main():
     parser.add_argument(
         "--no-subprocess-heatmaps",
         action="store_true",
-        help="Disable subprocess batching for heatmap generation (slower memory release).",
+        help=(
+            "Keep heatmap generation in the main process. This is the default and avoids "
+            "holding a second full CSV copy in RAM."
+        ),
+    )
+    parser.add_argument(
+        "--subprocess-heatmaps",
+        action="store_true",
+        help=(
+            "Generate heatmap batches in subprocesses. This can release memory between "
+            "batches, but raises peak RAM because each worker reloads the CSV."
+        ),
     )
     parser.add_argument(
         "--heatmap-batch-size",
@@ -6261,6 +6718,8 @@ def main():
         ),
     )
     args = parser.parse_args()
+    if args.csv and args.distinct_dir:
+        parser.error("--distinct-dir/--input-dir can only be used with --distinct")
 
     global INCLUDE_TIME_ANALYSIS
     INCLUDE_TIME_ANALYSIS = bool(args.time)
@@ -6288,28 +6747,33 @@ def main():
         input_files = [csv_path]
         output_dir = args.output_dir or default_output_dir_for_single_csv(csv_path, args.distinct)
     else:
+        distinct_input_dir = os.path.expanduser(args.distinct_dir or DEFAULT_RESULTS_DIR)
+        if not os.path.isdir(distinct_input_dir):
+            raise NotADirectoryError(f"Distinct input directory does not exist: {distinct_input_dir}")
         input_files = filter_distinct_input_files(
-            sorted(glob.glob(os.path.join(DEFAULT_RESULTS_DIR, "*.csv")))
+            sorted(glob.glob(os.path.join(distinct_input_dir, "*.csv"))),
+            distinct_input_dir,
         )
-        output_dir = args.output_dir or default_output_dir_for_glob(args.distinct)
+        output_dir = args.output_dir or default_output_dir_for_glob(args.distinct, distinct_input_dir)
 
-    raw_rows, raw_fieldnames, csv_files = load_raw_rows_from_files(input_files)
+    distinct_info = None
+    rows_are_prepared = False
+    if args.distinct:
+        raw_rows, raw_fieldnames, csv_files, distinct_info = load_rows_distinct_from_files(
+            input_files,
+            output_dir,
+        )
+        rows_are_prepared = True
+        _trim_heap()
+    else:
+        raw_rows, raw_fieldnames, csv_files = load_raw_rows_from_files(input_files)
 
     if not raw_rows:
         if args.csv:
             raise RuntimeError(f"No valid rows found in CSV: {args.csv}")
-        raise RuntimeError(f"No valid rows found under {DEFAULT_RESULTS_DIR}")
+        raise RuntimeError(f"No valid rows found under {distinct_input_dir}")
 
-    distinct_info = None
-    if args.distinct:
-        raw_rows, distinct_info = merge_rows_distinct(
-            raw_rows,
-            raw_fieldnames,
-            output_dir,
-            len(csv_files),
-        )
-
-    rows = prepare_rows_for_analysis(raw_rows)
+    rows = raw_rows if rows_are_prepared else prepare_rows_for_analysis(raw_rows)
     del raw_rows
     _trim_heap()
     register_extra_statuses(rows)
@@ -6421,7 +6885,8 @@ def main():
         heatmap_csv_path = (
             os.path.abspath(input_files[0])
             if (
-                not args.no_subprocess_heatmaps
+                args.subprocess_heatmaps
+                and not args.no_subprocess_heatmaps
                 and not args.distinct
                 and len(input_files) == 1
             )
