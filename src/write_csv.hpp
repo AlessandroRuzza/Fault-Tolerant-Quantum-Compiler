@@ -18,6 +18,18 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "status,exit_code,duration_seconds,log_file,error_excerpt,"
     "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
     "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,resolved_n_magic,"
+    "external_weight";
+
+inline constexpr const char *kBenchmarkRunsCsvHeaderV16 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,gaussian_confidence,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
     "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,t_states_proportional,resolved_n_magic,"
     "external_weight";
 
@@ -397,7 +409,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV15 ||
+        (first_line == kBenchmarkRunsCsvHeaderV16 ||
+         first_line == kBenchmarkRunsCsvHeaderV15 ||
          first_line == kBenchmarkRunsCsvHeaderV14 ||
          first_line == kBenchmarkRunsCsvHeaderV13 ||
          first_line == kBenchmarkRunsCsvHeaderV12 ||
@@ -433,6 +446,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v16 = (first_line == kBenchmarkRunsCsvHeaderV16);
             const bool from_v15 = (first_line == kBenchmarkRunsCsvHeaderV15);
             const bool from_v14 = (first_line == kBenchmarkRunsCsvHeaderV14);
             const bool from_v13 = (first_line == kBenchmarkRunsCsvHeaderV13);
@@ -451,7 +465,12 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v15) {
+            if (from_v16) {
+                // V16 already has the full 47-column layout (incl. external_weight
+                // and the now-removed t_states_proportional); the tail drops col 44.
+                migrated = parsed;
+                migrated.resize(47);
+            } else if (from_v15) {
                 migrated = parsed;
                 migrated.resize(46);
             } else if (from_v14) {
@@ -924,16 +943,22 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             }
 
             // Remove size_moltiplier (was column 16) from legacy rows before V15.
-            if (!from_v15 && migrated.size() > 16) {
+            // V15 and V16 already dropped it, so skip the erase for them.
+            if (!from_v15 && !from_v16 && migrated.size() > 16) {
                 migrated.erase(migrated.begin() + 16);
             }
             if (migrated.size() < 46) {
                 migrated.resize(46);
             }
-            // V15 -> current: append external_weight. Empty means unavailable
-            // in already-recorded runs; new executions write the configured value.
+            // V15/legacy -> V16 shape: append external_weight. Empty means
+            // unavailable in already-recorded runs; new executions write it.
             if (migrated.size() == 46) {
                 migrated.push_back("");
+            }
+            // V16 -> current: drop the removed t_states_proportional column
+            // (was index 44, between lower_non_routed_layer_pct and resolved_n_magic).
+            if (migrated.size() >= 45) {
+                migrated.erase(migrated.begin() + 44);
             }
 
             out << render_row(migrated) << '\n';

@@ -291,7 +291,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::string config_path = "../config/0_compiler_config.json";
     std::string graph_path = "";
     std::string magic_state_placement_strategy = "center_circle";
-    int number_of_magic_states = 10;
+    int number_of_magic_states = -1;  // -1 = proportional to circuit (max_t_in_layer)
     double number_of_magic_states_multiplier = 0.0;
     double border_distance_percentage = 10.0;
     int x = 10;
@@ -336,9 +336,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         patience_threshold,
         use_layer_cache,
         repetition_count,
-        t_states_proportional,
-        use_layer_cache_explicit,
-        t_states_proportional_explicit
+        use_layer_cache_explicit
     );
 
     argument_parsing(
@@ -390,6 +388,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     if (number_of_magic_states_multiplier > 0.0) {
         std::cout << "number_of_magic_states: qubits*" << number_of_magic_states_multiplier
                   << " (resolved at runtime)" << std::endl;
+    } else if (number_of_magic_states == -1) {
+        std::cout << "number_of_magic_states: proportional (max_t_in_layer, resolved at runtime)" << std::endl;
     } else {
         std::cout << "number_of_magic_states: " << number_of_magic_states << std::endl;
     }
@@ -397,7 +397,6 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "routing strategy: " << routing_strategy << std::endl;
     std::cout << "use_layer_cache: " << (use_layer_cache ? "true" : "false") << std::endl;
     std::cout << "metrics_only: " << (metrics_only ? "true" : "false") << std::endl;
-    std::cout << "T_states_proportional: " << (t_states_proportional ? "true" : "false") << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -432,9 +431,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         use_layer_cache,
         metrics_only,
         repetition_count,
-        t_states_proportional,
-        use_layer_cache_explicit,
-        t_states_proportional_explicit
+        use_layer_cache_explicit
     );
     write_benchmark_result_file_if_requested(result);
 
@@ -784,15 +781,13 @@ int run_bench_mode(
                 {21, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
                 {22, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")},
                 {23, plan_field(entry, {"use_layer_cache", "use-layer-cache"}, "true")},
-                {44, plan_field(entry, {"T_states_proportional", "t_states_proportional"}, "false")},
-                {46, plan_field(entry, {"EXTERNAL_WEIGHT", "external_weight"}, "0")}
+                {45, plan_field(entry, {"EXTERNAL_WEIGHT", "external_weight"}, "0")}
             };
 
             for (const auto &[index, expected] : comparisons) {
                 std::string fallback;
                 if (index == 22)      fallback = "normal_t_routing";
-                else if (index == 44) fallback = "false";  // T_states_proportional
-                else if (index == 46) fallback = "0";      // external_weight
+                else if (index == 45) fallback = "0";      // external_weight
                 if (csv_field(row, index, fallback) != expected) {
                     return false;
                 }
@@ -1403,9 +1398,6 @@ int run_bench_mode(
                 non_routed_pct,
                 mid_non_routed_pct_str,
                 lower_non_routed_pct_str,
-                get_json_field(entry, {"T_states_proportional", "t_states_proportional"}).empty()
-                    ? "false"
-                    : get_json_field(entry, {"T_states_proportional", "t_states_proportional"}),
                 resolved_n_magic,
                 ew.empty() ? "0" : ew
             };

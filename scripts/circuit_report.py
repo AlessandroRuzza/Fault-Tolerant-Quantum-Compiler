@@ -113,7 +113,6 @@ CONFIG_COLS = [
     ("border_distance_percentage",      "Border %"),
     ("t_routing_mode",                  "T-routing"),
     ("use_layer_cache",                 "Cache"),
-    ("t_states_proportional",           "T-prop"),
     ("gaussian_strategy",               "Gaussian"),
     ("magic_aware_strategy",            "MA strategy"),
 ]
@@ -405,11 +404,9 @@ def save_top15_figure(circuit: str, top_rows: list,
                     pass
             elif key == "use_layer_cache":
                 v = "yes" if str(v).lower() == "true" else "no"
-            elif key == "t_states_proportional":
-                v = "yes" if str(v).lower() == "true" else "no"
             elif key == "number_of_magic_states":
-                # Prefer the runtime-resolved value (after multiplier and
-                # T_states_proportional overrides) when the CSV provides it.
+                # Prefer the runtime-resolved value (after multiplier or the
+                # -1 proportional sentinel) when the CSV provides it.
                 resolved = row.get("resolved_n_magic", "")
                 if resolved not in ("", None):
                     v = resolved
@@ -457,7 +454,6 @@ FREQ_PARAMS = [
     ("routing_strategy",               "Routing",         None),
     ("t_routing_mode",                 "T-routing",       None),
     ("use_layer_cache",                "Cache",           None),
-    ("t_states_proportional",          "T-prop",          None),
     ("magic_state_placement_strategy", "Magic placement", None),
     ("gaussian_strategy",              "Gaussian",        "gaussian"),
     ("magic_aware_strategy",           "MA strategy",     "magic_aware"),
@@ -496,7 +492,7 @@ def save_param_frequency_figure(best_rows: list, sort_label: str, out_path: Path
         counts = Counter()
         for r in subset:
             v = r.get(key, "")
-            if key in ("use_layer_cache", "t_states_proportional"):
+            if key == "use_layer_cache":
                 v = "yes" if str(v).lower() == "true" else "no"
             else:
                 v = _abbrev(str(v)) if v else "—"

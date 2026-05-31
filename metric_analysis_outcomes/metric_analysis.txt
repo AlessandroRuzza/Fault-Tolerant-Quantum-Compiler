@@ -9,25 +9,22 @@ confidence-high-dim: are good 0.9999 and 0.999999
 
 kept: 0.9999, 0.99999, 0.999999
 
+---------right row vs center------------
+
+
+right row worse in every configuration
+
 --------gaussian-weights------------
 
-coarse_nocube:
-- trascurable difference between all diferences except number of magic states
-- [1.05-1.23], [0], [1.36-1.46], [0], [0.91, 1.12]
-- updated with routing also: [0.97-1.23], [0], [1.35-1.50], [0], [0.91-1.12]
+configuration of 700k each to understand correlation between weights and other params:
+- coarse_nocube: trascurable difference between all diferences except number of magic states
+- coarse_cube: big difference between magic states, and center circle vs right row
+- fine_nocube: difference between confidence trascurable (keep 0.cinque9 for next analysis), other differences big (keep both safe passage)
+- fine_cube: no data
 
-coarse_cube:
-- big difference between magic states, and center circle vs right row
-- [0.89-1.15], [0], [1.04-1.42], [0], [0.63-0.78]
-- updated with routing also: [0.70-1.15], [0], [1.00-1.46], [0], [0.61-0.82]
+=> use magic state; keep 0.99999 and 0.9999 for connectivity and no sub, 0.999999 for cube, keep only center circle but with different percentage
 
-
-fine_nocube:
-- difference between confidence trascurable (keep 0.cinque9 for next analysis), other differences big (keep both safe passage)
-- [1.35-1.43], [0.50-0.68], [1.38-1.47], [0.66-0.81], [1.04-1.32]
-- updated with routing also: [1.35-1.54], [0.50-0.73], [1.38-1.55], [0.66-0.81], [1.04-1.32]
+---------gaussian weights second run----------------------
 
 
-fine_cube:
-- updated with routing also: []
 

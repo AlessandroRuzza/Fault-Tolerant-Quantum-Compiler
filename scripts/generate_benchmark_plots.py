@@ -777,6 +777,42 @@ def to_int(value):
             return None
 
 
+_INTERN_MISSING = object()
+# Per-process caches that deduplicate the float/int objects produced for the
+# low-cardinality numeric columns. On a multi-million-row CSV every row would
+# otherwise carry its own float(0.5)/int(8) copy; sharing one object per distinct
+# value is safe (floats/ints are immutable and only ever read) and roughly halves
+# peak RAM. duration_seconds/elapsed_ms are deliberately converted with the plain
+# to_float() below: they are effectively unique per row, so caching them would add
+# per-value string-key overhead without saving any objects.
+_FLOAT_INTERN = {}
+_INT_INTERN = {}
+
+
+def to_float_interned(value):
+    if value is None:
+        return None
+    key = value if isinstance(value, str) else str(value)
+    cached = _FLOAT_INTERN.get(key, _INTERN_MISSING)
+    if cached is not _INTERN_MISSING:
+        return cached
+    result = to_float(key)
+    _FLOAT_INTERN[key] = result
+    return result
+
+
+def to_int_interned(value):
+    if value is None:
+        return None
+    key = value if isinstance(value, str) else str(value)
+    cached = _INT_INTERN.get(key, _INTERN_MISSING)
+    if cached is not _INTERN_MISSING:
+        return cached
+    result = to_int(key)
+    _INT_INTERN[key] = result
+    return result
+
+
 def format_number_label(value):
     if value is None:
         return "n/a"
@@ -1420,7 +1456,7 @@ _DROP_RAW_FIELDS_AFTER_PREP = (
     "mid_x", "mid_y", "mid_duration_seconds", "mid_routing_steps", "mid_status",
     "lower_x", "lower_y", "lower_duration_seconds", "lower_routing_steps", "lower_status",
     "mid_non_routed_layer_pct", "lower_non_routed_layer_pct",
-    "t_states_proportional", "resolved_n_magic",
+    "resolved_n_magic",
     "log_file", "error_excerpt", "run_date", "run_datetime",
     "source_csv", "source_csv_name",
     "_merge_order", "_source_row_index",
@@ -1462,23 +1498,23 @@ def prepare_row_for_analysis(row):
     row["routing_strategy_norm"] = normalize_text(row.get("routing_strategy"))
     row["t_routing_mode_norm"] = normalize_text(row.get("t_routing_mode"))
     row["use_layer_cache_norm"] = normalize_text(row.get("use_layer_cache"))
-    row["x_i"] = to_int(pick_first(row, "graph_x", "x"))
-    row["y_i"] = to_int(pick_first(row, "graph_y", "y"))
-    row["total_nodes_i"] = to_int(row.get("total_nodes"))
-    row["magic_states_f"] = to_float(row.get("number_of_magic_states"))
+    row["x_i"] = to_int_interned(pick_first(row, "graph_x", "x"))
+    row["y_i"] = to_int_interned(pick_first(row, "graph_y", "y"))
+    row["total_nodes_i"] = to_int_interned(row.get("total_nodes"))
+    row["magic_states_f"] = to_float_interned(row.get("number_of_magic_states"))
     if row["magic_states_f"] is not None:
         row["magic_states_label"] = sys.intern(format_number_label(row["magic_states_f"]))
     else:
         row["magic_states_label"] = ""
-    row["border_pct_f"] = to_float(row.get("border_distance_percentage"))
-    row["magic_high_f"] = to_float(row.get("magic_high"))
-    row["magic_low_f"] = to_float(row.get("magic_low"))
-    row["cnot_high_f"] = to_float(row.get("cnot_high"))
-    row["cnot_low_f"] = to_float(row.get("cnot_low"))
-    row["mapped_gaussian_weight_f"] = to_float(row.get("mapped_gaussian_weight"))
-    row["base_gaussian_weight_f"] = to_float(row.get("base_gaussian_weight"))
-    row["external_weight_f"] = to_float(row.get("external_weight"))
-    row["gaussian_confidence_f"] = to_float(row.get("gaussian_confidence"))
+    row["border_pct_f"] = to_float_interned(row.get("border_distance_percentage"))
+    row["magic_high_f"] = to_float_interned(row.get("magic_high"))
+    row["magic_low_f"] = to_float_interned(row.get("magic_low"))
+    row["cnot_high_f"] = to_float_interned(row.get("cnot_high"))
+    row["cnot_low_f"] = to_float_interned(row.get("cnot_low"))
+    row["mapped_gaussian_weight_f"] = to_float_interned(row.get("mapped_gaussian_weight"))
+    row["base_gaussian_weight_f"] = to_float_interned(row.get("base_gaussian_weight"))
+    row["external_weight_f"] = to_float_interned(row.get("external_weight"))
+    row["gaussian_confidence_f"] = to_float_interned(row.get("gaussian_confidence"))
     if row["gaussian_confidence_f"] is not None:
         row["gaussian_confidence_label"] = sys.intern(
             format_gaussian_confidence_label(row["gaussian_confidence_f"])
@@ -1493,12 +1529,12 @@ def prepare_row_for_analysis(row):
         row["duration_s_f"] = elapsed_ms / 1000.0
     else:
         row["duration_s_f"] = None
-    row["routing_steps_f"] = to_float(pick_first(row, "routing_steps", "total_routing_steps"))
-    row["non_routed_layer_pct_f"] = to_float(row.get("non_routed_layer_pct"))
-    row["interaction_pressure_f"] = to_float(row.get("interaction_pressure"))
-    row["data_density_f"] = to_float(row.get("data_density"))
-    row["overall_density_f"] = to_float(row.get("overall_density"))
-    row["exit_code_i"] = to_int(row.get("exit_code"))
+    row["routing_steps_f"] = to_float_interned(pick_first(row, "routing_steps", "total_routing_steps"))
+    row["non_routed_layer_pct_f"] = to_float_interned(row.get("non_routed_layer_pct"))
+    row["interaction_pressure_f"] = to_float_interned(row.get("interaction_pressure"))
+    row["data_density_f"] = to_float_interned(row.get("data_density"))
+    row["overall_density_f"] = to_float_interned(row.get("overall_density"))
+    row["exit_code_i"] = to_int_interned(row.get("exit_code"))
     row["success"] = normalize_text(row.get("status")) in SUCCESS_STATUSES
 
     if row["x_i"] is not None and row["y_i"] is not None:
@@ -1516,9 +1552,28 @@ def prepare_rows_for_analysis(raw_rows):
     return [prepare_row_for_analysis(row) for row in raw_rows]
 
 
+def load_prepared_rows_from_files(files):
+    """Stream raw CSV rows straight into compact prepared rows.
+
+    Unlike load_raw_rows_from_files() + prepare_rows_for_analysis(), this never
+    materializes the full list of raw dicts: each raw dict is converted to a
+    CompactRow and immediately discarded. On multi-GB CSVs (millions of rows)
+    the raw-dict list alone is ~3 KB/row, so holding it alongside the compact
+    rows was the cause of the OOM kills. Streaming caps peak RAM at roughly the
+    compact-row footprint.
+    """
+    fieldnames, accepted_files, metadata = csv_file_metadata(files)
+    prepared_rows = []
+    for index, raw in enumerate(iter_raw_rows_from_metadata(metadata)):
+        prepared_rows.append(prepare_row_for_analysis(raw))
+        if (index + 1) % 250000 == 0:
+            _trim_heap()
+    return prepared_rows, fieldnames, accepted_files
+
+
 def load_rows_from_files(files):
-    raw_rows, _, accepted_files = load_raw_rows_from_files(files)
-    return prepare_rows_for_analysis(raw_rows), accepted_files
+    prepared_rows, _, accepted_files = load_prepared_rows_from_files(files)
+    return prepared_rows, accepted_files
 
 
 def non_empty(values):
@@ -2790,6 +2845,7 @@ _GAUSSIAN_SUMMARY_WEIGHT_FIELDS = (
     ("gauss\nbase", "base_gaussian_weight"),
     ("external\nweight", "external_weight"),
 )
+_GAUSSIAN_SUMMARY_RANGE_MASS = 0.75
 
 
 def _gaussian_best_profile_by_metric(rows, metric_field):
@@ -2845,21 +2901,112 @@ def _gaussian_best_profile_by_metric(rows, metric_field):
     return best_entries
 
 
-def _gaussian_weight_profile_means_from_best_entries(best_entries):
+def _gaussian_summary_grid_step(values):
+    distinct = sorted(set(values))
+    diffs = [
+        distinct[i + 1] - distinct[i]
+        for i in range(len(distinct) - 1)
+        if distinct[i + 1] > distinct[i]
+    ]
+    if not diffs:
+        return None
+    return float(np.median(diffs))
+
+
+def _gaussian_summary_smoothed_mode(values, counts):
+    if not values:
+        return None
+    if len(values) == 1:
+        return values[0]
+
+    step = _gaussian_summary_grid_step(values)
+    if step is None or step <= 0:
+        return values[0]
+
+    bandwidth = step
+    lo, hi = min(values), max(values)
+    resolution = max(step / 50.0, 0.001)
+    n_points = max(101, int(round((hi - lo) / resolution)) + 1)
+    best_x = values[0]
+    best_score = -math.inf
+    total = sum(counts)
+    if total <= 0:
+        return values[0]
+
+    for idx in range(n_points):
+        x = lo + (hi - lo) * idx / (n_points - 1)
+        score = 0.0
+        for value, count in zip(values, counts):
+            z = (x - value) / bandwidth
+            score += (count / total) * math.exp(-0.5 * z * z)
+        if score > best_score:
+            best_score = score
+            best_x = x
+    return best_x
+
+
+def _gaussian_summary_refine_range(values, counts, mode_value):
+    if not values:
+        return []
+    total = sum(counts)
+    if total <= 0:
+        return [mode_value]
+    target = _GAUSSIAN_SUMMARY_RANGE_MASS * total
+    mode_idx = values.index(mode_value)
+    best = None
+    for left in range(mode_idx + 1):
+        running = 0
+        for right in range(left, len(values)):
+            running += counts[right]
+            if left <= mode_idx <= right and running >= target:
+                width = values[right] - values[left]
+                candidate = (width, right - left, left, right)
+                if best is None or candidate < best:
+                    best = candidate
+                break
+    if best is None:
+        return values
+    _width, _span, left, right = best
+    return values[left:right + 1]
+
+
+def _gaussian_summary_range_label(values):
+    if not values:
+        return "n/a"
+    labels = [format_number_label(value) for value in values]
+    return "/".join(labels)
+
+
+def _gaussian_weight_profile_modes_from_best_entries(best_entries):
     if not best_entries:
         return 0, None
-    means = {}
+
+    stats_by_field = {}
     for _, field in _GAUSSIAN_SUMMARY_WEIGHT_FIELDS:
         vals = [float(e[field]) for e in best_entries if e.get(field) is not None]
-        means[field] = float(np.mean(vals)) if vals else None
-    base = means.get("base_gaussian_weight")
-    if base is None:
-        return len(best_entries), None
-    normalized = {
-        field: (means[field] - base + 1.0) if means[field] is not None else None
-        for _, field in _GAUSSIAN_SUMMARY_WEIGHT_FIELDS
-    }
-    return len(best_entries), normalized
+        if not vals:
+            stats_by_field[field] = None
+            continue
+
+        counter = Counter(vals)
+        value_counts = sorted(counter.items())
+        values = [value for value, _count in value_counts]
+        counts = [count for _value, count in value_counts]
+        mode_value, mode_count = sorted(
+            counter.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[0]
+        smoothed_mode = _gaussian_summary_smoothed_mode(values, counts)
+        refine_values = _gaussian_summary_refine_range(values, counts, mode_value)
+
+        stats_by_field[field] = {
+            "value": smoothed_mode,
+            "mode": mode_value,
+            "support": mode_count / len(vals),
+            "range_values": refine_values,
+            "range_label": _gaussian_summary_range_label(refine_values),
+        }
+    return len(best_entries), stats_by_field
 
 
 def _gaussian_weight_profile_means_normalized(rows_subset, metric_field="routing_steps_f"):
@@ -2868,7 +3015,7 @@ def _gaussian_weight_profile_means_normalized(rows_subset, metric_field="routing
     metric_field per (circuit, x, y). Returns (sample_count, dict[field] -> float)
     or (0, None) if no usable best entries exist."""
     best_entries = _gaussian_best_profile_by_metric(rows_subset, metric_field)
-    return _gaussian_weight_profile_means_from_best_entries(best_entries)
+    return _gaussian_weight_profile_modes_from_best_entries(best_entries)
 
 
 def _gaussian_weight_entry_from_combo(combo):
@@ -2928,7 +3075,7 @@ def _gaussian_summary_result_from_configs(configs_by_x_key):
             gaussian_weight_sort_key(item[0]),
         ))
         best_entries.append(_gaussian_weight_entry_from_combo(config_metrics[0][0]))
-    return _gaussian_weight_profile_means_from_best_entries(best_entries)
+    return _gaussian_weight_profile_modes_from_best_entries(best_entries)
 
 
 def _gaussian_summary_profiles_by_section(rows, metric_field):
@@ -2988,8 +3135,9 @@ def _plot_gaussian_weight_summary_for_metric(
     rows, output_dir, generated, skipped, metric_field, filename, title_suffix
 ):
     """Render one summary heatmap; rows = OVERALL + per-dimension slices; cells
-    are mean weight value with gauss_base normalized to 1, where 'best' for each
-    (circuit, x, y) is chosen by minimizing metric_field."""
+    are smoothed modal weight values, where 'best' for each (circuit, x, y) is
+    chosen by minimizing metric_field. Cell annotations also show the modal
+    support and a compact refinement range covering the local vote mass."""
     # list of (group_label_or_None, row_label, sample_count, values_dict)
     sections = []
 
@@ -3037,11 +3185,11 @@ def _plot_gaussian_weight_summary_for_metric(
     for i, (_group, row_label, sample_count, vals) in enumerate(sections):
         row_labels.append(f"{row_label}   (n={sample_count})")
         for j, (_, field) in enumerate(_GAUSSIAN_SUMMARY_WEIGHT_FIELDS):
-            v = vals.get(field)
-            if v is None:
+            stat = vals.get(field)
+            if stat is None or stat.get("value") is None:
                 masked[i, j] = True
             else:
-                data[i, j] = v
+                data[i, j] = stat["value"]
 
     if (~masked).any():
         observed_min = float(np.min(data[~masked]))
@@ -3052,21 +3200,21 @@ def _plot_gaussian_weight_summary_for_metric(
     vmin, vmax = 1.0 - span, 1.0 + span
     norm = TwoSlopeNorm(vmin=vmin, vcenter=1.0, vmax=vmax)
 
-    fig_height = max(5.0, 0.42 * n_rows + 2.4)
-    fig, ax = plt.subplots(figsize=(12.8, fig_height))
+    fig_height = max(7.0, 0.92 * n_rows + 3.0)
+    fig, ax = plt.subplots(figsize=(19.5, fig_height))
     masked_data = np.ma.array(data, mask=masked)
     image = ax.imshow(masked_data, aspect="auto", cmap="RdBu_r", norm=norm)
 
     ax.set_title(
-        f"Best Gaussian Weights Summary — {title_suffix} (gauss_base = 1)",
-        fontsize=14, pad=14,
+        f"Best Gaussian Weights Summary — {title_suffix} (smoothed mode)",
+        fontsize=17, pad=16,
     )
     ax.set_xticks(range(n_cols))
-    ax.set_xticklabels([lbl for lbl, _ in _GAUSSIAN_SUMMARY_WEIGHT_FIELDS], fontsize=10)
+    ax.set_xticklabels([lbl for lbl, _ in _GAUSSIAN_SUMMARY_WEIGHT_FIELDS], fontsize=13)
     ax.xaxis.tick_top()
     ax.tick_params(axis="x", labeltop=True, labelbottom=False, pad=6)
     ax.set_yticks(range(n_rows))
-    ax.set_yticklabels(row_labels, fontsize=9)
+    ax.set_yticklabels(row_labels, fontsize=12)
     ax.set_xticks(np.arange(-0.5, n_cols, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, n_rows, 1), minor=True)
     ax.grid(which="minor", color="white", linewidth=1.2)
@@ -3079,9 +3227,17 @@ def _plot_gaussian_weight_summary_for_metric(
                 ax.text(j, i, "—", ha="center", va="center", fontsize=9, color="#475569")
                 continue
             v = data[i, j]
+            _label, field = _GAUSSIAN_SUMMARY_WEIGHT_FIELDS[j]
+            stat = sections[i][3][field]
+            support_pct = 100.0 * stat["support"]
+            cell_text = (
+                f"{v:.2f}\n"
+                f"[{stat['range_label']}]\n"
+                f"m={format_number_label(stat['mode'])} {support_pct:.0f}%"
+            )
             text_color = "white" if (norm(v) > 0.78 or norm(v) < 0.22) else "#0F172A"
-            ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=9,
-                    color=text_color, fontweight="bold")
+            ax.text(j, i, cell_text, ha="center", va="center", fontsize=10.5,
+                    color=text_color, fontweight="bold", linespacing=1.1)
 
     for i, (group, _row_label, _cnt, _vals) in enumerate(sections):
         if i == 0:
@@ -3092,8 +3248,8 @@ def _plot_gaussian_weight_summary_for_metric(
             ax.axhline(i - 0.5, color="#0F172A", linewidth=1.1)
 
     cbar = fig.colorbar(image, ax=ax, fraction=0.04, pad=0.02)
-    cbar.ax.tick_params(labelsize=8)
-    cbar.set_label("value (gauss_base = 1)", fontsize=9)
+    cbar.ax.tick_params(labelsize=11)
+    cbar.set_label("smoothed modal value", fontsize=12)
 
     save_fig(fig, output_dir, filename, generated, subfolder=GAUSSIAN_DIR)
 
@@ -5586,9 +5742,8 @@ def run_heatmap_worker(args):
         REQUESTED_HEATMAP_ITEMS,
         selected_heatmap_axis_slugs(args),
     )
-    raw_rows, _, _ = load_raw_rows_from_files([args.worker_csv])
-    rows_all = prepare_rows_for_analysis(raw_rows)
-    del raw_rows
+    rows_all, _, _ = load_prepared_rows_from_files([args.worker_csv])
+    _trim_heap()
     register_extra_statuses(rows_all)
     rows_no_timeout = exclude_timeout_rows(rows_all)
     rows_success_with_routing = [
@@ -6674,6 +6829,14 @@ def main():
             "n magic states, confidence, placement value)."
         ),
     )
+    parser.add_argument(
+        "--gaussian-summary-only",
+        action="store_true",
+        help=(
+            "Generate only the gaussian weight summary heatmaps under "
+            f"{GAUSSIAN_DIR}/ and skip helper CSV/table generation."
+        ),
+    )
     parser.add_argument("--worker-heatmap-batch", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--worker-heatmap-phase", default="source", choices=["source", "dashboard"], help=argparse.SUPPRESS)
     parser.add_argument("--worker-csv", default=None, help=argparse.SUPPRESS)
@@ -6766,7 +6929,9 @@ def main():
         rows_are_prepared = True
         _trim_heap()
     else:
-        raw_rows, raw_fieldnames, csv_files = load_raw_rows_from_files(input_files)
+        raw_rows, raw_fieldnames, csv_files = load_prepared_rows_from_files(input_files)
+        rows_are_prepared = True
+        _trim_heap()
 
     if not raw_rows:
         if args.csv:
@@ -6940,6 +7105,12 @@ def main():
         )
     if args.gaussian:
         plot_gaussian_weight_summary_dashboard(rows, output_dir, generated, skipped)
+    if args.gaussian_summary_only:
+        if not args.gaussian:
+            plot_gaussian_weight_summary_dashboard(rows, output_dir, generated, skipped)
+        skipped_msg = f", {len(skipped)} skipped" if skipped else ""
+        print(f"Created {len(generated)} plots{skipped_msg} in: {output_dir}")
+        return
     top_gaussian_weight_entries, top_gaussian_weight_groups = top_gaussian_weight_config_entries(
         rows,
         top_n=3,

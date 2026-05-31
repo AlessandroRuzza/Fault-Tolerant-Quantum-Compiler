@@ -82,9 +82,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::string t_routing_mode, int patience_threshold,
     bool use_layer_cache,
     bool metrics_only, int repetition_count,
-    bool t_states_proportional,
-    bool use_layer_cache_explicit = false,
-    bool t_states_proportional_explicit = false) {
+    bool use_layer_cache_explicit = false) {
 
     double circ_time_seconds = 0.0;
     double graph_time_seconds = 0.0;
@@ -147,13 +145,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     std::cout << "Setting up circuit with " << qubitsNumber << " qubits." << std::endl;
 
-    // Defaults applied unless the config/CLI explicitly forced a value.
-    // T_states_proportional defaults to true: magic states scale with the
-    // circuit's peak per-layer T demand.
-    if (!t_states_proportional_explicit) {
-        t_states_proportional = true;
-    }
-
     // The layer routing cache only pays off when layers repeat heavily;
     // otherwise lookup overhead dominates. Auto-select from the reuse ratio.
     if (!use_layer_cache_explicit) {
@@ -162,13 +153,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
                   << " (layer_reuse_ratio = " << metrics.layer_reuse_ratio << ")\n";
     }
 
-    if (t_states_proportional) {
-        number_of_magic_states = metrics.max_t_in_layer;
-        number_of_magic_states_multiplier = 0.0;
-        std::cout << "T_states_proportional: number_of_magic_states = " << number_of_magic_states
-                  << " (max_t_in_layer)\n";
-    }
-
+    // Resolve number_of_magic_states. Precedence:
+    //   fractional multiplier (0<f<1) -> round(qubits * f)
+    //   -1 sentinel                   -> max_t_in_layer (proportional to circuit)
+    //   explicit positive int        -> used as-is
     if (number_of_magic_states_multiplier > 0.0) {
         number_of_magic_states = static_cast<int>(std::round(static_cast<double>(qubitsNumber) * number_of_magic_states_multiplier));
         if (number_of_magic_states < 1) {
@@ -178,11 +166,14 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             throw std::runtime_error("Resolved number_of_magic_states must be > 0");
         }
 
-
         std::cout
             << "Resolved number_of_magic_states from multiplier: "
             << qubitsNumber << " * " << number_of_magic_states_multiplier
             << " -> " << number_of_magic_states << "\n";
+    } else if (number_of_magic_states == -1) {
+        number_of_magic_states = metrics.max_t_in_layer;
+        std::cout << "number_of_magic_states proportional: " << number_of_magic_states
+                  << " (max_t_in_layer)\n";
     }
 
     std::filesystem::path original_name = std::filesystem::path(path).stem();

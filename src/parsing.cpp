@@ -100,19 +100,18 @@ void assign_magic_state_count_or_multiplier(
     double parsed_value,
     const std::string& source_name,
     int& number_of_magic_states,
-    double& number_of_magic_states_multiplier,
-    bool t_states_proportional = false
+    double& number_of_magic_states_multiplier
 ) {
-    // When T_states_proportional is true, number_of_magic_states is computed
-    // at runtime from the circuit; a placeholder value of 0 in the config is valid.
-    if (t_states_proportional && parsed_value == 0.0) {
-        number_of_magic_states = 0;
+    // -1 is the sentinel for "proportional to the circuit": number_of_magic_states
+    // is resolved at runtime from the peak per-layer T demand (max_t_in_layer).
+    if (parsed_value == -1.0) {
+        number_of_magic_states = -1;
         number_of_magic_states_multiplier = 0.0;
         return;
     }
 
     if (!std::isfinite(parsed_value) || parsed_value <= 0.0) {
-        throw std::runtime_error(source_name + " must be a finite number > 0");
+        throw std::runtime_error(source_name + " must be -1 (proportional) or a finite number > 0");
     }
 
     if (is_effectively_integer(parsed_value)) {
@@ -319,7 +318,7 @@ void print_usage(const char* executable) {
               << "[--gaussian-strategy [" << Mapping::available_gaussian_strategies() << "]]\n"
               << "[--safe-passage [" << Mapping::available_safe_passage_strategies() << "]]\n"
               << "[--magic-state-placement-strategy [" << Graph::available_magic_state_placement_strategies() << "]]\n"
-              << "[--number-of-magic-states <integer|float> >0]\n"
+              << "[--number-of-magic-states <-1=proportional|int=count|0<f<1=multiplier>]\n"
               << "[--border-distance-percentage <float> in [0,100]]\n"
               << "[--magic-high <float>=0]\n"
               << "[--magic-low <float>=0]\n"
@@ -376,9 +375,7 @@ void apply_config_overrides(
     int& patience_threshold,
     bool& use_layer_cache,
     int& repetition_count,
-    bool& t_states_proportional,
-    bool& use_layer_cache_explicit,
-    bool& t_states_proportional_explicit
+    bool& use_layer_cache_explicit
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -553,15 +550,8 @@ void apply_config_overrides(
         set_magic_state_placement_strategy_from_config("magic_state_placement_strategy");
     }
 
-    if (config_json.contains("T_states_proportional") || config_json.contains("t_states_proportional")) {
-        const char* key = config_json.contains("T_states_proportional") ? "T_states_proportional" : "t_states_proportional";
-        if (!config_json[key].is_boolean()) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
-        }
-        t_states_proportional = config_json[key].get<bool>();
-        t_states_proportional_explicit = true;
-    }
-
+    // number_of_magic_states: -1 (proportional to circuit), positive int (exact),
+    // or fractional 0<f<1 (multiplier on qubit count). Resolved at runtime.
     const auto set_number_of_magic_states_from_config = [&](const char* key) {
         if (!config_json.contains(key)) {
             return false;
@@ -574,8 +564,7 @@ void apply_config_overrides(
             parsed_value,
             std::string("Config key '") + key + "'",
             number_of_magic_states,
-            number_of_magic_states_multiplier,
-            t_states_proportional
+            number_of_magic_states_multiplier
         );
         return true;
     };
@@ -905,7 +894,7 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --number-of-magic-states");
             }
-            const double parsed_value = parse_non_negative_double(argv[++i], "--number-of-magic-states");
+            const double parsed_value = parse_finite_double(argv[++i], "--number-of-magic-states");
             assign_magic_state_count_or_multiplier(
                 parsed_value,
                 "--number-of-magic-states",

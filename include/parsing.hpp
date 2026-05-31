@@ -33,9 +33,7 @@ void apply_config_overrides(
     int& patience_threshold,
     bool& use_layer_cache,
     int& repetition_count,
-    bool& t_states_proportional,
-    bool& use_layer_cache_explicit,
-    bool& t_states_proportional_explicit
+    bool& use_layer_cache_explicit
 );
 void argument_parsing(
     int argc,
