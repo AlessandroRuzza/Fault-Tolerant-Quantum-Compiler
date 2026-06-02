@@ -59,7 +59,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         make \
         libgomp1 \
         libstdc++6 \
-        gnuplot
+        gnuplot \
+        python3 \
+        python3-pip \
+        python3-venv
+
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir matplotlib
+
+ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 

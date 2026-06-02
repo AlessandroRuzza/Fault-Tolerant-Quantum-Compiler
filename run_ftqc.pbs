@@ -60,6 +60,4 @@ echo "END_JOB=$PBS_JOBID"
 date
 } >> "$LOG_FILE" 2>&1
 
-
-
 kill "$MONITOR_PID" 2>/dev/null
