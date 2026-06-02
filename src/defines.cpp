@@ -41,7 +41,7 @@ const bool PRINT_SAFE_PASSAGE = kPrintAllowed && false;
 
 const bool PRINT_LAYER = kPrintAllowed && false;
 const bool PRINT_ROUTING = kPrintAllowed && false;
-const bool PRINT_DRAW_ROUTING = kPrintAllowed && false;
+const bool PRINT_DRAW_ROUTING = kPrintAllowed && true;
 const bool PRINT_ROUTING_PROGRESS = kPrintAllowed && false;
 
 const bool PRINT_CACHE_METRICS = kPrintAllowed && false;

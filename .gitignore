@@ -54,6 +54,9 @@ benchmarks/**/*_plots_*/
 build/
 env/
 .env/
+.venv-mqt/
+.venv/
+venv/
 
 visualization/
 universal_set_qasms
