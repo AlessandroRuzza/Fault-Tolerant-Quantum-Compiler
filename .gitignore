@@ -93,3 +93,6 @@ docker-wheels/
 # Large QASM circuits (exceed GitHub 100MB limit)
 qasms/1000.qasm
 qasms/random_QAOA_angles_k3_N100_p1000.qasm
+qasms/randomcircuit_n600.qasm
+qasms/randomcircuit_n700.qasm
+qasms/randomcircuit_n800.qasm
