@@ -28,7 +28,7 @@ fi
 if [ -n "$BENCH_PATH" ]; then
     INPUT_ARG="--csv /app/host/benchmarks/results/${BENCH_PATH}_runs.csv"
 else
-    INPUT_ARG="--distinct --distinct-dir /app/host/${INPUT_DIR}"
+    INPUT_ARG="--distinct-dir /app/host/${INPUT_DIR}"
 fi
 
 apptainer exec \

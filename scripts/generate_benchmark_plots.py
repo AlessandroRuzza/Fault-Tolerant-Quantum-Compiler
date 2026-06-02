@@ -964,9 +964,11 @@ def default_output_dir_for_single_csv(csv_path, distinct):
     )
 
 
-def default_output_dir_for_glob(distinct, input_dir=DEFAULT_RESULTS_DIR):
+def default_output_dir_for_glob(distinct, input_dir=DEFAULT_RESULTS_DIR, glob_mode=False):
     if distinct:
         return os.path.join(input_dir, "merge_plots")
+    if glob_mode:
+        return os.path.join(input_dir, "glob_plots")
     return os.path.join(input_dir, "plots")
 
 
@@ -6756,6 +6758,15 @@ def write_report_markdown(
             f.write("\n")
 
 
+def write_glob_merged_csv(files, output_dir):
+    fieldnames, accepted_files, metadata = csv_file_metadata(files)
+    output_fieldnames = csv_output_fieldnames(fieldnames)
+    os.makedirs(output_dir, exist_ok=True)
+    merged_csv_path = os.path.join(output_dir, f"merged_glob_{len(accepted_files)}.csv")
+    write_csv_rows(merged_csv_path, output_fieldnames, iter_raw_rows_from_metadata(metadata))
+    return merged_csv_path, accepted_files
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate benchmark plots from CSV results.")
     input_group = parser.add_mutually_exclusive_group()
@@ -6774,6 +6785,14 @@ def main():
             "Analyze every CSV directly inside the distinct input directory, merging duplicate "
             "executions by configuration only. Rows with the same configuration but different "
             "status or routing_steps are all kept and exported to merging_duplicates.csv."
+        ),
+    )
+    input_group.add_argument(
+        "--glob",
+        action="store_true",
+        help=(
+            "Analyze every CSV directly inside the input directory, concatenating all rows "
+            "without deduplication. A merged CSV is written to the output directory."
         ),
     )
     parser.add_argument(
@@ -6882,7 +6901,7 @@ def main():
     )
     args = parser.parse_args()
     if args.csv and args.distinct_dir:
-        parser.error("--distinct-dir/--input-dir can only be used with --distinct")
+        parser.error("--distinct-dir/--input-dir can only be used with --distinct or --glob")
 
     global INCLUDE_TIME_ANALYSIS
     INCLUDE_TIME_ANALYSIS = bool(args.time)
@@ -6897,8 +6916,8 @@ def main():
         selected_heatmap_axes,
     )
 
-    if not args.csv and not args.distinct:
-        print("No input specified. Pass --csv for one file or --distinct for the benchmarks/results CSVs.")
+    if not args.csv and not args.distinct and not args.glob:
+        print("No input specified. Pass --csv for one file, --distinct or --glob for a directory.")
         return
 
     importMatplotlib()
@@ -6912,12 +6931,14 @@ def main():
     else:
         distinct_input_dir = os.path.expanduser(args.distinct_dir or DEFAULT_RESULTS_DIR)
         if not os.path.isdir(distinct_input_dir):
-            raise NotADirectoryError(f"Distinct input directory does not exist: {distinct_input_dir}")
+            raise NotADirectoryError(f"Input directory does not exist: {distinct_input_dir}")
         input_files = filter_distinct_input_files(
             sorted(glob.glob(os.path.join(distinct_input_dir, "*.csv"))),
             distinct_input_dir,
         )
-        output_dir = args.output_dir or default_output_dir_for_glob(args.distinct, distinct_input_dir)
+        output_dir = args.output_dir or default_output_dir_for_glob(
+            args.distinct, distinct_input_dir, glob_mode=args.glob
+        )
 
     distinct_info = None
     rows_are_prepared = False
@@ -6926,6 +6947,11 @@ def main():
             input_files,
             output_dir,
         )
+        rows_are_prepared = True
+        _trim_heap()
+    elif args.glob:
+        write_glob_merged_csv(input_files, output_dir)
+        raw_rows, raw_fieldnames, csv_files = load_prepared_rows_from_files(input_files)
         rows_are_prepared = True
         _trim_heap()
     else:
