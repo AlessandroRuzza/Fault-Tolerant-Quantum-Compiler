@@ -365,6 +365,7 @@ void apply_config_overrides(
     std::string& config_path,
     int& x,
     int& y,
+    int& dimension_offset,
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,
@@ -595,7 +596,7 @@ void apply_config_overrides(
     }
 
     // Sentinels: x>0 explicit; 0 -> low/mid/high from dimensions.csv;
-    // -n (n>=1) -> compute_dimensions(...) + (n-1).
+    // x<0 -> auto-size via compute_dimensions(...) + dimension_offset.
     if (config_json.contains("x")) {
         if (!config_json["x"].is_number_integer()) {
             throw std::runtime_error("Config key 'x' must be an integer");
@@ -608,6 +609,15 @@ void apply_config_overrides(
             throw std::runtime_error("Config key 'y' must be an integer");
         }
         y = config_json["y"].get<int>();
+    }
+
+    // Signed delta added to the auto-computed grid side (only used when x<0).
+    // Negative -> smaller/harder grid, positive -> larger/easier.
+    if (config_json.contains("dimension_offset")) {
+        if (!config_json["dimension_offset"].is_number_integer()) {
+            throw std::runtime_error("Config key 'dimension_offset' must be an integer");
+        }
+        dimension_offset = config_json["dimension_offset"].get<int>();
     }
 
     if (config_json.contains("graph")) {

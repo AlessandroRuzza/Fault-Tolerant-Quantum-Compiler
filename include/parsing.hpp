@@ -23,6 +23,7 @@ void apply_config_overrides(
     std::string& config_path,
     int& x,
     int& y,
+    int& dimension_offset,
     std::string& graph_path,
     std::string& magic_state_placement_strategy,
     int& number_of_magic_states,

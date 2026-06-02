@@ -296,6 +296,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double border_distance_percentage = 10.0;
     int x = 10;
     int y = 11;
+    int dimension_offset = 0;  // signed delta on auto-computed grid (x<0 mode)
     int maximum_iterations = 500;
     std::string routing_strategy = "congestion";
     std::string t_routing_mode = "normal_t_routing";
@@ -326,11 +327,12 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         config_path,
         x,
         y,
+        dimension_offset,
         graph_path,
         magic_state_placement_strategy,
         number_of_magic_states,
         number_of_magic_states_multiplier,
-        border_distance_percentage, 
+        border_distance_percentage,
         routing_strategy,
         t_routing_mode,
         patience_threshold,
@@ -401,6 +403,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
         std::cout << "graph dimensions: " << x << "x" << y << std::endl;
+        if (x < 0) {
+            std::cout << "dimension_offset: " << dimension_offset << std::endl;
+        }
     }
 
     const auto execution_start = std::chrono::steady_clock::now();
@@ -420,6 +425,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         external_weight,
         x,
         y,
+        dimension_offset,
         graph_path,
         magic_state_placement_strategy,
         number_of_magic_states,

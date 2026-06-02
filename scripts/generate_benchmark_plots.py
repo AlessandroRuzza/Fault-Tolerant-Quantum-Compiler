@@ -2885,8 +2885,8 @@ def _gaussian_best_profile_by_metric(rows, metric_field):
         if not config_metrics:
             continue
         config_metrics.sort(key=lambda item: (
-            item["best_metric"],
-            item["mean_metric"],
+            item["mean_metric"],   # primary: average metric across the combo's runs (robust)
+            item["best_metric"],   # tie-break: best single run
             item["best_duration_seconds"] if item["best_duration_seconds"] is not None else math.inf,
             gaussian_weight_sort_key(item["combo"]),
         ))
@@ -3071,8 +3071,8 @@ def _gaussian_summary_result_from_configs(configs_by_x_key):
         if not config_metrics:
             continue
         config_metrics.sort(key=lambda item: (
-            item[1],
-            item[2],
+            item[2],   # primary: mean metric across the combo's runs (robust)
+            item[1],   # tie-break: best single run (min)
             item[3] if item[3] is not None else math.inf,
             gaussian_weight_sort_key(item[0]),
         ))

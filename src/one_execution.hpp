@@ -75,7 +75,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::string gaussian_strategy, std::string safe_passage_strategy, double magic_high,
     double magic_low, double cnot_high, double cnot_low, double mapped_gaussian_weight,
     double base_gaussian_weight, double gaussian_confidence, double external_weight,
-    int x, int y, std::string graph_path,
+    int x, int y, int dimension_offset, std::string graph_path,
     std::string magic_state_placement_strategy, int number_of_magic_states,
     double number_of_magic_states_multiplier,
     double border_distance_percentage, std::string routing_strategy,
@@ -197,9 +197,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             x = compute_upper_dimensions(qubitsNumber, max_deg);
             y = x;
         } else if (x < 0 || y < 0){
-            const int sentinel = (x < 0) ? x : y;
-            const int offset = -sentinel - 1;
-            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type, border_distance_percentage, max_deg) + offset;
+            // Auto-size: base heuristic grid plus a signed delta from config.
+            // dimension_offset < 0 => smaller/harder grid, > 0 => larger/easier.
+            x = compute_dimensions(circuit.getNumQubits(), safe_passage_strategy, number_of_magic_states, type, border_distance_percentage, max_deg) + dimension_offset;
             y = x;
         }
         std::cout << "Creating rectangular graph with dimensions " << x << "x" << y << "...\n";
