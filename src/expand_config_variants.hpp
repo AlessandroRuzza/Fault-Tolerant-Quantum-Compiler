@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include <unistd.h>
+
 #include <nlohmann/json.hpp>
 
 inline std::string expand_config_variants(const std::string &json_name, int process_count = 1) {
@@ -231,8 +233,14 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
 
     // Stream each expanded entry straight to disk so the full set of generated
     // entries is never held in memory at once. Write to a temp file and rename
-    // so an interrupted expansion never leaves a truncated output behind.
-    const std::filesystem::path tmp_path = output_path.string() + ".tmp";
+    // so an interrupted expansion never leaves a truncated output behind. The
+    // temp name carries the PID so that several processes regenerating the same
+    // benchmark at once (one per --processor) each rename their own file instead
+    // of racing on a shared "<name>.tmp" (the loser used to fail with "cannot
+    // rename: No such file or directory"). The final rename is atomic, so the
+    // shared output ends up as one complete, identical expansion.
+    const std::filesystem::path tmp_path =
+        output_path.string() + ".tmp." + std::to_string(static_cast<long long>(::getpid()));
     std::ofstream output_stream(tmp_path, std::ios::trunc);
     if (!output_stream.is_open()) {
         throw std::runtime_error("Cannot open output file: " + tmp_path.string());

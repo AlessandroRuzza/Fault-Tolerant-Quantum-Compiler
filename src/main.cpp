@@ -530,11 +530,18 @@ int run_bench_mode(
     // are re-executed by the resume logic (sidecar / expanded "executed" flag),
     // so the leftover rows carry no result and would otherwise pile up as
     // duplicates. Column 26 is the "status" field of the runs CSV.
-    if (const std::size_t purged =
-            write_csv::remove_rows_with_status(csv_path, 26, "interrupted");
-        purged > 0) {
-        std::cout << "Removed " << purged
-                  << " stale interrupted CSV row(s) from a previous run.\n";
+    //
+    // Only processor 0 purges: when a benchmark is split across several
+    // processes they all share one CSV, and a single cleaner avoids N
+    // concurrent full-file rewrites (it removes every processor's stale rows,
+    // not just its own).
+    if (processor == 0) {
+        if (const std::size_t purged =
+                write_csv::remove_rows_with_status(csv_path, 26, "interrupted");
+            purged > 0) {
+            std::cout << "Removed " << purged
+                      << " stale interrupted CSV row(s) from a previous run.\n";
+        }
     }
 
     int next_execution_id = write_csv::read_max_execution_id(csv_path) + 1;
@@ -564,11 +571,21 @@ int run_bench_mode(
     }();
 
     auto persist_expanded = [&]() {
-        std::ofstream out(expanded_path);
-        if (!out.is_open()) {
-            throw std::runtime_error("Cannot write expanded bench file: " + expanded_path.string());
+        // Write to a PID-unique temp then atomically rename, so when several
+        // processes share this expanded file (one per --processor) a concurrent
+        // persist can't leave it half-written. Last writer wins; the resume
+        // truth lives in the sidecar, so a stale "executed" snapshot here is
+        // harmless.
+        const std::filesystem::path tmp_path =
+            expanded_path.string() + ".tmp." + std::to_string(static_cast<long long>(::getpid()));
+        {
+            std::ofstream out(tmp_path);
+            if (!out.is_open()) {
+                throw std::runtime_error("Cannot write expanded bench file: " + tmp_path.string());
+            }
+            out << bench_data.dump(2) << '\n';
         }
-        out << bench_data.dump(2) << '\n';
+        std::filesystem::rename(tmp_path, expanded_path);
     };
 
     const std::size_t total_cases = bench_data.size();
