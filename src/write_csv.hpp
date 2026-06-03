@@ -1,13 +1,56 @@
 #pragma once
 
 #include <algorithm>
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+
 namespace write_csv {
+
+// Cross-process advisory lock for a single runs-CSV. When the benchmark is run
+// as several processes (one per `--processor`) they all share one
+// `<bench>_runs.csv`; single-line appends are atomic, but the full-file rewrites
+// (purge / migrate / replace) would otherwise race with concurrent appends and
+// drop or corrupt rows. Every writer takes this lock for the duration of its
+// operation, so writers serialize. The lock lives on a sibling `<csv>.lock`
+// file (flock follows the open fd, so locking the CSV's own fd across a
+// truncate is fragile). Advisory + blocking; relies on flock support of the
+// underlying filesystem (fine on local/bound storage and modern NFSv4).
+class CsvFileLock {
+public:
+    explicit CsvFileLock(const std::filesystem::path &csv_path) {
+        lock_path_ = csv_path;
+        lock_path_ += ".lock";
+        fd_ = ::open(lock_path_.c_str(), O_CREAT | O_RDWR, 0666);
+        if (fd_ >= 0) {
+            while (::flock(fd_, LOCK_EX) == -1 && errno == EINTR) {
+                // Retry if interrupted by a signal; otherwise give up and
+                // proceed unlocked rather than abort the whole run.
+            }
+        }
+    }
+
+    ~CsvFileLock() {
+        if (fd_ >= 0) {
+            ::flock(fd_, LOCK_UN);
+            ::close(fd_);
+        }
+    }
+
+    CsvFileLock(const CsvFileLock &) = delete;
+    CsvFileLock &operator=(const CsvFileLock &) = delete;
+
+private:
+    int fd_ = -1;
+    std::filesystem::path lock_path_;
+};
 
 inline constexpr const char *kBenchmarkRunsCsvHeader =
     "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
@@ -299,6 +342,7 @@ inline int execution_id_from_log_file(const std::string &log_file, int fallback)
 }
 
 inline void append_row(const std::filesystem::path &csv_path, const std::vector<std::string> &columns) {
+    CsvFileLock lock(csv_path);
     std::ofstream out(csv_path, std::ios::app);
     if (!out.is_open()) {
         throw std::runtime_error("Cannot append CSV row: " + csv_path.string());
@@ -312,6 +356,7 @@ inline void replace_row(
     std::size_t data_row_index,
     const std::vector<std::string> &columns
 ) {
+    CsvFileLock lock(csv_path);
     std::ifstream in(csv_path);
     if (!in.is_open()) {
         throw std::runtime_error("Cannot read CSV rows for replacement: " + csv_path.string());
@@ -375,7 +420,70 @@ inline std::vector<std::vector<std::string>> read_data_rows(const std::filesyste
     return rows;
 }
 
+// Drop every data row whose `status_col` equals `status_value`, rewriting the
+// file in a single pass. Returns the number of rows removed (0 leaves the file
+// untouched). Kept rows preserve their original text verbatim. Used to purge
+// stale "interrupted" rows at benchmark startup: an interrupted row marks an
+// aborted run that the resume logic re-executes, so the leftover row carries no
+// result and would otherwise accumulate as a duplicate.
+inline std::size_t remove_rows_with_status(
+    const std::filesystem::path &csv_path,
+    std::size_t status_col,
+    const std::string &status_value
+) {
+    if (!std::filesystem::exists(csv_path)) {
+        return 0;
+    }
+
+    // Hold the lock across the whole read+rewrite so concurrent appenders see
+    // either the pre-purge or the post-purge file, never a half-rewritten one.
+    CsvFileLock lock(csv_path);
+
+    std::ifstream in(csv_path);
+    if (!in.is_open()) {
+        return 0;
+    }
+
+    std::string header;
+    if (!std::getline(in, header)) {
+        return 0;
+    }
+
+    std::vector<std::string> kept;
+    std::size_t removed = 0;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.empty()) {
+            continue;
+        }
+        if (at_or_empty(parse_row(line), status_col) == status_value) {
+            ++removed;
+            continue;
+        }
+        kept.push_back(line);
+    }
+    in.close();
+
+    if (removed == 0) {
+        return 0;
+    }
+
+    std::ofstream out(csv_path, std::ios::trunc);
+    if (!out.is_open()) {
+        throw std::runtime_error("Cannot rewrite CSV after removing rows: " + csv_path.string());
+    }
+    out << header << '\n';
+    for (const std::string &row : kept) {
+        out << row << '\n';
+    }
+    return removed;
+}
+
 inline void ensure_initialized(const std::filesystem::path &csv_path, const std::string &header) {
+    // Serialize creation/migration: several processes call this at startup, and
+    // the migration branch rewrites the whole file.
+    CsvFileLock lock(csv_path);
+
     if (!std::filesystem::exists(csv_path)) {
         std::ofstream out(csv_path);
         if (!out.is_open()) {

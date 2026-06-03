@@ -2848,15 +2848,54 @@ _GAUSSIAN_SUMMARY_WEIGHT_FIELDS = (
     ("external\nweight", "external_weight"),
 )
 _GAUSSIAN_SUMMARY_RANGE_MASS = 0.75
+# A "cell" fixes every non-weight sweep dimension, so only the gaussian weights vary
+# inside it. On tight grids, safe_passage_failed / timeout / failed remove combos
+# weight-dependently, so the surviving rows in a partially-failed cell are a biased
+# weight subset. Cells below this success fraction are dropped before any "best weights"
+# estimate (see tmp/sweetspot_analysis.py for the standalone version).
+_GAUSSIAN_CLEAN_CELL_THRESHOLD = 0.98
+
+
+def _gaussian_cell_key(row):
+    return (
+        row.get("circuit_name"),
+        row.get("x_i"),
+        row.get("y_i"),
+        row.get("border_pct_f"),
+        row.get("safe_passage_norm"),
+        row.get("gaussian_strategy_norm"),
+        row.get("gaussian_confidence_f"),
+    )
+
+
+def _gaussian_clean_cells(rows, metric_field, threshold=_GAUSSIAN_CLEAN_CELL_THRESHOLD):
+    """Return the set of cell keys whose weight-combos were (almost) all routed, i.e.
+    not weight-biased by safe_passage/timeout/fail. Used to exclude partial-failure cells
+    from the gaussian-weight 'best' plots."""
+    counts = defaultdict(lambda: [0, 0])  # cell -> [attempted, succeeded]
+    for row in rows:
+        if row.get("mapping_type_norm") != "gaussian":
+            continue
+        if gaussian_weight_tuple(row) is None:
+            continue
+        cell = _gaussian_cell_key(row)
+        counts[cell][0] += 1
+        if row.get("success") and row.get(metric_field) is not None:
+            counts[cell][1] += 1
+    return {cell for cell, (att, ok) in counts.items() if att > 0 and ok / att >= threshold}
 
 
 def _gaussian_best_profile_by_metric(rows, metric_field):
     """For each (circuit, graph_x, graph_y), pick the gaussian-weight config that
     minimizes metric_field (success rows only), with tie-break on mean(metric),
-    duration, combo. Returns list of dicts with the weight values per group."""
+    duration, combo. Returns list of dicts with the weight values per group.
+    Partial-failure cells (weight-biased) are excluded."""
+    clean_cells = _gaussian_clean_cells(rows, metric_field)
     grouped = defaultdict(lambda: defaultdict(list))
     for row in rows:
         if row.get("mapping_type_norm") != "gaussian":
+            continue
+        if _gaussian_cell_key(row) not in clean_cells:
             continue
         if not row.get("success") or row.get(metric_field) is None:
             continue
@@ -3085,8 +3124,12 @@ def _gaussian_summary_profiles_by_section(rows, metric_field):
     dimension_values = {field: set() for field, _display_name, _slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS}
     border_values = set()
 
+    clean_cells = _gaussian_clean_cells(rows, metric_field)
+
     for row in rows:
         if row.get("mapping_type_norm") != "gaussian":
+            continue
+        if _gaussian_cell_key(row) not in clean_cells:
             continue
 
         dimension_keys = []

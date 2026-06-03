@@ -525,6 +525,18 @@ int run_bench_mode(
     const std::string csv_file_name = sanitize_filename(bench_name) + "_runs.csv";
     const std::filesystem::path csv_path = results_dir / csv_file_name;
     write_csv::ensure_initialized(csv_path, write_csv::kBenchmarkRunsCsvHeader);
+
+    // Purge stale "interrupted" rows left by a previous aborted run. Those cases
+    // are re-executed by the resume logic (sidecar / expanded "executed" flag),
+    // so the leftover rows carry no result and would otherwise pile up as
+    // duplicates. Column 26 is the "status" field of the runs CSV.
+    if (const std::size_t purged =
+            write_csv::remove_rows_with_status(csv_path, 26, "interrupted");
+        purged > 0) {
+        std::cout << "Removed " << purged
+                  << " stale interrupted CSV row(s) from a previous run.\n";
+    }
+
     int next_execution_id = write_csv::read_max_execution_id(csv_path) + 1;
 
     // Per-case worker config/result files are transient (written, read by the
@@ -679,8 +691,6 @@ int run_bench_mode(
         bool already_executed = false;
         bool timeout_reached_before = false;
         bool rerun_timeout_case = false;
-        bool replace_interrupted_csv_row = false;
-        std::size_t replacement_csv_data_row = 0;
     };
 
     struct BenchCaseResult {
@@ -743,14 +753,6 @@ int run_bench_mode(
             return normalize_identity_value(value);
         };
 
-        const auto csv_field = [&](const std::vector<std::string> &row, std::size_t index, const std::string &fallback = "") {
-            std::string value = write_csv::at_or_empty(row, index);
-            if (value.empty()) {
-                value = fallback;
-            }
-            return normalize_identity_value(value);
-        };
-
         const auto is_sentinel_dim = [](const std::string &v) {
             if (v.empty()) return false;
             try {
@@ -759,83 +761,6 @@ int run_bench_mode(
                 return false;
             }
         };
-
-        const auto entry_has_explicit_graph_dimensions = [&](const json &entry) {
-            const std::string x_value = plan_field(entry, {"x"});
-            const std::string y_value = plan_field(entry, {"y"});
-            return !x_value.empty() && !y_value.empty()
-                && !is_sentinel_dim(x_value) && !is_sentinel_dim(y_value);
-        };
-
-        const auto csv_row_matches_plan = [&](const std::vector<std::string> &row, const json &entry) {
-            const std::vector<std::pair<std::size_t, std::string>> comparisons = {
-                {3, plan_field(entry, {"circuit"})},
-                {7, plan_field(entry, {"mapping_type", "type"})},
-                {8, plan_field(entry, {"magic_aware_strategy"})},
-                {9, plan_field(entry, {"gaussian_strategy"})},
-                {10, plan_field(entry, {"MAGIC_HIGH", "magic_high"})},
-                {11, plan_field(entry, {"MAGIC_LOW", "magic_low"})},
-                {12, plan_field(entry, {"CNOT_HIGH", "cnot_high"})},
-                {13, plan_field(entry, {"CNOT_LOW", "cnot_low"})},
-                {14, plan_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"})},
-                {15, plan_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"})},
-                {16, plan_field(entry, {"GAUSSIAN_CONFIDENCE", "gaussian_confidence"})},
-                {17, plan_field(entry, {"safe_passage_strategy"})},
-                {18, plan_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"})},
-                {19, plan_field(entry, {"border_distance_percentage"})},
-                {20, plan_field(entry, {"number_of_magic_states"})},
-                {21, plan_field(entry, {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}, "congestion")},
-                {22, plan_field(entry, {"t_routing_mode", "t-routing-mode"}, "normal_t_routing")},
-                {23, plan_field(entry, {"use_layer_cache", "use-layer-cache"}, "true")},
-                {45, plan_field(entry, {"EXTERNAL_WEIGHT", "external_weight"}, "0")}
-            };
-
-            for (const auto &[index, expected] : comparisons) {
-                std::string fallback;
-                if (index == 22)      fallback = "normal_t_routing";
-                else if (index == 45) fallback = "0";      // external_weight
-                if (csv_field(row, index, fallback) != expected) {
-                    return false;
-                }
-            }
-
-            if (entry_has_explicit_graph_dimensions(entry)) {
-                if (csv_field(row, 4) != plan_field(entry, {"x"}) ||
-                    csv_field(row, 5) != plan_field(entry, {"y"})) {
-                    return false;
-                }
-            }
-
-            const std::string expected_label = plan_field(entry, {"circuit_graph_label"});
-            if (!expected_label.empty() && csv_field(row, 6) != expected_label) {
-                return false;
-            }
-
-            return true;
-        };
-
-        struct InterruptedCsvRow {
-            std::size_t data_row_index = 0;
-            std::vector<std::string> row;
-            bool used = false;
-        };
-
-        std::vector<InterruptedCsvRow> interrupted_csv_rows;
-        const std::vector<std::vector<std::string>> existing_csv_rows = write_csv::read_data_rows(csv_path);
-        for (std::size_t row_index = 0; row_index < existing_csv_rows.size(); ++row_index) {
-            const std::vector<std::string> &row = existing_csv_rows[row_index];
-            if (csv_field(row, 27) != "interrupted") {
-                continue;
-            }
-
-            interrupted_csv_rows.push_back({row_index, row, false});
-        }
-
-        if (!interrupted_csv_rows.empty()) {
-            std::cout
-                << "Found " << interrupted_csv_rows.size()
-                << " interrupted CSV row(s) that can be reused if their configuration is scheduled again.\n";
-        }
 
         for (std::size_t i = 0; i < total_cases; ++i) {
             if (!bench_data.at(i).is_object()) {
@@ -899,29 +824,6 @@ int run_bench_mode(
             }
 
             plans.push_back(std::move(plan));
-        }
-
-        std::size_t reusable_interrupted_rows = 0;
-        for (std::size_t plan_index : runnable_indices) {
-            BenchCasePlan &plan = plans[plan_index];
-            const json &entry = bench_data.at(plan.index);
-            for (InterruptedCsvRow &interrupted_row : interrupted_csv_rows) {
-                if (interrupted_row.used || !csv_row_matches_plan(interrupted_row.row, entry)) {
-                    continue;
-                }
-
-                interrupted_row.used = true;
-                plan.replace_interrupted_csv_row = true;
-                plan.replacement_csv_data_row = interrupted_row.data_row_index;
-                ++reusable_interrupted_rows;
-                break;
-            }
-        }
-
-        if (reusable_interrupted_rows > 0) {
-            std::cout
-                << "Will overwrite " << reusable_interrupted_rows
-                << " interrupted CSV row(s) instead of appending new rows.\n";
         }
 
         if (!runnable_indices.empty()) {
@@ -1462,6 +1364,11 @@ int run_bench_mode(
         long long commits_since_flush = 0;
         constexpr long long kSidecarFlushInterval = 64;
 
+        // Per-configuration timing summary (printed once at the end).
+        const auto bench_loop_start = std::chrono::steady_clock::now();
+        double total_case_seconds = 0.0;
+        long long executed_case_count = 0;
+
 #pragma omp parallel for schedule(dynamic, 1) if(runnable_count > 1)
         for (long long runnable_idx = 0; runnable_idx < runnable_count; ++runnable_idx) {
             if (fatal_error.load() || g_bench_interrupt_requested != 0) {
@@ -1471,11 +1378,16 @@ int run_bench_mode(
             const std::size_t plan_index = runnable_indices[static_cast<std::size_t>(runnable_idx)];
             const BenchCasePlan &plan = plans[plan_index];
             const int execution_id = next_execution_id_counter.fetch_add(1);
+            const auto case_start = std::chrono::steady_clock::now();
             BenchCaseResult result = execute_case(plan, execution_id);
+            const double case_seconds =
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - case_start).count();
             results[plan.index] = result;
 
 #pragma omp critical(bench_commit)
             {
+                total_case_seconds += case_seconds;
+                ++executed_case_count;
                 if (!fatal_error.load()) {
                     try {
                         bench_data.at(result.index)["executed"] = result.mark_entry_as_executed;
@@ -1489,16 +1401,7 @@ int run_bench_mode(
                             sidecar_out.flush();
                             commits_since_flush = 0;
                         }
-                        const BenchCasePlan &committed_plan = plans[result.index];
-                        if (committed_plan.replace_interrupted_csv_row) {
-                            write_csv::replace_row(
-                                csv_path,
-                                committed_plan.replacement_csv_data_row,
-                                result.csv_row
-                            );
-                        } else {
-                            write_csv::append_row(csv_path, result.csv_row);
-                        }
+                        write_csv::append_row(csv_path, result.csv_row);
                     } catch (const std::exception &e) {
                         fatal_error = true;
                         fatal_error_message = e.what();
@@ -1516,6 +1419,17 @@ int run_bench_mode(
         }
 
         sidecar_out.flush();
+
+        if (executed_case_count > 0) {
+            const double bench_loop_seconds =
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - bench_loop_start).count();
+            std::cout << std::fixed << std::setprecision(2)
+                      << "\n=== Timing summary ===\n"
+                      << "configurations executed: " << executed_case_count << "\n"
+                      << "average time per configuration: "
+                      << (total_case_seconds / static_cast<double>(executed_case_count)) << " s\n"
+                      << "total wall time (loop): " << bench_loop_seconds << " s\n";
+        }
 
         if (fatal_error.load()) {
             throw std::runtime_error(fatal_error_message);
