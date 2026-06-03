@@ -16,8 +16,10 @@ def load_csv(csv_path):
     with open(csv_path, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            # Convert numeric fields
+            # Convert numeric fields (skip string-identity columns)
             for key in row:
+                if key == 'circuit':
+                    continue
                 try:
                     if '.' in row[key]:
                         row[key] = float(row[key])
