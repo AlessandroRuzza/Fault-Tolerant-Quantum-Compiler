@@ -113,6 +113,7 @@ CONFIG_COLS = [
     ("border_distance_percentage",      "Border %"),
     ("t_routing_mode",                  "T-routing"),
     ("use_layer_cache",                 "Cache"),
+    ("_t_prop_computed",                "T-prop"),
     ("gaussian_strategy",               "Gaussian"),
     ("magic_aware_strategy",            "MA strategy"),
 ]
@@ -402,6 +403,15 @@ def save_top15_figure(circuit: str, top_rows: list,
                     v = str(int(v))
                 except (ValueError, TypeError):
                     pass
+            elif key == "_t_prop_computed":
+                # T-prop is "yes" if number_of_magic_states==-1 (new sentinel)
+                # or if the legacy t_states_proportional column says "true"
+                nmag = row.get("number_of_magic_states", "")
+                legacy = row.get("t_states_proportional", "")
+                try:
+                    v = "yes" if int(float(nmag)) == -1 or str(legacy).lower() == "true" else "no"
+                except (ValueError, TypeError):
+                    v = "yes" if str(legacy).lower() == "true" else "no"
             elif key == "use_layer_cache":
                 v = "yes" if str(v).lower() == "true" else "no"
             elif key == "number_of_magic_states":

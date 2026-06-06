@@ -26,6 +26,8 @@
 #include <nlohmann/json.hpp>
 
 #include <cerrno>
+#include <cstring>
+#include <fcntl.h>
 #include <mutex>
 #include <spawn.h>
 #include <sys/wait.h>
@@ -85,6 +87,88 @@ void handle_bench_interrupt(int signal_number) {
             kill(worker_pid, signal_number);
         }
     }
+}
+
+// --- Worker-side timeout handler -------------------------------------------
+//
+// When this process runs as a benchmark worker, the runner wraps it in
+// `timeout --signal=TERM`. Without a handler, that SIGTERM discards every
+// repetition completed so far. We cache the result-file path up front and, on
+// SIGTERM, persist the best completed repetition (mirrored in g_partial_* by
+// one_execution) using only async-signal-safe calls (open/write/close/_exit
+// and hand-rolled integer formatting — no malloc, no stdio, no JSON lib).
+char g_worker_result_path[4096] = {0};
+
+void as_append_cstr(char *buf, std::size_t &pos, std::size_t cap, const char *s) {
+    while (*s != '\0' && pos < cap) {
+        buf[pos++] = *s++;
+    }
+}
+
+void as_append_int(char *buf, std::size_t &pos, std::size_t cap, long value) {
+    if (value < 0) {
+        if (pos < cap) buf[pos++] = '-';
+        value = -value;
+    }
+    char digits[24];
+    int n = 0;
+    if (value == 0) {
+        digits[n++] = '0';
+    }
+    while (value > 0 && n < 24) {
+        digits[n++] = static_cast<char>('0' + (value % 10));
+        value /= 10;
+    }
+    while (n > 0 && pos < cap) {
+        buf[pos++] = digits[--n];
+    }
+}
+
+void as_append_int_field(char *buf, std::size_t &pos, std::size_t cap,
+                         const char *key, long value) {
+    as_append_cstr(buf, pos, cap, key);
+    as_append_int(buf, pos, cap, value);
+}
+
+void handle_worker_timeout(int /*signal_number*/) {
+    if (g_partial_has_result == 0 || g_worker_result_path[0] == '\0') {
+        // Nothing completed yet — behave like a plain timeout (write nothing).
+        _exit(124);
+    }
+
+    char buf[1024];
+    std::size_t pos = 0;
+    const std::size_t cap = sizeof(buf);
+    as_append_cstr(buf, pos, cap,
+                   "{\"status\":\"timeout_partial\",\"routing_steps\":");
+    as_append_int(buf, pos, cap, g_partial_routing_steps);
+    as_append_int_field(buf, pos, cap, ",\"completed_repetitions\":",
+                        g_partial_completed_repetitions);
+    if (g_partial_resolved_graph_x >= 0)
+        as_append_int_field(buf, pos, cap, ",\"resolved_graph_x\":", g_partial_resolved_graph_x);
+    if (g_partial_resolved_graph_y >= 0)
+        as_append_int_field(buf, pos, cap, ",\"resolved_graph_y\":", g_partial_resolved_graph_y);
+    if (g_partial_num_qubits >= 0)
+        as_append_int_field(buf, pos, cap, ",\"num_qubits\":", g_partial_num_qubits);
+    if (g_partial_max_interaction_degree >= 0)
+        as_append_int_field(buf, pos, cap, ",\"max_interaction_degree\":", g_partial_max_interaction_degree);
+    if (g_partial_resolved_n_magic >= 0)
+        as_append_int_field(buf, pos, cap, ",\"resolved_number_of_magic_states\":", g_partial_resolved_n_magic);
+    if (g_partial_non_routed_micro >= 0)
+        as_append_int_field(buf, pos, cap, ",\"non_routed_layer_micro\":", g_partial_non_routed_micro);
+    as_append_cstr(buf, pos, cap, "}\n");
+
+    const int fd = open(g_worker_result_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+        std::size_t off = 0;
+        while (off < pos) {
+            const ssize_t written = write(fd, buf + off, pos - off);
+            if (written <= 0) break;
+            off += static_cast<std::size_t>(written);
+        }
+        close(fd);
+    }
+    _exit(124);
 }
 
 // Spawn `/bin/sh -c "command"` and wait, exposing the worker PID to the signal
@@ -273,6 +357,19 @@ int main(int argc, char **argv) {
 benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     if (benchmark_artifacts_enabled()) {
         clear_visualization_outputs();
+    }
+
+    // As a benchmark worker, arm the timeout handler so a SIGTERM from the
+    // runner's `timeout` persists the best completed repetition instead of
+    // discarding the whole run. Cache the result-file path now (getenv in a
+    // signal handler is not async-signal-safe).
+    if (benchmark_worker_mode_enabled()) {
+        const char *result_path = std::getenv(kBenchResultFileEnv);
+        if (result_path != nullptr && *result_path != '\0') {
+            std::strncpy(g_worker_result_path, result_path, sizeof(g_worker_result_path) - 1);
+            g_worker_result_path[sizeof(g_worker_result_path) - 1] = '\0';
+            std::signal(SIGTERM, handle_worker_timeout);
+        }
     }
 
     std::string path = "../qasms/example.qasm";
@@ -992,6 +1089,58 @@ int run_bench_mode(
                     std::ostringstream timeout_ss;
                     timeout_ss << std::fixed << std::setprecision(3) << plan.timeout_seconds;
                     error_excerpt = "Execution exceeded timeout of " + timeout_ss.str() + "s";
+
+                    // Recover the best completed repetition if the worker's
+                    // timeout handler managed to persist it before being killed.
+                    // The row stays status="timeout"; a populated routing_steps
+                    // is the signal that a partial best was salvaged.
+                    try {
+                        if (std::filesystem::exists(temp_result_path)) {
+                            const json partial = read_benchmark_worker_payload(temp_result_path);
+                            if (partial.contains("routing_steps") &&
+                                partial.at("routing_steps").is_number_integer()) {
+                                routing_steps = std::to_string(partial.at("routing_steps").get<int>());
+                                if (partial.contains("non_routed_layer_micro") &&
+                                    partial.at("non_routed_layer_micro").is_number_integer()) {
+                                    const double pct =
+                                        partial.at("non_routed_layer_micro").get<long long>() / 1.0e6;
+                                    if (pct >= 0.0) {
+                                        non_routed_pct = format_pct(pct);
+                                    }
+                                }
+                                if (partial.contains("resolved_graph_x") &&
+                                    partial.at("resolved_graph_x").is_number_integer()) {
+                                    resolved_graph_x = std::to_string(partial.at("resolved_graph_x").get<int>());
+                                }
+                                if (partial.contains("resolved_graph_y") &&
+                                    partial.at("resolved_graph_y").is_number_integer()) {
+                                    resolved_graph_y = std::to_string(partial.at("resolved_graph_y").get<int>());
+                                }
+                                if (partial.contains("num_qubits") &&
+                                    partial.at("num_qubits").is_number_integer()) {
+                                    resolved_num_qubits = partial.at("num_qubits").get<int>();
+                                }
+                                if (partial.contains("max_interaction_degree") &&
+                                    partial.at("max_interaction_degree").is_number_integer()) {
+                                    resolved_max_degree = partial.at("max_interaction_degree").get<int>();
+                                }
+                                if (partial.contains("resolved_number_of_magic_states") &&
+                                    partial.at("resolved_number_of_magic_states").is_number_integer()) {
+                                    resolved_n_magic =
+                                        std::to_string(partial.at("resolved_number_of_magic_states").get<int>());
+                                }
+                                int completed = 0;
+                                if (partial.contains("completed_repetitions") &&
+                                    partial.at("completed_repetitions").is_number_integer()) {
+                                    completed = partial.at("completed_repetitions").get<int>();
+                                }
+                                error_excerpt += " (saved best of " + std::to_string(completed) +
+                                                 " completed repetition(s): routing_steps=" + routing_steps + ")";
+                            }
+                        }
+                    } catch (const std::exception &) {
+                        // No usable partial result; leave routing_steps empty.
+                    }
                 } else if (result.exit_code == 2) {
                     result.status = "safe_passage_failed";
                     const std::string worker_error = worker_error_from_result_file(temp_result_path);

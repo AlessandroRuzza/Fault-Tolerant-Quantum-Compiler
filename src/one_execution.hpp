@@ -21,6 +21,7 @@
 #include <memory>
 #include <chrono>
 #include <cmath>
+#include <csignal>
 #include <filesystem>
 #include <iostream>
 #include <limits>
@@ -38,6 +39,31 @@ struct benchmarkResult {
     double non_routed_layer_pct = -1.0;
     int resolved_number_of_magic_states = -1;
 };
+
+// ---------------------------------------------------------------------------
+// Partial best-so-far state for the benchmark worker's timeout handler.
+//
+// The repetition loop keeps the best result in local `best_*` variables and
+// only writes the worker result file once the whole loop finishes. If the
+// benchmark runner's `timeout` kills the worker mid-loop (SIGTERM), every
+// completed repetition would otherwise be discarded. We mirror the best-so-far
+// here, in plain integer scalars that are safe to read from a signal handler,
+// so the worker can persist the best completed repetition before exiting.
+//
+// Only integer scalars (sig_atomic_t) are used so the handler that consumes
+// them stays async-signal-safe. non_routed is stored as fixed-point
+// micro-units (value * 1e6; -1 = unknown) to avoid floating point in the
+// handler while preserving the exact value the success path would record.
+// ---------------------------------------------------------------------------
+inline volatile std::sig_atomic_t g_partial_has_result = 0;
+inline volatile std::sig_atomic_t g_partial_routing_steps = 0;
+inline volatile std::sig_atomic_t g_partial_completed_repetitions = 0;
+inline volatile std::sig_atomic_t g_partial_resolved_graph_x = -1;
+inline volatile std::sig_atomic_t g_partial_resolved_graph_y = -1;
+inline volatile std::sig_atomic_t g_partial_num_qubits = -1;
+inline volatile std::sig_atomic_t g_partial_max_interaction_degree = -1;
+inline volatile std::sig_atomic_t g_partial_resolved_n_magic = -1;
+inline volatile std::sig_atomic_t g_partial_non_routed_micro = -1;
 
 namespace {
 void clear_visualization_outputs() {
@@ -83,6 +109,13 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     bool use_layer_cache,
     bool metrics_only, int repetition_count,
     bool use_layer_cache_explicit = false) {
+
+    // Clear any stale partial state (a worker process runs exactly one
+    // one_execution, but resetting keeps the timeout handler honest).
+    g_partial_has_result = 0;
+    g_partial_routing_steps = 0;
+    g_partial_completed_repetitions = 0;
+    g_partial_non_routed_micro = -1;
 
     double circ_time_seconds = 0.0;
     double graph_time_seconds = 0.0;
@@ -238,6 +271,14 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     const int resolved_graph_y = graph_template.getMaxY() + 1;
     std::cout << "resolved graph dimensions: " << resolved_graph_x << "x" << resolved_graph_y << "\n";
 
+    // Publish the now-resolved circuit/graph facts so a timeout mid-loop still
+    // records dimensions alongside the best completed repetition.
+    g_partial_resolved_graph_x = resolved_graph_x;
+    g_partial_resolved_graph_y = resolved_graph_y;
+    g_partial_num_qubits = qubitsNumber;
+    g_partial_max_interaction_degree = max_deg;
+    g_partial_resolved_n_magic = number_of_magic_states;
+
     output_path = std::filesystem::path(PROJECT_ROOT) /
                 "qasm_graphs" /
                 (original_name.string() + ".graph");
@@ -378,8 +419,21 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             best_path_strategy = std::move(pathStrategyPtr);
             best_t_gate_strategy = std::move(tGateRoutingStrategyPtr);
             best_route_metrics = std::move(route_metrics);
+
+            // Mirror the new best into the partial state read by the worker's
+            // timeout handler. Order matters: publish the values, then flip
+            // has_result last so the handler never sees a half-updated best.
+            g_partial_routing_steps = best_routing_steps;
+            g_partial_non_routed_micro = best_non_routed_layer_pct >= 0.0
+                ? static_cast<std::sig_atomic_t>(best_non_routed_layer_pct * 1e6 + 0.5)
+                : -1;
+            g_partial_has_result = 1;
         }
-            
+
+        // Count every completed repetition (not just the improving ones) so the
+        // saved partial reports how far the loop actually got.
+        g_partial_completed_repetitions = repetition + 1;
+
         if(print_reps) {
             std::cout << "Routing steps: " << routing_steps << "\n";
             std::cout << "Avg parallelism: " << avg_parallelism << "\n";
