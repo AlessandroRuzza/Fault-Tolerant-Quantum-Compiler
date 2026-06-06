@@ -43,12 +43,12 @@ if "MPLCONFIGDIR" not in os.environ:
 os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
 
 def importMatplotlib():
-    global plt, np, Line2D, TwoSlopeNorm
+    global plt, np, Line2D, TwoSlopeNorm, Normalize
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
-    from matplotlib.colors import TwoSlopeNorm
+    from matplotlib.colors import TwoSlopeNorm, Normalize
     from matplotlib.lines import Line2D
 
 
@@ -2857,10 +2857,12 @@ _GAUSSIAN_CLEAN_CELL_THRESHOLD = 0.98
 
 
 def _gaussian_cell_key(row):
+    # No x_i/y_i on purpose: at x=-1 the grid is deterministic per
+    # (circuit, border, safe_passage, strategy, confidence), and failed rows
+    # (safe_passage_failed/timeout) have no resolved graph_x — keying on x,y
+    # would make them invisible and cells would look spuriously 100% clean.
     return (
         row.get("circuit_name"),
-        row.get("x_i"),
-        row.get("y_i"),
         row.get("border_pct_f"),
         row.get("safe_passage_norm"),
         row.get("gaussian_strategy_norm"),
@@ -3299,9 +3301,219 @@ def _plot_gaussian_weight_summary_for_metric(
     save_fig(fig, output_dir, filename, generated, subfolder=GAUSSIAN_DIR)
 
 
+def _gaussian_weight_effect_by_section(rows, metric_field):
+    """Companion to the best-weights summary: per section & weight field, how much
+    the metric IMPROVES from the worst to the best value of that weight, i.e. the
+    spread (max-min) of the per-value cell-equal mean over clean cells. A large
+    effect => the 'best' value is meaningful; ~0 => the 'best' is just noise (every
+    value gives ~the same metric). Mirrors the sectioning of
+    _gaussian_summary_profiles_by_section so the two heatmaps line up row-for-row.
+
+    Returns (section_results, dimension_values, border_values) where
+    section_results[section_key] = (n_cells, {field: stat or None}) and
+    stat = {effect, rel, best_value, n_values}."""
+    clean_cells = _gaussian_clean_cells(rows, metric_field)
+    fields = [field for _label, field in _GAUSSIAN_SUMMARY_WEIGHT_FIELDS]
+    # section_key -> field -> weight_value -> cell -> [metric_sum, n]
+    acc = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0.0, 0])))
+    )
+    section_cells = defaultdict(set)
+    dimension_values = {field: set() for field, _dn, _slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS}
+    border_values = set()
+
+    for row in rows:
+        if row.get("mapping_type_norm") != "gaussian":
+            continue
+        if _gaussian_cell_key(row) not in clean_cells:
+            continue
+
+        dimension_keys = []
+        for field, _dn, _slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS:
+            value = row.get(field)
+            if value in (None, ""):
+                continue
+            dimension_values[field].add(value)
+            dimension_keys.append(("dimension", field, value))
+
+        border_key = _summary_border_key(row)
+        if border_key is not None:
+            border_values.add(border_key[1])
+
+        metric_value = row.get(metric_field)
+        if not row.get("success") or metric_value is None:
+            continue
+        cell = _gaussian_cell_key(row)
+
+        section_keys = [("overall",)]
+        section_keys.extend(dimension_keys)
+        if border_key is not None:
+            section_keys.append(border_key)
+
+        for section_key in section_keys:
+            section_cells[section_key].add(cell)
+            field_acc = acc[section_key]
+            for field in fields:
+                # prepared rows store weights under the "<field>_f" float keys
+                # (see gaussian_weight_tuple); the bare field names only exist on
+                # the constructed best-entry dicts.
+                wval = row.get(field + "_f")
+                if wval is None or math.isnan(wval):
+                    continue
+                bucket = field_acc[field][float(wval)][cell]
+                bucket[0] += metric_value
+                bucket[1] += 1
+
+    section_results = {}
+    for section_key, by_field in acc.items():
+        field_stats = {}
+        for field in fields:
+            by_value = by_field.get(field)
+            value_scores = {}
+            if by_value:
+                for value, per_cell in by_value.items():
+                    # cell-equal: average the in-cell means so a circuit that
+                    # happens to have many runs doesn't dominate the effect.
+                    cell_means = [s / n for _cell, (s, n) in per_cell.items() if n]
+                    if cell_means:
+                        value_scores[value] = sum(cell_means) / len(cell_means)
+            if len(value_scores) < 2:
+                field_stats[field] = None  # only one value tested -> no effect to measure
+                continue
+            best_value = min(value_scores, key=value_scores.get)
+            best_score = value_scores[best_value]
+            worst_score = max(value_scores.values())
+            mean_score = sum(value_scores.values()) / len(value_scores)
+            effect = worst_score - best_score
+            field_stats[field] = {
+                "effect": effect,
+                "rel": (effect / mean_score) if mean_score else 0.0,
+                "best_value": best_value,
+                "n_values": len(value_scores),
+            }
+        section_results[section_key] = (len(section_cells[section_key]), field_stats)
+    return section_results, dimension_values, border_values
+
+
+def _plot_gaussian_weight_effect_for_metric(
+    rows, output_dir, generated, skipped, metric_field, filename, title_suffix
+):
+    """Render the effect-size heatmap: for each section x weight field, how much
+    the best value beats the others (max-min of the per-value mean metric). Color
+    = effect magnitude (pale ≈ the 'best' is noise, saturated = it really matters)."""
+    section_results, dimension_values, border_values = _gaussian_weight_effect_by_section(
+        rows, metric_field
+    )
+
+    # Same row order as the best-weights summary: OVERALL, per-dimension, per-border.
+    sections = []  # (group_label_or_None, row_label, n_cells, field_stats)
+    overall = section_results.get(("overall",))
+    if overall is not None:
+        sections.append((None, "OVERALL", overall[0], overall[1]))
+
+    for field, display_name, _slug in GAUSSIAN_GAP_BREAKDOWN_DIMENSIONS:
+        first_in_group = True
+        for value in sorted(dimension_values[field], key=str):
+            res = section_results.get(("dimension", field, value))
+            if res is None:
+                continue
+            sections.append((display_name if first_in_group else "", f"{display_name} = {value}", res[0], res[1]))
+            first_in_group = False
+
+    first_border_row = True
+    for border_value in sorted(border_values):
+        res = section_results.get(("border", border_value))
+        if res is None:
+            continue
+        display_name = "border percentage"
+        sections.append((
+            display_name if first_border_row else "",
+            f"{display_name} = {format_number_label(border_value)}",
+            res[0],
+            res[1],
+        ))
+        first_border_row = False
+
+    if not sections:
+        record_skipped_plot(skipped, filename, "no gaussian effect entries available")
+        return
+
+    n_rows = len(sections)
+    n_cols = len(_GAUSSIAN_SUMMARY_WEIGHT_FIELDS)
+    data = np.zeros((n_rows, n_cols), dtype=float)
+    masked = np.zeros((n_rows, n_cols), dtype=bool)
+    row_labels = []
+    for i, (_group, row_label, n_cells, field_stats) in enumerate(sections):
+        row_labels.append(f"{row_label}   (n={n_cells})")
+        for j, (_lbl, field) in enumerate(_GAUSSIAN_SUMMARY_WEIGHT_FIELDS):
+            stat = field_stats.get(field)
+            if stat is None:
+                masked[i, j] = True
+            else:
+                data[i, j] = stat["effect"]
+
+    if (~masked).any():
+        vmax = float(np.percentile(data[~masked], 95))
+    else:
+        vmax = 1.0
+    vmax = max(vmax, 1e-6)
+    norm = Normalize(vmin=0.0, vmax=vmax)
+
+    fig_height = max(7.0, 0.92 * n_rows + 3.0)
+    fig, ax = plt.subplots(figsize=(19.5, fig_height))
+    masked_data = np.ma.array(data, mask=masked)
+    image = ax.imshow(masked_data, aspect="auto", cmap="YlOrRd", norm=norm)
+
+    ax.set_title(
+        f"Gaussian Weight Effect Size — {title_suffix}\n"
+        f"how much the best value beats the others (Δ = max−min of per-value mean; "
+        f"pale ≈ best is noise)",
+        fontsize=15, pad=16,
+    )
+    ax.set_xticks(range(n_cols))
+    ax.set_xticklabels([lbl for lbl, _ in _GAUSSIAN_SUMMARY_WEIGHT_FIELDS], fontsize=13)
+    ax.xaxis.tick_top()
+    ax.tick_params(axis="x", labeltop=True, labelbottom=False, pad=6)
+    ax.set_yticks(range(n_rows))
+    ax.set_yticklabels(row_labels, fontsize=12)
+    ax.set_xticks(np.arange(-0.5, n_cols, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, n_rows, 1), minor=True)
+    ax.grid(which="minor", color="white", linewidth=1.2)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    ax.tick_params(axis="both", length=0)
+
+    for i in range(n_rows):
+        for j in range(n_cols):
+            if masked[i, j]:
+                ax.text(j, i, "—", ha="center", va="center", fontsize=9, color="#475569")
+                continue
+            stat = sections[i][3][_GAUSSIAN_SUMMARY_WEIGHT_FIELDS[j][1]]
+            effect = stat["effect"]
+            cell_text = (
+                f"Δ{effect:.2f}\n"
+                f"→{format_number_label(stat['best_value'])}\n"
+                f"{100.0 * stat['rel']:.0f}%"
+            )
+            text_color = "white" if norm(effect) > 0.55 else "#0F172A"
+            ax.text(j, i, cell_text, ha="center", va="center", fontsize=10.5,
+                    color=text_color, fontweight="bold", linespacing=1.1)
+
+    for i, (group, _row_label, _cnt, _vals) in enumerate(sections):
+        if i == 0 or group is None or group == "":
+            continue
+        ax.axhline(i - 0.5, color="#0F172A", linewidth=1.1)
+
+    cbar = fig.colorbar(image, ax=ax, fraction=0.04, pad=0.02)
+    cbar.ax.tick_params(labelsize=11)
+    cbar.set_label(f"metric improvement of best vs worst value ({title_suffix})", fontsize=12)
+
+    save_fig(fig, output_dir, filename, generated, subfolder=GAUSSIAN_DIR)
+
+
 def plot_gaussian_weight_summary_dashboard(rows, output_dir, generated, skipped=None):
-    """Generate the two gaussian-weight summary heatmaps: one optimizing for
-    routing_steps, one for non_routed_layer_pct. Both go under GAUSSIAN_DIR/."""
+    """Generate the gaussian-weight summary heatmaps: best-value maps (one per
+    metric) plus the companion effect-size maps showing how much the best value
+    actually beats the others. All go under GAUSSIAN_DIR/."""
     target_dir = os.path.join(output_dir, GAUSSIAN_DIR)
     clear_plot_tree(target_dir, "gaussian weight summary")
     _plot_gaussian_weight_summary_for_metric(
@@ -3314,6 +3526,18 @@ def plot_gaussian_weight_summary_dashboard(rows, output_dir, generated, skipped=
         rows, output_dir, generated, skipped,
         metric_field="non_routed_layer_pct_f",
         filename="gaussian_weight_summary_by_non_routed.png",
+        title_suffix="by non_routed_layer_pct",
+    )
+    _plot_gaussian_weight_effect_for_metric(
+        rows, output_dir, generated, skipped,
+        metric_field="routing_steps_f",
+        filename="gaussian_weight_effect_by_routing.png",
+        title_suffix="by routing_steps",
+    )
+    _plot_gaussian_weight_effect_for_metric(
+        rows, output_dir, generated, skipped,
+        metric_field="non_routed_layer_pct_f",
+        filename="gaussian_weight_effect_by_non_routed.png",
         title_suffix="by non_routed_layer_pct",
     )
 

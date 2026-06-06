@@ -34,14 +34,14 @@ const bool PRINT_PARSING = kPrintAllowed && false;
 const bool PRINT_CIRCUIT = kPrintAllowed && false;
 
 const bool PRINT_MAPPING = kPrintAllowed && false;
-const bool PRINT_MAPPING_GRAPH = kPrintAllowed && false;
+const bool PRINT_MAPPING_GRAPH = kPrintAllowed && true;
 const bool MAPPING_VERBOSE = kPrintAllowed && false;
 
 const bool PRINT_SAFE_PASSAGE = kPrintAllowed && false;
 
 const bool PRINT_LAYER = kPrintAllowed && false;
 const bool PRINT_ROUTING = kPrintAllowed && false;
-const bool PRINT_DRAW_ROUTING = kPrintAllowed && true;
+const bool PRINT_DRAW_ROUTING = kPrintAllowed && false;
 const bool PRINT_ROUTING_PROGRESS = kPrintAllowed && false;
 
 const bool PRINT_CACHE_METRICS = kPrintAllowed && false;

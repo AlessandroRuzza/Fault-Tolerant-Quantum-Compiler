@@ -400,9 +400,7 @@ void update_gaussians_fine(
 
 Node Mapping::computeNextMappingNode(std::vector<Gaussian>& mapped_gaussians, std::vector<Gaussian>& magic_gaussians, std::vector<Gaussian>& cnot_gaussians, Gaussian& baseline_gaussian, Graph& graph, const Qubit& qubit, const std::vector<double>& baseline_cache, const std::vector<double>& mapped_cache) {
 
-    if (MAPPING_VERBOSE) {
-        GaussianMappingVisualization::save_gaussian_frame(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, qubit, externalWeight);
-    }
+    GaussianMappingVisualization::save_gaussian_frame(mapped_gaussians, magic_gaussians, cnot_gaussians, baseline_gaussian, graph, qubit, externalWeight);
 
     // Compute the combined Gaussian influence for each node and select the best one
     const std::vector<Node>& nodes = graph.get_nodes_ref();

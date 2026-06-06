@@ -24,7 +24,65 @@ configuration of 700k each to understand correlation between weights and other p
 
 => use magic state; keep 0.99999 and 0.9999 for connectivity and no sub, 0.999999 for cube, keep only center circle but with different percentage
 
----------gaussian weights second run----------------------
+---------gaussian weights second run ----------------------
+
+inconcludente
+
+
+-------- gaussian weights sweetspost ----------------------
+
+unico dato certo: best external = 0
+
+magic_high e magic_low dipendono quasi interamente da border percentage
+gaussian_mapped dipende dalle dimensioni
+
+coarse cube danno risultati per tutto tranne magic:
+- magic_high: 4.5 (da testare più in alto)
+- magic_low: 0
+- cnot high: 8
+- cnot low: 0
+- mapped: 0.8
+
+
+analisi per fine no cube:
+	Quando cnot_high è basso (~4.5), impostare cnot_low a un valore intermedio (=1, non 0 né 2) aiuta — e l'effetto scala con la dimensione della griglia. Questo ha senso fisico: con high basso il contrasto high/low è già piccolo, quindi lo zero non offre "floor" utile come farebbe con high alto.
+
+	Con cnot_high = 8 invece il contrasto è già abbastanza grande da rendere irrilevante il valore del floor.
+
+---------- gaussian weights tuning cnot ------------
+
+fine_cube troppi fallimenti
+
+fine_noncube tutto piatto tranne: mapped:1.2
+
+coarse_nocube:
+- mapped: 1.2
+- cnot_high: 16
+
+
+
+--------- gaussian weight fine cnot tuning --------
+
+
+cnot_low: 0
+cnot_high: highly dependent on dimension, median value:
+- both cube and non cube: 6-8
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
