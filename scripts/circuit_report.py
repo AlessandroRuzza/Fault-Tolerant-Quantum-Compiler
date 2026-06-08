@@ -57,6 +57,10 @@ METRIC_GROUPS = {
         ("avg_cnot_pair_repetition",  "Avg CNOT pair rep."),
         ("cnot_interaction_density",  "CNOT interaction density"),
         ("max_cnot_degree",           "Max CNOT degree"),
+        ("avg_cnot_degree",           "Avg CNOT degree"),
+        ("cnot_degree_gini",          "CNOT degree Gini"),
+        ("cnot_graph_modularity",     "CNOT graph modularity"),
+        ("cnot_pair_rep_gini",        "CNOT pair-rep Gini"),
     ],
     "T-gate structure": [
         ("t_qubit_diversity",         "T-qubit diversity"),
@@ -475,13 +479,30 @@ FREQ_COLORS = [
 ]
 
 
-def save_param_frequency_figure(best_rows: list, sort_label: str, out_path: Path):
+def save_param_frequency_figure(best_rows: list, sort_label: str, out_path: Path,
+                                highlight_flags: list = None,
+                                highlight_label: str = None):
     """Bar-chart grid: for each parameter, how many times each value
-    appears as the best configuration across all circuits."""
+    appears as the best configuration across all circuits.
+
+    When ``highlight_flags`` is given (one bool per row in ``best_rows``,
+    same order), each bar is split into a solid lower segment counting the
+    "clean" winners (flag True) and a hatched upper segment for the rest.
+    This is used by the routing-steps plot to mark circuits whose winning
+    config had a *strictly* lowest routing_steps (true winner) apart from
+    those that only won the time tie-break at equal routing_steps.
+    """
     if not best_rows:
         return
 
     from collections import Counter
+
+    if highlight_flags is None:
+        highlight_flags = [False] * len(best_rows)
+    paired = list(zip(best_rows, highlight_flags))
+    show_highlight = any(highlight_flags)
+    if highlight_label is None:
+        highlight_label = "won on routing steps alone"
 
     n_params = len(FREQ_PARAMS)
     ncols = 3
@@ -495,38 +516,59 @@ def save_param_frequency_figure(best_rows: list, sort_label: str, out_path: Path
     for idx, (key, label, mapping_filter) in enumerate(FREQ_PARAMS):
         ax = axes_flat[idx]
 
-        subset = best_rows
+        subset = paired
         if mapping_filter is not None:
-            subset = [r for r in best_rows if r.get("mapping_type") == mapping_filter]
+            subset = [(r, h) for (r, h) in paired if r.get("mapping_type") == mapping_filter]
 
-        counts = Counter()
-        for r in subset:
+        total_counts = Counter()
+        clean_counts = Counter()
+        for r, is_clean in subset:
             v = r.get(key, "")
             if key == "use_layer_cache":
                 v = "yes" if str(v).lower() == "true" else "no"
             else:
                 v = _abbrev(str(v)) if v else "—"
-            counts[v] += 1
+            total_counts[v] += 1
+            if is_clean:
+                clean_counts[v] += 1
 
-        if not counts:
+        if not total_counts:
             ax.axis("off")
             ax.set_title(label, fontsize=11, fontweight="bold")
             continue
 
-        labels_sorted = sorted(counts.keys(), key=lambda x: -counts[x])
-        values = [counts[l] for l in labels_sorted]
+        labels_sorted = sorted(total_counts.keys(), key=lambda x: -total_counts[x])
+        totals = [total_counts[l] for l in labels_sorted]
         colors = [FREQ_COLORS[i % len(FREQ_COLORS)] for i in range(len(labels_sorted))]
 
-        bars = ax.bar(labels_sorted, values, color=colors,
-                      edgecolor="white", zorder=2)
-        ax.bar_label(bars, padding=3, fontsize=9, fontweight="bold")
+        if show_highlight:
+            cleans = [clean_counts[l] for l in labels_sorted]
+            others = [t - c for t, c in zip(totals, cleans)]
+            # Solid lower segment = clean winners; hatched upper = tie-break wins.
+            ax.bar(labels_sorted, cleans, color=colors,
+                   edgecolor="white", zorder=2)
+            ax.bar(labels_sorted, others, bottom=cleans, color=colors,
+                   edgecolor="white", hatch="////", alpha=0.45, zorder=2)
+            # Total on top of each stacked bar.
+            for x, total in enumerate(totals):
+                ax.text(x, total, str(total), ha="center", va="bottom",
+                        fontsize=9, fontweight="bold")
+            # Clean count inside the solid segment (when there is room).
+            for x, clean in enumerate(cleans):
+                if clean > 0:
+                    ax.text(x, clean / 2, str(clean), ha="center", va="center",
+                            fontsize=8, color="white", fontweight="bold")
+        else:
+            bars = ax.bar(labels_sorted, totals, color=colors,
+                          edgecolor="white", zorder=2)
+            ax.bar_label(bars, padding=3, fontsize=9, fontweight="bold")
 
         title = label
         if mapping_filter:
             title += f" (only {mapping_filter})"
         ax.set_title(title, fontsize=11, fontweight="bold", pad=8)
         ax.set_ylabel("# circuits", fontsize=9)
-        ax.set_ylim(0, max(values) * 1.25)
+        ax.set_ylim(0, max(totals) * 1.25)
         ax.tick_params(axis="x", labelsize=9)
         ax.tick_params(axis="y", labelsize=8)
         ax.grid(axis="y", color="#eeeeee", zorder=0)
@@ -540,9 +582,122 @@ def save_param_frequency_figure(best_rows: list, sort_label: str, out_path: Path
         axes_flat[idx].axis("off")
 
     n = len(best_rows)
+    suptitle = (
+        f"Parameter frequency in best configs — sorted by {sort_label}  ({n} circuits)"
+    )
+    fig.suptitle(suptitle, fontsize=14, fontweight="bold", y=1.01)
+
+    if show_highlight:
+        n_clean = sum(1 for h in highlight_flags if h)
+        legend_handles = [
+            mpatches.Patch(facecolor="#777777", edgecolor="white",
+                           label=f"{highlight_label}  ({n_clean}/{n})"),
+            mpatches.Patch(facecolor="#777777", edgecolor="white", alpha=0.45,
+                           hatch="////",
+                           label=f"won only on the time tie-break (equal routing steps)  "
+                                 f"({n - n_clean}/{n})"),
+        ]
+        fig.legend(handles=legend_handles, loc="upper right",
+                   bbox_to_anchor=(0.995, 1.005), fontsize=9, framealpha=0.9)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=130, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# Per-circuit plot: per-parameter winner and the cost of the losers
+# ---------------------------------------------------------------------------
+
+def save_param_winner_figure(circuit: str, circ_runs: list, out_path: Path,
+                             metric_key: str = "routing_steps",
+                             metric_word: str = "routing steps"):
+    """For one circuit, a grid of bar charts (one per parameter). For each
+    parameter value we take its *best* (lowest) value of ``metric_key`` across
+    the circuit's runs, find the overall winner, and express every value as the
+    percentage of extra metric its best case needs over the winner.
+
+    ``metric_key`` is either ``"routing_steps"`` or ``"duration_seconds"``.
+    The winner sits at 0%; losers show +X%. On a tie (several values reach the
+    same minimum) all tied values are 0%.
+    """
+    is_time = metric_key == "duration_seconds"
+
+    def fmt_val(value):
+        return f"{value:.3f}s" if is_time else f"steps={int(value)}"
+
+    n_params = len(FREQ_PARAMS)
+    ncols = 3
+    nrows = (n_params + ncols - 1) // ncols
+
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(ncols * 6, nrows * 3.8),
+                             facecolor="white")
+    axes_flat = axes.flatten()
+
+    for idx, (key, label, mapping_filter) in enumerate(FREQ_PARAMS):
+        ax = axes_flat[idx]
+
+        subset = circ_runs
+        if mapping_filter is not None:
+            subset = [r for r in circ_runs if r.get("mapping_type") == mapping_filter]
+
+        # Best (minimum) metric per parameter value.
+        best_by_value = {}
+        for r in subset:
+            v = r.get(key, "")
+            if key == "use_layer_cache":
+                v = "yes" if str(v).lower() == "true" else "no"
+            else:
+                v = _abbrev(str(v)) if v else "—"
+            m = r[metric_key]
+            if v not in best_by_value or m < best_by_value[v]:
+                best_by_value[v] = m
+
+        title = label + (f" (only {mapping_filter})" if mapping_filter else "")
+        if not best_by_value:
+            ax.axis("off")
+            ax.set_title(title, fontsize=11, fontweight="bold")
+            continue
+
+        overall_best = min(best_by_value.values())
+        rows = []
+        for v, m in best_by_value.items():
+            pct = (m / overall_best - 1.0) * 100.0 if overall_best > 0 else 0.0
+            rows.append((v, m, pct))
+        rows.sort(key=lambda t: (t[2], t[0]))   # winner(s) first
+
+        y = np.arange(len(rows))
+        pcts = [t[2] for t in rows]
+        colors = ["#59a14f" if p <= 0.0 else "#e15759" for p in pcts]
+
+        ax.barh(y, pcts, color=colors, edgecolor="white", height=0.6, zorder=2)
+        ax.set_yticks(y)
+        ax.set_yticklabels([t[0] for t in rows], fontsize=9)
+        ax.invert_yaxis()   # winner on top
+
+        for i, (v, m, pct) in enumerate(rows):
+            txt = (f"  winner ({fmt_val(m)})" if pct <= 0.0
+                   else f"  +{pct:.1f}%  ({fmt_val(m)})")
+            ax.text(pct, i, txt, va="center", ha="left", fontsize=8, color="#333333")
+
+        xmax = max(pcts) if any(p > 0 for p in pcts) else 1.0
+        ax.set_xlim(0, xmax * 1.45)
+        ax.set_xlabel(f"% extra {metric_word} vs winner", fontsize=8)
+        ax.set_title(title, fontsize=11, fontweight="bold", pad=8)
+        ax.tick_params(axis="y", labelsize=9)
+        ax.grid(axis="x", color="#eeeeee", zorder=0)
+        ax.set_axisbelow(True)
+        for spine in ["top", "right"]:
+            ax.spines[spine].set_visible(False)
+
+    for idx in range(n_params, len(axes_flat)):
+        axes_flat[idx].axis("off")
+
     fig.suptitle(
-        f"Parameter frequency in best configs — sorted by {sort_label}  ({n} circuits)",
-        fontsize=14, fontweight="bold", y=1.01,
+        f"Per-parameter winner & cost — {circuit}\n"
+        f"winner = 0%; each loser = extra {metric_word} its best case needs",
+        fontsize=14, fontweight="bold", y=1.02,
     )
     fig.tight_layout()
     fig.savefig(out_path, dpi=130, bbox_inches="tight", facecolor="white")
@@ -578,6 +733,16 @@ def make_reports(circuit: str, runs: list, rankings: dict,
         f"Top 15 Configurations — {circuit} — by Execution Time  (lower = better)",
         out_dir / f"{circuit}_top15_time.png",
     )
+    save_param_winner_figure(
+        circuit, circ_runs,
+        out_dir / f"{circuit}_param_winners_steps.png",
+        metric_key="routing_steps", metric_word="routing steps",
+    )
+    save_param_winner_figure(
+        circuit, circ_runs,
+        out_dir / f"{circuit}_param_winners_time.png",
+        metric_key="duration_seconds", metric_word="execution time",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -586,7 +751,7 @@ def make_reports(circuit: str, runs: list, rankings: dict,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate per-circuit benchmark reports (3 PNG files each).",
+        description="Generate per-circuit benchmark reports (5 PNG files each).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -635,10 +800,20 @@ def main():
     print("\nGenerating global parameter frequency plots...")
     all_circ_runs = {c: [r for r in runs if r["circuit"] == c] for c in circuits}
 
-    best_by_steps = [
-        sorted(rows, key=lambda r: (r["routing_steps"], r["duration_seconds"]))[0]
-        for rows in all_circ_runs.values() if rows
-    ]
+    best_by_steps = []
+    # "Clean" winner = the minimum routing_steps is reached by exactly one run,
+    # so the win is decided purely by routing steps and NOT by the
+    # equal-steps/lower-time tie-break.
+    clean_by_steps = []
+    for rows in all_circ_runs.values():
+        if not rows:
+            continue
+        winner = sorted(rows, key=lambda r: (r["routing_steps"], r["duration_seconds"]))[0]
+        min_steps = winner["routing_steps"]
+        n_at_min = sum(1 for r in rows if r["routing_steps"] == min_steps)
+        best_by_steps.append(winner)
+        clean_by_steps.append(n_at_min == 1)
+
     best_by_time = [
         sorted(rows, key=lambda r: (r["duration_seconds"], r["routing_steps"]))[0]
         for rows in all_circ_runs.values() if rows
@@ -647,13 +822,15 @@ def main():
     save_param_frequency_figure(
         best_by_steps, "routing steps",
         out_dir / "param_frequency_steps.png",
+        highlight_flags=clean_by_steps,
+        highlight_label="won on routing steps alone (unique minimum)",
     )
     save_param_frequency_figure(
         best_by_time, "execution time",
         out_dir / "param_frequency_time.png",
     )
 
-    total = len(circuits) * 3 + 2
+    total = len(circuits) * 5 + 2
     print(f"\nDone — {total} files written to {args.out}/")
 
 

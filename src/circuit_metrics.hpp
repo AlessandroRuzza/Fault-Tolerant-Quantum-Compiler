@@ -14,8 +14,10 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // Returns a numeric hash that identifies the gate set of a layer.
@@ -61,6 +63,12 @@ struct CircuitMetrics {
     double cnot_interaction_density = 0.0;  // unique_pairs / (n*(n-1)/2)
     int max_cnot_degree = 0;                // max neighbours any qubit has in CNOT graph
     int t_qubit_diversity = 0;              // distinct qubits that receive a T/Tdg gate
+
+    // CNOT graph topology metrics
+    double avg_cnot_degree = 0.0;       // mean degree over qubits with ≥1 CNOT edge
+    double cnot_degree_gini = 0.0;      // Gini coeff of degree distribution [0=uniform, 1=star]
+    double cnot_graph_modularity = 0.0; // greedy Louvain modularity [0=random/regular, ~1=clustered]
+    double cnot_pair_rep_gini = 0.0;    // Gini of per-pair repetition counts [0=all pairs equally used (QFT), 1=one dominant pair]
 
     // Layer structure (depth, parallelism)
     int num_layers = 0;
@@ -158,6 +166,156 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
     }
 
     const int t_qubit_diversity = static_cast<int>(t_qubits.size());
+
+    // ---- CNOT graph topology: avg degree, Gini, greedy modularity ----
+
+    // 0. Gini coefficient of the per-pair CNOT repetition distribution.
+    //    Built from cnot_pair_counts which is already populated above.
+    //    Gini = 0 when every pair is used the same number of times (QFT signature).
+    //    Gini > 0 when some pairs are "hotspots" used far more than others.
+    double cnot_pair_rep_gini = 0.0;
+    if (cnot_pair_counts.size() >= 2) {
+        std::vector<int> rep_vec;
+        rep_vec.reserve(cnot_pair_counts.size());
+        for (const auto& kv : cnot_pair_counts)
+            rep_vec.push_back(kv.second);
+        std::sort(rep_vec.begin(), rep_vec.end());
+        const long long n_p = static_cast<long long>(rep_vec.size());
+        long long sum_r = 0;
+        for (int r : rep_vec) sum_r += r;
+        if (sum_r > 0) {
+            long long weighted = 0;
+            for (long long i = 0; i < n_p; i++)
+                weighted += (i + 1) * static_cast<long long>(rep_vec[static_cast<size_t>(i)]);
+            cnot_pair_rep_gini = 2.0 * weighted / (static_cast<double>(n_p) * sum_r)
+                                 - static_cast<double>(n_p + 1) / n_p;
+            cnot_pair_rep_gini = std::max(0.0, cnot_pair_rep_gini);
+        }
+    }
+
+    // 1. Average degree (over qubits that participate in at least one CNOT)
+    double avg_cnot_degree = 0.0;
+    if (!cnot_adj.empty()) {
+        long long deg_sum = 0;
+        for (const auto& kv : cnot_adj)
+            deg_sum += static_cast<long long>(kv.second.size());
+        avg_cnot_degree = static_cast<double>(deg_sum) / cnot_adj.size();
+    }
+
+    // 2. Gini coefficient of the degree distribution.
+    //    Gini = 0 for a fully uniform distribution (all equal), tends toward 1
+    //    for a star-like topology. Formula for sorted non-negative values x[0..n-1]:
+    //      Gini = (2 * Σ (i+1)*x[i]) / (n * Σ x[i]) - (n+1)/n
+    double cnot_degree_gini = 0.0;
+    if (cnot_adj.size() >= 2) {
+        std::vector<int> deg_vec;
+        deg_vec.reserve(cnot_adj.size());
+        for (const auto& kv : cnot_adj)
+            deg_vec.push_back(static_cast<int>(kv.second.size()));
+        std::sort(deg_vec.begin(), deg_vec.end());
+        const long long n_g = static_cast<long long>(deg_vec.size());
+        long long sum_d = 0;
+        for (int d : deg_vec) sum_d += d;
+        if (sum_d > 0) {
+            long long weighted = 0;
+            for (long long i = 0; i < n_g; i++)
+                weighted += (i + 1) * static_cast<long long>(deg_vec[static_cast<size_t>(i)]);
+            cnot_degree_gini = 2.0 * weighted / (static_cast<double>(n_g) * sum_d)
+                               - static_cast<double>(n_g + 1) / n_g;
+            cnot_degree_gini = std::max(0.0, cnot_degree_gini); // numerical safety
+        }
+    }
+
+    // 3. Greedy modularity via Louvain phase-1 (Blondel et al. 2008).
+    //    Each node starts in its own community; we greedily move nodes to the
+    //    neighbour community that maximises ΔQ until convergence (≤100 passes).
+    //    Returns Q ∈ [0, 1]: ~0 means no community structure (regular/random
+    //    graphs like QFT), high means well-defined clusters.
+    double cnot_graph_modularity = 0.0;
+    if (!cnot_adj.empty() && num_unique_cnot_pairs > 0) {
+        // Map qubit IDs to contiguous 0..nn-1
+        const int nn = static_cast<int>(cnot_adj.size());
+        std::vector<int> node_ids;
+        node_ids.reserve(nn);
+        std::unordered_map<int, int> node_idx;
+        node_idx.reserve(nn);
+        for (const auto& kv : cnot_adj) {
+            node_idx[kv.first] = static_cast<int>(node_ids.size());
+            node_ids.push_back(kv.first);
+        }
+
+        // Build adjacency list by contiguous index and compute degrees
+        std::vector<std::vector<int>> adj_by_idx(nn);
+        std::vector<int> deg(nn, 0);
+        for (int i = 0; i < nn; i++) {
+            for (int nb : cnot_adj.at(node_ids[i])) {
+                int j = node_idx.at(nb);
+                adj_by_idx[i].push_back(j);
+            }
+            deg[i] = static_cast<int>(adj_by_idx[i].size());
+        }
+
+        const double m_d = static_cast<double>(num_unique_cnot_pairs);
+        const double two_m = 2.0 * m_d;
+
+        // Community assignment; k_tot[c] = Σ deg of nodes assigned to c
+        std::vector<int> comm(nn);
+        std::iota(comm.begin(), comm.end(), 0);
+        std::vector<double> k_tot(nn);
+        for (int i = 0; i < nn; i++) k_tot[i] = static_cast<double>(deg[i]);
+
+        bool improved = true;
+        for (int iter = 0; iter < 100 && improved; iter++) {
+            improved = false;
+            for (int i = 0; i < nn; i++) {
+                const int ci = comm[i];
+
+                // Count edges from i to each neighbouring community
+                std::unordered_map<int, int> edges_to;
+                for (int j : adj_by_idx[i])
+                    edges_to[comm[j]]++;
+
+                const int k_i_ci = (edges_to.count(ci) ? edges_to.at(ci) : 0);
+                // Remove i from ci temporarily
+                k_tot[ci] -= static_cast<double>(deg[i]);
+
+                double best_dQ = 0.0;
+                int best_c = ci;
+                for (const auto& [cj, k_i_cj] : edges_to) {
+                    if (cj == ci) continue;
+                    // ΔQ = (k_{i→cj} - k_{i→ci})/m - k_i*(k_tot[cj] - k_tot[ci])/(2m²)
+                    // k_tot[ci] here is already after removing i
+                    double dQ = static_cast<double>(k_i_cj - k_i_ci) / m_d
+                                - static_cast<double>(deg[i]) * (k_tot[cj] - k_tot[ci])
+                                  / (two_m * two_m);
+                    if (dQ > best_dQ) { best_dQ = dQ; best_c = cj; }
+                }
+
+                if (best_c != ci) {
+                    comm[i] = best_c;
+                    k_tot[best_c] += static_cast<double>(deg[i]);
+                    improved = true;
+                } else {
+                    k_tot[ci] += static_cast<double>(deg[i]); // restore
+                }
+            }
+        }
+
+        // Compute final Q = Σ_c [e_c/m - (k_tot_c/(2m))²]
+        std::unordered_map<int, double> final_k;
+        for (int i = 0; i < nn; i++) final_k[comm[i]] += static_cast<double>(deg[i]);
+        std::unordered_map<int, int> e_int;
+        for (int i = 0; i < nn; i++)
+            for (int j : adj_by_idx[i])
+                if (comm[i] == comm[j] && j > i)
+                    e_int[comm[i]]++;
+        double Q = 0.0;
+        for (const auto& [c, kc] : final_k) {
+            int ec = (e_int.count(c) ? e_int.at(c) : 0);
+            Q += static_cast<double>(ec) / m_d - (kc / two_m) * (kc / two_m);
+        }
+        cnot_graph_modularity = std::max(0.0, Q);
+    }
 
     // ---- Layer fingerprints (numeric hash: gate name + sorted qubits) ----
     std::vector<size_t> layer_fps;
@@ -293,6 +451,10 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
         .cnot_interaction_density     = cnot_interaction_density,
         .max_cnot_degree              = max_cnot_degree,
         .t_qubit_diversity            = t_qubit_diversity,
+        .avg_cnot_degree              = avg_cnot_degree,
+        .cnot_degree_gini             = cnot_degree_gini,
+        .cnot_graph_modularity        = cnot_graph_modularity,
+        .cnot_pair_rep_gini           = cnot_pair_rep_gini,
         .num_layers                   = num_layers,
         .num_unique_layers            = num_unique_layers,
         .layer_reuse_ratio            = layer_reuse_ratio,
@@ -387,6 +549,7 @@ inline void write_metrics_csv(const CircuitMetrics& metrics,
         "t_count_ratio,cnot_ratio,other_gate_ratio,"
         "num_unique_cnot_pairs,max_cnot_pair_repetition,avg_cnot_pair_repetition,"
         "cnot_interaction_density,max_cnot_degree,t_qubit_diversity,"
+        "avg_cnot_degree,cnot_degree_gini,cnot_graph_modularity,cnot_pair_rep_gini,"
         "total_layers,num_unique_layers,layer_reuse_ratio,depth_width_ratio,"
         "avg_layer_size,max_layer_size,avg_cnot_per_layer,avg_t_per_layer,"
         "max_t_in_layer,max_cnot_in_layer,t_depth,cnot_depth,t_layer_ratio,"
@@ -434,6 +597,7 @@ inline void write_metrics_csv(const CircuitMetrics& metrics,
         << metrics.t_ratio << ',' << metrics.cnot_ratio << ',' << metrics.other_gate_ratio << ','
         << metrics.num_unique_cnot_pairs << ',' << metrics.max_cnot_pair_rep << ',' << metrics.avg_cnot_pair_rep << ','
         << metrics.cnot_interaction_density << ',' << metrics.max_cnot_degree << ',' << metrics.t_qubit_diversity << ','
+        << metrics.avg_cnot_degree << ',' << metrics.cnot_degree_gini << ',' << metrics.cnot_graph_modularity << ',' << metrics.cnot_pair_rep_gini << ','
         << metrics.num_layers << ',' << metrics.num_unique_layers << ',' << metrics.layer_reuse_ratio << ',' << metrics.depth_width_ratio << ','
         << metrics.avg_layer_size << ',' << metrics.max_layer_size << ',' << metrics.avg_cnot_per_layer << ',' << metrics.avg_t_per_layer << ','
         << metrics.max_t_in_layer << ',' << metrics.max_cnot_in_layer << ',' << metrics.t_depth << ',' << metrics.cnot_depth << ',' << metrics.t_layer_ratio << ','
