@@ -96,3 +96,6 @@ qasms/random_QAOA_angles_k3_N100_p1000.qasm
 qasms/randomcircuit_n600.qasm
 qasms/randomcircuit_n700.qasm
 qasms/randomcircuit_n800.qasm
+
+# Synthetic study circuits (generated, not committed)
+qasms/synth*.qasm
