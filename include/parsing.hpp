@@ -34,7 +34,9 @@ void apply_config_overrides(
     int& patience_threshold,
     bool& use_layer_cache,
     int& repetition_count,
-    bool& use_layer_cache_explicit
+    bool& use_layer_cache_explicit,
+    double& cnot_formula_scale,
+    double& mapped_formula_scale
 );
 void argument_parsing(
     int argc,

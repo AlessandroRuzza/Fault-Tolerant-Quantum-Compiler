@@ -404,6 +404,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     bool t_states_proportional = false;
     bool use_layer_cache_explicit = false;
     bool t_states_proportional_explicit = false;
+    double cnot_formula_scale = 1.0;
+    double mapped_formula_scale = 1.0;
 
     apply_config_overrides(
         argc,
@@ -435,7 +437,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         patience_threshold,
         use_layer_cache,
         repetition_count,
-        use_layer_cache_explicit
+        use_layer_cache_explicit,
+        cnot_formula_scale,
+        mapped_formula_scale
     );
 
     argument_parsing(
@@ -534,7 +538,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         use_layer_cache,
         metrics_only,
         repetition_count,
-        use_layer_cache_explicit
+        use_layer_cache_explicit,
+        cnot_formula_scale,
+        mapped_formula_scale
     );
     write_benchmark_result_file_if_requested(result);
 

@@ -21,6 +21,7 @@
 # Env overrides:
 #   PBS_SCRIPT   path to the PBS job script   (default: run_ftqc.pbs)
 #   WALLTIME     wall-clock limit per job     (default: 48:00:00)
+#   MEM          memory reserved per job      (default: 64gb)
 set -eu
 
 if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
@@ -34,17 +35,18 @@ NPROC="${3:-1}"
 
 PBS_SCRIPT="${PBS_SCRIPT:-run_ftqc.pbs}"
 WALLTIME="${WALLTIME:-48:00:00}"
+MEM="${MEM:-64gb}"
 
 case "$NPROC" in
     ''|*[!0-9]*) echo "NPROC must be a positive integer, got '$NPROC'" >&2; exit 1 ;;
 esac
 [ "$NPROC" -ge 1 ] || { echo "NPROC must be >= 1" >&2; exit 1; }
 
-echo "Submitting $NPROC job(s) for '$BENCH_PATH' (BENCH_JOBS=$BENCH_JOBS cores each, BENCH_PROCESS_COUNT=$NPROC)"
+echo "Submitting $NPROC job(s) for '$BENCH_PATH' (BENCH_JOBS=$BENCH_JOBS cores + $MEM each, BENCH_PROCESS_COUNT=$NPROC)"
 
 i=0
 while [ "$i" -lt "$NPROC" ]; do
-    qsub -l select=1:ncpus="$BENCH_JOBS" -l walltime="$WALLTIME" \
+    qsub -l select=1:ncpus="$BENCH_JOBS":mem="$MEM" -l walltime="$WALLTIME" \
          -v BENCH_PATH="$BENCH_PATH",BENCH_JOBS="$BENCH_JOBS",BENCH_PROCESS_COUNT="$NPROC",PROCESSOR="$i" \
          "$PBS_SCRIPT"
     i=$((i + 1))

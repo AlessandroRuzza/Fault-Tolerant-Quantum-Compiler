@@ -376,7 +376,9 @@ void apply_config_overrides(
     int& patience_threshold,
     bool& use_layer_cache,
     int& repetition_count,
-    bool& use_layer_cache_explicit
+    bool& use_layer_cache_explicit,
+    double& cnot_formula_scale,
+    double& mapped_formula_scale
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -471,14 +473,46 @@ void apply_config_overrides(
     if (!load_non_negative_double_from_config("MAGIC_LOW", magic_low)) {
         load_non_negative_double_from_config("magic_low", magic_low);
     }
-    if (!load_non_negative_double_from_config("CNOT_HIGH", cnot_high)) {
-        load_non_negative_double_from_config("cnot_high", cnot_high);
+    // CNOT_HIGH / CNOT_LOW accept -1 as a sentinel meaning "compute from
+    // circuit family and grid dimension at runtime" (one_execution.hpp).
+    const auto load_cnot_from_config = [&](const char* key, double& target) {
+        if (!config_json.contains(key)) return false;
+        if (!config_json[key].is_number())
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
+        const double value = config_json[key].get<double>();
+        if (!std::isfinite(value) || (value < 0.0 && value != -1.0))
+            throw std::runtime_error(std::string("Config key '") + key + "' must be >= 0 or -1 (auto)");
+        target = value;
+        return true;
+    };
+    if (!load_cnot_from_config("CNOT_HIGH", cnot_high)) {
+        load_cnot_from_config("cnot_high", cnot_high);
     }
-    if (!load_non_negative_double_from_config("CNOT_LOW", cnot_low)) {
-        load_non_negative_double_from_config("cnot_low", cnot_low);
+    if (!load_cnot_from_config("CNOT_LOW", cnot_low)) {
+        load_cnot_from_config("cnot_low", cnot_low);
     }
-    if (!load_non_negative_double_from_config("MAPPED_GAUSSIAN_WEIGHT", mapped_gaussian_weight)) {
-        load_non_negative_double_from_config("mapped_gaussian_weight", mapped_gaussian_weight);
+    // MAPPED_GAUSSIAN_WEIGHT accepts -1 as a sentinel meaning "compute from
+    // grid dimension at runtime" (formula applied in one_execution.hpp).
+    const auto load_mapped_from_config = [&](const char* key) {
+        if (!config_json.contains(key)) return false;
+        if (!config_json[key].is_number())
+            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
+        const double value = config_json[key].get<double>();
+        if (!std::isfinite(value) || (value < 0.0 && value != -1.0))
+            throw std::runtime_error(std::string("Config key '") + key + "' must be >= 0 or -1 (auto)");
+        mapped_gaussian_weight = value;
+        return true;
+    };
+    if (!load_mapped_from_config("MAPPED_GAUSSIAN_WEIGHT")) {
+        load_mapped_from_config("mapped_gaussian_weight");
+    }
+    // Scale factors applied to auto-formula results for cnot_high / mapped_gaussian_weight.
+    // Only active when the corresponding sentinel (-1) is used; ignored for fixed values.
+    if (!load_non_negative_double_from_config("CNOT_FORMULA_SCALE", cnot_formula_scale)) {
+        load_non_negative_double_from_config("cnot_formula_scale", cnot_formula_scale);
+    }
+    if (!load_non_negative_double_from_config("MAPPED_FORMULA_SCALE", mapped_formula_scale)) {
+        load_non_negative_double_from_config("mapped_formula_scale", mapped_formula_scale);
     }
     if (!load_non_negative_double_from_config("BASE_GAUSSIAN_WEIGHT", base_gaussian_weight)) {
         load_non_negative_double_from_config("base_gaussian_weight", base_gaussian_weight);

@@ -70,12 +70,21 @@ cnot_high: highly dependent on dimension, median value:
 
 
 
+---------- analisi mapped and dimension--------
+
+i dati precedenti di mapped oltre ad essere dipendenti dalla dimensione erano artefatti dal range e erano comunque una distribuzione quasi uniforme
+
+- nocube: mapped ≈ 0.12–0.18 × dim
+- fine cube: 0
+- coarse_cube: dim <= 16: mapped : 0; dim >= 17 : mapped: 0.13 × dim
 
 
+---------------
 
-
-
-
+Fine/cube	dim≤19: 0 ; dim≥20: max(0, 0.085×dim − 1.33)
+Coarse/cube	dim≤17: 0 ; dim≥18: max(0, 0.19×dim − 3.33)
+Fine/noncube	0.15×dim (invariato)
+Coarse/noncube	0.15×dim (invariato)
 
 
 

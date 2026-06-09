@@ -108,7 +108,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::string t_routing_mode, int patience_threshold,
     bool use_layer_cache,
     bool metrics_only, int repetition_count,
-    bool use_layer_cache_explicit = false) {
+    bool use_layer_cache_explicit = false,
+    double cnot_formula_scale = 1.0,
+    double mapped_formula_scale = 1.0) {
 
     // Clear any stale partial state (a worker process runs exactly one
     // one_execution, but resetting keeps the timeout handler honest).
@@ -270,6 +272,78 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     const int resolved_graph_x = graph_template.getMaxX() + 1;
     const int resolved_graph_y = graph_template.getMaxY() + 1;
     std::cout << "resolved graph dimensions: " << resolved_graph_x << "x" << resolved_graph_y << "\n";
+
+    // Auto-formula block: -1 sentinels for cnot_high, cnot_low, mapped.
+    // Formulas are per (gaussian_strategy, safe_passage, circuit_family, dim).
+    // Circuit family is detected from the filename: qft / qaoa / rest.
+    {
+        const std::string circ_stem = std::filesystem::path(path).stem().string();
+        std::string circ_lower = circ_stem;
+        std::transform(circ_lower.begin(), circ_lower.end(), circ_lower.begin(), ::tolower);
+        const bool is_qft  = circ_lower.find("qft")  != std::string::npos;
+        const bool is_qaoa = circ_lower.find("qaoa") != std::string::npos;
+        const bool is_cube = (safe_passage_strategy == "cube");
+        const bool is_fine = (gaussian_strategy == "fine");
+        const double d = static_cast<double>(resolved_graph_x);
+
+        // cnot_high formulas — dim-dependent where R²>0.24 and Δ>1pp across dim range,
+        // constant elsewhere (QFT always flat; QAOA fine flat; QAOA coarse moderate).
+        if (cnot_high == -1.0) {
+            if (is_fine && !is_cube) {
+                // fine/noncube  qft:const  qaoa:const  rest:R²=0.51 Δ=7pp
+                if      (is_qft)  cnot_high = 0.35;
+                else if (is_qaoa) cnot_high = 0.7;
+                else              cnot_high = std::max(0.3, 0.29 * d - 1.2);
+            } else if (!is_fine && !is_cube) {
+                // coarse/noncube  qft:const  qaoa:R²=0.26 Δ=1.4pp  rest:R²=0.55 Δ=8.6pp
+                if      (is_qft)  cnot_high = 0.5;
+                else if (is_qaoa) cnot_high = std::max(0.3, 0.07 * d - 0.3);
+                else              cnot_high = std::max(0.3, 0.36 * d - 2.1);
+            } else if (is_fine && is_cube) {
+                // fine/cube  qft:const  qaoa:const  rest:R²=0.37 Δ=7pp
+                if      (is_qft)  cnot_high = 0.5;
+                else if (is_qaoa) cnot_high = 5.0;
+                else              cnot_high = std::max(0.3, 0.26 * d - 5.7);
+            } else {
+                // coarse/cube  qft:const  qaoa:R²=0.24 Δ=8pp  rest:R²=0.57 Δ=15pp
+                if      (is_qft)  cnot_high = 1.0;
+                else if (is_qaoa) cnot_high = std::max(0.5, 0.40 * d - 3.8);
+                else              cnot_high = std::max(0.5, 0.56 * d - 13.9);
+            }
+            if (cnot_low == -1.0) cnot_low = 0.0;
+            cnot_high *= cnot_formula_scale;
+            std::cout << "cnot_high (auto): " << cnot_high
+                      << "  cnot_low (auto): " << cnot_low
+                      << "  cnot_formula_scale: " << cnot_formula_scale << "\n";
+        }
+
+        if (mapped_gaussian_weight == -1.0) {
+            if (is_fine && !is_cube) {
+                // fine/noncube
+                if (is_qft)       mapped_gaussian_weight = 5.0;
+                else if (is_qaoa) mapped_gaussian_weight = 3.5;
+                else              mapped_gaussian_weight = std::max(0.0, 0.07 * d);
+            } else if (!is_fine && !is_cube) {
+                // coarse/noncube
+                if (is_qft)       mapped_gaussian_weight = 0.18 * d + 3.0;
+                else if (is_qaoa) mapped_gaussian_weight = 4.0;
+                else              mapped_gaussian_weight = std::max(0.0, 0.12 * d);
+            } else if (is_fine && is_cube) {
+                // fine/cube
+                if (is_qft)       mapped_gaussian_weight = std::max(0.0, 0.34 * d - 3.9);
+                else if (is_qaoa) mapped_gaussian_weight = 0.6;
+                else              mapped_gaussian_weight = 0.0;
+            } else {
+                // coarse/cube
+                if (is_qft)       mapped_gaussian_weight = std::max(0.0, 0.28 * d - 3.3);
+                else if (is_qaoa) mapped_gaussian_weight = std::max(0.0, 0.14 * d - 1.8);
+                else              mapped_gaussian_weight = std::max(0.0, 0.08 * d - 0.93);
+            }
+            mapped_gaussian_weight *= mapped_formula_scale;
+            std::cout << "mapped_gaussian_weight (auto): " << mapped_gaussian_weight
+                      << "  mapped_formula_scale: " << mapped_formula_scale << "\n";
+        }
+    }
 
     // Publish the now-resolved circuit/graph facts so a timeout mid-loop still
     // records dimensions alongside the best completed repetition.
