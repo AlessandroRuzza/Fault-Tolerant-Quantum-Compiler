@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <queue>
 #include <sstream>
 #include <unordered_set>
 
@@ -153,14 +154,113 @@ void Mapping::gaussian_mapping() {
     int total_qubits = circuit.getNumQubits();
     int iterations = 0;
 
-    while (circuit.getHeapSize() > 0 && iterations < maximum_iterations) {
-        if (MAPPING_VERBOSE) circuit.print_qubit_heap();
-        Qubit* qubit = circuit.popFromHeap();
+    // Mapping order, density-gated. The per-qubit CNOT attraction only fires
+    // toward partners that are ALREADY mapped (cnot_gaussian is gated on
+    // mapped_node!=-1), so the placement order decides whether the CNOT weights
+    // do anything. Two orders, picked by CNOT-graph density:
+    //
+    //  * CNOT-BFS (sparse/structured graphs): seed by descending priority
+    //    (T + maxCNOT) and expand each seed's CNOT-connected component
+    //    breadth-first, visiting partners heaviest-first, so every non-seed
+    //    qubit has its strongest partner already placed. Exploits locality.
+    //  * heap-pop (dense/uniform graphs): the original priority-heap order. On a
+    //    near-complete interaction graph there is no locality for BFS to follow
+    //    and it only disturbs the priority heuristic, hurting results.
+    //
+    // Threshold tuned on a 19-circuit density-spanning sweep (broad_density):
+    // the aggregate-non_routed optimum sits in a flat basin 0.30-0.45 with the
+    // argmin at ~0.40; below it BFS wins big on structured circuits (graphstate
+    // 11->0, adder 1.96->0) and above it heap wins on dense/uniform graphs
+    // (qaoa, random). 0.40 routes qft_n100 (0.36) to BFS and the boundary
+    // synth d=0.40 cluster to heap, which is marginally best. Overridable via
+    // env FTQC_BFS_DENSITY_THRESHOLD so a tuning sweep can force always-BFS
+    // (high value) or always-heap (negative) and re-derive the optimum post-hoc.
+    const int qv_size = circuit.getQubitsVectorSize();
+    std::vector<int> present;
+    present.reserve(total_qubits);
+    for (int id = 0; id < qv_size; ++id) {
+        if (circuit.getQubit(id) != nullptr) present.push_back(id);
+    }
+
+    double bfs_density_threshold = 0.40;
+    if (const char* env = std::getenv("FTQC_BFS_DENSITY_THRESHOLD")) {
+        try { bfs_density_threshold = std::stod(env); } catch (...) {}
+    }
+    const double cnot_graph_density = circuit.getCNOTGraphDensity();
+    const bool use_bfs_order = cnot_graph_density < bfs_density_threshold;
+
+    // Opt-in diagnostic: print the CNOT-graph density and chosen order. Dormant
+    // unless FTQC_DENSITY_PROBE is set, so it never pollutes normal/bench logs.
+    // Used to build the density-spanning circuit set for threshold tuning.
+    if (std::getenv("FTQC_DENSITY_PROBE")) {
+        std::cerr << "DENSITY_PROBE n=" << present.size()
+                  << " density=" << cnot_graph_density
+                  << " order=" << (use_bfs_order ? "BFS" : "heap") << "\n";
+        // In probe mode we only want the density; skip the (possibly slow)
+        // mapping+routing entirely so the measurement is instant.
+        std::exit(0);
+    }
+
+    std::vector<int> mapping_order;
+    mapping_order.reserve(present.size());
+
+    if (use_bfs_order) {
+        const auto priority_of = [&](int id) {
+            const Qubit* q = circuit.getQubit(id);
+            return q->getTCount() + q->getMaxCNOTCount();
+        };
+        std::vector<int> seeds = present;
+        std::sort(seeds.begin(), seeds.end(), [&](int a, int b) {
+            const int pa = priority_of(a), pb = priority_of(b);
+            if (pa != pb) return pa > pb;
+            return a < b;
+        });
+
+        std::vector<char> enqueued(qv_size, 0);
+        std::queue<int> bfs;
+        for (int seed : seeds) {
+            if (enqueued[seed]) continue;
+            enqueued[seed] = 1;
+            bfs.push(seed);
+            while (!bfs.empty()) {
+                const int cur = bfs.front();
+                bfs.pop();
+                mapping_order.push_back(cur);
+                std::vector<std::pair<int, int>> partners; // (cnot_count, partner_id)
+                for (int other : present) {
+                    if (other == cur || enqueued[other]) continue;
+                    const int c = circuit.getCNOTCount(cur, other);
+                    if (c > 0) partners.emplace_back(c, other);
+                }
+                std::sort(partners.begin(), partners.end(), [](const std::pair<int,int>& a, const std::pair<int,int>& b) {
+                    if (a.first != b.first) return a.first > b.first;
+                    return a.second < b.second;
+                });
+                for (const auto& [c, other] : partners) {
+                    if (!enqueued[other]) { enqueued[other] = 1; bfs.push(other); }
+                }
+            }
+        }
+    } else {
+        // Heap-pop order (original behaviour). Draining the heap up-front is
+        // equivalent to popping one-at-a-time: mapping never reinserts into the
+        // heap, and the unified loop below skips qubits already mapped as a
+        // side effect, exactly as the old in-loop check did.
+        while (circuit.getHeapSize() > 0) {
+            Qubit* q = circuit.popFromHeap();
+            if (q == nullptr) continue;
+            mapping_order.push_back(q->getQubitID());
+        }
+    }
+
+    for (int qid : mapping_order) {
+        if (iterations >= maximum_iterations) break;
+        if (get_mapped_node(qid) != -1) {
+            continue; // already mapped as a side effect of mapping a related qubit
+        }
+        Qubit* qubit = const_cast<Qubit*>(circuit.getQubit(qid));
         if (qubit == nullptr) {
             continue;
-        }
-        if (get_mapped_node(qubit->getQubitID()) != -1) {
-            continue; // already mapped as a side effect of mapping a related qubit
         }
         try {
             one_iteration_gaussian_mapping(qubit, &iterations, mapped_gaussians, magic_gaussians, baseline_gaussian, baseline_cache, mapped_cache);
@@ -176,7 +276,7 @@ void Mapping::gaussian_mapping() {
         if (PRINT_MAPPING) std::cout << "Mapped qubits: " << iterations << "/" << total_qubits << "\n\n";
     }
 
-    if (circuit.getHeapSize() > 0 && iterations >= maximum_iterations) {
+    if (static_cast<int>(mapping_order.size()) > iterations && iterations >= maximum_iterations) {
         throw std::runtime_error(
             "Mapping stopped after reaching the maximum iteration limit (" +
             std::to_string(maximum_iterations) +

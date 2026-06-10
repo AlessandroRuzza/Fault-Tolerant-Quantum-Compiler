@@ -235,6 +235,23 @@ public:
         return count > 0 ? std::sqrt(sum_squared_diff / count) : 0.0;
     }
 
+    // Fraction of qubit pairs that share at least one CNOT (edges / max_edges).
+    // Near 1.0 for dense/uniform interaction graphs (qaoa, random), small for
+    // structured/local ones (graphstate, adder). Used to gate the CNOT-BFS
+    // mapping order: BFS helps only when there is locality to exploit.
+    const double getCNOTGraphDensity() const {
+        long edges = 0, pairs = 0;
+        for (size_t i = 0; i < qubitsVector.size(); ++i) {
+            if (qubitsVector[i] == nullptr) continue;
+            for (size_t j = i + 1; j < qubitsVector.size(); ++j) {
+                if (qubitsVector[j] == nullptr) continue;
+                pairs++;
+                if (getCNOTCount(i, j) > 0) edges++;
+            }
+        }
+        return pairs > 0 ? static_cast<double>(edges) / pairs : 0.0;
+    }
+
     //------------initializers/setters--------------
 
 
