@@ -79,7 +79,7 @@ i dati precedenti di mapped oltre ad essere dipendenti dalla dimensione erano ar
 - coarse_cube: dim <= 16: mapped : 0; dim >= 17 : mapped: 0.13 × dim
 
 
----------------
+------------ seconda analisi mapped and dimension-------------
 
 Fine/cube	dim≤19: 0 ; dim≥20: max(0, 0.085×dim − 1.33)
 Coarse/cube	dim≤17: 0 ; dim≥18: max(0, 0.19×dim − 3.33)
@@ -87,11 +87,73 @@ Fine/noncube	0.15×dim (invariato)
 Coarse/noncube	0.15×dim (invariato)
 
 
+---------- cnot_high auto-formula (implementata in one_execution.hpp) --------
+
+fine/noncube     qft: 0.35          qaoa: 0.7                    rest: max(0.3, 0.29×d − 1.2)   [R²=0.51 Δ=7pp]
+coarse/noncube   qft: 0.5           qaoa: max(0.3, 0.07×d − 0.3) rest: max(0.3, 0.36×d − 2.1)   [R²=0.55 Δ=8.6pp]
+fine/cube        qft: 0.5           qaoa: 5.0                    rest: max(0.3, 0.26×d − 5.7)   [R²=0.37 Δ=7pp]
+coarse/cube      qft: 1.0           qaoa: max(0.5, 0.40×d − 3.8) rest: max(0.5, 0.56×d − 13.9)  [R²=0.57 Δ=15pp]
+
+cnot_low auto = 0.0.
+
+
+---------- magic_high tuning --------
+
+fine nessun risultato
+
+
+L'ottimo di magic_high dipende SOLO da geometria safe-passage (cube vs noncube) × border.
+NON dipende da: topologia del circuito, dimensione/griglia, cnot_high (cnot_scale), mapped (mapped_scale).
+
+
+raccomandazioni (metrica = non_routed_layer_pct mean-no-out):
+- cube + border 20  → magic_high ≈ 30, ma è una CONCA PIATTA 16–40 (spread ~0.15pp = rumore,
+                      win-rate appaiato 46–50%): qualsiasi valore in 20–35 è equivalente. NON è
+                      un ginocchio netto, è saturo. Sotto ~14 e sopra ~44 peggiora leggermente.
+- cube + border 0   → magic basso (~0.4); alto peggiora (mild).
+- cube + border 5   → indifferente (piatto).
+- noncube (ogni border) → magic basso (0.2); alto fa molto male (fino a +4–6pp;
+                      magic_high=15 vince solo 6–10% dei confronti appaiati).
+
+=> dentro cube l'ottimo di magic si RIBALTA col border (b0 basso → b20 alto): vera interazione di 2° ordine.
+   magic_high è leva FORTE (fino a −5pp) solo in cube+border-largo; altrove debole o plateau.
+   (contrasto con cnot_high che è plateau ovunque.)
 
 
 
+------------------ sure so far ------------------
 
+config ottima per ora (metrica = non_routed mean-no-out):
 
+comuni a tutte:
+- external_weight: 0
+- magic placement: center_circle (mai right_row)
+- number_of_magic_states: usare (-1 = auto)
+- base_gaussian_weight: 1
+- confidence: cube 0.999999 ; noncube 0.99999 (anche 0.9999 ok)
+- cnot_low: 0
+- cnot_high: formula auto (scale 1.0; plateau, non scendere sotto formula)
+- mapped: formula auto
 
+magic (SOLO coarse confermato; fine ancora ignoto):
+- coarse cube:    magic_low 0 ; magic_high dipende da border:
+                  b=0 → ~0.4 ; b=5 → indifferente ; b=20 → ~30 (conca piatta 16–40)
+- coarse noncube: magic_low 0 ; magic_high ~0.2 (ogni border; alto fa male)
+- fine: da determinare (config gaussian_finemagic_* pronte, border 0..30)
 
+cnot_high formula auto (scala con dimensione d = graph_x):
+  fine/noncube     qft: 0.35    qaoa: 0.7                    rest: max(0.3, 0.29×d − 1.2)
+  coarse/noncube   qft: 0.5     qaoa: max(0.3, 0.07×d − 0.3) rest: max(0.3, 0.36×d − 2.1)
+  fine/cube        qft: 0.5     qaoa: 5.0                    rest: max(0.3, 0.26×d − 5.7)
+  coarse/cube      qft: 1.0     qaoa: max(0.5, 0.40×d − 3.8) rest: max(0.5, 0.56×d − 13.9)
+  cnot_low auto = 0.0
 
+mapped formula auto (scala con dimensione d = graph_x):
+  fine/noncube     0.15×d
+  coarse/noncube   0.15×d
+  fine/cube        dim≤19: 0 ; dim≥20: max(0, 0.085×d − 1.33)
+  coarse/cube      dim≤17: 0 ; dim≥18: max(0, 0.19×d − 3.33)
+
+note:
+- magic_high: nessuna relazione con dimensione/topologia/cnot/mapped (R²<0.02), è costante per geometria×border
+- cnot_high/mapped: SCALANO con la dimensione (vedi formule sopra)
