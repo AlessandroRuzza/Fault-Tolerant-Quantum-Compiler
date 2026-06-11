@@ -20,6 +20,8 @@ if "MPLCONFIGDIR" not in os.environ:
     os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib-cache"
 os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
 
+import matplotlib
+matplotlib.use("Agg")  # non-interactive: no X display → avoids BadAlloc/X_CreatePixmap
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import TwoSlopeNorm
@@ -492,6 +494,62 @@ def plot_scatter(circuits, our_agg, wisq_agg, our_agg_key, wisq_key,
     generated.append(os.path.join(output_dir, filename))
 
 
+# ── plot: ratio scatter our/wisq per circuit ──────────────────────────────────
+
+def plot_ratio_scatter(circuits, our_agg, wisq_agg, our_agg_key, wisq_key,
+                       xlabel, ylabel, title, filename, output_dir, generated,
+                       log_x=False):
+    """One point per circuit: x = wisq value, y = ratio (our best / wisq).
+    Ratio < 1 (green) = ours better, ratio > 1 (red) = wisq better."""
+    wisq_vals, ratios, labels = [], [], []
+
+    for cg in circuits:
+        w = wisq_agg.get(cg, {}).get(wisq_key)
+        if w is None or w == 0:
+            continue
+        entries = our_agg.get(cg, {}).values()
+        vals = [e[our_agg_key] for e in entries if e.get(our_agg_key) is not None]
+        if not vals:
+            continue
+        wisq_vals.append(w)
+        ratios.append(min(vals) / w)
+        labels.append(cg)
+
+    if not ratios:
+        return
+
+    colors = ["#16a34a" if r < 1.0 else "#dc2626" for r in ratios]
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+    ax.scatter(wisq_vals, ratios, s=65, alpha=0.82, c=colors, zorder=3)
+
+    for x, y, lbl in zip(wisq_vals, ratios, labels):
+        ax.annotate(lbl, (x, y), textcoords="offset points", xytext=(5, 4),
+                    fontsize=7, color="#475569")
+
+    ax.axhline(1.0, color="#334155", linewidth=1.4, linestyle="--",
+               label="parity (= wisq)")
+
+    below = sum(1 for r in ratios if r < 1.0)
+    above = len(ratios) - below
+    ax.text(0.03, 0.97,
+            f"our < wisq (better): {below}/{len(ratios)}\n"
+            f"our > wisq (worse):  {above}/{len(ratios)}",
+            transform=ax.transAxes, va="top", ha="left", fontsize=9,
+            bbox={"facecolor": "white", "edgecolor": "#cbd5e1", "alpha": 0.88})
+
+    ax.set_xlabel(xlabel, fontsize=10)
+    ax.set_ylabel(ylabel, fontsize=10)
+    ax.set_title(f"{title}\n({len(ratios)} common circuits)", fontsize=12)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3, which="both" if log_x else "major")
+    if log_x:
+        ax.set_xscale("log")
+
+    save_fig(fig, os.path.join(output_dir, filename))
+    generated.append(os.path.join(output_dir, filename))
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -577,6 +635,14 @@ def main():
             "Our Best Routing Steps vs WISQ",
             "scatter_routing_vs_wisq.png", args.output_dir, generated,
         )
+        plot_ratio_scatter(
+            common, our_agg, wisq_agg,
+            "routing_min", "routing",
+            "wisq routing steps",
+            "routing steps ratio (our best ÷ wisq)",
+            "Routing Steps Ratio vs WISQ",
+            "scatter_ratio_routing_vs_wisq.png", args.output_dir, generated,
+        )
 
     if do_duration:
         d_mat, d_cols = build_matrix(common, our_agg, wisq_agg, all_cfg_labels,
@@ -595,6 +661,15 @@ def main():
             "Our Best Duration vs WISQ",
             "scatter_duration_vs_wisq.png", args.output_dir, generated,
             log_scale=True,
+        )
+        plot_ratio_scatter(
+            common, our_agg, wisq_agg,
+            "duration_min", "duration",
+            "wisq duration (s)",
+            "duration ratio (our best ÷ wisq)",
+            "Duration Ratio vs WISQ",
+            "scatter_ratio_duration_vs_wisq.png", args.output_dir, generated,
+            log_x=True,
         )
 
     # ── per-circuit subfolders ────────────────────────────────────────────────
