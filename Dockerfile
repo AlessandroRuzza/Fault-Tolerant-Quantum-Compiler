@@ -47,7 +47,26 @@ RUN cmake -S . -B build \
  && strip --strip-all build/FaultTolerantQuantumCompiler
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 4 — Minimal runtime image
+# Stage 4 — Python venv with wisq (needs Java 21 to build)
+# Uses Eclipse Temurin image which has Java 21 pre-installed.
+# Only the venv is copied to the final image — Java stays out.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM debian:bookworm-slim AS python-deps
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-pip python3-venv gcc wget gnupg ca-certificates \
+ && wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public \
+    | gpg --dearmor > /usr/share/keyrings/adoptium.gpg \
+ && echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" \
+    > /etc/apt/sources.list.d/adoptium.list \
+ && apt-get update && apt-get install -y --no-install-recommends temurin-21-jre \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir matplotlib wisq
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 5 — Minimal runtime image
 # Only the stripped binary + runtime data files land here.
 # cmake/ninja/gcc/headers are NOT copied — saves ~500 MB.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,11 +80,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libstdc++6 \
         gnuplot \
         python3 \
-        python3-pip \
         python3-venv
 
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir matplotlib
+COPY --from=python-deps /opt/venv /opt/venv
 
 ENV PATH="/opt/venv/bin:$PATH"
 

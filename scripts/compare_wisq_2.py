@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import fcntl
 import itertools
 import json
 import re
@@ -591,6 +592,11 @@ def main() -> int:
                         help="Max concurrent WISQ instances (default: same as --workers). "
                              "Set lower than --workers to cap RAM usage: extra workers run "
                              "the compiler freely but queue before launching WISQ.")
+    parser.add_argument("--process-count", type=int, default=1,
+                        help="Total number of parallel processes sharing the same CSV "
+                             "(default: 1). Process K handles items where index %% N == K.")
+    parser.add_argument("--processor", type=int, default=0,
+                        help="Index of this process (0-based, default: 0).")
     args = parser.parse_args()
 
     global _wisq_semaphore
@@ -633,6 +639,8 @@ def main() -> int:
             return 0
 
         output_path = Path(args.output) if args.output else None
+        process_count = args.process_count
+        processor = args.processor
 
         # Resume support: skip (circuit, config) pairs already in the CSV.
         done_keys = load_done_keys_bench(output_path) if output_path else set()
@@ -644,20 +652,32 @@ def main() -> int:
         writer = None
         if output_path:
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            new_file = not output_path.exists() or output_path.stat().st_size == 0
             csv_file = output_path.open("a", newline="")
             writer = csv.DictWriter(csv_file, fieldnames=BENCH_CSV_COLUMNS)
-            if new_file:
-                writer.writeheader()
-                csv_file.flush()
+            # Write header only if the file is empty; flock prevents two processes
+            # from racing on the first write.
+            with _csv_write_lock:
+                fcntl.flock(csv_file, fcntl.LOCK_EX)
+                try:
+                    if output_path.stat().st_size == 0:
+                        writer.writeheader()
+                        csv_file.flush()
+                finally:
+                    fcntl.flock(csv_file, fcntl.LOCK_UN)
 
-        # Build the list of (index, cfg) pairs that still need to run.
+        # Build the list of (index, cfg) pairs that still need to run,
+        # then shard by processor index so multiple PBS jobs can share one CSV.
         todo = [
             (i, cfg) for i, cfg in enumerate(expanded)
             if cfg_key(cfg["circuit"], cfg) not in done_keys
+            and (process_count <= 1 or i % process_count == processor)
         ]
         skipped = len(expanded) - len(todo)
-        print(f"To run: {len(todo)}  (skipped {skipped} already done).", file=sys.stderr)
+        if process_count > 1:
+            print(f"Process {processor}/{process_count}: {len(todo)} items to run "
+                  f"(skipped {skipped} already done).", file=sys.stderr)
+        else:
+            print(f"To run: {len(todo)}  (skipped {skipped} already done).", file=sys.stderr)
 
         rows: list[dict] = []
         completed = 0
@@ -679,9 +699,16 @@ def main() -> int:
             completed += 1
             if writer:
                 with _csv_write_lock:
-                    writer.writerow(row)
-                    csv_file.flush()
+                    fcntl.flock(csv_file, fcntl.LOCK_EX)
+                    try:
+                        writer.writerow(row)
+                        csv_file.flush()
+                    finally:
+                        fcntl.flock(csv_file, fcntl.LOCK_UN)
+            my_grid = f"{row['my_x']}x{row['my_y']}" if row.get('my_x') else "?"
+            wisq_grid = f"{row['wisq_x']}x{row['wisq_y']}" if row.get('wisq_x') else "?"
             print(f"  [{completed}/{len(todo)}] {row['circuit']} "
+                  f"my_grid={my_grid} wisq_grid={wisq_grid} "
                   f"mine={row['my_routing_steps']} wisq={row['wisq_routing_steps']} "
                   f"ratio={row['ratio_wisq_over_mine']} status={row['wisq_status']}",
                   file=sys.stderr)
@@ -723,10 +750,14 @@ def main() -> int:
         # Brief summary (last 20 rows to avoid flooding the terminal).
         print(f"\n=== Summary (last {min(20, len(rows))} of {len(rows)} new rows) ===")
         print(f"{'circuit':<28} {'type':>10} {'routing':>10} "
+              f"{'my_grid':>9} {'wisq_grid':>9} "
               f"{'mine':>6} {'wisq':>6} {'wisq/mine':>9} {'status':>9}")
         for r in rows[-20:]:
+            my_grid = f"{r['my_x']}x{r['my_y']}" if r.get('my_x') else "?"
+            wisq_grid = f"{r['wisq_x']}x{r['wisq_y']}" if r.get('wisq_x') else "?"
             print(f"{str(r['circuit']):<28} {str(r['type']):>10} "
                   f"{str(r['routing_strategy']):>10} "
+                  f"{my_grid:>9} {wisq_grid:>9} "
                   f"{str(r['my_routing_steps']):>6} {str(r['wisq_routing_steps']):>6} "
                   f"{str(r['ratio_wisq_over_mine']):>9} {str(r['wisq_status']):>9}")
 
@@ -763,11 +794,12 @@ def main() -> int:
         print(f"\nCSV written to {out}")
 
     print("\n=== Summary (routing steps) ===")
-    print(f"{'circuit':<28} {'qubits':>6} {'grid':>9} {'mine':>6} {'wisq':>6} "
-          f"{'wisq/mine':>9} {'grown':>6} {'status':>9}")
+    print(f"{'circuit':<28} {'qubits':>6} {'my_grid':>9} {'wisq_grid':>9} "
+          f"{'mine':>6} {'wisq':>6} {'wisq/mine':>9} {'grown':>6} {'status':>9}")
     for r in rows:
-        grid = f"{r['wisq_x']}x{r['wisq_y']}" if r["wisq_x"] != "" else "-"
-        print(f"{r['circuit']:<28} {str(r['n_qubits']):>6} {grid:>9} "
+        my_grid = f"{r['my_x']}x{r['my_y']}" if r.get("my_x", "") != "" else "-"
+        wisq_grid = f"{r['wisq_x']}x{r['wisq_y']}" if r.get("wisq_x", "") != "" else "-"
+        print(f"{r['circuit']:<28} {str(r['n_qubits']):>6} {my_grid:>9} {wisq_grid:>9} "
               f"{str(r['my_routing_steps']):>6} {str(r['wisq_routing_steps']):>6} "
               f"{str(r['ratio_wisq_over_mine']):>9} {str(r['grid_grown_for_wisq']):>6} "
               f"{str(r['wisq_status']):>9}")
