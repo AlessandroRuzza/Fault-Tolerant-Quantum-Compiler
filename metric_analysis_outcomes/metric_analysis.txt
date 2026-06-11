@@ -120,6 +120,89 @@ raccomandazioni (metrica = non_routed_layer_pct mean-no-out):
    (contrasto con cnot_high che è plateau ovunque.)
 
 
+--------------- nuove esecuzioni, cambio codice, agginta BFS----------------
+
+
+================================================================
+ANALISI REGIME BFS  (CNOT-BFS order, gate density<0.40)   [2026-06-10]
+================================================================
+Vale SOLO per i circuiti con density(grafo CNOT) < 0.40 = quelli che il gate
+manda all'ordine CNOT-BFS. I densi (heap, density>=0.40: qaoa, random, qft
+piccoli n<=64) tengono le formule qui sopra, gia' valide e non toccate.
+Suite: bfs_retune_* (12 config, 62784 casi sul cluster). Metrica: non_routed_layer_pct.
+
+--- VERIFICHE (tutte fatte) ---
+1) d-SCALING: NESSUNO. Test su circuito FISSO (varia solo la griglia via
+   dimension_offset: 6-7 dimensioni per circuito, d=5..41 testate, stessi qubit/
+   gate/densita'). cnot_high e mapped: il ginocchio rimbalza senza trend monotono
+   (es. synth fisso: cnot 0->2->0->1.5; mapped 1.5->8->1.2). La dimensione cambia
+   nr_min (griglia grande = meno non_routed) ma NON il peso ottimo.
+   => la vecchia mapped=0.15*dim era artefatto del range (plateau), come gia' sospettato sopra.
+2) OTTIMO INTERNO vs BORDO:
+   - mapped/noncube = INTERNO genuino: peggio sia a 0 che a 10, conca con minimo ~1.5-2.
+   - mapped/cube = al pavimento 0 (vuole minima repulsione: fisico, non artefatto).
+   - cnot_high = GINOCCHIO + PLATEAU: 0 costa +3-4pp, poi piatto fino al bordo alto.
+     Conta il ginocchio (minimo necessario), non un punto preciso; valori alti ne'
+     aiutano ne' fanno male (coerente con "plateau, non scendere sotto").
+3) DISCRIMINANTE: SI. Profondita' curva robusta 2.2-4.0pp in media (molto di piu' sui
+   strutturati: graphstate 35pp, adder 23pp). Segnale ben sopra il rumore. Per cnot e'
+   soprattutto on/off (0 vs >0); per mapped/noncube e' una vera conca.
+
+--- PARAMETRI OTTIMI (regime BFS) ---
+                cnot_high(ginocchio)   mapped
+  coarse/cube         1.5               0
+  coarse/noncube      1.5               2.0    (minimo interno)
+  fine/cube           0.5               0
+  fine/noncube        0.5               1.5    (minimo interno)
+  cnot_low = 0   <-- VERIFICATO inerte sotto BFS (check locale bfs_cnotlow_check,
+                     5 circuiti): cl=0/0.5/1.0/1.5 danno non_routed IDENTICO
+                     all'ultima cifra. Cambiarlo non fa nulla -> tienilo 0.
+  external_weight=0, magic_high ~0.2-0.4 / magic_low 0 (vedi sezione MAGIC),
+  center_circle, base 1, confidence come storico.
+
+--- MAGIC re-tune (regime BFS) ---  [2026-06-11, magic_retune_{coarse,fine}_{cube,noncube}]
+Sweep MAGIC_HIGH x MAGIC_LOW x border (cnot/mapped tenuti agli ottimi BFS qui sopra,
+variati leggermente per robustezza). Solo circuiti con T (synth t030 + bwt_n37: senza
+T niente magic states -> i pesi magic non fanno nulla). ~97k righe/config, metodo
+robusto mean-excess appaiato (controllo circuito,d,cnot,mapped,altro-knob).
+
+magic_high* per border, al mapped raccomandato (cube=0, noncube~2):
+                   b0    b5    b10   b20   b30     trend
+  coarse/cube      0     0.2   0.2   0.2   1.6     piatto basso
+  coarse/noncube   0     0.2   0.8   0.8   0.2     basso, no trend
+  fine/cube        alto  3     1.6   0     0       decresce col border (b0 rumoroso)
+  fine/noncube     3     1.6   0.4   0.4   0.2     decresce col border
+=> magic_high BASSO ovunque (~0.2-0.4), tende a 0 a border largo nel fine.
+   magic alto (>=6) fa male; nel NONCUBE e' CATASTROFICO (+3-8pp, monotono).
+   coarse: piatto sul border. fine: decresce col border.
+
+magic_low:
+  coarse (cube+noncube): INERTE (update_gaussians_coarse non lo usa; spread 0.00) -> 0
+  fine/cube:   ~1 migliora un po' (-0.1..-0.16pp) a border <=10; a border >=20 meglio 0
+  fine/noncube: 0 sempre (valori alti fanno male a border largo, +0.15-0.20pp)
+  => REGOLA: magic_low = 0 ovunque, TRANNE fine/cube con border<=10 -> magic_low = 1.
+
+INTERAZIONE mapped x magic (cube): la vecchia regola "magic ALTO a border largo"
+era un ARTEFATTO del tenere mapped>0. Confronto ASSOLUTO appaiato:
+  (mapped=0, magic basso) BATTE (mapped>0, magic alto): -0.52pp coarse/cube,
+  -1.05pp fine/cube; le top-5 celle (mapped,magic_high) per non_routed assoluto sono
+  TUTTE mapped=0 con magic basso (0.2). => cube: mapped=0 + magic_high ~0.2-0.4,
+  niente magic alto, niente dipendenza da border.
+
+--- NOTE ---
+- NIENTE d-scaling per cnot_high/mapped in regime BFS: sono piccole COSTANTI.
+  L'ordine BFS fa gia' il lavoro strutturale che i pesi crescenti facevano in heap.
+- synth_d040 COMPLETAMENTE INERTE: ottimo (cnot=0, mapped piatto), i pesi non fanno
+  nulla; l'ordine BFS basta da solo.
+- qft grandi (n>=100) sono BFS e vogliono cnot basso ~0.5-1 => la costante "qft" va
+  SPEZZATA per taglia: n>=100 -> regime BFS, n<=64 -> regime heap.
+- cnot e mapped INTERAGISCONO (2D, cresta antagonista: mapped respinge, cnot attrae):
+  piu' mapped -> serve piu' cnot, ma il minimo congiunto e' sempre basso-basso.
+  Quindi NON scalare mapped indipendentemente; tienili entrambi piccoli.
+
+
+
+
 
 ------------------ sure so far ------------------
 
