@@ -37,6 +37,7 @@ DEFAULT_METRICS = PROJECT_ROOT / "benchmarks" / "results" / "cache_metrics" / "a
 
 GINI_KEY = "cnot_pair_rep_gini"
 DENSITY_KEY = "cnot_interaction_density"
+MOD_KEY = "cnot_graph_modularity"
 
 
 def load_advantage(runs_csv, metrics_csv):
@@ -74,6 +75,7 @@ def load_advantage(runs_csv, metrics_csv):
             "advantage": (rnd - g) / rnd,
             "gini": float(m[GINI_KEY]),
             "density": float(m[DENSITY_KEY]),
+            "modularity": float(m[MOD_KEY]) if m.get(MOD_KEY, "").strip() else 0.0,
             "g_steps": g, "r_steps": rnd,
         })
     if missing:
@@ -83,23 +85,23 @@ def load_advantage(runs_csv, metrics_csv):
 
 
 def regression_r2(data):
-    """advantage ~ gini + density (standardized). Returns (b_gini, b_dens, r2)."""
-    if len(data) < 4:
+    """advantage ~ gini + density + modularity (standardized).
+    Returns dict with betas and r2."""
+    if len(data) < 5:
         return None
     adv = np.array([d["advantage"] for d in data])
-    gini = np.array([d["gini"] for d in data])
-    dens = np.array([d["density"] for d in data])
 
-    def z(x):
+    def z(key):
+        x = np.array([d[key] for d in data])
         sd = x.std()
         return (x - x.mean()) / sd if sd > 0 else x * 0.0
 
-    X = np.column_stack([np.ones(len(adv)), z(gini), z(dens)])
+    X = np.column_stack([np.ones(len(adv)), z("gini"), z("density"), z("modularity")])
     beta, *_ = np.linalg.lstsq(X, adv, rcond=None)
     pred = X @ beta
     ss_tot = ((adv - adv.mean()) ** 2).sum()
     r2 = 1 - ((adv - pred) ** 2).sum() / ss_tot if ss_tot > 0 else 0.0
-    return beta[1], beta[2], r2
+    return {"gini": beta[1], "density": beta[2], "modularity": beta[3], "r2": r2}
 
 
 def plot_advantage_vs_gini(data, out_path):
@@ -129,9 +131,9 @@ def plot_advantage_vs_gini(data, out_path):
                  "sopra 0 = gaussian meglio di random", fontsize=12, fontweight="bold")
     reg = regression_r2(data)
     if reg:
-        bg, bd, r2 = reg
         ax.text(0.02, 0.02,
-                f"regressione adv ~ gini + densità:  β_gini={bg:+.3f}, β_dens={bd:+.3f},  R²={r2:.2f}",
+                f"adv ~ gini+dens+mod:  β_gini={reg['gini']:+.3f}, "
+                f"β_dens={reg['density']:+.3f}, β_mod={reg['modularity']:+.3f},  R²={reg['r2']:.2f}",
                 transform=ax.transAxes, fontsize=9, color="#333333",
                 bbox=dict(boxstyle="round", fc="white", ec="#cccccc"))
     ax.grid(color="#eeeeee", zorder=0)
@@ -180,6 +182,30 @@ def plot_heatmap(data, out_path):
     plt.close(fig)
 
 
+def plot_advantage_vs_modularity(data, out_path):
+    densities = sorted(set(round(d["density"], 2) for d in data))
+    cmap = plt.get_cmap("viridis")
+    colors = {dv: cmap(i / max(1, len(densities) - 1)) for i, dv in enumerate(densities)}
+
+    fig, ax = plt.subplots(figsize=(10, 6.5), facecolor="white")
+    ax.axhline(0, color="#888888", lw=1.2, ls="--", zorder=1, label="pareggio")
+    for dv in densities:
+        pts = [d for d in data if round(d["density"], 2) == dv]
+        xs = np.array([d["modularity"] for d in pts])
+        ys = np.array([d["advantage"] for d in pts])
+        ax.scatter(xs, ys, color=colors[dv], alpha=0.55, s=40, zorder=2,
+                   label=f"density = {dv:.2f}")
+    ax.set_xlabel("CNOT graph modularity  (0 = nessun cluster, ~1 = molto clusterizzato)", fontsize=11)
+    ax.set_ylabel("gaussian advantage = (random − gaussian) / random", fontsize=11)
+    ax.set_title("Vantaggio di gaussian vs modularità del grafo di interazione",
+                 fontsize=12, fontweight="bold")
+    ax.grid(color="#eeeeee", zorder=0)
+    ax.legend(fontsize=9, framealpha=0.9)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=130, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -202,9 +228,12 @@ def main():
     print(f"gaussian vince: {wins} | random vince: {sum(1 for d in data if d['advantage'] < -0.01)}")
     reg = regression_r2(data)
     if reg:
-        print(f"regressione: β_gini={reg[0]:+.3f}  β_density={reg[1]:+.3f}  R²={reg[2]:.3f}")
+        print(f"regressione adv ~ gini+densità+modularità: "
+              f"β_gini={reg['gini']:+.3f}  β_density={reg['density']:+.3f}  "
+              f"β_mod={reg['modularity']:+.3f}  R²={reg['r2']:.3f}")
 
     plot_advantage_vs_gini(data, out_dir / "advantage_vs_gini.png")
+    plot_advantage_vs_modularity(data, out_dir / "advantage_vs_modularity.png")
     plot_heatmap(data, out_dir / "advantage_heatmap.png")
     print(f"Plot scritti in {out_dir}/")
 

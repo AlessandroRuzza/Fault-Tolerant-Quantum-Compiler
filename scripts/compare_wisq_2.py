@@ -28,6 +28,16 @@ Bench mode (--bench):
   cartesian product of all parameter combinations, mirroring the C++ benchmark
   expansion logic. Results are written incrementally so the run can be interrupted
   and resumed without losing work.
+
+WISQ deduplication:
+  Our compiler runs once per (circuit, config) pair, but WISQ only depends on the
+  architecture (grid dims + magic-state positions + data slots) and the circuit
+  QASM — never on our mapping/routing config. So config fields that do not change
+  the grid (gaussian_strategy, routing_strategy, t_routing_mode, use_layer_cache,
+  ...) all yield the same arch, and WISQ is run only once per distinct arch and its
+  result reused for every config that maps to it. The per-config ratio_wisq_over_mine
+  is still computed against each config's own routing steps. Cache hits are logged as
+  "[wisq] (cached) ...".
 """
 
 from __future__ import annotations
@@ -69,6 +79,15 @@ _csv_write_lock = threading.Lock()
 _wisq_semaphore: threading.Semaphore | None = None
 _active_wisq = 0
 _active_wisq_lock = threading.Lock()
+
+# Cache of WISQ results keyed by (circuit, arch signature). WISQ's result depends
+# only on the architecture (grid dims + magic-state positions + data slots) and the
+# circuit QASM — never on our mapping/routing config (gaussian_strategy,
+# routing_strategy, t_routing_mode, ... do not change the grid). So every
+# (circuit, config) pair that yields the same arch reuses a single WISQ run.
+# Values are a threading.Event while a run is in progress, then the result dict.
+_wisq_cache: dict[tuple, object] = {}
+_wisq_cache_lock = threading.Lock()
 
 
 def _get_circuit_lock(circuit: str) -> threading.Lock:
@@ -395,6 +414,65 @@ BENCH_CSV_COLUMNS = (
 
 # ── shared per-circuit logic ─────────────────────────────────────────────────────
 
+def _run_wisq_with_limit(circuit: str, arch_path: Path, mr_timeout: int) -> dict:
+    """run_wisq, honoring the optional --wisq-workers concurrency cap."""
+    global _active_wisq
+    if _wisq_semaphore is None:
+        return run_wisq(circuit, arch_path, mr_timeout)
+    with _wisq_semaphore:
+        with _active_wisq_lock:
+            _active_wisq += 1
+        try:
+            return run_wisq(circuit, arch_path, mr_timeout)
+        finally:
+            with _active_wisq_lock:
+                _active_wisq -= 1
+
+
+def get_or_run_wisq(circuit: str, built: dict, arch_dir: Path,
+                    mr_timeout: int, run_id: int | None) -> dict:
+    """Run WISQ for `built["arch"]`, or reuse a cached result for an identical arch.
+
+    Because WISQ depends only on the architecture and the circuit QASM, two configs
+    that produce the same grid + magic-state layout share one WISQ run. Concurrent
+    workers needing the same arch wait on the first run instead of launching
+    duplicates. The returned dict is shared across callers and must not be mutated.
+    """
+    sig = (circuit, json.dumps(built["arch"], sort_keys=True))
+
+    with _wisq_cache_lock:
+        entry = _wisq_cache.get(sig)
+        if entry is None:
+            event = threading.Event()
+            _wisq_cache[sig] = event
+            owner = True
+        else:
+            owner = False
+
+    if not owner:
+        if isinstance(entry, threading.Event):
+            entry.wait()
+            with _wisq_cache_lock:
+                entry = _wisq_cache[sig]
+        arch = built["arch"]
+        print(f"  [wisq]     (cached) {circuit} "
+              f"{arch['width']}x{arch['height']}", file=sys.stderr)
+        return entry  # type: ignore[return-value]
+
+    suffix = f"_{run_id}" if run_id is not None else ""
+    arch_path = arch_dir / f"{circuit}{suffix}_wisq2.arch"
+    write_arch_file(built["arch"], arch_path)
+    try:
+        wisq = _run_wisq_with_limit(circuit, arch_path, mr_timeout)
+    finally:
+        arch_path.unlink(missing_ok=True)
+
+    with _wisq_cache_lock:
+        _wisq_cache[sig] = wisq
+    event.set()
+    return wisq
+
+
 def run_one(circuit: str, cfg: dict, binary: Path, arch_dir: Path,
             parity: int, mr_timeout: int, run_id: int | None = None) -> dict:
     """Run compiler + WISQ for one (circuit, cfg) pair. Returns a result dict.
@@ -414,9 +492,6 @@ def run_one(circuit: str, cfg: dict, binary: Path, arch_dir: Path,
         graph["width"], graph["height"], graph["magic_states"],
         n_qubits, parity,
     )
-    suffix = f"_{run_id}" if run_id is not None else ""
-    arch_path = arch_dir / f"{circuit}{suffix}_wisq2.arch"
-    write_arch_file(built["arch"], arch_path)
 
     if not built["enough_space"]:
         print(f"  WARNING: only {built['n_slots']} slots for {n_qubits} qubits "
@@ -427,19 +502,7 @@ def run_one(circuit: str, cfg: dict, binary: Path, arch_dir: Path,
               f"{built['arch']['width']}x{built['arch']['height']} "
               f"(dimension parity broken).", file=sys.stderr)
 
-    global _active_wisq
-    if _wisq_semaphore is not None:
-        with _wisq_semaphore:
-            with _active_wisq_lock:
-                _active_wisq += 1
-            try:
-                wisq = run_wisq(circuit, arch_path, mr_timeout)
-            finally:
-                with _active_wisq_lock:
-                    _active_wisq -= 1
-    else:
-        wisq = run_wisq(circuit, arch_path, mr_timeout)
-    arch_path.unlink(missing_ok=True)
+    wisq = get_or_run_wisq(circuit, built, arch_dir, mr_timeout, run_id)
 
     ratio = None
     if (wisq["routing_steps"] and mine["routing_steps"] and mine["routing_steps"] > 0):
