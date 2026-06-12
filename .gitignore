@@ -52,6 +52,8 @@ benchmarks/**/*_plots_*/
 
 
 build/
+build-*/
+build_*/
 env/
 .env/
 .venv-mqt/

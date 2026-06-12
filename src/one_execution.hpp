@@ -371,7 +371,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     int best_routing_steps = std::numeric_limits<int>::max();
     double best_avg_parallelism = 0.0;
     double best_non_routed_layer_pct = -1.0;
-
+    double max_parallelism = -1;
+    
     if (repetition_count < 1) {
         repetition_count = 1;
     }
@@ -421,6 +422,12 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         }
 
         auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
+        if(max_parallelism < 0){
+            const int num_layers = layeredCircuit->getNumLayers();
+            max_parallelism = num_layers > 0
+            ? static_cast<double>(layeredCircuit->getNumGates()) / num_layers
+            : 0.0;
+        }
 
         // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr
         // (QubitRouter holds raw pointers into them).
@@ -510,7 +517,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
         if(print_reps) {
             std::cout << "Routing steps: " << routing_steps << "\n";
-            std::cout << "Avg parallelism: " << avg_parallelism << "\n";
+            std::cout << "Achieved avg parallelism: " << avg_parallelism << " / " << max_parallelism << "\n";
             std::cout << "Non-routed layer %: " << non_routed_layer_pct << "\n";
         }
     }
@@ -540,7 +547,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     if (PRINT_ROUTING) best_router->print_routing_steps();
 
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << best_routing_steps << "\n";
-    std::cout << "Average Parallelism (" << routing_strategy << "): " << best_avg_parallelism << "\n";
+    std::cout << "Achieved avg parallelism (" << routing_strategy << "): " << best_avg_parallelism << " / " << max_parallelism << "\n";
     std::cout << "Average non-routed % (" << routing_strategy << "): " << best_non_routed_layer_pct << "%\n\n";
 
     total_mr_time_seconds = mapping_time_seconds + routing_time_seconds;
