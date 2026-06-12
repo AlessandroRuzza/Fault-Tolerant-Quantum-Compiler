@@ -38,7 +38,8 @@ apptainer exec \
     --output "/app/benchmarks/results/${BENCH_PATH}_wisq.csv" \
     --workers "$BENCH_JOBS" \
     --process-count "${BENCH_PROCESS_COUNT:-1}" \
-    --processor "${PROCESSOR:-0}" >> "$LOG_FILE" 2>&1
+    --processor "${PROCESSOR:-0}" \
+    --mr_timeout "${MR_TIMEOUT:-300}" >> "$LOG_FILE" 2>&1
 
 {
 echo "END_JOB=$PBS_JOBID"

@@ -109,6 +109,18 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
     steps_vals = [best_steps, worst_steps, wisq_steps]
     time_vals = [best_time, worst_time, wisq_time]
 
+    # Grid size per bar: ours (best/worst) use my_x×my_y, WISQ uses wisq_x×wisq_y.
+    # Drawn inside each bar so a larger WISQ grid is immediately visible.
+    def grid_str(row: dict, xkey: str, ykey: str) -> str:
+        x, y = str(row.get(xkey, "")).strip(), str(row.get(ykey, "")).strip()
+        return f"{x}×{y}" if x and y else ""
+
+    grids = [
+        grid_str(best, "my_x", "my_y"),
+        grid_str(worst, "my_x", "my_y"),
+        grid_str(best, "wisq_x", "wisq_y"),
+    ]
+
     fig, (ax_steps, ax_time) = plt.subplots(1, 2, figsize=(11, 5))
     fig.suptitle(f"{circuit}  —  grid {grid}", fontsize=13, fontweight="bold")
 
@@ -138,12 +150,22 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
                 ax.text(x, y + y_pad * 5, pct,
                         ha="center", va="bottom", fontsize=9, color=color)
 
+    def label_grids(ax, bars, vals):
+        """Write the grid size centred inside each bar (white text on the bar)."""
+        for bar, val, g in zip(bars, vals, grids):
+            if val is None or not g:
+                continue
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() / 2, g,
+                    ha="center", va="center", fontsize=9, fontweight="bold",
+                    color="white")
+
     # ── routing steps ──
     bars = ax_steps.bar(labels, steps_vals, color=colors, width=0.5, edgecolor="white")
     ax_steps.set_title("Routing steps")
     ax_steps.set_ylabel("steps")
     ax_steps.set_ylim(0, max(v for v in steps_vals if v is not None) * 1.35)
     annotate_bars(ax_steps, bars, steps_vals, best_steps, lambda v: str(int(v)))
+    label_grids(ax_steps, bars, steps_vals)
 
     # ── time ──
     bars2 = ax_time.bar(labels, time_vals, color=colors, width=0.5, edgecolor="white")
@@ -152,6 +174,7 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
     max_t = max((v for v in time_vals if v is not None), default=1)
     ax_time.set_ylim(0, max_t * 1.35)
     annotate_bars(ax_time, bars2, time_vals, best_time, lambda v: f"{v:.2f}s")
+    label_grids(ax_time, bars2, time_vals)
 
     # number of configs shown as footnote
     n_configs = len(rows)
@@ -161,6 +184,81 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
 
     plt.tight_layout(rect=[0, 0.04, 1, 1])
     out_path = out_dir / f"{circuit}_wisq_comparison.png"
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  saved: {out_path}")
+
+
+def plot_summary(by_circuit: dict[str, list[dict]], out_dir: Path, metric: str) -> None:
+    """One overview figure across all circuits: grouped bars (ours-best vs WISQ).
+
+    metric = "steps" -> routing steps; metric = "time" -> wall-clock seconds.
+    Only circuits where both our best config and WISQ have a valid value are shown.
+    """
+    if metric == "steps":
+        my_key, wisq_key = "my_routing_steps", "wisq_routing_steps"
+        ylabel, title, fname = "routing steps", "Routing steps: ours (best) vs WISQ", "summary_routing_steps.png"
+    else:
+        my_key, wisq_key = "my_duration_s", "wisq_duration_s"
+        ylabel, title, fname = "seconds", "Wall-clock time: ours (best) vs WISQ", "summary_time.png"
+
+    # One point per circuit: our best config (by routing steps, tiebreak time).
+    entries = []
+    for circuit, rows in by_circuit.items():
+        best, _ = pick_best_worst(rows)
+        mine = to_float(best.get(my_key))
+        wisq = to_float(best.get(wisq_key))
+        if mine is None or wisq is None:
+            continue
+        nq = to_float(best.get("n_qubits")) or 0.0
+        entries.append((circuit, nq, mine, wisq))
+
+    if not entries:
+        print(f"  (no data for summary '{metric}')")
+        return
+
+    # Sort by qubit count, then name, for a natural left-to-right progression.
+    entries.sort(key=lambda e: (e[1], e[0]))
+    circuits = [e[0] for e in entries]
+    mine_vals = [e[2] for e in entries]
+    wisq_vals = [e[3] for e in entries]
+
+    # Win/tie/loss tally (lower is better for both metrics).
+    EPS = 1e-9
+    ours_wins = sum(1 for m, w in zip(mine_vals, wisq_vals) if m < w - EPS)
+    ties = sum(1 for m, w in zip(mine_vals, wisq_vals) if abs(m - w) <= EPS)
+    wisq_wins = sum(1 for m, w in zip(mine_vals, wisq_vals) if m > w + EPS)
+    total = len(circuits)
+
+    x = np.arange(len(circuits))
+    width = 0.4
+
+    fig, ax = plt.subplots(figsize=(max(8, len(circuits) * 0.5), 6))
+    ax.bar(x - width / 2, mine_vals, width, label="ours (best)", color="#2196F3")
+    ax.bar(x + width / 2, wisq_vals, width, label="WISQ", color="#E53935")
+
+    # Win summary box (ours beats WISQ = strictly lower value).
+    summary = (f"ours wins: {ours_wins}   ties: {ties}   WISQ wins: {wisq_wins}"
+               f"   (of {total})")
+    ax.text(0.5, 0.97, summary, transform=ax.transAxes, ha="center", va="top",
+            fontsize=11, fontweight="bold",
+            bbox=dict(boxstyle="round", facecolor="#FFF9C4", edgecolor="#BDBDBD"))
+
+    # Log scale when the values span a wide range and are all positive.
+    allv = mine_vals + wisq_vals
+    if min(allv) > 0 and max(allv) / min(allv) > 50:
+        ax.set_yscale("log")
+        ylabel += " (log scale)"
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(circuits, rotation=90, fontsize=8)
+    ax.set_ylabel(ylabel)
+    ax.set_title(f"{title}  ({len(circuits)} circuits)", fontweight="bold")
+    ax.legend()
+    ax.grid(axis="y", linestyle=":", alpha=0.4)
+
+    plt.tight_layout()
+    out_path = out_dir / fname
     plt.savefig(out_path, dpi=150)
     plt.close(fig)
     print(f"  saved: {out_path}")
@@ -196,6 +294,10 @@ def main() -> int:
     print(f"Plotting {len(by_circuit)} circuit(s) → {out_dir}")
     for circuit, rows in sorted(by_circuit.items()):
         plot_circuit(circuit, rows, out_dir)
+
+    # Two cross-circuit overview figures: routing steps and time.
+    plot_summary(by_circuit, out_dir, "steps")
+    plot_summary(by_circuit, out_dir, "time")
 
     return 0
 

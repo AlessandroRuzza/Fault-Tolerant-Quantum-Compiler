@@ -4,11 +4,11 @@
 # Works exactly like submit-bench.sh but targets run_wisq.pbs.
 #
 # Usage:
-#   scripts/submit-wisq.sh <BENCH_PATH> <BENCH_JOBS> [NPROC=1]
+#   scripts/submit-wisq.sh <BENCH_PATH> <BENCH_JOBS> [NPROC=1] [MR_TIMEOUT=300]
 #
 # Example:
-#   scripts/submit-wisq.sh qaoa_best_gaussian 28 4
-#     → submits 4 jobs, each using 28 threads, sharing one output CSV
+#   scripts/submit-wisq.sh qaoa_best_gaussian 28 4 600
+#     → submits 4 jobs, each using 28 threads, wisq timeout 600s
 #
 # Env overrides:
 #   PBS_SCRIPT   path to the PBS job script   (default: run_wisq.pbs)
@@ -16,14 +16,15 @@
 #   MEM          memory reserved per job      (default: 64gb)
 set -eu
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
-    echo "Uso: submit-wisq.sh <BENCH_PATH> <BENCH_JOBS> [NPROC=1]" >&2
+if [ "$#" -lt 2 ] || [ "$#" -gt 4 ]; then
+    echo "Uso: submit-wisq.sh <BENCH_PATH> <BENCH_JOBS> [NPROC=1] [MR_TIMEOUT=300]" >&2
     exit 1
 fi
 
 BENCH_PATH="$1"
 BENCH_JOBS="$2"
 NPROC="${3:-1}"
+MR_TIMEOUT="${4:-300}"
 
 PBS_SCRIPT="${PBS_SCRIPT:-run_wisq.pbs}"
 WALLTIME="${WALLTIME:-48:00:00}"
@@ -34,12 +35,12 @@ case "$NPROC" in
 esac
 [ "$NPROC" -ge 1 ] || { echo "NPROC must be >= 1" >&2; exit 1; }
 
-echo "Submitting $NPROC wisq job(s) for '$BENCH_PATH' (BENCH_JOBS=$BENCH_JOBS cores + $MEM each, BENCH_PROCESS_COUNT=$NPROC)"
+echo "Submitting $NPROC wisq job(s) for '$BENCH_PATH' (BENCH_JOBS=$BENCH_JOBS cores + $MEM each, BENCH_PROCESS_COUNT=$NPROC, MR_TIMEOUT=${MR_TIMEOUT}s)"
 
 i=0
 while [ "$i" -lt "$NPROC" ]; do
     qsub -l select=1:ncpus="$BENCH_JOBS":mem="$MEM" -l walltime="$WALLTIME" \
-         -v BENCH_PATH="$BENCH_PATH",BENCH_JOBS="$BENCH_JOBS",BENCH_PROCESS_COUNT="$NPROC",PROCESSOR="$i" \
+         -v BENCH_PATH="$BENCH_PATH",BENCH_JOBS="$BENCH_JOBS",BENCH_PROCESS_COUNT="$NPROC",PROCESSOR="$i",MR_TIMEOUT="$MR_TIMEOUT" \
          "$PBS_SCRIPT"
     i=$((i + 1))
 done
