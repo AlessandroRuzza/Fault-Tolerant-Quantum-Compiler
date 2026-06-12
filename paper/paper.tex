@@ -58,7 +58,7 @@
 \newcommand{\figslot}[2][0.95\linewidth]{%
     \setlength{\fboxsep}{0pt}%
     \fbox{\parbox[c][#2][c]{#1}{\centering\footnotesize\itshape
-        \textcolor{gray}{[ figure placeholder — #1 wide ]}}}%
+        \textcolor{gray}{[ figure placeholder — \detokenize{#1} wide ]}}}%
 }
 
 % ── Metadata ─────────────────────────────────────────────────
@@ -91,7 +91,7 @@ Executing a logical quantum circuit fault-tolerantly on a surface-code
 processor reduces to placing logical qubits on a two-dimensional lattice and
 scheduling lattice-surgery operations that consume magic states for
 non-Clifford gates. Unlike the near-term (NISQ) setting, the cost is dominated
-not by \SWAP{} insertion but by the time-multiplexed routing corridors that
+not by $\SWAP{}$ insertion but by the time-multiplexed routing corridors that
 must be kept free so that interacting patches, and patches in need of a magic
 state, can be connected on demand. We present a \emph{Gaussian potential-field}
 heuristic for the initial-placement (mapping) sub-problem of fault-tolerant
@@ -310,7 +310,7 @@ into the score surface $S$.
 % ---- FIGURE: influence-field decomposition (single column) ----
 \begin{figure}[t]
     \centering
-    \figslot{1.5in}
+    \figslot[0.95\textwidth]{1.5in}
     \caption{Decomposition of the Gaussian placement score for one qubit:
     magic-state, CNOT-partner, repulsion, and baseline fields (left) and their
     superposition $S$ over the lattice (right). The chosen tile is the safe
@@ -539,11 +539,11 @@ finishes in seconds.}
 \section{Related Work}
 \label{sec:related}
 
-\textbf{NISQ mapping and routing.} Heuristic layout-and-\SWAP{} methods such as
+\textbf{NISQ mapping and routing.} Heuristic layout-and-$\SWAP{}$ methods such as
 SABRE~\cite{li2019sabre}, the routing passes of
 \mbox{t$|$ket$\rangle$}~\cite{sivarajah2020tket} and Qiskit~\cite{qiskit}, and
-exact/\NP-hardness treatments~\cite{siraichi2018qubit} target a fixed coupling
-graph and minimise \SWAP{} count or depth. Our cost model has no \SWAP{}s and a
+exact/$\NP$-hardness treatments~\cite{siraichi2018qubit} target a fixed coupling
+graph and minimise $\SWAP{}$ count or depth. Our cost model has no $\SWAP{}$s and a
 per-step reconfigurable topology, so these objectives do not transfer directly,
 though the greedy, lookahead-driven spirit does.
 

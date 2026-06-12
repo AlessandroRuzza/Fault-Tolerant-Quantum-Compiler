@@ -101,3 +101,30 @@ qasms/randomcircuit_n800.qasm
 
 # Synthetic study circuits (generated, not committed)
 qasms/synth*.qasm
+
+# LaTeX build artifacts (pdflatex/bibtex/latexmk temp outputs; *.out already
+# covered above, *.pdf intentionally kept so the built paper can be committed)
+*.aux
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ind
+*.ilg
+*.glo
+*.gls
+*.acn
+*.acr
+*.alg
+*.xdv
+paper/*.log
