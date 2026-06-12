@@ -421,8 +421,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             }
         }
 
-        const auto routing_start = std::chrono::steady_clock::now();
 
+        const auto layering_start = std::chrono::steady_clock::now();
         auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
         if(max_parallelism < 0){
             const int num_layers = layeredCircuit->getNumLayers();
@@ -430,6 +430,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             ? static_cast<double>(layeredCircuit->getNumGates()) / num_layers
             : 0.0;
         }
+        const auto layering_end = std::chrono::steady_clock::now();
+        circ_time_seconds +=
+            std::chrono::duration<double>(layering_end - layering_start).count();
 
         // pathStrategyPtr / tGateRoutingStrategyPtr are declared here so they outlive routerPtr (holds raw pointers into them).
         std::unique_ptr<IPathStrategy> pathStrategyPtr;
@@ -438,6 +441,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         auto route_metrics = std::make_unique<CircuitMetrics>();
         std::unordered_map<size_t, Routing>* cache_ptr = use_layer_cache ? &route_metrics->layer_routing_cache : nullptr;
 
+        const auto routing_start = std::chrono::steady_clock::now();
 
         if (routing_strategy == "boost") {
 #if FTOQC_HAS_BOOST_ROUTER
