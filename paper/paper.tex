@@ -19,6 +19,7 @@
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{graphicx}
 \usepackage{booktabs}           % \toprule / \midrule / \bottomrule
+\usepackage{calc}               % \widthof for fixed-width regime labels
 \usepackage{algorithm}
 \usepackage{algpseudocode}      % algorithmicx pseudocode
 \usepackage{xcolor}
@@ -60,6 +61,9 @@
     \fbox{\parbox[c][#2][c]{#1}{\centering\footnotesize\itshape
         \textcolor{gray}{[ figure placeholder — \detokenize{#1} wide ]}}}%
 }
+
+% Fixed-width variant label so the "/" lines up across regime rows (Table II).
+\newcommand{\regime}[2]{\makebox[\widthof{coarse}][l]{#1} / #2}
 
 % ── Metadata ─────────────────────────────────────────────────
 \title{%
@@ -222,6 +226,18 @@ for the not-yet-placed $T$-consuming qubits. Safe passage is the
 fault-tolerant analogue of the connectivity constraint that ordinary routing
 takes for granted, and it is what makes a purely score-driven placement
 admissible.
+
+We use two safe-passage tests (``cube'' vs.\
+``connectivity'') for the tuning regimes in Section~\ref{sec:eval}.
+\emph{Connectivity} test enforces (i)--(iii) directly on the free lattice,
+admitting a placement whenever reachability still holds; it packs tightly and so
+maps and routes on smaller lattices. \emph{Cube} instead applies a
+stricter geometric rule---it forbids any tile within the $3\times3$ neighbourhood
+of an occupied patch. This requires a larger grid
+area but yields consistently shorter routes in our experiments, since the
+reserved spacing leaves more routing alternatives; we therefore treat
+\emph{cube} as the default and \emph{connectivity} as the option for when lattice
+area is constrained.
 
 \begin{definition}[Qubit Mapping]
     Given circuit $\C$ and architecture $\A$, a \emph{mapping}
@@ -481,7 +497,7 @@ while the Gaussian method completes.
         \texttt{factor247\_n15}    & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
         ~~$\vdots$ & & & & & & & & & & & & \\
         \midrule
-        \textbf{Mean / geomean}    & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \textbf{Mean}    & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
         \bottomrule
     \end{tabular}
 \end{table*}
@@ -498,11 +514,11 @@ while the Gaussian method completes.
 
 \paragraph{Tuned parameters}
 The fields are governed by a small set of weights: the confidence $\kappa$ of
-\eqref{eq:sigma} (field width), the \textsc{cnot-high} attractive weight, the
+\eqref{eq:sigma} (field width), the \textsc{cnot-high} (attractive) weight, the
 \textsc{magic-high} and \textsc{magic-low} weights, and the mapped
-(repulsion-field) weight. Table~\ref{tab:params} lists the values we tuned for
+(repulsive) weight. Table~\ref{tab:params} lists the values we tuned for
 each regime---the four combinations of weighting variant (coarse or fine) and
-lattice geometry (cube or non-cube). All weights are border-independent except
+lattice geometry (cube or connectivity). All weights are border-independent except
 \textsc{magic-high}, which varies with the placement border margin and is given
 per border width.
 \todo{Confirm best-found settings once the tuning CSVs are final.}
@@ -529,10 +545,10 @@ per border width.
         \textbf{Regime} & \textbf{$\kappa$} & \textbf{\textsc{cnot-high}} & \textbf{mapped} & \textbf{\textsc{magic-low}}
             & $b{=}0$ & $b{=}5$ & $b{=}10$ & $b{=}20$ & $b{=}30$ \\
         \midrule
-        coarse / cube    & 0.999999 & 1.5 & 0   & 0              & 0               & 0.2 & 0.2 & 0.2 & 1.6 \\
-        coarse / noncube & 0.99999  & 1.5 & 2.0 & 0              & 0               & 0.2 & 0.8 & 0.8 & 0.2 \\
-        fine / cube      & 0.999999 & 0.5 & 0   & $1^{\dagger}$  & $20^{\ddagger}$ & 3   & 1.6 & 0   & 0   \\
-        fine / noncube   & 0.99999  & 0.5 & 1.5 & 0              & 3               & 1.6 & 0.4 & 0.4 & 0.2 \\
+        \regime{coarse}{cube} & 0.999999 & 1.5 & 0   & 0              & 0               & 0.2 & 0.2 & 0.2 & 1.6 \\
+        \regime{coarse}{conn} & 0.99999  & 1.5 & 2.0 & 0              & 0               & 0.2 & 0.8 & 0.8 & 0.2 \\
+        \regime{fine}{cube}   & 0.999999 & 0.5 & 0   & $1^{\dagger}$  & $20^{\ddagger}$ & 3   & 1.6 & 0   & 0   \\
+        \regime{fine}{conn}   & 0.99999  & 0.5 & 1.5 & 0              & 3               & 1.6 & 0.4 & 0.4 & 0.2 \\
         \bottomrule
     \end{tabular}
 
