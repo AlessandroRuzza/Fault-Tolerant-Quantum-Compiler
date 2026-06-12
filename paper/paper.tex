@@ -87,25 +87,20 @@
 
 % ── Abstract ─────────────────────────────────────────────────
 \begin{abstract}
-Executing a logical quantum circuit fault-tolerantly on a surface-code
-processor reduces to placing logical qubits on a two-dimensional lattice and
-scheduling lattice-surgery operations that consume magic states for
-non-Clifford gates. Unlike the near-term (NISQ) setting, the cost is dominated
-not by $\SWAP{}$ insertion but by the time-multiplexed routing corridors that
-must be kept free so that interacting patches, and patches in need of a magic
-state, can be connected on demand. We present a \emph{Gaussian potential-field}
-heuristic for the initial-placement (mapping) sub-problem of fault-tolerant
-compilation. Each candidate location on the lattice is scored by a
-superposition of two-dimensional Gaussian influence fields: attractive fields
-pull T-gate--heavy qubits toward magic states and tightly interacting qubits
-toward their already-placed partners, while repulsive (inverted) fields spread
-qubits apart and preserve routing space. Placement is greedy in qubit-priority
-order and is filtered by a \emph{safe-passage} connectivity test that
-guarantees every committed patch can still reach its interaction partners and a
-magic state. We implement the method in an open-source C++20 compiler that
-ingests OpenQASM and emits a routed lattice-surgery schedule, and we evaluate it
-against a rule-based magic-aware placement, a fast randomized-restart baseline,
-and the external WISQ compiler on a suite of benchmark circuits.
+Running a quantum circuit fault-tolerantly on a surface-code processor reduces
+to two coupled tasks: placing logical qubits on a two-dimensional lattice and
+scheduling the lattice-surgery operations that execute its gates, each
+non-Clifford gate consuming a magic state. Unlike the near-term (NISQ) setting,
+the bottleneck is not $\SWAP{}$ insertion but the routing corridors---free lanes
+of lattice that must stay open so interacting patches, or a patch and the magic
+state it needs, can be joined on demand. We present a \emph{Gaussian
+potential-field} heuristic for the placement sub-problem. Each candidate tile is
+scored by summing attractive Gaussian fields---pulling $T$-heavy qubits toward
+magic states and tightly interacting qubits toward their partners---and
+repulsive fields that preserve routing space; a \emph{safe-passage} test keeps
+every layout routable. We implement the method in an open-source C++20 OpenQASM
+compiler and evaluate it against rule-based, randomized-restart, and WISQ
+baselines.
 \todo{Insert one or two headline numbers once tables are filled (e.g.\ mean
 routing-step reduction vs.\ baseline; compile time; circuits where WISQ
 times out but our method succeeds).}
@@ -132,15 +127,15 @@ transversally and are instead teleported by consuming a distilled \emph{magic
 state}, which must be delivered from a dedicated magic-state factory through a
 free corridor of the lattice~\cite{bravyi2005magic}.
 
-Compiling a logical circuit to such hardware therefore has two coupled
-sub-problems. The \emph{mapping} problem assigns logical qubits to patches on
-the lattice, and the \emph{routing} problem time-schedules the lattice-surgery
-operations, reserving disjoint ancilla corridors at each step. This mirrors the
-classical NISQ mapping-and-routing pipeline of compilers such as
-SABRE~\cite{li2019sabre} and the Qiskit transpiler~\cite{qiskit}, but the cost model is fundamentally
-different: there are no $\SWAP{}$ gates, connectivity is reconfigured every step,
-and the scarce resource is free \emph{space} for corridors and magic-state
-access rather than edges of a fixed coupling graph. Both sub-problems are
+Compiling a logical circuit to such hardware therefore splits into two coupled
+sub-problems. \emph{Mapping} assigns logical qubits to patches on the lattice;
+\emph{routing} then time-schedules the lattice-surgery operations, reserving
+disjoint ancilla corridors at each step. This mirrors the classical NISQ
+mapping-and-routing pipeline of compilers such as SABRE~\cite{li2019sabre} and
+the Qiskit transpiler~\cite{qiskit}, but the cost model is fundamentally
+different. There are no $\SWAP{}$ gates, the connectivity is rebuilt at every
+step, and the scarce resource is free \emph{space}---for corridors and
+magic-state access---rather than the edges of a fixed coupling graph. Both sub-problems are
 $\NP$-hard in their classical analogues~\cite{siraichi2018qubit}, and the
 fault-tolerant variants inherit this hardness, motivating fast heuristics.
 
@@ -310,7 +305,7 @@ into the score surface $S$.
 % ---- FIGURE: influence-field decomposition (single column) ----
 \begin{figure}[t]
     \centering
-    \figslot[0.95\textwidth]{1.5in}
+    \figslot{1.5in}
     \caption{Decomposition of the Gaussian placement score for one qubit:
     magic-state, CNOT-partner, repulsion, and baseline fields (left) and their
     superposition $S$ over the lattice (right). The chosen tile is the safe
@@ -324,12 +319,13 @@ into the score surface $S$.
 The two variants differ only in how the per-field weights $w$ and the
 attractive/repulsive sign are chosen from circuit statistics.
 
-\emph{Coarse} uses discrete decisions. If $t(q)$ exceeds $q$'s maximum CNOT
-count, the magic fields are made strongly attractive (weight \textsc{magic-high});
-otherwise placement is partner-driven: attractive CNOT fields (weight
-\textsc{cnot-high}) are added at mapped partners, and the magic fields are
-attractive when $t(q)>\bar t+\sigma_t$, repulsive when $t(q)<\bar t-\sigma_t$,
-and disabled in between.
+\emph{Coarse} makes discrete decisions. If a qubit's $T$-count $t(q)$ outweighs
+its largest CNOT count with any single partner, the qubit is treated as
+$T$-bound and its magic fields are made strongly attractive (weight
+\textsc{magic-high}). Otherwise placement is partner-driven: attractive CNOT
+fields (weight \textsc{cnot-high}) are added at its mapped partners, and the
+magic fields are turned attractive only when $t(q)>\bar t+\sigma_t$, repulsive
+when $t(q)<\bar t-\sigma_t$, and left off in between.
 
 \emph{Fine} replaces the thresholds with linear interpolation. For the magic
 fields,
@@ -566,14 +562,14 @@ patches as repellers, under a hard connectivity (safe-passage) constraint.
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented a Gaussian potential-field heuristic for the initial-placement
-sub-problem of fault-tolerant compilation. By superposing attractive
-magic-state and partner fields with repulsive spread-out fields and selecting
-the safe maximum, the method turns the competing objectives of T-gate locality,
-interaction clustering, and corridor preservation into a single, fast scoring
-pass, while a safe-passage filter guarantees routable layouts. Implemented in an
-open-source OpenQASM-to-lattice-surgery compiler, it is evaluated against a
-rule-based baseline and the WISQ compiler.
+We presented a Gaussian potential-field heuristic for the placement sub-problem
+of fault-tolerant compilation. The method superposes attractive magic-state and
+partner fields with repulsive spread-out fields, then places each qubit at the
+safe maximum of the result. This folds three competing objectives---$T$-gate
+locality, interaction clustering, and corridor preservation---into a single fast
+scoring pass, while the safe-passage filter keeps every layout routable. We
+implement it in an open-source OpenQASM-to-lattice-surgery compiler and evaluate
+it against a rule-based baseline and the WISQ compiler.
 \todo{State the headline empirical result once tables are filled.}
 Limitations include the greedy, single-pass nature of placement and reliance on
 hand-tuned field weights. A natural next step is to learn or jointly optimise
