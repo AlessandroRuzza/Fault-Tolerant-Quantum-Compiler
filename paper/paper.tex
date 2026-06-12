@@ -444,44 +444,47 @@ the non-routed-layer percentage.
 Table~\ref{tab:results} reports routing steps and compile time across the
 benchmark suite for both Gaussian variants and the three baselines.
 Figure~\ref{fig:scatter} plots per-circuit routing steps of the Gaussian method
-against WISQ; points below the diagonal favour our method, and the rightmost
-column of Table~\ref{tab:results} flags circuits where WISQ fails or times out
+against WISQ; points below the diagonal favour our method, and the WISQ entries
+of Table~\ref{tab:results} flag circuits where WISQ fails or times out
 while the Gaussian method completes.
 
-% ---- TABLE: main comparison (skeleton, ample room) ----
-\begin{table}[t]
+% ---- TABLE: main comparison (full width, two panels) ----
+\begin{table*}[t]
     \centering
     \caption{Routing steps and compile time per benchmark. ``G-coarse'' and
     ``G-fine'' are the Gaussian variants; ``MA'' is the rule-based magic-aware
     baseline; ``Rand'' is the best of $k$ randomized restarts; WISQ is the
-    external compiler (\,---\,$=$ failure/timeout).
+    external compiler (\,---\,$=$ failure/timeout). Compile time is reported
+    per method, since each strategy runs its own mapping and routing.
+    $L_{\min}$ is the circuit's dependency-layer count (from its layered form),
+    a lower bound on the routing steps any method can achieve.
     \todo{Fill from \texttt{best\_params\_benchmark\_runs.csv} and
     \texttt{wisq\_docker} CSVs.}}
     \label{tab:results}
     \setlength{\tabcolsep}{4pt}
     \footnotesize
-    \begin{tabular}{l r rrrrr r}
+    \begin{tabular}{l r r rrrrr rrrrr}
         \toprule
-        \textbf{Circuit} & \textbf{$|\Q_L|$}
+        \textbf{Circuit} & \textbf{$|\Q_L|$} & \textbf{$L_{\min}$}
             & \multicolumn{5}{c}{\textbf{Routing steps}}
-            & \textbf{Time} \\
-        \cmidrule(lr){3-7}
-            & & \textbf{G-coarse} & \textbf{G-fine} & \textbf{MA} & \textbf{Rand} & \textbf{WISQ}
-            & \textbf{(s)} \\
+            & \multicolumn{5}{c}{\textbf{Compile time (s)}} \\
+        \cmidrule(lr){4-8}\cmidrule(lr){9-13}
+            & & & \textbf{G-coarse} & \textbf{G-fine} & \textbf{MA} & \textbf{Rand} & \textbf{WISQ}
+              & \textbf{G-coarse} & \textbf{G-fine} & \textbf{MA} & \textbf{Rand} & \textbf{WISQ} \\
         \midrule
-        \texttt{adder\_n28}        & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{qft\_20}           & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{multiplier\_n45}   & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{square\_root\_n45} & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{bwt\_n21}          & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{hhl\_n10}          & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{factor247\_n15}    & -- & -- & -- & -- & -- & -- & -- \\
-        ~~$\vdots$                 &    &    &    &    &    &    &    \\
+        \texttt{adder\_n28}        & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{qft\_20}           & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{multiplier\_n45}   & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{square\_root\_n45} & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{bwt\_n21}          & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{hhl\_n10}          & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{factor247\_n15}    & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        ~~$\vdots$ & & & & & & & & & & & & \\
         \midrule
-        \textbf{Mean / geomean}    & -- & -- & -- & -- & -- & -- & -- \\
+        \textbf{Mean / geomean}    & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
         \bottomrule
     \end{tabular}
-\end{table}
+\end{table*}
 
 % ---- FIGURE: per-circuit scatter vs WISQ (single column) ----
 \begin{figure}[t]
@@ -493,34 +496,50 @@ while the Gaussian method completes.
     \label{fig:scatter}
 \end{figure}
 
-\paragraph{Parameter sensitivity}
-The fields are governed by a small set of parameters: the confidence $\kappa$ of
-\eqref{eq:sigma} (field width), the size multiplier (footprint), and the
-high/low magic and CNOT weights. Table~\ref{tab:sweep} summarises a sweep over
-the two most influential knobs, $\kappa$ and size; in our preliminary tuning
-$\kappa$ chiefly controls effective field radius and interacts with the
-safe-passage margin, with a broad, robust optimum.
-\todo{Confirm best-found setting and headline sensitivity once filled.}
+\paragraph{Tuned parameters}
+The fields are governed by a small set of weights: the confidence $\kappa$ of
+\eqref{eq:sigma} (field width), the \textsc{cnot-high} attractive weight, the
+\textsc{magic-high} and \textsc{magic-low} weights, and the mapped
+(repulsion-field) weight. Table~\ref{tab:params} lists the values we tuned for
+each regime---the four combinations of weighting variant (coarse or fine) and
+lattice geometry (cube or non-cube). All weights are border-independent except
+\textsc{magic-high}, which varies with the placement border margin and is given
+per border width.
+\todo{Confirm best-found settings once the tuning CSVs are final.}
 
-% ---- TABLE: parameter sensitivity (skeleton) ----
-\begin{table}[t]
+% ---- TABLE: tuned Gaussian parameters per regime (full width) ----
+\begin{table*}[t]
     \centering
-    \caption{Sensitivity of mean routing steps to confidence $\kappa$ and
-    Gaussian size multiplier (fine variant). \todo{Fill from
-    \texttt{size\_confidence\_tuning} CSVs.}}
-    \label{tab:sweep}
-    \setlength{\tabcolsep}{6pt}
+    \caption{Tuned Gaussian parameters by regime (weighting variant $\times$
+    lattice geometry). Common to all configurations: \texttt{external\_weight}
+    $=0$, \texttt{base\_gaussian\_weight}$=1$, \texttt{cnot\_low}$=0$,
+    \texttt{number\_of\_magic\_states}$=-1$ (auto), \texttt{center\_circle}
+    magic placement with a border margin, and naive routing with smart
+    $T$-routing. ``mapped'' is the repulsion-field weight and $\kappa$ the
+    confidence of \eqref{eq:sigma}; \textsc{magic-high} depends on the border
+    margin $b$ (percent), while all other weights do not.}
+    \label{tab:params}
+    \setlength{\tabcolsep}{5pt}
     \footnotesize
-    \begin{tabular}{l cccc}
+    \begin{tabular}{l cccc ccccc}
         \toprule
-        \textbf{size $\backslash\ \kappa$} & $0.90$ & $0.95$ & $0.99$ & $0.999$ \\
+        & \multicolumn{4}{c}{\textbf{Border-independent weights}}
+        & \multicolumn{5}{c}{\textbf{\textsc{magic-high} by border $b$ (\%)}} \\
+        \cmidrule(lr){2-5}\cmidrule(lr){6-10}
+        \textbf{Regime} & \textbf{$\kappa$} & \textbf{\textsc{cnot-high}} & \textbf{mapped} & \textbf{\textsc{magic-low}}
+            & $b{=}0$ & $b{=}5$ & $b{=}10$ & $b{=}20$ & $b{=}30$ \\
         \midrule
-        $0.5$ & -- & -- & -- & -- \\
-        $0.7$ & -- & -- & -- & -- \\
-        $1.0$ & -- & -- & -- & -- \\
+        coarse / cube    & 0.999999 & 1.5 & 0   & 0              & 0               & 0.2 & 0.2 & 0.2 & 1.6 \\
+        coarse / noncube & 0.99999  & 1.5 & 2.0 & 0              & 0               & 0.2 & 0.8 & 0.8 & 0.2 \\
+        fine / cube      & 0.999999 & 0.5 & 0   & $1^{\dagger}$  & $20^{\ddagger}$ & 3   & 1.6 & 0   & 0   \\
+        fine / noncube   & 0.99999  & 0.5 & 1.5 & 0              & 3               & 1.6 & 0.4 & 0.4 & 0.2 \\
         \bottomrule
     \end{tabular}
-\end{table}
+
+    \vspace{2pt}
+    {\footnotesize $^{\dagger}$\,\textsc{magic-low}$=1$ for border $b\le10\%$, else $0$ (fine\,/\,cube only).\quad
+    $^{\ddagger}$\,Robust argmin is $20$, but the curve is flat above ${\sim}1.6$.}
+\end{table*}
 
 \paragraph{Discussion}
 \todo{2--4 sentences once numbers are in: (i) coarse vs.\ fine trade-off;
