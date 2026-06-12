@@ -162,7 +162,7 @@ scheduler.
     \item We give two parameterisations---a discrete \emph{coarse} variant and a
     continuous \emph{fine} variant that interpolates field strength from
     per-qubit $T$-count and per-pair CNOT statistics.
-    \item We provide an open-source C++20 implementation (OpenQASM
+    \item We provide an open-source C++20 implementation~\cite{ftqc} (OpenQASM
     front-end, lattice-surgery router, benchmark harness) and evaluate it
     against rule-based magic-aware and randomized-restart baselines and the
     WISQ compiler (Section~\ref{sec:eval}).
@@ -406,7 +406,7 @@ from the benchmark CSVs.}
 \subsection{Experimental Setup}
 
 \textbf{Implementation.} The method is implemented in an open-source C++20
-compiler that parses OpenQASM, generates the rectangular architecture and
+compiler~\cite{ftqc} that parses OpenQASM, generates the rectangular architecture and
 magic-state placement, runs the mapping of Section~\ref{sec:approach}, and
 routes the result with a lattice-surgery router (naive or congestion-aware
 shortest-path corridors, with a dedicated $T$-gate-to-magic routing strategy).
