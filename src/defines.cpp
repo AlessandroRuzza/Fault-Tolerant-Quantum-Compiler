@@ -34,13 +34,13 @@ const bool PRINT_PARSING = kPrintAllowed && false;
 const bool PRINT_CIRCUIT = kPrintAllowed && false;
 
 const bool PRINT_MAPPING = kPrintAllowed && false;
-const bool PRINT_MAPPING_GRAPH = kPrintAllowed && true;
+const bool PRINT_MAPPING_GRAPH = kPrintAllowed && false;
 const bool MAPPING_VERBOSE = kPrintAllowed && false;
 
 const bool PRINT_SAFE_PASSAGE = kPrintAllowed && false;
 
 const bool PRINT_LAYER = kPrintAllowed && false;
-const bool PRINT_ROUTING = kPrintAllowed && true;
+const bool PRINT_ROUTING = kPrintAllowed && false;
 const bool PRINT_DRAW_ROUTING = kPrintAllowed && false;
 const bool PRINT_ROUTING_PROGRESS = kPrintAllowed && false;
 
@@ -55,7 +55,7 @@ const bool USE_S_GATES = false;
 const bool ORDER_GATES_BY_MANHATTAN = false;
 const int LAYERING_LOOKAHEAD = 5;
 
-const bool WRITE_UNIVERSAL_QASM = true;
+const bool WRITE_UNIVERSAL_QASM = false;
 const bool WRITE_GRAPH_FOR_WISQ = true;
 const bool GRAPH_FOR_WISQ_USES_3x3_CUBE = true;
 
