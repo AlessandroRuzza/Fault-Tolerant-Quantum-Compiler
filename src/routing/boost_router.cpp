@@ -115,8 +115,18 @@ Path Boost_QubitRouter::dijkstra_path(int start, int end, float end_node_congest
 
 Path Boost_QubitRouter::dijkstra_to_closest_magic(
     int start,
-    const std::unordered_set<int>& used_magic_states
+    const std::unordered_set<int>& used_magic_states,
+    const std::vector<float>& node_congestion
 ) const {
+    // Magic states are in the hard-blocked set (their in-edges carry
+    // HARD_BLOCK_WEIGHT), but they are the legitimate *destinations* of this
+    // search. Temporarily unblock every free magic state, like dijkstra_path
+    // does for its end node, then restore the hard-block afterwards.
+    for (int m : graph.get_magic_state_ids()) {
+        if (!used_magic_states.count(m))
+            set_in_edge_weights(m, 1.0f + congestion_penalty * node_congestion[m]);
+    }
+
     std::vector<float> dist(num_nodes, std::numeric_limits<float>::max());
     std::vector<int>   pred(num_nodes);
     std::iota(pred.begin(), pred.end(), 0);
@@ -130,6 +140,12 @@ Path Boost_QubitRouter::dijkstra_to_closest_magic(
             boost::make_iterator_property_map(dist.begin(), boost::get(boost::vertex_index, bgraph))
         )
     );
+
+    // Restore hard-blocks on the magic states unblocked above.
+    for (int m : graph.get_magic_state_ids()) {
+        if (!used_magic_states.count(m))
+            set_in_edge_weights(m, HARD_BLOCK_WEIGHT);
+    }
 
     // Pick the closest reachable, free magic state.
     int   best_magic = -1;
@@ -226,7 +242,7 @@ Routing Boost_QubitRouter::route_layer_rrr(const Layer& layer_gates) const {
         for (auto& gr : gate_routes) {
             if (!gr.path.empty()) continue;
             if (gr.is_t_gate) {
-                gr.path = dijkstra_to_closest_magic(gr.start_node, used_magic_states);
+                gr.path = dijkstra_to_closest_magic(gr.start_node, used_magic_states, node_congestion);
                 if (!gr.path.empty()) {
                     gr.end_node = gr.path.back();
                     used_magic_states.insert(gr.end_node);

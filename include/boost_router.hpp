@@ -70,9 +70,13 @@ private:
 
     // Dijkstra from start; returns the path to the closest magic state
     // that is not in used_magic_states (empty if none reachable).
+    // node_congestion supplies the entry cost of each free magic state, which
+    // is temporarily unblocked for the search (magic states are otherwise
+    // hard-blocked and would be unreachable destinations).
     Path dijkstra_to_closest_magic(
         int start,
-        const std::unordered_set<int>& used_magic_states
+        const std::unordered_set<int>& used_magic_states,
+        const std::vector<float>& node_congestion
     ) const;
 
     // Returns the set of physical nodes occupied by mapped qubits.
