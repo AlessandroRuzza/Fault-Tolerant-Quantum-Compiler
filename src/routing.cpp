@@ -314,8 +314,18 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             return minGateRouteLength(a) < minGateRouteLength(b);
         });
 
+    if (gate_ordering == GateOrdering::CRITICALITY) {
+        // Primary key: dependency-chain tail (criticality), descending. The
+        // preceding stable_sort by route length stays as the tiebreaker, so a
+        // critical-path gate is routed first and shorter gates fill the gaps.
+        std::stable_sort(ordered_gates.begin(), ordered_gates.end(),
+            [&](const Gate& a, const Gate& b) {
+                return gate_criticality(a) > gate_criticality(b);
+            });
+    }
 
-    for (const Gate& gate : ordered_gates) {
+    for (std::size_t gate_idx = 0; gate_idx < ordered_gates.size(); ++gate_idx) {
+        const Gate& gate = ordered_gates[gate_idx];
         Path path;
         if (gate.qubits.size() == 1 && gate.name != "t") {
             // Single-qubit gate (non-t): always executable
@@ -328,7 +338,7 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
             // Two-qubit gate: find path between the 2 qubits
             int qubit1 = gate.qubits[0];
             int qubit2 = gate.qubits[1];
-            
+
             int node1 = mapping.get_mapped_node(qubit1);
             int node2 = mapping.get_mapped_node(qubit2);
             if (node1 < 0 || node2 < 0) {
@@ -368,12 +378,43 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
     return routing;
 }
 
+void QubitRouter::compute_gate_criticality() {
+    // Reverse pass over the circuit's gate sequence. Gates touching the same qubit
+    // form a linear dependency chain (textual order), so a gate's direct successors
+    // are, per qubit, the next gate that touches that qubit. tail = 1 + max tail of
+    // those successors (1 for a gate with none). Computed once; the values stay
+    // valid as already-routed gates are removed, so there is no per-step recompute.
+    const std::vector<Gate>& gates = circuit.getGates();
+    gate_tail_by_id.clear();
+    gate_tail_by_id.reserve(gates.size());
+
+    std::unordered_map<uint32_t, int> next_tail_on_qubit; // qubit -> tail of next gate on it
+    for (auto it = gates.rbegin(); it != gates.rend(); ++it) {
+        const Gate& g = *it;
+        int tail = 1;
+        for (const uint32_t q : g.qubits) {
+            const auto found = next_tail_on_qubit.find(q);
+            if (found != next_tail_on_qubit.end()) {
+                tail = std::max(tail, 1 + found->second);
+            }
+        }
+        gate_tail_by_id[g.id] = tail;
+        for (const uint32_t q : g.qubits) {
+            next_tail_on_qubit[q] = tail;
+        }
+    }
+}
+
 void QubitRouter::route_circuit() {
     // std::cout << "Starting qubit routing...\n";
 
     routing_steps.clear();
     routing_steps.reserve(circuit.getNumLayers());
     non_routed_histogram.clear();
+
+    if (gate_ordering == GateOrdering::CRITICALITY && gate_tail_by_id.empty()) {
+        compute_gate_criticality();
+    }
 
     // Per-gate first-exposure tracking for the non-routed-layer metric.
     first_exposure_total = 0;

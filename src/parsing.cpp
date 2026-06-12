@@ -196,6 +196,7 @@ std::string normalize_routing_method(std::string value) {
     std::replace(value.begin(), value.end(), '-', '_');
     if (value == "congestion_aware" || value == "congestionaware" ) return "congestion";
     if (value == "simple" ) return "naive";
+    if (value == "naivecritical" || value == "critical" ) return "naive_critical";
     return value;
 }
 
@@ -209,7 +210,7 @@ std::string normalize_t_routing_mode(std::string value) {
 
 void validate_routing_method(const std::string& value, const char* executable) {
     const std::string normalized = normalize_routing_method(value);
-    const std::vector<std::string> valid_methods = {"congestion", "naive", "boost"};
+    const std::vector<std::string> valid_methods = {"congestion", "naive", "naive_critical", "boost"};
     if (std::find(valid_methods.begin(), valid_methods.end(), normalized) == valid_methods.end()) {
         std::cerr << "Invalid routing method: " << value << "\n";
         print_usage(executable);
@@ -329,9 +330,9 @@ void print_usage(const char* executable) {
               << "[--size-moltiplier <float> >=0, default=1]\n"
               << "[--gaussian-confidence <float> in (0,1), default=0.95]\n"
 #if FTOQC_HAS_BOOST_ROUTER
-              << "[--routing-strategy [congestion|naive|boost]]\n"
+              << "[--routing-strategy [congestion|naive|naive_critical|boost]]\n"
 #else
-              << "[--routing-strategy [congestion|naive]] (boost unavailable in this build)\n"
+              << "[--routing-strategy [congestion|naive|naive_critical]] (boost unavailable in this build)\n"
 #endif
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"
@@ -722,6 +723,7 @@ void apply_config_overrides(
             throw std::runtime_error(std::string("Config key '") + key + "' must be > 0");
         }
     }
+
 
 }
 

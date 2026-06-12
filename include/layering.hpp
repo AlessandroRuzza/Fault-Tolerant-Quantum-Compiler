@@ -20,14 +20,14 @@ protected:
     std::deque<Layer> layers;
     std::unordered_set<Gate> ignored_gates;
     std::size_t layer_pull_lookahead;
-    
+
 private:
     void build_layers();
     void remove_routed_from_topLayer(const std::unordered_set<Gate>& routed_set);
     void remove_leading_empty_layers();
     void remove_trailing_empty_layers();
     void pull_gates_into_top_layer(std::size_t max_lookahead_layers);
-    
+
 public:
     LayeredCircuit(const Circuit& circuit, std::size_t lookahead_layers = 8)
         : Circuit(circuit),

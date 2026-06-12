@@ -450,8 +450,17 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         } else {
             constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
             constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
-            if (routing_strategy == "naive") {
+            // "naive_critical" shares the naive shortest-path strategy but orders
+            // each layer's gates by criticality (dependency-chain tail) instead of
+            // by route length. "naive_kpaths" also shares it, but considers up to
+            // k_paths candidate paths per gate and picks the one that interferes
+            // least with the rest of the layer (better per-step packing).
+            GateOrdering gate_ordering = GateOrdering::PATH_LENGTH;
+            if (routing_strategy == "naive" || routing_strategy == "naive_critical") {
                 pathStrategyPtr = std::make_unique<NaiveShortestPath>(*graph);
+                if (routing_strategy == "naive_critical") {
+                    gate_ordering = GateOrdering::CRITICALITY;
+                }
             } else { // default to congestion-aware
                 pathStrategyPtr = std::make_unique<CongestionAwareShortestPath>(
                     *graph,
@@ -470,7 +479,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
                 *graph,
                 pathStrategyPtr.get(),
                 tGateRoutingStrategyPtr.get(),
-                cache_ptr
+                cache_ptr,
+                gate_ordering
             );
         }
 

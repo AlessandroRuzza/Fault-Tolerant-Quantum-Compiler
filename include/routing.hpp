@@ -16,6 +16,14 @@
 using Path = std::vector<int>;
 using Routing = std::unordered_map<Gate, Path>;
 
+// How QubitRouter orders the gates of a layer when deciding which to route first
+// in a step. PATH_LENGTH is the historical behaviour ("naive"); CRITICALITY is
+// the "naive_critical" strategy, which routes critical-path gates first.
+enum class GateOrdering {
+    PATH_LENGTH,   // shortest route length first (default; unchanged behaviour)
+    CRITICALITY    // dependency-chain tail (descending), route-length as tiebreak
+};
+
 class IPathStrategy{
 protected:
     const Graph& graph;
@@ -154,6 +162,10 @@ private:
     std::vector<Routing> routing_steps;
     std::unordered_map<int, std::vector<int>> magic_state_order_cache;
     std::unordered_map<size_t, Routing>* layer_routing_cache;
+    GateOrdering gate_ordering;
+    // gate.id -> criticality (longest dependency-chain tail). Populated once by
+    // compute_gate_criticality() and only used when gate_ordering == CRITICALITY.
+    std::unordered_map<int, int> gate_tail_by_id;
     std::unordered_map<std::size_t, std::size_t> non_routed_histogram;
 
     // Non-routed metric accumulators (see get_non_routed_layer_percentage).
@@ -169,6 +181,15 @@ private:
     Routing route_layer(const Layer& layer_gates) const;
     float minGateRouteLength(const Gate& g) const;
 
+    // Compute, for every gate, the length of the longest chain of gates that
+    // depend on it (its "tail"). This is its criticality: routing it late delays
+    // that whole chain, so high-tail gates are scheduled first under CRITICALITY.
+    void compute_gate_criticality();
+    inline int gate_criticality(const Gate& g) const {
+        const auto it = gate_tail_by_id.find(g.id);
+        return it != gate_tail_by_id.end() ? it->second : 0;
+    }
+
 public:
     QubitRouter(
         const Mapping& m,
@@ -176,13 +197,15 @@ public:
         const Graph& g,
         const IPathStrategy* p,
         const ITGateRoutingStrategy* t,
-        std::unordered_map<size_t, Routing>* cache = nullptr
+        std::unordered_map<size_t, Routing>* cache = nullptr,
+        GateOrdering ordering = GateOrdering::PATH_LENGTH
     ) : mapping(m),
         circuit(c),
         graph(g),
         pathStrategy(p),
         tGateRoutingStrategy(t),
-        layer_routing_cache(cache) {
+        layer_routing_cache(cache),
+        gate_ordering(ordering) {
             precompute_magic_state_order();
         }
     void route_circuit() override;
