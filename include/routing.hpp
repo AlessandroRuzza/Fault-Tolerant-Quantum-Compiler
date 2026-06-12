@@ -233,4 +233,80 @@ public:
 
 };
 
+/*
+ * PackingQubitRouter
+ *
+ * Routes each layer by *packing* a maximum set of vertex-disjoint paths instead
+ * of routing gates one-by-one in a fixed greedy order. Per layer:
+ *   1. Generate up to num_candidates diverse candidate paths per gate
+ *      (penalized re-search for 2q gates; nearest free magic states for T gates).
+ *   2. Greedily select a high-weight conflict-free subset, where weight is the
+ *      gate's downstream criticality (how many gates in the next
+ *      criticality_lookahead layers touch its qubits), ties broken by shorter path.
+ *   3. Fill pass: any still-unrouted gate gets a fresh shortest path avoiding the
+ *      selected ones, so the result is always maximal (never routes fewer gates
+ *      than "nothing left fits").
+ */
+class PackingQubitRouter : public IQubitRouter {
+private:
+    const Mapping& mapping;
+    LayeredCircuit& circuit;
+    const Graph& graph;
+
+    int num_candidates;
+    int criticality_lookahead;
+    float diversity_penalty;
+
+    std::vector<Routing> routing_steps;
+    std::unordered_map<std::size_t, std::size_t> non_routed_histogram;
+    std::size_t first_exposure_total = 0;
+    std::size_t first_exposure_routed = 0;
+
+    std::unordered_set<int> base_blocked_nodes() const;
+    Path penalized_shortest_path(
+        int start_node,
+        int end_node,
+        const std::unordered_set<int>& blocked,
+        const std::unordered_map<int, float>& penalties
+    ) const;
+    Routing route_layer_packing(const Layer& layer_gates) const;
+
+public:
+    PackingQubitRouter(
+        const Mapping& m,
+        LayeredCircuit& c,
+        const Graph& g,
+        int num_candidates = 2,
+        int criticality_lookahead = 4,
+        float diversity_penalty = 1.0f
+    ) : mapping(m),
+        circuit(c),
+        graph(g),
+        num_candidates(std::max(1, num_candidates)),
+        criticality_lookahead(std::max(0, criticality_lookahead)),
+        diversity_penalty(diversity_penalty) {}
+
+    void route_circuit() override;
+    inline int get_routing_length() const override { return static_cast<int>(routing_steps.size()); }
+
+    inline double get_non_routed_layer_percentage() const override {
+        if (first_exposure_total == 0) return 0.0;
+        return 100.0 * static_cast<double>(first_exposure_total - first_exposure_routed)
+                     / static_cast<double>(first_exposure_total);
+    }
+
+    void print_routing_steps() const override;
+    inline void reset() override {
+        circuit.reset();
+        routing_steps.clear();
+        first_exposure_total = 0;
+        first_exposure_routed = 0;
+    }
+
+    inline const std::vector<Routing>& get_routing() const { return routing_steps; }
+    inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
+    void print_routing(int i) const;
+    void print_non_routed_histogram() const;
+};
+
 #endif // ROUTING_HPP

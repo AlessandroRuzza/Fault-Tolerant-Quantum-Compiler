@@ -447,6 +447,22 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
                 "Routing strategy 'boost' requires Boost support, but this binary was built without Boost."
             );
 #endif
+        } else if (routing_strategy == "packing") {
+            // Tunables overridable via env for parameter sweeps (same pattern as
+            // FTQC_BFS_DENSITY_THRESHOLD in gaussian_mapping.cpp). Defaults are
+            // the tuned values; env is only for re-deriving them post-hoc.
+            // Tuned on qft/qaoa/randomcircuit n50-n100 sweep (2026-06): L=4
+            // dominant across all k; k flat at L=4 with k=2 best and cheapest.
+            int packing_candidates = 2;
+            int packing_lookahead = 4;
+            if (const char* env = std::getenv("FTQC_PACKING_CANDIDATES")) {
+                try { packing_candidates = std::stoi(env); } catch (...) {}
+            }
+            if (const char* env = std::getenv("FTQC_PACKING_LOOKAHEAD")) {
+                try { packing_lookahead = std::stoi(env); } catch (...) {}
+            }
+            routerPtr = std::make_unique<PackingQubitRouter>(
+                *mapping, *layeredCircuit, *graph, packing_candidates, packing_lookahead);
         } else {
             constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
             constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
