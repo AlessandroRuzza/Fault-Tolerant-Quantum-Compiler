@@ -134,6 +134,45 @@ You can still override config values from CLI:
 	--routing-strategy naive
 ```
 
+## Tuned Gaussian mapping parameters
+
+Recommended parameter values for the Gaussian mapping, grouped by *regime* — the
+combination of `gaussian_strategy` (`coarse` / `fine`) and `safe_passage_strategy`
+(`cube` / `connectivity`). `cube` yields shorter routes but needs a larger
+lattice; `connectivity` packs onto smaller lattices.
+
+Common to all configurations:
+
+| Parameter | Value | Note |
+|---|---|---|
+| `EXTERNAL_WEIGHT` | `0` | |
+| `BASE_GAUSSIAN_WEIGHT` | `1` | |
+| `CNOT_LOW` | `0` | |
+| `number_of_magic_states` | `-1` | auto |
+| `MagicStatePlacementStrategy` | `center_circle` | with `border_distance_percentage` |
+| `routing_strategy` / `t-routing-mode` | `naive` / `smart_t_routing` | |
+
+Border-independent weights:
+
+| Regime (`gaussian_strategy` / `safe_passage_strategy`) | `GAUSSIAN_CONFIDENCE` | `CNOT_HIGH` | `MAPPED_GAUSSIAN_WEIGHT` | `MAGIC_LOW` |
+|---|---|---|---|---|
+| coarse / cube | 0.999999 | 1.5 | 0 | 0 |
+| coarse / connectivity | 0.99999 | 1.5 | 2.0 | 0 |
+| fine / cube | 0.999999 | 0.5 | 0 | 1 † |
+| fine / connectivity | 0.99999 | 0.5 | 1.5 | 0 |
+
+`MAGIC_HIGH` depends on `border_distance_percentage` (`b`, in %):
+
+| Regime | `b=0` | `b=5` | `b=10` | `b=20` | `b=30` |
+|---|---|---|---|---|---|
+| coarse / cube | 0 | 0.2 | 0.2 | 0.2 | 1.6 |
+| coarse / connectivity | 0 | 0.2 | 0.8 | 0.8 | 0.2 |
+| fine / cube | 20 ‡ | 3 | 1.6 | 0 | 0 |
+| fine / connectivity | 3 | 1.6 | 0.4 | 0.4 | 0.2 |
+
+† `MAGIC_LOW` = 1 for `border_distance_percentage` ≤ 10, else 0 (fine / cube only).
+‡ Robust argmin is 20, but the curve is flat above ~1.6.
+
 ## Run benchmarks through JSON in config/
 
 Benchmark mode expands and runs combinations defined in a benchmark JSON (for example `config/ex1.json`).

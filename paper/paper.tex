@@ -516,14 +516,18 @@ while the Gaussian method completes.
 The fields are governed by a small set of weights: the confidence $\kappa$ of
 \eqref{eq:sigma} (field width), the \textsc{cnot-high} (attractive) weight, the
 \textsc{magic-high} and \textsc{magic-low} weights, and the mapped
-(repulsive) weight. Table~\ref{tab:params} lists the values we tuned for
-each regime---the four combinations of weighting variant (coarse or fine) and
-lattice geometry (cube or connectivity). All weights are border-independent except
-\textsc{magic-high}, which varies with the placement border margin and is given
-per border width.
+(repulsive) weight. The full tuned values for each regime---the four combinations
+of weighting variant (coarse or fine) and safe-passage strategy (cube or
+connectivity)---are provided in the project repository~\cite{ftqc}. All weights
+are border-independent except \textsc{magic-high}, which varies with the
+placement border margin.
 \todo{Confirm best-found settings once the tuning CSVs are final.}
 
 % ---- TABLE: tuned Gaussian parameters per regime (full width) ----
+% Moved to the project README (section "Tuned Gaussian mapping parameters").
+% To restore in the paper: delete the \iffalse ... \fi wrapper below, and
+% re-point the "Tuned parameters" paragraph above back to Table~\ref{tab:params}.
+\iffalse
 \begin{table*}[t]
     \centering
     \caption{Tuned Gaussian parameters by regime (weighting variant $\times$
@@ -556,6 +560,7 @@ per border width.
     {\footnotesize $^{\dagger}$\,\textsc{magic-low}$=1$ for border $b\le10\%$, else $0$ (fine\,/\,cube only).\quad
     $^{\ddagger}$\,Robust argmin is $20$, but the curve is flat above ${\sim}1.6$.}
 \end{table*}
+\fi
 
 \paragraph{Discussion}
 \todo{2--4 sentences once numbers are in: (i) coarse vs.\ fine trade-off;
