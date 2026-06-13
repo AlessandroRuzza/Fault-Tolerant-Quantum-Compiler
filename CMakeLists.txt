@@ -120,30 +120,12 @@ add_custom_target(run-wisq-all
 )
 
 
-# ------Eigen-------------
-
 # Suppress deprecated enum-enum conversion warning
 target_compile_options(FaultTolerantQuantumCompiler PRIVATE -Wno-deprecated-enum-enum-conversion)
 
 # Optimization: default build carries no flags, which leaves the binary
 # unoptimized (~3-5x slower). -O2 without -DNDEBUG keeps asserts enabled.
 target_compile_options(FaultTolerantQuantumCompiler PRIVATE -O2)
-
-find_package(Eigen3 3.3 QUIET)
-if(Eigen3_FOUND)
-    target_link_libraries(FaultTolerantQuantumCompiler PRIVATE Eigen3::Eigen)
-    message(STATUS "Found Eigen3: ${EIGEN3_INCLUDE_DIR}")
-else()
-    # Prova path specifico del cluster
-    if(EXISTS "/u/sw/toolchains/gcc-glibc/11.2.0/pkgs/eigen/3.3.9/share/eigen3/cmake/")
-        list(APPEND CMAKE_PREFIX_PATH "/u/sw/toolchains/gcc-glibc/11.2.0/pkgs/eigen/3.3.9/share/eigen3/cmake/")
-        find_package(Eigen3 3.3 REQUIRED)
-        target_link_libraries(FaultTolerantQuantumCompiler PRIVATE Eigen3::Eigen)
-        message(STATUS "Found Eigen3 manually: ${EIGEN3_INCLUDE_DIR}")
-    else()
-        message(FATAL_ERROR "Eigen3 not found. Please install Eigen3, set mkEigenInc environment variable, or set CMAKE_PREFIX_PATH.")
-    endif()
-endif()
 
 # Add graph_viewer target and a run/open target to build, run --test, copy the html to Windows (WSL)
 # and open it (or fall back to xdg-open on Linux).
@@ -162,13 +144,6 @@ target_include_directories(graph_viewer PRIVATE
 target_link_libraries(graph_viewer PRIVATE
     nlohmann_json::nlohmann_json
 )
-
-# If Eigen is available, use it; otherwise add system include
-if (TARGET Eigen3::Eigen)
-    target_link_libraries(graph_viewer PRIVATE Eigen3::Eigen)
-else()
-    target_include_directories(graph_viewer PRIVATE /usr/include/eigen3)
-endif()
 
 # Target that runs the binary (--test)
 add_custom_target(run-graph-viewer

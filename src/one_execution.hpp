@@ -73,6 +73,14 @@ void clear_visualization_outputs() {
         return;
     }
 
+    // Only wipe visualization/ when this run is actually going to produce new
+    // artifacts there (gaussian frames are opt-in via FTQC_SAVE_FRAMES, routing
+    // drawings via PRINT_DRAW_ROUTING). Otherwise a plain interactive run would
+    // delete frames the user generated on purpose.
+    if (!env_flag_is_truthy("FTQC_SAVE_FRAMES") && !PRINT_DRAW_ROUTING) {
+        return;
+    }
+
     const fs::path visualization_dir = fs::path(PROJECT_ROOT) / "visualization";
     fs::create_directories(visualization_dir);
 
@@ -101,6 +109,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::string gaussian_strategy, std::string safe_passage_strategy, double magic_high,
     double magic_low, double cnot_high, double cnot_low, double mapped_gaussian_weight,
     double base_gaussian_weight, double gaussian_confidence, double external_weight,
+    double bfs_density_threshold,
     int x, int y, int dimension_offset, std::string graph_path,
     std::string magic_state_placement_strategy, int number_of_magic_states,
     double number_of_magic_states_multiplier,
@@ -243,8 +252,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     }
 
 
-    int safe_passage_ignore_outer_layers = std::max(1, static_cast<int>(std::min(x, y) / 2.5));
-
     Graph graph_template(
         use_generated_graph,
         100,
@@ -273,6 +280,12 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     const int resolved_graph_y = graph_template.getMaxY() + 1;
     std::cout << "resolved graph dimensions: " << resolved_graph_x << "x" << resolved_graph_y << "\n";
 
+    // Derived from the *resolved* dimensions: with a graph loaded from file the
+    // x/y variables still hold the 10x11 CLI defaults, which used to silently
+    // size this from the wrong grid.
+    const int safe_passage_ignore_outer_layers =
+        std::max(1, static_cast<int>(std::min(resolved_graph_x, resolved_graph_y) / 2.5));
+
     // Auto-formula block: -1 sentinels for cnot_high, cnot_low, mapped.
     // Formulas are per (gaussian_strategy, safe_passage, circuit_family, dim).
     // Circuit family is detected from the filename: qft / qaoa / rest.
@@ -285,6 +298,11 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         const bool is_cube = (safe_passage_strategy == "cube");
         const bool is_fine = (gaussian_strategy == "fine");
         const double d = static_cast<double>(resolved_graph_x);
+
+        // cnot_low's -1 sentinel resolves to 0 on its own: it used to be resolved
+        // only inside the cnot_high auto-branch, so CNOT_LOW:-1 with an explicit
+        // CNOT_HIGH was a fatal validation error instead of "auto".
+        if (cnot_low == -1.0) cnot_low = 0.0;
 
         // cnot_high formulas — dim-dependent where R²>0.24 and Δ>1pp across dim range,
         // constant elsewhere (QFT always flat; QAOA fine flat; QAOA coarse moderate).
@@ -310,7 +328,6 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
                 else if (is_qaoa) cnot_high = std::max(0.5, 0.40 * d - 3.8);
                 else              cnot_high = std::max(0.5, 0.56 * d - 13.9);
             }
-            if (cnot_low == -1.0) cnot_low = 0.0;
             cnot_high *= cnot_formula_scale;
             std::cout << "cnot_high (auto): " << cnot_high
                       << "  cnot_low (auto): " << cnot_low
@@ -381,7 +398,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
     for (int repetition = 0; repetition < repetition_count; ++repetition) {
         if(print_reps) std::cout << "\n------- MAPPING & ROUTING #" << repetition+1 << " ---------" << std::endl;
-        
+
+        try {
+
         auto graph = std::make_unique<Graph>(graph_template);
 
         const auto mapping_start = std::chrono::steady_clock::now();
@@ -401,6 +420,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             base_gaussian_weight,
             gaussian_confidence,
             external_weight,
+            bfs_density_threshold,
             circuit.getNumQubits()*2,
             safe_passage_ignore_outer_layers
         );
@@ -518,7 +538,17 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         if(PRINT_CIRCUIT_METRICS || PRINT_CACHE_METRICS)
             routerPtr->print_non_routed_histogram();
 
-        if (routing_steps < best_routing_steps) {
+        // Lexicographic best: primary metric is non_routed_layer_pct, with
+        // routing_steps as tie-breaker. Selecting on routing_steps alone could
+        // keep a repetition that is worse on the metric the benchmarks actually
+        // optimize.
+        const bool is_new_best =
+            !best_router ||
+            non_routed_layer_pct < best_non_routed_layer_pct ||
+            (non_routed_layer_pct == best_non_routed_layer_pct &&
+             routing_steps < best_routing_steps);
+
+        if (is_new_best) {
             std::cout << "NEW BEST! #" << repetition << std::endl;
             best_routing_steps = routing_steps;
             best_avg_parallelism = avg_parallelism;
@@ -549,6 +579,17 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             std::cout << "Routing steps: " << routing_steps << "\n";
             std::cout << "Achieved avg parallelism: " << avg_parallelism << " / " << max_parallelism << "\n";
             std::cout << "Non-routed layer %: " << non_routed_layer_pct << "\n";
+        }
+
+        } catch (const std::exception& e) {
+            // A repetition can fail on its own (safe-passage rejection, routing
+            // dead-end). With repetition>1 the run is still valid if any other
+            // repetition succeeded, so only rethrow when this was the last
+            // chance and nothing has been kept as best.
+            if (!best_router && repetition == repetition_count - 1) {
+                throw;
+            }
+            std::cout << "Repetition #" << repetition + 1 << " failed: " << e.what() << "\n";
         }
     }
 

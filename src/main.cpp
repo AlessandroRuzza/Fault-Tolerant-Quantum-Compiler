@@ -372,7 +372,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         }
     }
 
-    std::string path = "../qasms/example.qasm";
+    std::string path = (std::filesystem::path(PROJECT_ROOT) / "qasms" / "example.qasm").string();
     std::string magic_aware_strategy = "distance";
     std::string type = "magic_aware";
     std::string gaussian_strategy = "fine";
@@ -385,7 +385,15 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double base_gaussian_weight = 1.0;
     double external_weight = 0.0;
     double gaussian_confidence = 0.95;
-    std::string config_path = "../config/0_compiler_config.json";
+    // CNOT-graph density below which CNOT-BFS mapping order is used (>= falls
+    // back to the priority heap). Tuned to 0.70 post-fix (BFS beats heap almost
+    // everywhere); configurable via JSON/CLI, env FTQC_BFS_DENSITY_THRESHOLD wins.
+    double bfs_density_threshold = 0.70;
+    // Anchored to PROJECT_ROOT, not the CWD: the old CWD-relative default
+    // loaded the config from build/ but silently fell back to hardcoded
+    // defaults when launched from anywhere else — a reproducibility trap.
+    std::string config_path =
+        (std::filesystem::path(PROJECT_ROOT) / "config" / "0_compiler_config.json").string();
     std::string graph_path = "";
     std::string magic_state_placement_strategy = "center_circle";
     int number_of_magic_states = -1;  // -1 = proportional to circuit (max_t_in_layer)
@@ -394,16 +402,13 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     int x = 10;
     int y = 11;
     int dimension_offset = 0;  // signed delta on auto-computed grid (x<0 mode)
-    int maximum_iterations = 500;
     std::string routing_strategy = "congestion";
     std::string t_routing_mode = "normal_t_routing";
     int patience_threshold = 3;
     bool use_layer_cache = true;
     bool metrics_only = false;
     int repetition_count = 1;
-    bool t_states_proportional = false;
     bool use_layer_cache_explicit = false;
-    bool t_states_proportional_explicit = false;
     double cnot_formula_scale = 1.0;
     double mapped_formula_scale = 1.0;
 
@@ -423,6 +428,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         base_gaussian_weight,
         gaussian_confidence,
         external_weight,
+        bfs_density_threshold,
         config_path,
         x,
         y,
@@ -458,6 +464,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         base_gaussian_weight,
         gaussian_confidence,
         external_weight,
+        bfs_density_threshold,
         x,
         y,
         graph_path,
@@ -486,6 +493,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
     std::cout << "EXTERNAL_WEIGHT: " << external_weight << std::endl;
     std::cout << "gaussian_confidence: " << gaussian_confidence << std::endl;
+    std::cout << "bfs_density_threshold: " << bfs_density_threshold << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
     if (number_of_magic_states_multiplier > 0.0) {
@@ -524,6 +532,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         base_gaussian_weight,
         gaussian_confidence,
         external_weight,
+        bfs_density_threshold,
         x,
         y,
         dimension_offset,

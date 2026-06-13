@@ -93,21 +93,25 @@ Path CongestionAwareShortestPath::find_shortest_path(
 		return {start_node};
 	}
 
+	// Flat arrays indexed by node id instead of unordered_maps: this Dijkstra
+	// is the routing hot path (tens of thousands of calls per circuit) and the
+	// grid's node ids are dense in [0, node_count).
+	const int node_count = graph.get_node_count();
+	constexpr float kInf = std::numeric_limits<float>::infinity();
+	std::vector<float> distance(node_count, kInf);
+	std::vector<int> parent(node_count, -1);
+
 	using QueueItem = std::pair<float, int>;
 	std::priority_queue<QueueItem, std::vector<QueueItem>, std::greater<QueueItem>> pq;
-	std::unordered_map<int, float> distance;
-	std::unordered_map<int, int> parent;
 
 	distance[start_node] = 0.0f;
-	parent[start_node] = -1;
 	pq.push({0.0f, start_node});
 
 	while (!pq.empty()) {
 		const auto [current_cost, current] = pq.top();
 		pq.pop();
 
-		auto best_it = distance.find(current);
-		if (best_it == distance.end() || current_cost > best_it->second) {
+		if (current_cost > distance[current]) {
 			continue;
 		}
 
@@ -128,8 +132,7 @@ Path CongestionAwareShortestPath::find_shortest_path(
 			}
 
 			const float new_cost = current_cost + step_cost;
-			const auto old_dist_it = distance.find(neighbor);
-			if (old_dist_it == distance.end() || new_cost < old_dist_it->second) {
+			if (new_cost < distance[neighbor]) {
 				distance[neighbor] = new_cost;
 				parent[neighbor] = current;
 				pq.push({new_cost, neighbor});
@@ -137,7 +140,7 @@ Path CongestionAwareShortestPath::find_shortest_path(
 		}
 	}
 
-	if (parent.find(end_node) == parent.end()) {
+	if (distance[end_node] == kInf) {
 		return {};
 	}
 

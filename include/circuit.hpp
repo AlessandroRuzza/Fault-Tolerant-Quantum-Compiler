@@ -151,6 +151,19 @@ public:
         return qubitsHeap.pop();
     }
 
+    // Rebuild the priority heap from the final per-qubit counts. The heap is
+    // consumed by popFromHeap during mapping, and the incremental inserts done
+    // while parsing don't reflect the final T/CNOT counts, so every mapping
+    // pass (each repetition) must start from a freshly built heap.
+    inline void rebuildHeap() {
+        std::vector<Qubit*> alive;
+        alive.reserve(qubitsVector.size());
+        for (Qubit* q : qubitsVector) {
+            if (q != nullptr) alive.push_back(q);
+        }
+        qubitsHeap.buildHeap(alive);
+    }
+
     // Calculate the mean number of T gates per qubit
     inline double getTMean() const {
         if (qubitsVector.empty()) return 0.0;
@@ -263,12 +276,13 @@ public:
 
     //----------incrementers----------
 
+    // Note: these do NOT touch the heap. Heap order is established once via
+    // rebuildHeap() when the counts are final (heapify(qubit_id) here would be
+    // wrong anyway: heapify wants a heap-array position, not a qubit ID).
     inline void incrementTCount(int qubit_index) {
         const int index = getQubitHeapIndex(qubit_index);
         if (index < 0 || static_cast<size_t>(qubit_index) >= qubitsVector.size()) throw std::runtime_error("Invalid qubit index in incrementTCount");
         qubitsVector[qubit_index]->incrementTCount();
-        qubitsHeap.heapify(index);
-
     }
 
     inline void incrementCNOTCount(int control_qubit, int target_qubit) {
@@ -278,8 +292,6 @@ public:
         if (control_index > static_cast<int>(qubitsVector.size()) || target_index > static_cast<int>(qubitsVector.size())) throw std::runtime_error("Invalid qubit index in incrementCNOTCount");
         qubitsVector[control_qubit]->incrementCNOTCount(target_index);
         qubitsVector[target_qubit]->incrementCNOTCount(control_index);
-        qubitsHeap.heapify(control_index);
-        qubitsHeap.heapify(target_index);
     }
 
 

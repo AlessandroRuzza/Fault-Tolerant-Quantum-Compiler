@@ -284,13 +284,7 @@ bool Mapping::safe_connectivity(const Node& node, const Qubit& q, const std::vec
         const Node& n = graph.get_node(node);
         const int maxX = graph.getMaxX();
         const int maxY = graph.getMaxY();
-        const int eps = safe_passage_ignore_outer_layers;
         return can_reach_opposite_borders(n, occupied_nodes_after_map, maxX+1, maxY+1, safe_passage_ignore_outer_layers);
-        
-        if (n.coordX <= eps || n.coordX >= maxX - eps || n.coordY <= eps || n.coordY >= maxY - eps) {
-            return has_entry_path_from_border(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
-        }
-        return has_exit_path_from_occupied(n, occupied_nodes_after_map, maxX + 1, maxY + 1, safe_passage_ignore_outer_layers);
     };
 
     std::unordered_set<int> cnot_nodes_requiring_access;
@@ -620,13 +614,17 @@ bool has_exit_path_from_occupied(
         return x >= min_x && x <= max_x && y >= min_y && y <= max_y;
     };
 
-    const auto is_blocked = [&blocked_nodes](int x, int y) {
-        for (const Node& blocked : blocked_nodes) {
-            if (blocked.coordX == x && blocked.coordY == y) {
-                return true;
-            }
-        }
-        return false;
+    // Set lookup instead of a linear scan over blocked_nodes: this lambda runs
+    // once per visited cell of the BFS, which made safe_passage O(n^2 * cells)
+    // on large grids (the twin function has_entry_path_from_border already
+    // builds the same set).
+    std::unordered_set<int> blocked_set;
+    blocked_set.reserve(blocked_nodes.size());
+    for (const Node& blocked : blocked_nodes) {
+        blocked_set.insert(blocked.coordY * width + blocked.coordX);
+    }
+    const auto is_blocked = [&blocked_set, width](int x, int y) {
+        return blocked_set.count(y * width + x) != 0;
     };
 
     if (!is_inside_effective_area(occupied_node.coordX, occupied_node.coordY)) {

@@ -76,16 +76,12 @@ std::string resolve_config_graph_path(
     return candidate.lexically_normal().string();
 }
 
-int parse_positive_integer(const std::string& value, const char* flag_name) {
+int parse_integer(const std::string& value, const char* flag_name) {
     int parsed_value = 0;
     try {
         parsed_value = std::stoi(value);
     } catch (const std::exception&) {
         throw std::runtime_error("Invalid integer value for " + std::string(flag_name) + ": " + value);
-    }
-
-    if (parsed_value <= 0) {
-        throw std::runtime_error(std::string(flag_name) + " must be > 0");
     }
 
     return parsed_value;
@@ -137,6 +133,24 @@ double parse_non_negative_double(const std::string& value, const char* flag_name
 
     if (!std::isfinite(parsed_value) || parsed_value < 0.0) {
         throw std::runtime_error(std::string(flag_name) + " must be a finite number >= 0");
+    }
+
+    return parsed_value;
+}
+
+// Same as parse_non_negative_double but additionally accepts the -1 sentinel
+// ("auto": resolve from circuit family / grid dimension at runtime), matching
+// what the JSON config already allows for the same keys.
+double parse_auto_or_non_negative_double(const std::string& value, const char* flag_name) {
+    double parsed_value = 0.0;
+    try {
+        parsed_value = std::stod(value);
+    } catch (const std::exception&) {
+        throw std::runtime_error("Invalid floating-point value for " + std::string(flag_name) + ": " + value);
+    }
+
+    if (!std::isfinite(parsed_value) || (parsed_value < 0.0 && parsed_value != -1.0)) {
+        throw std::runtime_error(std::string(flag_name) + " must be a finite number >= 0, or -1 (auto)");
     }
 
     return parsed_value;
@@ -324,12 +338,13 @@ void print_usage(const char* executable) {
               << "[--border-distance-percentage <float> in [0,100]]\n"
               << "[--magic-high <float>=0]\n"
               << "[--magic-low <float>=0]\n"
-              << "[--cnot-high <float>=0]\n"
-              << "[--cnot-low <float>=0]\n"
-              << "[--mapped-gaussian-weight <float>=0]\n"
+              << "[--cnot-high <float>=0 | -1=auto formula]\n"
+              << "[--cnot-low <float>=0 | -1=auto]\n"
+              << "[--mapped-gaussian-weight <float>=0 | -1=auto formula]\n"
               << "[--base-gaussian-weight <float>=0]\n"
-              << "[--size-moltiplier <float> >=0, default=1]\n"
+              << "[--external-weight <float>]\n"
               << "[--gaussian-confidence <float> in (0,1), default=0.95]\n"
+              << "[--bfs-density-threshold <float>, default=0.70 | CNOT-graph density below which CNOT-BFS order is used; <0 always heap; env FTQC_BFS_DENSITY_THRESHOLD overrides]\n"
 #if FTOQC_HAS_BOOST_ROUTER
               << "[--routing-strategy [congestion|naive|naive_critical|packing|boost]]\n"
 #else
@@ -337,8 +352,10 @@ void print_usage(const char* executable) {
 #endif
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"
-              << "[--x <integer>]\n"
-              << "[--y <integer>]\n"
+              << "[--x <int>: >0 explicit | 0 heuristic upper bound | <0 auto-size]\n"
+              << "[--y <int>: same sentinels as --x]\n"
+              << "[--use-layer-cache <true|false>]\n"
+              << "[--metrics-only]\n"
               << "[--graph <graph_path>]\n"
               << "[--config <json_file_path>]\n"
               << "Configuration precedence:\n"
@@ -364,6 +381,7 @@ void apply_config_overrides(
     double& base_gaussian_weight,
     double& gaussian_confidence,
     double& external_weight,
+    double& bfs_density_threshold,
     std::string& config_path,
     int& x,
     int& y,
@@ -556,6 +574,14 @@ void apply_config_overrides(
         load_gaussian_confidence_from_config("gaussian_confidence");
     }
 
+    // CNOT-graph density below which the CNOT-BFS mapping order is used (>= it
+    // falls back to the priority heap). Any finite value: <0 forces always-heap,
+    // a large value forces always-BFS. Env FTQC_BFS_DENSITY_THRESHOLD still wins
+    // at runtime over this config value (see Mapping::gaussian_mapping).
+    if (!load_finite_double_from_config("BFS_DENSITY_THRESHOLD", bfs_density_threshold)) {
+        load_finite_double_from_config("bfs_density_threshold", bfs_density_threshold);
+    }
+
     if (config_json.contains("safe_passage_strategy")) {
         if (!config_json["safe_passage_strategy"].is_string()) {
             throw std::runtime_error("Config key 'safe_passage_strategy' must be a string");
@@ -744,6 +770,7 @@ void argument_parsing(
     double& base_gaussian_weight,
     double& gaussian_confidence,
     double& external_weight,
+    double& bfs_density_threshold,
     int& x,
     int& y,
     std::string& graph_path,
@@ -851,7 +878,7 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --cnot-high");
             }
-            cnot_high = parse_non_negative_double(argv[++i], "--cnot-high");
+            cnot_high = parse_auto_or_non_negative_double(argv[++i], "--cnot-high");
             continue;
         }
 
@@ -861,7 +888,7 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --cnot-low");
             }
-            cnot_low = parse_non_negative_double(argv[++i], "--cnot-low");
+            cnot_low = parse_auto_or_non_negative_double(argv[++i], "--cnot-low");
             continue;
         }
 
@@ -871,7 +898,7 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --mapped-gaussian-weight");
             }
-            mapped_gaussian_weight = parse_non_negative_double(argv[++i], "--mapped-gaussian-weight");
+            mapped_gaussian_weight = parse_auto_or_non_negative_double(argv[++i], "--mapped-gaussian-weight");
             continue;
         }
 
@@ -902,6 +929,16 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --gaussian-confidence");
             }
             gaussian_confidence = parse_gaussian_confidence(argv[++i], "--gaussian-confidence");
+            continue;
+        }
+
+        if (arg == "--bfs-density-threshold" || arg == "--bfs_density_threshold") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --bfs-density-threshold\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --bfs-density-threshold");
+            }
+            bfs_density_threshold = parse_finite_double(argv[++i], "--bfs-density-threshold");
             continue;
         }
 
@@ -969,10 +1006,11 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --x");
             }
-            // -1 means compute from circuit dimensions
-            if (x != -1) {
-                x = parse_positive_integer(argv[++i], "--x");
-            }
+            // Sentinels match the JSON config: >0 explicit, 0 upper-bound
+            // heuristic, <0 auto-size + dimension_offset. The old guard also
+            // failed to consume the value, so "--x -1" fell through to the
+            // unknown-option error.
+            x = parse_integer(argv[++i], "--x");
             continue;
         }
 
@@ -982,10 +1020,7 @@ void argument_parsing(
                 print_usage(argv[0]);
                 throw std::runtime_error("Missing value for --y");
             }
-            // -1 means compute from circuit dimensions
-            if (y != -1) {
-                y = parse_positive_integer(argv[++i], "--y");
-            }
+            y = parse_integer(argv[++i], "--y");
             continue;
         }
 
@@ -1050,7 +1085,7 @@ void argument_parsing(
             } else if (val == "false" || val == "0") {
                 use_layer_cache = false;
             } else {
-                throw std::runtime_error("Invalid boolean value for --repetition: " + val);
+                throw std::runtime_error("Invalid boolean value for --use-layer-cache: " + val);
             }
             use_layer_cache_explicit = true;
 

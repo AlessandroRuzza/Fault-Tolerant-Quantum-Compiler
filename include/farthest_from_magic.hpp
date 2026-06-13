@@ -19,8 +19,12 @@ public:
     }
 
     // Return the farthest non-occupied node from magic states.
-    // Mark it as occupied (Node::occupied = true).
     // Return -1 if no free node is available.
+    // Occupancy is NOT set here: the caller maps the qubit via
+    // map_qubit_to_node, which rejects already-occupied nodes and is the one
+    // that occupies the node on success. Marking it here would make every
+    // pick fail ("Node X is already occupied") and, when the mapping is
+    // rejected by safe-passage, would leave a ghost-occupied cell behind.
     int pick_next() {
         // Skip nodes that are already occupied
         while (idx < order.size() && graph.get_node(order[idx]).occupied) {
@@ -32,8 +36,6 @@ public:
         }
 
         int v = order[idx];
-        // Mark node as occupied in the underlying graph
-        graph.get_node(v).occupied = true;
         ++idx;
         return v;
     }

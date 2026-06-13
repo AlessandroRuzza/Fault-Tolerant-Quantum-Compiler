@@ -56,12 +56,6 @@ void Graph::add_edge(int u, int v) {
         add_node(v);
     }
 
-    
-    if (u >= adj.rows() || v >= adj.cols()) {
-        resize(std::max(u, v) + 1);
-    }
-    adj.coeffRef(u, v) = 1;
-    
     // Update node's neighbor list
     Node& u_node = get_node(u);
     if (std::find(u_node.neighbors.begin(), u_node.neighbors.end(), v) == u_node.neighbors.end()) {
@@ -74,22 +68,6 @@ void Graph::add_edge(int u, int v) {
     
     node_count = std::max(node_count, std::max(u, v) + 1);
 }
-
-// Resize adjacency matrix
-void Graph::resize(int new_size) {
-    SpMat new_adj(new_size, new_size);
-    new_adj.reserve(adj.nonZeros());
-    
-    std::vector<Eigen::Triplet<int>> triplets;
-    for (int k = 0; k < adj.outerSize(); ++k) {
-        for (SpMat::InnerIterator it(adj, k); it; ++it) {
-            triplets.emplace_back(it.row(), it.col(), it.value());
-        }
-    }
-    new_adj.setFromTriplets(triplets.begin(), triplets.end());
-    adj = std::move(new_adj);
-}
-
 
 
 
@@ -398,9 +376,6 @@ void Graph::create_rectangular_with_magic_states(
     int height,
     int width
 ) {
-    const int total_nodes = width * height;  // only grid nodes
-    this->resize(total_nodes);
-
     // Create all grid nodes with explicit coordinates.
     for (int row = 0; row < height; row++) {
         for (int col = 0; col < width; col++) {

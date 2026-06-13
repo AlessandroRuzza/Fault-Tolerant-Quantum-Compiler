@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
-#include <Eigen/Sparse>
 #include <vector>
 
 #include "igraph.hpp"
@@ -19,7 +18,7 @@
 using json = nlohmann::json;
 
 
-// Graph represented as a sparse adjacency matrix (row-major)
+// Grid graph; adjacency lives in Node::neighbors (see IGraph).
 class Graph : public IGraph {
 
 public:
@@ -43,28 +42,22 @@ public:
         return magic_state_placement_strategy;
     }
 
-    using SpMat = Eigen::SparseMatrix<int, Eigen::RowMajor>;
-    using Triplet = Eigen::Triplet<int>;
-
 private:
-    SpMat adj;
     int number_of_magic_states;
     double border_distance_percentage;
     MagicStatePlacementStrategy magic_state_placement_strategy = MagicStatePlacementStrategy::CENTER_CIRCLE;
 
-    void resize(int new_size);
-
 public:
     void set_magic_state_placement_strategy(const std::string& strategy_name);
 
-    // Constructor: specify maximum number of nodes
-    explicit Graph(bool use_generated_graph, int max_nodes, int number_of_magic_states,  
+    // max_nodes is kept for call-site compatibility; sizing now happens in
+    // add_node as nodes are created.
+    explicit Graph(bool use_generated_graph, int /*max_nodes*/, int number_of_magic_states,
         double border_distance_percentage, const std::string& magic_state_placement_strategy,
-        int x, int y, const std::string& filename) : 
+        int x, int y, const std::string& filename) :
     
-    IGraph(), 
-    adj(max_nodes, max_nodes), 
-    number_of_magic_states(number_of_magic_states), 
+    IGraph(),
+    number_of_magic_states(number_of_magic_states),
     border_distance_percentage(border_distance_percentage) {
         set_magic_state_placement_strategy(magic_state_placement_strategy);
         if (use_generated_graph) {

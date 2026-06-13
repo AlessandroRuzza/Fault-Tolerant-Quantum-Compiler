@@ -110,6 +110,7 @@ private:
     double baseGaussianWeight;
     double gaussianConfidence;
     double externalWeight;
+    double bfsDensityThreshold;
     int T_lower_bound;
     int T_upper_bound;
     int CNOT_threshold;
@@ -137,6 +138,7 @@ public:
         double base_gaussian_weight,
         double gaussian_confidence,
         double external_weight,
+        double bfs_density_threshold,
         int maximum_iterations,
         int safe_passage_ignore_outer_layers
     ) :
@@ -150,6 +152,7 @@ public:
     baseGaussianWeight(base_gaussian_weight),
     gaussianConfidence(gaussian_confidence),
     externalWeight(external_weight),
+    bfsDensityThreshold(bfs_density_threshold),
     maximum_iterations(maximum_iterations),
     safe_passage_ignore_outer_layers(safe_passage_ignore_outer_layers),
     farthest_from_magic_selector(graph)  {
@@ -215,6 +218,10 @@ public:
 
     
     inline void map() {
+        // The heap is consumed by the previous repetition's mapping (and the
+        // insert-time order from parsing predates the final counts), so build
+        // it fresh for every pass.
+        circuit.rebuildHeap();
         switch (mappingType) {
             case MappingType::MAGIC_AWARE:
                 magic_aware_mapping();
@@ -497,6 +504,9 @@ private:
         validate_non_negative_finite(baseGaussianWeight, "BASE_GAUSSIAN_WEIGHT");
         if (!std::isfinite(externalWeight)) {
             throw std::invalid_argument("EXTERNAL_WEIGHT must be a finite number");
+        }
+        if (!std::isfinite(bfsDensityThreshold)) {
+            throw std::invalid_argument("BFS_DENSITY_THRESHOLD must be a finite number");
         }
         validate_gaussian_confidence(gaussianConfidence);
 

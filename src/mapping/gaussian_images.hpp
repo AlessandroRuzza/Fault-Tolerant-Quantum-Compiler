@@ -166,7 +166,11 @@ void save_gaussian_frame(
     const Qubit& qubit,
     double external_weight
 ) {
-    if (!benchmark_artifacts_enabled()) {
+    // Frame writing is opt-in via FTQC_SAVE_FRAMES=1. Gating on "not a bench
+    // worker" made every interactive gaussian run pay the gnuplot frames
+    // inside the timed mapping region (measured ~670x on qft_n18), so manual
+    // timings were meaningless and visualization/ was rewritten on every run.
+    if (!env_flag_is_truthy("FTQC_SAVE_FRAMES")) {
         return;
     }
 

@@ -182,7 +182,9 @@ void Mapping::gaussian_mapping() {
         if (circuit.getQubit(id) != nullptr) present.push_back(id);
     }
 
-    double bfs_density_threshold = 0.40;
+    // Base value comes from config/CLI (member, default 0.70); the env var still
+    // wins at runtime so ad-hoc threshold sweeps need no rebuild.
+    double bfs_density_threshold = bfsDensityThreshold;
     if (const char* env = std::getenv("FTQC_BFS_DENSITY_THRESHOLD")) {
         try { bfs_density_threshold = std::stod(env); } catch (...) {}
     }

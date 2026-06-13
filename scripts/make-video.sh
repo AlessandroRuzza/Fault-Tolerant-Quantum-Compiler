@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# NOTE: gaussian frames are opt-in now. Generate them first with
+#   FTQC_SAVE_FRAMES=1 ./build/FaultTolerantQuantumCompiler --type gaussian ...
+# (frames land in visualization/gaussian_frames/), then run this script.
 set -eu
 
 PROJECT="${PROJECT:-$(cd "$(dirname "$0")/.." && pwd)}"

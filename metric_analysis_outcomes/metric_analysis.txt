@@ -157,8 +157,10 @@ Suite: bfs_retune_* (12 config, 62784 casi sul cluster). Metrica: non_routed_lay
   cnot_low = 0   <-- VERIFICATO inerte sotto BFS (check locale bfs_cnotlow_check,
                      5 circuiti): cl=0/0.5/1.0/1.5 danno non_routed IDENTICO
                      all'ultima cifra. Cambiarlo non fa nulla -> tienilo 0.
-  external_weight=0, magic_high ~0.2-0.4 / magic_low 0 (vedi sezione MAGIC),
-  center_circle, base 1, confidence come storico.
+  external_weight ~ -15 (NEGATIVO, vedi sezione EXTERNAL_WEIGHT; NON 0),
+  magic_high ~0.2-0.4 / magic_low 0 (vedi sezione MAGIC),
+  center_circle, base 1, confidence (vedi sezione CONFIDENCE: coarse/cube 8 nove,
+  noncube 12 nove NON satura, fine/cube 0.9999).
 
 --- MAGIC re-tune (regime BFS) ---  [2026-06-11, magic_retune_{coarse,fine}_{cube,noncube}]
 Sweep MAGIC_HIGH x MAGIC_LOW x border (cnot/mapped tenuti agli ottimi BFS qui sopra,
@@ -189,6 +191,59 @@ era un ARTEFATTO del tenere mapped>0. Confronto ASSOLUTO appaiato:
   TUTTE mapped=0 con magic basso (0.2). => cube: mapped=0 + magic_high ~0.2-0.4,
   niente magic alto, niente dipendenza da border.
 
+--- CONFIDENCE sweep (regime BFS) ---  [2026-06-12, confidence_sweep_*]
+Sweep GAUSSIAN_CONFIDENCE 0.5..0.99999999 (14 valori, fino a 8 nove) con pesi
+gaussiani FISSATI agli ottimi e border migliore per regime. 48 circuiti, 8 dim.
+excess = pp sopra il minimo del gruppo (appaiato circuito,d).
+
+                 0.5   0.9   0.99  0.999  1e-4  1e-5  1e-6  1e-7  1e-8   CHI SATURA
+  coarse/cube    0.76  0.70  0.65  0.55   0.53  0.48  0.42  0.38  0.35   NON satura (monotono giu' fino a 8 nove)
+  coarse/noncube 5.92  3.40  1.98  1.34   1.11  1.10  0.75  0.83  0.65   NON satura (vedi knee/deep sotto)
+  fine/cube      2.31  1.46  0.60  0.44   0.43* 0.47  0.51  0.50  0.57   CONCA: minimo 1e-4, poi PEGGIORA
+  fine/noncube   6.79  4.36  2.63  1.80   1.41  1.20  0.94  0.73  0.74   NON satura (vedi knee/deep sotto)
+  (1e-4=0.9999 ... 1e-8=0.99999999 ; *=best per fine/cube)
+
+KNEE+DEEP sweep noncube [confidence_knee/deep_noncube, fino a 1e-16]: i noncube
+NON saturano - continuano a scendere DOLCEMENTE fino al limite di rappresentazione.
+Il "satura a 6 nove" era un artefatto dei passi grossi. Excess noncube continua:
+1e-6~1.0 -> 1e-9~0.8 -> 1e-12~0.6 -> bucket 1e-13..1e-16~0.55 (sempre il migliore).
+ATTENZIONE: il CSV logga confidence a ~12 cifre, quindi 1e-13..1e-16 collassano a "1"
+e non sono distinguibili; e il double satura a 1e-16. Doppio tetto: log ~1e-12, double 1e-16.
+
+=> NONCUBE (coarse+fine): leva FORTISSIMA (da 0.5 a 6-nove ~-5/-6pp), poi continua giu'
+   senza saturare. Oltre 1e-12 guadagno <0.1pp e non loggabile => usa 0.999999999999
+   (12 nove): piu' profondo ancora distinguibile, gia' al fondo. Mai sotto 6 nove.
+   COARSE/CUBE: NON satura, migliora monotono fino a 0.99999999 (span piccolo ~0.4pp).
+   FINE/CUBE: conca, ottimo a 0.9999, oltre 0.99999 PEGGIORA (lieve). Non spingere.
+   Rivede lo storico (era cube 0.999999 / noncube 0.99999): noncube vuole 12 nove;
+   fine/cube ne vuole MENO (0.9999).
+
+--- EXTERNAL_WEIGHT sweep (regime BFS) ---  [2026-06-12, external_sweep]
+Sweep EXTERNAL_WEIGHT 0 -> -15 con confidence/border/pesi FISSATI agli ottimi.
+RIBALTA lo storico "best external = 0" (i vecchi sweep testavano solo >=0).
+excess = pp sopra il minimo del gruppo (appaiato circuito,d).
+
+                 0     -0.5   -1    -2    -3    -5    -8    -15
+  coarse/cube    0.12  0.10   0.08  0.08  0.07  0.06  0.05  0.05   debole; best -15 = il piu' grande testato (piatto da -3)
+  coarse/noncube 2.01  1.91   1.53  0.65  0.49  0.41  0.36  0.33   FORTE ~-2pp; best -15 = il piu' grande testato (ANCORA in discesa)
+  fine/cube      0.44  0.23   0.18  0.20  0.17  0.17  0.17  0.17   debole; best -15 = il piu' grande testato (piatto da -3)
+  fine/noncube   2.02  2.08   1.38  0.61  0.57  0.44  0.45  0.44   FORTE ~-2pp; best -5 (poi piatto)
+
+=> NEGATIVO vince OVUNQUE, direzione univoca (piu' negativo = meglio), poi SATURA.
+   NONCUBE: leva forte ~-1.5/-2pp (salto tra -1 e -2, poi plateau).
+   CUBE: leva debole (coarse ~-0.07pp, fine ~-0.27/-0.6pp), satura a ~-5.
+
+ESTENSIONE a -30 [external_neigh_sweep, anche x intorno cnot/mapped/magic -> robusto
+agli altri pesi]: CHIUDE la questione "non bracketato": e' PLATEAU, non discesa infinita.
+excess (control circuito,d,cnot,mapped,magic):
+                 -0.5   -5    -15   -20   -30
+  coarse/cube    0.12   0.03  0.03  0.03  0.03   satura da -5
+  coarse/noncube 1.69   0.19  0.12  0.12  0.12   satura da -15 (il "-15 in discesa" era rumore)
+  fine/cube      0.59   0.08  0.05  0.04  0.04   satura da -15/-20
+  fine/noncube   1.70   0.16  0.12  0.12  0.12   satura da -15
+=> RECO FINALE: external ~ -15 (plateau sicuro per tutti; -5 basta al cube). Oltre -20
+   inutile. Very negative -> qualche run perso per safe_passage_failed, non sposta l'ottimo.
+
 --- NOTE ---
 - NIENTE d-scaling per cnot_high/mapped in regime BFS: sono piccole COSTANTI.
   L'ordine BFS fa gia' il lavoro strutturale che i pesi crescenti facevano in heap.
@@ -209,11 +264,13 @@ era un ARTEFATTO del tenere mapped>0. Confronto ASSOLUTO appaiato:
 config ottima per ora (metrica = non_routed mean-no-out):
 
 comuni a tutte:
-- external_weight: 0
+- external_weight: NEGATIVO ~-15 (lo 0 storico e' battuto; satura: cube da -5, noncube
+  da -15; oltre -20 inutile; noncube ~-1.5/-2pp) [vedi sezione EXTERNAL_WEIGHT]
 - magic placement: center_circle (mai right_row)
 - number_of_magic_states: usare (-1 = auto)
 - base_gaussian_weight: 1
-- confidence: cube 0.999999 ; noncube 0.99999 (anche 0.9999 ok)
+- confidence: coarse/cube 0.99999999 (8 nove) ; noncube 0.999999999999 (12 nove, NON
+  satura) ; fine/cube 0.9999 (conca, oltre peggiora)  [vedi sezione CONFIDENCE]
 - cnot_low: 0
 - cnot_high: formula auto (scale 1.0; plateau, non scendere sotto formula)
 - mapped: formula auto

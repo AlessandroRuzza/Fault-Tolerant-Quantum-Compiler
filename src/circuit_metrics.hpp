@@ -6,6 +6,7 @@
 #include "mapping.hpp"
 #include "igraph.hpp"
 #include "routing.hpp"
+#include "write_csv.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -23,8 +24,8 @@
 // Returns a numeric hash that identifies the gate set of a layer.
 // Faster than a string-based fingerprint: no ostringstream, no heap string per gate.
 inline size_t compute_layer_fingerprint(const Layer& layer) {
-    // Compute a hash for each gate (name + sorted qubits), then sort the per-gate
-    // hashes so the result is independent of the unordered_set iteration order.
+    // Compute a hash for each gate (name + qubits in textual order), then sort the
+    // per-gate hashes so the result is independent of the unordered_set iteration order.
     std::vector<size_t> gate_hashes;
     gate_hashes.reserve(layer.size());
     for (const Gate& g : layer) {
@@ -317,7 +318,7 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
         cnot_graph_modularity = std::max(0.0, Q);
     }
 
-    // ---- Layer fingerprints (numeric hash: gate name + sorted qubits) ----
+    // ---- Layer fingerprints (numeric hash: gate name + qubits in textual order) ----
     std::vector<size_t> layer_fps;
     std::vector<int>    layer_sizes;
     std::vector<int>    layer_cnot_counts;
@@ -540,6 +541,11 @@ inline void write_metrics_csv(const CircuitMetrics& metrics,
     const fs::path csv_dir = fs::path(PROJECT_ROOT) / "benchmarks" / "results" / "cache_metrics";
     fs::create_directories(csv_dir);
     const fs::path csv_path = csv_dir / "all_circuits_cache_metrics.csv";
+
+    // This CSV is shared by every worker of a parallel benchmark and updated
+    // with a full read-filter-rewrite, so hold the same advisory lock the
+    // runs-CSV writers use; without it concurrent workers drop/corrupt rows.
+    write_csv::CsvFileLock lock(csv_path);
 
     // Canonical header for the current metrics schema. If a stale CSV exists with a
     // different header, its rows are discarded (different columns would misalign).
