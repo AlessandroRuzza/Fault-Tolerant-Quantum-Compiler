@@ -118,7 +118,7 @@ void Mapping::one_iteration_gaussian_mapping(Qubit* qubit, int* iterations, std:
         graph,
         mapped_node,
         mappedGaussianWeight,
-        gaussianConfidence
+        gaussianSigma
     ));
 
     // mapped gaussians are append-only, so fold the new one into the running cache.
@@ -135,7 +135,7 @@ void Mapping::gaussian_mapping() {
     std::vector<Gaussian> mapped_gaussians;
     std::vector<Gaussian> magic_gaussians;
 
-    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight, gaussianConfidence);
+    Gaussian baseline_gaussian = Gaussians::baseline_gaussian(graph, baseGaussianWeight, gaussianSigma);
 
     // Per-node caches for the contributions that don't vary across the inner
     // candidate loop. baseline_cache is constant (computed once); mapped_cache is
@@ -148,7 +148,7 @@ void Mapping::gaussian_mapping() {
     add_gaussian_to_cache(graph, baseline_cache, baseline_gaussian);
 
     for (int node_id : graph.get_magic_state_ids()) {
-        magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id, gaussianConfidence));
+        magic_gaussians.push_back(Gaussians::magic_gaussian(graph, node_id, gaussianSigma));
     }
 
     int total_qubits = circuit.getNumQubits();
@@ -345,7 +345,7 @@ void update_gaussians_coarse(
                     second_qubit_mapped_node,
                     weight,
                     false,
-                    mapping.getGaussianConfidence()
+                    mapping.getGaussianSigma()
                 ));
             }
         }
@@ -463,7 +463,7 @@ void update_gaussians_fine(
                     mapped_node,
                     weight,
                     false,
-                    mapping.getGaussianConfidence()
+                    mapping.getGaussianSigma()
                 ));
             }
 
@@ -490,7 +490,7 @@ void update_gaussians_fine(
                 mapped_node,
                 weight,
                 false,
-                mapping.getGaussianConfidence()
+                mapping.getGaussianSigma()
             ));
         }
     }

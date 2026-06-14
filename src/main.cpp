@@ -384,11 +384,14 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     double mapped_gaussian_weight = 0.8;
     double base_gaussian_weight = 1.0;
     double external_weight = 0.0;
-    double gaussian_confidence = 0.95;
     // CNOT-graph density below which CNOT-BFS mapping order is used (>= falls
     // back to the priority heap). Tuned to 0.70 post-fix (BFS beats heap almost
     // everywhere); configurable via JSON/CLI, env FTQC_BFS_DENSITY_THRESHOLD wins.
     double bfs_density_threshold = 0.70;
+    // Direct, absolute gaussian sigma (stddev, same on both axes, graph-independent),
+    // used verbatim by every gaussian. Replaced gaussian_confidence. Must be > 0;
+    // sweep optimum ~0.4 in the coarse/connectivity regime.
+    double gaussian_sigma = 0.4;
     // Anchored to PROJECT_ROOT, not the CWD: the old CWD-relative default
     // loaded the config from build/ but silently fell back to hardcoded
     // defaults when launched from anywhere else — a reproducibility trap.
@@ -426,9 +429,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        gaussian_confidence,
         external_weight,
         bfs_density_threshold,
+        gaussian_sigma,
         config_path,
         x,
         y,
@@ -462,9 +465,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        gaussian_confidence,
         external_weight,
         bfs_density_threshold,
+        gaussian_sigma,
         x,
         y,
         graph_path,
@@ -492,7 +495,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "MAPPED_GAUSSIAN_WEIGHT: " << mapped_gaussian_weight << std::endl;
     std::cout << "BASE_GAUSSIAN_WEIGHT: " << base_gaussian_weight << std::endl;
     std::cout << "EXTERNAL_WEIGHT: " << external_weight << std::endl;
-    std::cout << "gaussian_confidence: " << gaussian_confidence << std::endl;
+    std::cout << "gaussian_sigma: " << gaussian_sigma << std::endl;
     std::cout << "bfs_density_threshold: " << bfs_density_threshold << std::endl;
     std::cout << "safe passage strategy: " << safe_passage_strategy << std::endl;
     std::cout << "MagicStatePlacementStrategy: " << magic_state_placement_strategy << std::endl;
@@ -530,9 +533,9 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_low,
         mapped_gaussian_weight,
         base_gaussian_weight,
-        gaussian_confidence,
         external_weight,
         bfs_density_threshold,
+        gaussian_sigma,
         x,
         y,
         dimension_offset,
@@ -1433,12 +1436,12 @@ int run_bench_mode(
 
             const std::string mw = get_json_field(entry, {"MAPPED_GAUSSIAN_WEIGHT", "mapped_gaussian_weight"});
             const std::string bw = get_json_field(entry, {"BASE_GAUSSIAN_WEIGHT", "base_gaussian_weight"});
-            const std::string gc = get_json_field(entry, {"GAUSSIAN_CONFIDENCE", "gaussian_confidence"});
             const std::string mh = get_json_field(entry, {"MAGIC_HIGH", "magic_high"});
             const std::string ml = get_json_field(entry, {"MAGIC_LOW", "magic_low"});
             const std::string ch = get_json_field(entry, {"CNOT_HIGH", "cnot_high"});
             const std::string cl = get_json_field(entry, {"CNOT_LOW", "cnot_low"});
             const std::string ew = get_json_field(entry, {"EXTERNAL_WEIGHT", "external_weight"});
+            const std::string gs = get_json_field(entry, {"GAUSSIAN_SIGMA", "gaussian_sigma"});
             const std::string mapping_type_csv = get_json_field(entry, {"mapping_type", "type"});
             const std::string safe_passage_strategy_csv = get_json_field(entry, {"safe_passage_strategy"});
 
@@ -1459,7 +1462,7 @@ int run_bench_mode(
                 cl,
                 mw,
                 bw,
-                gc,
+                gs,  // gaussian_sigma (column 16, replaced gaussian_confidence)
                 safe_passage_strategy_csv,
                 get_json_field(entry, {"magic_state_placement_strategy", "MagicStatePlacementStrategy"}),
                 get_json_field(entry, {"border_distance_percentage"}),

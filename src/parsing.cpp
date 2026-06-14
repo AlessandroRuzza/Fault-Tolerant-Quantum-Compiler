@@ -171,21 +171,6 @@ double parse_finite_double(const std::string& value, const char* flag_name) {
     return parsed_value;
 }
 
-double parse_gaussian_confidence(const std::string& value, const char* flag_name) {
-    double parsed_value = 0.0;
-    try {
-        parsed_value = std::stod(value);
-    } catch (const std::exception&) {
-        throw std::runtime_error("Invalid floating-point value for " + std::string(flag_name) + ": " + value);
-    }
-
-    if (!std::isfinite(parsed_value) || parsed_value <= 0.0 || parsed_value >= 1.0) {
-        throw std::runtime_error(std::string(flag_name) + " must be a finite number in (0, 1)");
-    }
-
-    return parsed_value;
-}
-
 double parse_percentage_0_100(const std::string& value, const char* flag_name) {
     const double parsed_value = parse_non_negative_double(value, flag_name);
     if (parsed_value > 100.0) {
@@ -343,8 +328,8 @@ void print_usage(const char* executable) {
               << "[--mapped-gaussian-weight <float>=0 | -1=auto formula]\n"
               << "[--base-gaussian-weight <float>=0]\n"
               << "[--external-weight <float>]\n"
-              << "[--gaussian-confidence <float> in (0,1), default=0.95]\n"
               << "[--bfs-density-threshold <float>, default=0.70 | CNOT-graph density below which CNOT-BFS order is used; <0 always heap; env FTQC_BFS_DENSITY_THRESHOLD overrides]\n"
+              << "[--gaussian-sigma <float> > 0, default=0.4 | absolute gaussian stddev, same on both axes, graph-independent]\n"
 #if FTOQC_HAS_BOOST_ROUTER
               << "[--routing-strategy [congestion|naive|naive_critical|packing|boost]]\n"
 #else
@@ -379,9 +364,9 @@ void apply_config_overrides(
     double& cnot_low,
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
-    double& gaussian_confidence,
     double& external_weight,
     double& bfs_density_threshold,
+    double& gaussian_sigma,
     std::string& config_path,
     int& x,
     int& y,
@@ -555,31 +540,18 @@ void apply_config_overrides(
         load_finite_double_from_config("external_weight", external_weight);
     }
 
-    const auto load_gaussian_confidence_from_config = [&](const char* key) {
-        if (!config_json.contains(key)) {
-            return false;
-        }
-        if (!config_json[key].is_number()) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be numeric");
-        }
-        const double value = config_json[key].get<double>();
-        if (!std::isfinite(value) || value <= 0.0 || value >= 1.0) {
-            throw std::runtime_error(std::string("Config key '") + key + "' must be a finite number in (0, 1)");
-        }
-        gaussian_confidence = value;
-        return true;
-    };
-
-    if (!load_gaussian_confidence_from_config("GAUSSIAN_CONFIDENCE")) {
-        load_gaussian_confidence_from_config("gaussian_confidence");
-    }
-
     // CNOT-graph density below which the CNOT-BFS mapping order is used (>= it
     // falls back to the priority heap). Any finite value: <0 forces always-heap,
     // a large value forces always-BFS. Env FTQC_BFS_DENSITY_THRESHOLD still wins
     // at runtime over this config value (see Mapping::gaussian_mapping).
     if (!load_finite_double_from_config("BFS_DENSITY_THRESHOLD", bfs_density_threshold)) {
         load_finite_double_from_config("bfs_density_threshold", bfs_density_threshold);
+    }
+
+    // Direct gaussian sigma: absolute stddev, same on both axes, graph-independent.
+    // Must be > 0 (validated in Mapping). Any finite value accepted here.
+    if (!load_finite_double_from_config("GAUSSIAN_SIGMA", gaussian_sigma)) {
+        load_finite_double_from_config("gaussian_sigma", gaussian_sigma);
     }
 
     if (config_json.contains("safe_passage_strategy")) {
@@ -768,9 +740,9 @@ void argument_parsing(
     double& cnot_low,
     double& mapped_gaussian_weight,
     double& base_gaussian_weight,
-    double& gaussian_confidence,
     double& external_weight,
     double& bfs_density_threshold,
+    double& gaussian_sigma,
     int& x,
     int& y,
     std::string& graph_path,
@@ -922,16 +894,6 @@ void argument_parsing(
             continue;
         }
 
-        if (arg == "--gaussian-confidence" || arg == "--gaussian_confidence") {
-            if (i + 1 >= argc) {
-                std::cerr << "Missing value for --gaussian-confidence\n";
-                print_usage(argv[0]);
-                throw std::runtime_error("Missing value for --gaussian-confidence");
-            }
-            gaussian_confidence = parse_gaussian_confidence(argv[++i], "--gaussian-confidence");
-            continue;
-        }
-
         if (arg == "--bfs-density-threshold" || arg == "--bfs_density_threshold") {
             if (i + 1 >= argc) {
                 std::cerr << "Missing value for --bfs-density-threshold\n";
@@ -939,6 +901,16 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --bfs-density-threshold");
             }
             bfs_density_threshold = parse_finite_double(argv[++i], "--bfs-density-threshold");
+            continue;
+        }
+
+        if (arg == "--gaussian-sigma" || arg == "--gaussian_sigma") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --gaussian-sigma\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --gaussian-sigma");
+            }
+            gaussian_sigma = parse_finite_double(argv[++i], "--gaussian-sigma");
             continue;
         }
 

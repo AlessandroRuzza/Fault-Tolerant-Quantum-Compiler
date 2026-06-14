@@ -2,13 +2,11 @@
 #include <limits>
 #include <stdexcept>
 
-inline double compute_sigma(int radius, double gaussian_confidence) {
-    if (!std::isfinite(gaussian_confidence) || gaussian_confidence <= 0.0 || gaussian_confidence >= 1.0) {
-        throw std::invalid_argument("gaussian_confidence must be a finite number in (0, 1)");
-    }
-    return radius / std::sqrt(-2 * std::log(1 - gaussian_confidence));
-}
-
+// gaussian_sigma is the direct, absolute standard deviation of every gaussian,
+// the same on both axes and independent of the grid size. It replaced the old
+// gaussian_confidence parameter (which derived a per-axis, grid-scaled sigma via
+// sigma = radius / sqrt(-2 ln(1 - confidence)) and was floored near confidence=1
+// by double precision). Validity (> 0, finite) is enforced by the Gaussian ctor.
 
 namespace Gaussians {
 
@@ -29,15 +27,15 @@ namespace Gaussians {
         return static_cast<int>(scaled);
     }
 
-    Gaussian baseline_gaussian(const Graph& graph, double base_gaussian_weight, double gaussian_confidence){
+    Gaussian baseline_gaussian(const Graph& graph, double base_gaussian_weight, double gaussian_sigma){
         return Gaussian (
             //mean
             graph.get_maxX() / 2,
             graph.get_maxY() / 2,
 
-            //sigma
-            compute_sigma(graph.get_maxX() / 2, gaussian_confidence),
-            compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
+            //sigma (direct, absolute, same on both axes)
+            gaussian_sigma,
+            gaussian_sigma,
 
             //size — full grid so gaussian_at has no artificial cutoff inside the grid
             graph.get_maxX() + 1,
@@ -52,15 +50,15 @@ namespace Gaussians {
     }
 
 
-    Gaussian mapped_gaussian(const Graph& graph, const Node& node, double mapped_gaussian_weight, double gaussian_confidence) {
+    Gaussian mapped_gaussian(const Graph& graph, const Node& node, double mapped_gaussian_weight, double gaussian_sigma) {
         return Gaussian(
             //mean
             node.coordX,
             node.coordY,
 
-            //sigma
-            compute_sigma(graph.get_maxX() / 2, gaussian_confidence),
-            compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
+            //sigma (direct, absolute, same on both axes)
+            gaussian_sigma,
+            gaussian_sigma,
 
             //size
             graph.get_maxX() + 1,
@@ -75,15 +73,15 @@ namespace Gaussians {
 
     }
 
-    Gaussian magic_gaussian(const Graph& graph, int node_id, double gaussian_confidence) {
+    Gaussian magic_gaussian(const Graph& graph, int node_id, double gaussian_sigma) {
         return Gaussian(
             //mean
             graph.get_coordX(node_id),
             graph.get_coordY(node_id),
 
-            //sigma
-            compute_sigma(graph.get_maxX() / 2, gaussian_confidence),
-            compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
+            //sigma (direct, absolute, same on both axes)
+            gaussian_sigma,
+            gaussian_sigma,
 
             //size
             graph.get_maxX() + 1,
@@ -100,15 +98,15 @@ namespace Gaussians {
     }
 
 
-    Gaussian cnot_gaussian(const Graph& graph, int node_id, double weight, bool inverse, double gaussian_confidence) {
+    Gaussian cnot_gaussian(const Graph& graph, int node_id, double weight, bool inverse, double gaussian_sigma) {
         return Gaussian(
             //mean
             graph.get_coordX(node_id),
             graph.get_coordY(node_id),
 
-            //sigma
-            compute_sigma(graph.get_maxX() / 2, gaussian_confidence),
-            compute_sigma(graph.get_maxY() / 2, gaussian_confidence),
+            //sigma (direct, absolute, same on both axes)
+            gaussian_sigma,
+            gaussian_sigma,
 
             //size
             graph.get_maxX() + 1,

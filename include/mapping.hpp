@@ -108,7 +108,7 @@ private:
     double cnotLow;
     double mappedGaussianWeight;
     double baseGaussianWeight;
-    double gaussianConfidence;
+    double gaussianSigma;
     double externalWeight;
     double bfsDensityThreshold;
     int T_lower_bound;
@@ -136,7 +136,7 @@ public:
         double cnot_low,
         double mapped_gaussian_weight,
         double base_gaussian_weight,
-        double gaussian_confidence,
+        double gaussian_sigma,
         double external_weight,
         double bfs_density_threshold,
         int maximum_iterations,
@@ -150,7 +150,7 @@ public:
     cnotLow(cnot_low),
     mappedGaussianWeight(mapped_gaussian_weight),
     baseGaussianWeight(base_gaussian_weight),
-    gaussianConfidence(gaussian_confidence),
+    gaussianSigma(gaussian_sigma),
     externalWeight(external_weight),
     bfsDensityThreshold(bfs_density_threshold),
     maximum_iterations(maximum_iterations),
@@ -293,7 +293,7 @@ public:
     inline double getCnotLow() const { return cnotLow; }
     inline double getMappedGaussianWeight() const { return mappedGaussianWeight; }
     inline double getBaseGaussianWeight() const { return baseGaussianWeight; }
-    inline double getGaussianConfidence() const { return gaussianConfidence; }
+    inline double getGaussianSigma() const { return gaussianSigma; }
     inline double getExternalWeight() const { return externalWeight; }
 
 
@@ -489,12 +489,6 @@ private:
         }
     }
 
-    inline void validate_gaussian_confidence(double value) {
-        if (!std::isfinite(value) || value <= 0.0 || value >= 1.0) {
-            throw std::invalid_argument("GAUSSIAN_CONFIDENCE must be a finite number in (0, 1)");
-        }
-    }
-
     inline void validate_gaussian_weights() {
         validate_non_negative_finite(magicHigh, "MAGIC_HIGH");
         validate_non_negative_finite(magicLow, "MAGIC_LOW");
@@ -508,7 +502,10 @@ private:
         if (!std::isfinite(bfsDensityThreshold)) {
             throw std::invalid_argument("BFS_DENSITY_THRESHOLD must be a finite number");
         }
-        validate_gaussian_confidence(gaussianConfidence);
+        // Direct gaussian sigma: must be a finite, strictly positive stddev.
+        if (!std::isfinite(gaussianSigma) || gaussianSigma <= 0.0) {
+            throw std::invalid_argument("GAUSSIAN_SIGMA must be a finite number > 0");
+        }
 
         if (magicHigh < magicLow) {
             throw std::invalid_argument("MAGIC_HIGH must be >= MAGIC_LOW");

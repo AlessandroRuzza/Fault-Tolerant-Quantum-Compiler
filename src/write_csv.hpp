@@ -55,6 +55,21 @@ private:
 inline constexpr const char *kBenchmarkRunsCsvHeader =
     "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
     "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,gaussian_sigma,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,resolved_n_magic,"
+    "external_weight";
+
+// V17: the layout that named column 16 gaussian_confidence (before it was
+// replaced by gaussian_sigma). Same width; on migration the old confidence
+// value is dropped (it is not a sigma). Kept so existing CSV files migrate.
+inline constexpr const char *kBenchmarkRunsCsvHeaderV17 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
     "mapped_gaussian_weight,base_gaussian_weight,gaussian_confidence,"
     "safe_passage_strategy,magic_state_placement_strategy,"
     "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
@@ -517,7 +532,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV16 ||
+        (first_line == kBenchmarkRunsCsvHeaderV17 ||
+         first_line == kBenchmarkRunsCsvHeaderV16 ||
          first_line == kBenchmarkRunsCsvHeaderV15 ||
          first_line == kBenchmarkRunsCsvHeaderV14 ||
          first_line == kBenchmarkRunsCsvHeaderV13 ||
@@ -554,6 +570,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v17 = (first_line == kBenchmarkRunsCsvHeaderV17);
             const bool from_v16 = (first_line == kBenchmarkRunsCsvHeaderV16);
             const bool from_v15 = (first_line == kBenchmarkRunsCsvHeaderV15);
             const bool from_v14 = (first_line == kBenchmarkRunsCsvHeaderV14);
@@ -573,7 +590,13 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v16) {
+            if (from_v17) {
+                // V17 already has the current 46-column layout; only column 16
+                // changes meaning (gaussian_confidence -> gaussian_sigma) and is
+                // blanked below. No structural fix-up needed.
+                migrated = parsed;
+                migrated.resize(46);
+            } else if (from_v16) {
                 // V16 already has the full 47-column layout (incl. external_weight
                 // and the now-removed t_states_proportional); the tail drops col 44.
                 migrated = parsed;
@@ -1032,6 +1055,9 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 };
             }
 
+            // V17 is already the final 46-column layout; skip every structural
+            // fix-up below (they would corrupt it). Column 16 is blanked afterwards.
+            if (!from_v17) {
             if (!migrated.empty()) {
                 migrated[0] = config_id_from_log_file(at_or_empty(migrated, 29), migrated[0]);
             }
@@ -1067,6 +1093,13 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             // (was index 44, between lower_non_routed_layer_pct and resolved_n_magic).
             if (migrated.size() >= 45) {
                 migrated.erase(migrated.begin() + 44);
+            }
+            } // end !from_v17 structural fix-ups
+
+            // Column 16 was gaussian_confidence in every prior layout; it is now
+            // gaussian_sigma. Old rows carry no sigma, so drop the stale value.
+            if (migrated.size() > 16) {
+                migrated[16] = "";
             }
 
             out << render_row(migrated) << '\n';
