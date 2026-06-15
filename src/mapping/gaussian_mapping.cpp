@@ -391,17 +391,17 @@ void update_gaussians_fine(
     //Se T_count = media allora peso = 0
     //Se T_count < media - varianza allora peso = peso alto, inverso
     //Se T_count > media + varianza allora peso = peso alto, non inverso
-    //Se T_count compreso tra media e media - varianza, prendi T_count, 
-    //                                 dividi per (media - varianza), e moltiplica per peso alto - basso, inverso
-    //Se T_count compreso tra media e media + varianza, prendi T_count,
-    //                                 dividi per (media + varianza) e moltiplica per peso alto - basso, non inverso
+    //Se T_count compreso tra media e media - varianza, prendi (media - T_count),
+    //                                 dividi per varianza, e moltiplica per peso alto - basso, inverso
+    //Se T_count compreso tra media e media + varianza, prendi (T_count - media),
+    //                                 dividi per varianza, e moltiplica per peso alto - basso, non inverso
 
 
     //es: media = 10, varianza = 5, peso alto = 1, peso basso = 0.5
     //T_count = 5 -> peso = 1, inverso
     //T_count = 15 -> peso = 1, non inverso
-    //T_count = 7 -> peso = 0.5 + (1 - 0.5) * (7 - 5) / (10 - 5) = 0.7, inverso
-    //T_count = 12 -> peso = 0.5 + (1 - 0.5) * (12 - 10) / (15 - 10) = 0.7, non inverso
+    //T_count = 7 -> peso = 0.5 + (1 - 0.5) * (10 - 7) / 5 = 0.8, inverso
+    //T_count = 12 -> peso = 0.5 + (1 - 0.5) * (12 - 10) / 5 = 0.7, non inverso
 
     // tutto uguale per CNOT
 
@@ -421,7 +421,7 @@ void update_gaussians_fine(
         update_weight(magic_gaussians, magic_high);
         update_inverse(magic_gaussians, false);
     } else if (t_count >= T_mean - T_std && t_count <= T_mean) {
-        double weight = interpolate_weight(magic_low, magic_high, (t_count - (T_mean - T_std)) / T_std);
+        double weight = interpolate_weight(magic_low, magic_high, (T_mean - t_count) / T_std);
         update_weight(magic_gaussians, weight);
         update_inverse(magic_gaussians, true);
     } else if (t_count > T_mean && t_count <= T_mean + T_std) {
