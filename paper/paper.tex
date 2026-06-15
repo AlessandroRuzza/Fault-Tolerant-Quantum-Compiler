@@ -47,7 +47,7 @@
 \newcommand{\A}{\mathcal{A}}            % architecture graph
 \newcommand{\C}{\mathcal{C}}            % circuit
 \newcommand{\Q}{\mathcal{Q}}            % qubit set
-\newcommand{\M}{\mathcal{M}}            % mapping / layout
+\newcommand{\M}{\mathcal{M}}            % mapping
 \newcommand{\SWAP}{\mathrm{SWAP}}
 \newcommand{\CNOT}{\mathrm{CNOT}}
 \newcommand{\depth}{\mathrm{depth}}
@@ -96,13 +96,12 @@ to two coupled tasks: placing logical qubits on a two-dimensional lattice and
 scheduling the lattice-surgery operations that execute its gates, each
 non-Clifford gate consuming a magic state. Unlike the near-term (NISQ) setting,
 the bottleneck is not $\SWAP{}$ insertion but the routing corridors---free lanes
-of lattice that must stay open so interacting patches, or a patch and the magic
-state it needs, can be joined on demand. We present a \emph{Gaussian
+of lattice that must stay open so interacting patches can be joined on demand. We present a \emph{Gaussian
 potential-field} heuristic for the placement sub-problem. Each candidate tile is
 scored by summing attractive Gaussian fields---pulling $T$-heavy qubits toward
 magic states and tightly interacting qubits toward their partners---and
 repulsive fields that preserve routing space; a \emph{safe-passage} test keeps
-every layout routable. We implement the method in an open-source C++20 OpenQASM
+every mapping routable. We implement the method in an open-source C++20 OpenQASM
 compiler and evaluate it against rule-based, randomized-restart, and WISQ
 baselines.
 \todo{Insert one or two headline numbers once tables are filled (e.g.\ mean
@@ -149,7 +148,7 @@ for it in serialised lattice surgery. Existing fault-tolerant toolchains such as
 WISQ~\cite{wisq} and lattice-surgery schedulers~\cite{beverland2022surface}
 typically treat placement and routing jointly with search or solver-based
 methods that scale poorly. We instead ask whether a cheap, geometry-aware
-\emph{placement} heuristic can produce layouts that route well under a simple
+\emph{placement} heuristic can produce mappings that route well under a simple
 scheduler.
 
 \smallskip
@@ -162,7 +161,7 @@ scheduler.
     (Section~\ref{sec:approach}).
     \item We couple the placement with a \emph{safe-passage} connectivity
     filter that rejects any placement which would block a committed patch from
-    reaching its CNOT partners or a magic state, guaranteeing a routable layout.
+    reaching its CNOT partners or a magic state, guaranteeing a routable mapping.
     \item We give two parameterisations---a discrete \emph{coarse} variant and a
     continuous \emph{fine} variant that interpolates field strength from
     per-qubit $T$-count and per-pair CNOT statistics.
@@ -175,8 +174,7 @@ scheduler.
 The rest of the paper is organised as follows.
 Section~\ref{sec:background} fixes the architecture and circuit model and
 states the placement problem. Section~\ref{sec:approach} describes the Gaussian
-field method. Section~\ref{sec:eval} reports the experimental evaluation, with
-space reserved for the Gaussian-mapping result tables and figures.
+field method. Section~\ref{sec:eval} reports the experimental evaluation.
 Sections~\ref{sec:related} and~\ref{sec:conclusion} discuss related work and
 conclude.
 
@@ -187,56 +185,48 @@ conclude.
 \subsection{Architecture and Circuit Model}
 
 We target a rectangular $W\times H$ grid of surface-code patches. We model it as
-an \emph{architecture graph} $\A = (V, E)$ whose vertices $V$ are tiles, each
+an \emph{architecture graph} $\A = (V, E)$ whose vertices $V$ are tiles
 with integer coordinates $(x,y)$, and whose edges $E$ connect orthogonally
 adjacent tiles (the corridors along which lattice surgery can merge patches). A
-fixed subset $V_{\mathrm{m}} \subset V$ of tiles host \emph{magic states};
-their number and placement (a central cluster or a boundary row) are
-configuration parameters. The remaining tiles are available for logical-qubit
-patches or as transient routing corridors.
+fixed subset $V_{\mathrm{m}} \subset V$ of tiles hosts \emph{magic states};
+their number and placement are configuration parameters. 
 
 A circuit $\C$ over logical qubits $\Q_L$ is taken in the Clifford$+T$ basis.
-From $\C$ we extract, per logical qubit $q$, its $T$-count $t(q)$ (number of
-non-Clifford gates, i.e.\ magic-state demand) and, for each pair $(q,q')$, the
-two-qubit interaction count $c(q,q')$. We write $\bar t,\sigma_t$ for the mean
-and standard deviation of the $T$-count across qubits, and $\bar c,\sigma_c$
-for the corresponding CNOT-count statistics; these summary statistics drive the
-field weights in Section~\ref{sec:approach}.
+From $\C$ we extract, per logical qubit $q$, its $T$-count $t(q)$ (i.e.\ magic-state demand) 
+and, for each pair $(q,q')$, the
+two-qubit interaction count $c(q,q')$. We write $\bar t,\sigma_t,\ \bar c,\sigma_c$ for the mean
+and standard deviation of the $T$-count and CNOT-count across qubits.
+These summary statistics drive the field weights in Section~\ref{sec:approach}.
 
 \subsection{Fault-Tolerant Routing Model}
 
-A layout $\M:\Q_L\to V$ is injective: each logical qubit occupies one tile. The
+Each logical qubit occupies one vertex in $V$. The
 router processes the circuit in layers and, at each step, must realise the
 active two-qubit gates by reserving vertex-disjoint paths in $\A$ between
 operand tiles, and must realise active $T$ gates by reserving a path from the
 operand tile to some free magic-state tile. Gates whose corridors collide are
 serialised into later steps. The primary cost we minimise is the number of
-\emph{routing steps} (the lattice-surgery time-depth); we also report the
-average gate parallelism (gates per step) and the fraction of gates that could
-not be routed at first exposure.
+\emph{routing steps} (the lattice-surgery time-depth); we also consider the
+average gate parallelism achieved.
 
 \subsection{Safe Passage}
 
-Because corridors are reclaimed each step, the layout must never \emph{trap} a
-patch. We say a placement satisfies \emph{safe passage} if, after committing it,
+The mapping must never \emph{trap} a patch.
+We say a placement satisfies \emph{safe passage} if, after committing it,
 (i) every pair of already-placed CNOT partners is still connected by some free
-path, (ii) every placed patch with remaining $T$ demand can still reach a magic
+path, (ii) every placed patch with $T$ demand can still reach a magic
 state, and (iii) at least one magic-state tile keeps a free neighbouring entry
-for the not-yet-placed $T$-consuming qubits. Safe passage is the
-fault-tolerant analogue of the connectivity constraint that ordinary routing
-takes for granted, and it is what makes a purely score-driven placement
-admissible.
+for the not-yet-placed qubits with $T$ demand. 
 
 We use two safe-passage tests (``cube'' vs.\
 ``connectivity'') for the tuning regimes in Section~\ref{sec:eval}.
 \emph{Connectivity} test enforces (i)--(iii) directly on the free lattice,
 admitting a placement whenever reachability still holds; it packs tightly and so
-maps and routes on smaller lattices. \emph{Cube} instead applies a
-stricter geometric rule---it forbids any tile within the $3\times3$ neighbourhood
-of an occupied patch. This requires a larger grid
+maps and routes on smaller lattices. \emph{Cube} instead forbids placement on any tile 
+within the $3\times3$ neighbourhood of an occupied patch. This requires a larger grid
 area but yields consistently shorter routes in our experiments, since the
 reserved spacing leaves more routing alternatives; we therefore treat
-\emph{cube} as the default and \emph{connectivity} as the option for when lattice
+\emph{cube} as the default and \emph{connectivity} for when lattice
 area is constrained.
 
 \begin{definition}[Qubit Mapping]
@@ -258,7 +248,7 @@ area is constrained.
 The core idea is to convert the soft, competing objectives of fault-tolerant
 placement---``be near magic states if T-heavy'', ``cluster with frequent
 partners'', ``leave room to route''---into an additive scalar field on the
-lattice, then place each qubit at the field's safe maximum.
+lattice, then place each qubit at the field's maximum that respects \emph{safe passage}.
 
 \subsection{Influence Fields}
 \label{sec:fields}
@@ -271,18 +261,19 @@ g(x,y) \;=\; w\,\exp\!\Big(\!-\tfrac{(x-\mu_x)^2}{2\sigma_x^2}
 \label{eq:gauss}
 \end{equation}
 with non-negative weight $w$. A field is either \emph{attractive}, contributing
-$g(x,y)$, or \emph{repulsive} (``inverted''), contributing the valley
+$g(x,y)$, or \emph{repulsive}, contributing the valley
 $\max\!\big(w-g(x,y),\,0\big)$, which is small at the centre and rises to $w$
 far away. The widths are set from a single interpretable parameter, the
 \emph{confidence} $\kappa\in(0,1)$: with $R$ the half-extent of the grid along
 an axis,
 \begin{equation}
-\sigma \;=\; \frac{R}{\sqrt{-2\ln(1-\kappa)}},
+\sigma_{x/y} \;=\; \frac{R_{x/y}}{\sqrt{-2\ln(1-\kappa)}},
 \label{eq:sigma}
 \end{equation}
 so that the field retains a fraction $(1-\kappa)$ of its peak at distance $R$
-from the centre; larger $\kappa$ yields broader, longer-range fields. A
-\texttt{size} multiplier scales the supported footprint independently.
+from the centre; larger $\kappa$ yields broader, longer-range fields. 
+A separate \texttt{size} multiplier bounds the region of the lattice over which
+the field is evaluated, independently of its width $\sigma$.
 
 For the qubit $q$ currently being placed, the total score at a free tile $v$ is
 \begin{equation}
@@ -296,23 +287,22 @@ S(v) \;=\;
 optionally plus a constant border bonus. The four families are:
 
 \paragraph{Magic-state fields}
-one Gaussian per magic tile, whose sign and weight encode $q$'s $T$ demand:
-T-heavy qubits make them attractive (pull toward magic states), T-light qubits
-make them repulsive (push away, freeing magic neighbourhoods for qubits that
-need them), and average qubits zero them out.
+one Gaussian per magic tile, whose sign and weight encode $q$'s $T$ demand.
+% T-heavy qubits make them attractive (pull toward magic states), T-light qubits
+% make them repulsive (push away, freeing magic neighbourhoods for qubits that
+% need them), and average qubits zero them out.
 
 \paragraph{CNOT (partner) fields}
-one attractive Gaussian centred on the already-mapped tile of each frequent
-interaction partner $p\in P(q)$, so that strongly coupled qubits coalesce and
-their future surgeries traverse short corridors.
+attractive Gaussians centred on the already-mapped tiles of frequent
+interaction partners $p\in P(q)$. Strongly coupled qubits are pulled closer 
+so that their future surgeries traverse shorter corridors.
 
 \paragraph{Repulsion (mapped) fields}
 one repulsive Gaussian centred on every already-placed qubit, discouraging
-overcrowding and preserving routing space---the field-based surrogate for
-congestion avoidance.
+overcrowding and preserving routing space.
 
 \paragraph{Baseline field}
-a single attractive Gaussian at the grid centre that keeps the overall layout
+a single attractive Gaussian at the grid centre that keeps the overall mapping
 compact.
 
 Figure~\ref{fig:fields} illustrates the four families and their superposition
@@ -321,29 +311,46 @@ into the score surface $S$.
 % ---- FIGURE: influence-field decomposition (single column) ----
 \begin{figure}[t]
     \centering
-    \figslot{1.5in}
-    \caption{Decomposition of the Gaussian placement score for one qubit:
-    magic-state, CNOT-partner, repulsion, and baseline fields (left) and their
-    superposition $S$ over the lattice (right). The chosen tile is the safe
-    maximum of $S$. \todo{Replace with rendered field maps from
-    \texttt{visualization/gaussian\_frames/}.}}
+    \includegraphics[width=\linewidth]{figures/gaussian_fields.pdf}
+    \caption{Decomposition of the Gaussian placement score for one qubit: the
+    magic-state, CNOT-partner, repulsion, and baseline field families (heatmaps,
+    left) and their superposition $S$ as a surface over the lattice (right).
+    Markers denote the magic tiles ($\star$), the qubit's interaction partners
+    ($\circ$), and already-placed patches ($\square$); the red marker on $S$ is
+    its safe maximum---the tile where the qubit is committed.}
     \label{fig:fields}
 \end{figure}
 
 \subsection{Weight Assignment: Coarse and Fine}
 
 The two variants differ only in how the per-field weights $w$ and the
-attractive/repulsive sign are chosen from circuit statistics.
+attractive/repulsive signs are chosen from circuit statistics.
 
-\emph{Coarse} makes discrete decisions. If a qubit's $T$-count $t(q)$ outweighs
-its largest CNOT count with any single partner, the qubit is treated as
-$T$-bound and its magic fields are made strongly attractive (weight
-\textsc{magic-high}). Otherwise placement is partner-driven: attractive CNOT
-fields (weight \textsc{cnot-high}) are added at its mapped partners, and the
-magic fields are turned attractive only when $t(q)>\bar t+\sigma_t$, repulsive
-when $t(q)<\bar t-\sigma_t$, and left off in between.
+\paragraph{Coarse} makes discrete decisions from a qubit's $T$-count $t(q)$ and
+its largest single-partner CNOT count $c_{\max}(q)=\max_{p}c(q,p)$: the qubit is
+\emph{$T$-bound} when $t(q)>c_{\max}(q)$ and \emph{partner-driven} otherwise. Its
+magic-field weight is
+\begin{equation*}
+w^{\mathrm{mag}} \;=\;
+\begin{cases}
+\textsc{magic-high}, & t(q)>c_{\max}(q)\ \text{ or }\ |t(q)-\bar t|>\sigma_t,\\[2pt]
+0, & \text{otherwise,}
+\end{cases}
+\end{equation*}
+the field being attractive except in the partner-driven, $T$-light case
+($t(q)\le c_{\max}(q)$ and $t(q)<\bar t-\sigma_t$), where it is repulsive. In the
+partner-driven regime, coarse also adds an attractive CNOT field at every mapped
+partner $p$ with above-average interaction ($c(q,p)\ge\lceil\bar c\rceil$), of weight
+\begin{equation*}
+w^{\mathrm{cnot}}_{p} \;=\;
+\begin{cases}
+3\,\textsc{cnot-high}, & p=p^{\star},\\[2pt]
+\textsc{cnot-high}, & \text{otherwise,}
+\end{cases}
+\end{equation*}
+tripling the pull toward the single dominant partner $p^{\star}=\arg\max_{p'}c(q,p')$.
 
-\emph{Fine} replaces the thresholds with linear interpolation. For the magic
+\paragraph{Fine} replaces the thresholds with linear interpolation. For the magic
 fields,
 \begin{equation*}
 w \;=\;
@@ -352,8 +359,7 @@ w \;=\;
 \mathrm{lerp}\big(\textsc{magic-low},\textsc{magic-high},\tfrac{|t(q)-\bar t|}{\sigma_t}\big), & \hspace{-0.2cm} \text{otherwise},
 \end{cases}
 \end{equation*}
-attractive when $t(q)>\bar t$ and repulsive when $t(q)<\bar t$ (zero at the
-mean). The CNOT fields are weighted analogously from the per-pair count
+attractive when $t(q)>\bar t$ and repulsive when $t(q)<\bar t$. The CNOT fields are weighted analogously from the per-pair count
 $c(q,p)$ relative to $\bar c,\sigma_c$. Fine thus reacts smoothly to how far a
 qubit deviates from the circuit's average resource profile.
 
@@ -368,7 +374,7 @@ sorted by descending $S$ (stable, with a deterministic tie-break) and the first
 one passing the safe-passage test of Section~\ref{sec:background} is committed.
 A new repulsion field is then added at the chosen tile. The procedure is
 summarised in Algorithm~\ref{alg:main}; Figure~\ref{fig:frames} shows snapshots
-of a layout forming.
+of a mapping forming.
 
 \begin{algorithm}[t]
 \caption{Gaussian field placement}
@@ -394,16 +400,16 @@ of a layout forming.
 \end{algorithmic}
 \end{algorithm}
 
-% ---- FIGURE: layout-formation frames (full width, top) ----
+% ---- FIGURE: mapping-formation frames (full width, top) ----
 \begin{figure*}[t]
     \centering
-    \figslot[0.95\textwidth]{1.7in}
-    \caption{Formation of a Gaussian-field layout for a representative
-    benchmark (e.g.\ \texttt{qft\_20}). Each frame shows the current score
-    surface $S$ and the committed patches; magic tiles in the centre, repulsion
-    fields visibly spacing qubits apart while T-heavy qubits cluster around the
-    magic cluster. \todo{Replace with stills exported by the
-    \texttt{make-video} target.}}
+    \includegraphics[width=0.95\textwidth]{figures/gaussian_frames.pdf}
+    \caption{Formation of a Gaussian-field mapping for a representative circuit. 
+    Each panel shows the total score surface $S$
+    (per-panel normalised) after the indicated number of qubits has been
+    committed; white squares mark committed patches and red stars the magic
+    tiles. The repulsion fields carve a well at every committed patch, visibly
+    spacing qubits apart as the mapping grows.}
     \label{fig:frames}
 \end{figure*}
 
@@ -442,11 +448,11 @@ against three baselines that share the same architecture generator and router:
 magic-state neighbourhood or beside its heaviest CNOT partner according to
 threshold rules on its $T$- and CNOT-counts; (ii) \emph{random}, a fast
 placement that scatters qubits over a sparse, magic-avoiding sublattice whose
-enforced spacing makes every layout trivially routable; and (iii) the external
+enforced spacing makes every mapping trivially routable; and (iii) the external
 WISQ compiler~\cite{wisq}. The random baseline is the natural speed reference:
 because each restart is cheap---no field evaluation and no per-candidate
 connectivity test---it is run for many randomized repetitions and the
-best-routing layout is kept, whereas the Gaussian and magic-aware placements are
+best-routing mapping is kept, whereas the Gaussian and magic-aware placements are
 deterministic and run once. Random buys this speed with grid area: lacking any
 circuit-structure information, it is allotted a larger, sparser lattice, while
 the Gaussian and magic-aware methods pack onto a roughly one-third smaller grid
@@ -575,7 +581,7 @@ finishes in seconds.}
 \section{Related Work}
 \label{sec:related}
 
-\textbf{NISQ mapping and routing.} Heuristic layout-and-$\SWAP{}$ methods such as
+\textbf{NISQ mapping and routing.} Heuristic mapping-and-$\SWAP{}$ methods such as
 SABRE~\cite{li2019sabre}, the routing passes of
 \mbox{t$|$ket$\rangle$}~\cite{sivarajah2020tket} and Qiskit~\cite{qiskit}, and
 exact/$\NP$-hardness treatments~\cite{siraichi2018qubit} target a fixed coupling
@@ -591,7 +597,7 @@ T-gate placement the central tension our magic-state fields address. WISQ~\cite{
 is a recent end-to-end fault-tolerant compiler that we use as an external
 baseline. Relative to solver- and search-heavy schedulers, our contribution is
 a cheap, interpretable \emph{placement} prior---the superposed Gaussian field---
-that produces routable layouts for a simple downstream router.
+that produces routable mappings for a simple downstream router.
 
 \textbf{Potential-field methods.} Artificial potential fields are classic in
 robot motion planning; we adapt the attractive/repulsive-field idea to discrete
@@ -607,7 +613,7 @@ of fault-tolerant compilation. The method superposes attractive magic-state and
 partner fields with repulsive spread-out fields, then places each qubit at the
 safe maximum of the result. This folds three competing objectives---$T$-gate
 locality, interaction clustering, and corridor preservation---into a single fast
-scoring pass, while the safe-passage filter keeps every layout routable. We
+scoring pass, while the safe-passage filter keeps every mapping routable. We
 implement it in an open-source OpenQASM-to-lattice-surgery compiler and evaluate
 it against a rule-based baseline and the WISQ compiler.
 \todo{State the headline empirical result once tables are filled.}
