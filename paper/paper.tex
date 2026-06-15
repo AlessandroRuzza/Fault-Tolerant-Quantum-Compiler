@@ -248,7 +248,7 @@ area is constrained.
 The core idea is to convert the soft, competing objectives of fault-tolerant
 placement---``be near magic states if T-heavy'', ``cluster with frequent
 partners'', ``leave room to route''---into an additive scalar field on the
-lattice, then place each qubit at the field's maximum that respects \emph{safe passage}.
+lattice, then place each qubit at the field's maximum that respects safe passage.
 
 \subsection{Influence Fields}
 \label{sec:fields}
@@ -333,22 +333,22 @@ magic-field weight is
 \begin{equation*}
 w^{\mathrm{mag}} \;=\;
 \begin{cases}
-\textsc{magic-high}, & t(q)>c_{\max}(q)\ \text{ or }\ |t(q)-\bar t|>\sigma_t,\\[2pt]
+\textsc{magic-high}, & |t(q)-\bar t|>\sigma_t,\\[2pt]
 0, & \text{otherwise,}
 \end{cases}
 \end{equation*}
-the field being attractive except in the partner-driven, $T$-light case
-($t(q)\le c_{\max}(q)$ and $t(q)<\bar t-\sigma_t$), where it is repulsive. In the
-partner-driven regime, coarse also adds an attractive CNOT field at every mapped
-partner $p$ with above-average interaction ($c(q,p)\ge\lceil\bar c\rceil$), of weight
+the field being attractive if $t(q) > c_{\max}(q)$ and repulsive if $t(q)\le c_{\max}(q)$.
+In the partner-driven regime, coarse also adds an attractive CNOT field at every mapped
+partner $p$ with above-average interaction ($c(q,p)\ge \bar c$), tripling the
+pull toward the single dominant partner $p^{\star}$. 
+Its CNOT-field weight is
 \begin{equation*}
 w^{\mathrm{cnot}}_{p} \;=\;
 \begin{cases}
 3\,\textsc{cnot-high}, & p=p^{\star},\\[2pt]
-\textsc{cnot-high}, & \text{otherwise,}
+\textsc{cnot-high}, & \text{otherwise.}
 \end{cases}
 \end{equation*}
-tripling the pull toward the single dominant partner $p^{\star}=\arg\max_{p'}c(q,p')$.
 
 \paragraph{Fine} replaces the thresholds with linear interpolation. For the magic
 fields,
@@ -365,16 +365,29 @@ qubit deviates from the circuit's average resource profile.
 
 \subsection{Placement Loop}
 
-Logical qubits are placed greedily in priority order: a max-heap ranks qubits by
-their interaction importance---the sum of a qubit's $T$-count and its largest
-single-partner CNOT count---so that the most resource-hungry qubits are committed
-first, while their relations are still free to shape. For each popped qubit, the
-score field $S$ of \eqref{eq:score} is evaluated over all free tiles; tiles are
-sorted by descending $S$ (stable, with a deterministic tie-break) and the first
-one passing the safe-passage test of Section~\ref{sec:background} is committed.
-A new repulsion field is then added at the chosen tile. The procedure is
-summarised in Algorithm~\ref{alg:main}; Figure~\ref{fig:frames} shows snapshots
-of a mapping forming.
+\vspace{4pt}
+\paragraph{Importance} we rank the qubits by \emph{interaction importance}---a qubit's
+$T$-count plus its largest CNOT count with any single partner---and place the
+most important first. Committing these qubits while the lattice is still mostly
+empty lets the mapping form around the qubits that constrain it most.
+
+\vspace{4pt}
+\paragraph{Visiting order} we follow the density of the CNOT interaction graph
+(qubit pairs that share a gate), because a qubit's CNOT fields pull it only toward 
+partners that are \emph{already} placed. Below a tunable density threshold $\tau$ 
+($0.7$ by default), we consider a circuit sparse.
+On sparse circuits we expand the placement in \emph{CNOT-BFS} order: starting from the
+highest-importance qubits, each qubit's interaction neighbourhood is visited
+breadth-first, heaviest partner first, so every qubit finds its strongest partner
+already in place and its CNOT fields take effect. On dense circuits we keep the
+plain importance order, as a dense interaction graph offers no locality to exploit.
+
+\vspace{4pt}
+\paragraph{Tile selection} we evaluate the score field $S$ of \eqref{eq:score} on
+every free tile, sort the tiles by decreasing $S$, and commit the first that
+passes safe-passage of Section~\ref{sec:background}; a repulsion field is
+then added at that tile. Algorithm~\ref{alg:main} summarises the procedure, and
+Figure~\ref{fig:frames} shows a layout forming.
 
 \begin{algorithm}[t]
 \caption{Gaussian field placement}
@@ -382,20 +395,22 @@ of a mapping forming.
 \begin{algorithmic}[1]
     \Require Circuit $\C$, architecture $\A$ with magic tiles $V_{\mathrm m}$
     \Ensure Safe-passage mapping $\M$
-    \State build priority heap of $\Q_L$ by interaction importance
+    \If{CNOT-graph density $<\tau$}
+        \State order $\Q_L$ by CNOT-BFS 
+    \Else
+        \State order $\Q_L$ by interaction importance
+    \EndIf
     \State $\M \gets \emptyset$;\; add baseline field; add magic fields
-    \While{heap not empty}
-        \State $q \gets$ pop highest-priority unmapped qubit
-        \State set magic/CNOT field weights from $q$'s $T$- and CNOT-statistics
-                \Comment{coarse or fine}
-        \State $S(v)\gets$ superpose fields over each free tile $v$ \Comment{Eq.~\eqref{eq:score}}
+    \For{$q$ in order}
+        \State build magic/CNOT field weights
+        \State $S(v)\gets$ superpose fields over each free tile $v$
         \For{$v$ in tiles sorted by $S(v)$ descending}
             \If{\Call{SafePassage}{$v,q,\M$}}
                 \State $\M(q)\gets v$;\; add repulsion field at $v$;\; \textbf{break}
             \EndIf
         \EndFor
         \If{no tile committed} \State \textbf{fail} (no routable placement) \EndIf
-    \EndWhile
+    \EndFor
     \State \Return $\M$
 \end{algorithmic}
 \end{algorithm}
@@ -416,9 +431,9 @@ of a mapping forming.
 \begin{remark}
 Field evaluation is $O(|V|\cdot(|V_{\mathrm m}|+|P(q)|+|\M|))$ per qubit; with
 the lattice sized as $\Theta(|\Q_L|+|V_{\mathrm m}|)$ tiles, placement is
-low-order polynomial. In practice the per-candidate safe-passage connectivity
-checks dominate placement time. \todo{Insert measured placement/compile times
-from the benchmark CSVs.}
+low-order polynomial. 
+%In practice the per-candidate safe-passage connectivity checks dominate placement time. 
+% \todo{Insert measured placement/compile times from the benchmark CSVs.}
 \end{remark} 
 
 % ============================================================
@@ -427,7 +442,7 @@ from the benchmark CSVs.}
 
 \subsection{Experimental Setup}
 
-\textbf{Implementation.} The method is implemented in an open-source C++20
+\subsubsection{Implementation} The method is implemented in an open-source C++20
 compiler~\cite{ftqc} that parses OpenQASM, generates the rectangular architecture and
 magic-state placement, runs the mapping of Section~\ref{sec:approach}, and
 routes the result with a lattice-surgery router (naive or congestion-aware
@@ -435,14 +450,14 @@ shortest-path corridors, with a dedicated $T$-gate-to-magic routing strategy).
 The lattice dimensions are sized automatically from the qubit count, the
 interaction degree, and the magic-state budget.
 
-\textbf{Benchmarks.} We use \todo{$N$} circuits spanning arithmetic
+\subsubsection{Benchmarks} We use \todo{$N$} circuits spanning arithmetic
 (\texttt{adder}, \texttt{multiplier}, \texttt{square\_root}), algorithmic
 (\texttt{qft}, \texttt{qpe}, \texttt{bwt}, \texttt{hhl}, \texttt{factor247}),
 and structured/state-prep (\texttt{ghz}, \texttt{wstate}, \texttt{ising},
 \texttt{qaoa}) families, with logical qubit counts from \todo{min} to
 \todo{max}.
 
-\textbf{Baselines and metrics.} We compare the coarse and fine Gaussian variants
+\subsubsection{Baselines and metrics} We compare the coarse and fine Gaussian variants
 against three baselines that share the same architecture generator and router:
 (i) \emph{magic-aware}, a rule-based greedy placement that sends each qubit to a
 magic-state neighbourhood or beside its heaviest CNOT partner according to
@@ -599,10 +614,10 @@ baseline. Relative to solver- and search-heavy schedulers, our contribution is
 a cheap, interpretable \emph{placement} prior---the superposed Gaussian field---
 that produces routable mappings for a simple downstream router.
 
-\textbf{Potential-field methods.} Artificial potential fields are classic in
-robot motion planning; we adapt the attractive/repulsive-field idea to discrete
-lattice placement, where magic states and partners act as attractors and placed
-patches as repellers, under a hard connectivity (safe-passage) constraint.
+% \textbf{Potential-field methods.} Artificial potential fields are classic in
+% robot motion planning; we adapt the attractive/repulsive-field idea to discrete
+% lattice placement, where magic states and partners act as attractors and placed
+% patches as repellers, under a hard connectivity (safe-passage) constraint.
 
 % ============================================================
 \section{Conclusion}
