@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -13,6 +14,73 @@
 #include <unistd.h>
 
 #include <nlohmann/json.hpp>
+
+// Per-case execution state recovered from sidecar files.
+struct SidecarStatus {
+    bool executed = false;
+    bool timeout_reached = false;
+};
+
+// Merge every sidecar status file for a given expanded stem into one map keyed
+// by case index. Reads the legacy single file "<stem>.status.jsonl" plus all
+// per-processor files "<stem>.p<N>.status.jsonl".
+//
+// Each benchmark process writes only its OWN per-processor file, so concurrent
+// jobs never share a writer. That avoids the interleaved/corrupted lines a
+// shared append produces on networked filesystems (NFS/Lustre), where O_APPEND
+// is not atomic across nodes — corrupted lines are silently skipped on read and
+// would otherwise drop "executed" marks, forcing finished cases to re-run.
+//
+// Corrupt/partial lines are skipped; executed/timeout are OR-ed across files so
+// a "done" mark from any source is never lost.
+inline std::unordered_map<std::size_t, SidecarStatus> read_sidecar_status(
+    const std::filesystem::path &executed_dir, const std::string &expanded_stem) {
+    std::unordered_map<std::size_t, SidecarStatus> status;
+    const std::string legacy = expanded_stem + ".status.jsonl";
+    const std::string per_proc_prefix = expanded_stem + ".p";
+    const std::string suffix = ".status.jsonl";
+
+    std::error_code ec;
+    if (!std::filesystem::exists(executed_dir, ec)) {
+        return status;
+    }
+    for (std::filesystem::directory_iterator it(executed_dir, ec), end;
+         !ec && it != end; it.increment(ec)) {
+        const std::string fname = it->path().filename().string();
+        const bool is_legacy = (fname == legacy);
+        const bool is_per_proc =
+            fname.size() > per_proc_prefix.size() + suffix.size() &&
+            fname.compare(0, per_proc_prefix.size(), per_proc_prefix) == 0 &&
+            fname.compare(fname.size() - suffix.size(), suffix.size(), suffix) == 0;
+        if (!is_legacy && !is_per_proc) {
+            continue;
+        }
+
+        std::ifstream in(it->path());
+        if (!in.is_open()) {
+            continue;
+        }
+        std::string line;
+        while (std::getline(in, line)) {
+            if (line.empty()) {
+                continue;
+            }
+            try {
+                const nlohmann::json sc = nlohmann::json::parse(line);
+                const std::size_t idx =
+                    sc.value("i", std::numeric_limits<std::size_t>::max());
+                if (idx != std::numeric_limits<std::size_t>::max()) {
+                    SidecarStatus &s = status[idx];
+                    // OR so a later line/file can never clear a "done" mark.
+                    s.executed = s.executed || sc.value("e", false);
+                    s.timeout_reached = s.timeout_reached || sc.value("t", false);
+                }
+            } catch (...) {
+            }
+        }
+    }
+    return status;
+}
 
 inline std::string expand_config_variants(const std::string &json_name, int process_count = 1) {
     using json = nlohmann::json;
@@ -192,6 +260,11 @@ inline std::string expand_config_variants(const std::string &json_name, int proc
     std::unordered_map<std::string, ExistingState> existing_by_signature;
     std::size_t next_id = 1;
 
+    // Note: the authoritative resume state is the per-processor sidecar, read at
+    // run time by run_bench_mode (read_sidecar_status). Here we only carry the
+    // expanded's own "executed"/"id" forward so regenerating it (e.g. with a
+    // different process count) keeps stable ids; stale flags are harmless because
+    // the sidecar wins at run time.
     if (std::filesystem::exists(output_path)) {
         std::ifstream existing_stream(output_path);
         if (existing_stream.is_open()) {

@@ -628,8 +628,13 @@ int run_bench_mode(
         throw std::runtime_error("Expanded bench file must contain a JSON array: " + expanded_path.string());
     }
 
-    const std::filesystem::path sidecar_path =
-        expanded_path.parent_path() / (expanded_path.stem().string() + ".status.jsonl");
+    // Each processor writes its OWN sidecar file (never a shared append) so
+    // concurrent jobs on a networked filesystem can't corrupt each other's
+    // lines; resume merges every per-processor file plus the legacy single file.
+    const std::filesystem::path sidecar_dir = expanded_path.parent_path();
+    const std::string sidecar_stem = expanded_path.stem().string();
+    const std::filesystem::path sidecar_write_path =
+        sidecar_dir / (sidecar_stem + ".p" + std::to_string(processor) + ".status.jsonl");
 
     const std::filesystem::path project_root(PROJECT_ROOT);
     const std::filesystem::path results_dir = project_root / "benchmarks" / "results";
@@ -707,27 +712,12 @@ int run_bench_mode(
 
     // Sidecar: per-case execution state written as one JSONL line per case.
     // Replaces per-case persist_expanded() (was O(n) per case → O(n²) total).
-    struct SidecarEntry { bool executed = false; bool timeout_reached = false; };
-    std::unordered_map<std::size_t, SidecarEntry> sidecar;
-    {
-        std::ifstream sidecar_in(sidecar_path);
-        if (sidecar_in.is_open()) {
-            std::string sidecar_line;
-            while (std::getline(sidecar_in, sidecar_line)) {
-                if (sidecar_line.empty()) continue;
-                try {
-                    const json sc = json::parse(sidecar_line);
-                    const std::size_t idx = sc.value("i", std::numeric_limits<std::size_t>::max());
-                    if (idx < total_cases) {
-                        sidecar[idx] = {sc.value("e", false), sc.value("t", false)};
-                    }
-                } catch (...) {}
-            }
-        }
-    }
-    std::ofstream sidecar_out(sidecar_path, std::ios::app);
+    // Resume reads every per-processor sidecar plus the legacy single file.
+    const std::unordered_map<std::size_t, SidecarStatus> sidecar =
+        read_sidecar_status(sidecar_dir, sidecar_stem);
+    std::ofstream sidecar_out(sidecar_write_path, std::ios::app);
     if (!sidecar_out.is_open()) {
-        throw std::runtime_error("Cannot open sidecar status file: " + sidecar_path.string());
+        throw std::runtime_error("Cannot open sidecar status file: " + sidecar_write_path.string());
     }
 
     const auto parse_timeout_seconds = [](const json &entry) -> double {
@@ -1540,13 +1530,13 @@ int run_bench_mode(
 
         const long long runnable_count = static_cast<long long>(runnable_indices.size());
 
-        // The sidecar is only a resume log: flushing it on every case forces an
-        // fsync inside the serial critical section, which throttles scaling.
-        // Flush in batches instead; a hard kill loses at most one batch, which
-        // just re-runs those cases next time. A final flush after the loop makes
-        // graceful stops (SIGTERM) fully durable.
-        long long commits_since_flush = 0;
-        constexpr long long kSidecarFlushInterval = 64;
+        // Flush the sidecar after every case so a hard kill (e.g. qdel sending
+        // SIGKILL past its grace window) loses at most the single in-flight case,
+        // which just re-runs on resume. flush() is a write() to the OS, not an
+        // fsync, so it survives process death without touching the disk — cheap,
+        // and dwarfed by the per-case write_csv::append_row() already done here.
+        // Each processor owns its sidecar file, so this never contends across
+        // jobs. (A final flush after the loop also covers the graceful path.)
 
         // Per-configuration timing summary (printed once at the end).
         const auto bench_loop_start = std::chrono::steady_clock::now();
@@ -1581,10 +1571,7 @@ int run_bench_mode(
                                      {"e", result.mark_entry_as_executed},
                                      {"t", result.timeout_reached}}).dump()
                             << '\n';
-                        if (++commits_since_flush >= kSidecarFlushInterval) {
-                            sidecar_out.flush();
-                            commits_since_flush = 0;
-                        }
+                        sidecar_out.flush();
                         write_csv::append_row(csv_path, result.csv_row);
                     } catch (const std::exception &e) {
                         fatal_error = true;
