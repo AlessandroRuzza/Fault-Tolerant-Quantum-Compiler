@@ -331,9 +331,9 @@ def main():
 
     # formation strip
     ap.add_argument("--strip-frames", type=lambda s: [int(x) for x in s.split(",")],
-                    default=[2, 6, 10, 14])
+                    default=[2, 10])
     ap.add_argument("--upsample", type=int, default=10)
-    ap.add_argument("--strip-w", type=float, default=13.0)
+    ap.add_argument("--strip-w", type=float, default=6.5)
     ap.add_argument("--strip-h", type=float, default=3.3)
 
     ap.add_argument("--only", choices=["fields", "frames"], default=None)

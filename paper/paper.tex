@@ -424,18 +424,16 @@ Figure~\ref{fig:frames} shows a mapping forming.
 \end{algorithmic}
 \end{algorithm}
 
-% ---- FIGURE: mapping-formation frames (full width, top) ----
-\begin{figure*}[t]
+% ---- FIGURE: mapping-formation frames (single column) ----
+\begin{figure}[t]
     \centering
-    \includegraphics[width=0.95\textwidth]{figures/gaussian_frames.pdf}
-    \caption{Formation of a Gaussian-field mapping for a representative circuit. 
-    Each panel shows the total score surface $S$
-    (per-panel normalised) after the indicated number of qubits has been
-    committed; white squares mark committed patches and red stars the magic
-    tiles. The repulsion fields carve a well at every committed patch, visibly
-    spacing qubits apart as the mapping grows.}
+    \includegraphics[width=\linewidth]{figures/gaussian_frames.pdf}
+    \caption{Formation of a Gaussian-field mapping: the (per-panel normalised)
+    score surface $S$ after the indicated number of qubits are committed. White
+    squares are committed patches, red stars magic tiles; repulsion carves a well
+    at each patch, spacing qubits apart.}
     \label{fig:frames}
-\end{figure*}
+\end{figure}
 
 \begin{remark}
 Field evaluation is $O(|V|\cdot(|V_{\mathrm m}|+|P(q)|+|\M|))$ per qubit; with
@@ -538,22 +536,17 @@ while the Gaussian method completes.
 \begin{figure}[t]
     \centering
     \figslot{1.6in}
-    \caption{Per-circuit routing steps: Gaussian field placement vs.\
-    WISQ~\cite{wisq}. Points below the diagonal indicate fewer routing steps for
-    our method. \todo{Generate from merged benchmark CSVs.}}
+    \caption{Per-circuit routing step ratios: Gaussian field placement / WISQ~\cite{wisq}. 
+    Points below the diagonal indicate fewer routing steps for our method. 
+    \todo{Generate from merged benchmark CSVs.}}
     \label{fig:scatter}
 \end{figure}
 
 \paragraph{Tuned parameters}
-The fields are governed by a small set of weights: the confidence $\kappa$ of
-\eqref{eq:sigma} (field width), the \textsc{cnot-high} (attractive) weight, the
-\textsc{magic-high} and \textsc{magic-low} weights, and the mapped
-(repulsive) weight. The full tuned values for each regime---the four combinations
-of weighting variant (coarse or fine) and safe-passage strategy (cube or
-connectivity)---are provided in the project repository~\cite{ftqc}. All weights
-are border-independent except \textsc{magic-high}, which varies with the
-placement border margin.
-\todo{Confirm best-found settings once the tuning CSVs are final.}
+The field weights of Section~\ref{sec:fields} were tuned per regime---the four
+combinations of weighting variant (coarse or fine) and safe-passage strategy
+(cube or connectivity)---by benchmark sweeps; the full values are provided in the
+project repository~\cite{ftqc}.
 
 % ---- TABLE: tuned Gaussian parameters per regime (full width) ----
 % Moved to the project README (section "Tuned Gaussian mapping parameters").
