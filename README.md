@@ -173,18 +173,47 @@ Border-independent weights:
 † `MAGIC_LOW` = 1 for `border_distance_percentage` ≤ 10, else 0 (fine / cube only).
 ‡ Robust argmin is 20, but the curve is flat above ~1.6.
 
+### Example: `cube` vs `connectivity` on `ising_n420`
+
+The "`cube` routes better, `connectivity` packs smaller" rule above is a
+tendency, not a law. `ising_n420` is a counterexample where `connectivity` wins
+on *both* axes — it routes optimally on a much smaller lattice (gaussian mapping,
+`naive_critical` routing):
+
+| Config | Grid | Routing steps | Avg parallelism | Non-routed | Exec. time |
+|---			 |---	 |---	 |---				 |---	  |---	   |
+| `cube`         | 42×42 | 5     | 167.6 / 209.5     | 2.51%  | 0.21 s |
+| `connectivity` | 24×24 | **4** | **209.5 / 209.5** | **0%** | 0.28 s |
+| WISQ           | 45x45 | 43    | —                 | —      | 93 s   |
+
+`connectivity` reaches full parallelism (209.5 / 209.5) with zero non-routed
+layers in 4 steps on a 24×24 grid, while `cube` needs 42×42 yet takes 5 steps and
+leaves 2.5% of gates in layers unrouted. This is **circuit-specific**: for most circuits
+`cube` still gives the shorter routes — `ising_n420` is an exception, not the rule.
+
+Both configs also dwarf the external WISQ compiler on this circuit: ~4–5 routing
+steps in ~0.2–0.3 s versus WISQ's **43 steps in 93 s** (≈10× fewer steps, ≈300×
+faster).
+
 ## Routing strategies
 
 Pick the corridor router with `--routing-strategy <name>` (aliases also accepted:
 `--routing`, `--routing-method`) or the `routing_strategy` config field. The
-default is `congestion`.
+default is `naive_critical` (simple, fast, and competitive across circuit classes).
+
+**No router is universally best.** The strongest strategy is circuit-specific:
+`packing` usually opens the most parallel corridors on *contended* circuits, but
+on structured/regular circuits a simpler ordering can win — on `qft_n200`,
+`naive_critical` beats `packing` by ~12% fewer steps while routing ~10× faster
+(see the example below). Benchmark a couple of strategies per circuit class
+rather than assuming one wins everywhere.
 
 | Strategy (aliases) | What it does |
 |---|---|
-| `congestion` (`congestion_aware`) | Shortest-path corridors with a congestion penalty (scale `0.35`, static global) that steers paths away from already-busy nodes. Gates routed one-by-one, shortest operand-distance first. **Default.** |
+| `congestion` (`congestion_aware`) | Shortest-path corridors with a congestion penalty (scale `0.35`, static global) that steers paths away from already-busy nodes. Gates routed one-by-one, shortest operand-distance first. |
 | `naive` | Plain shortest-path corridors, no congestion penalty. Gates routed one-by-one, shortest operand-distance first. |
-| `naive_critical` (`critical`, `naivecritical`) | Same shortest-path routing as `naive`, but orders each layer's gates by **criticality** (dependency-chain tail length) first, operand distance second, so gates on the critical path claim corridors first. |
-| `packing` (`pack`, `disjoint`, `disjoint_paths`) | Maximises the set of **vertex-disjoint** corridors opened per layer instead of routing greedily one-by-one. Per layer: (1) generate up to `k` candidate paths per gate (penalised re-search for 2-qubit gates, nearest free magic states for T gates); (2) greedily select a conflict-free subset, prioritising **downstream criticality** (how many of the next `L` layers touch the gate's qubits), ties broken by shorter path; (3) a fill pass routes any still-unrouted gate on a fresh disjoint path, so each step is always maximal. Routes more gates per step → fewer routing steps. |
+| `naive_critical` (`critical`, `naivecritical`) | Same shortest-path routing as `naive`, but orders each layer's gates by **criticality** (dependency-chain tail length) first, operand distance second, so gates on the critical path claim corridors first. **Default.** |
+| `packing` (`pack`, `disjoint`, `disjoint_paths`) | Maximises the set of **vertex-disjoint** corridors opened per layer instead of routing greedily one-by-one. Per layer: (1) generate up to `k` candidate paths per gate (penalised re-search for 2-qubit gates, nearest free magic states for T gates); (2) greedily select a conflict-free subset, prioritising **downstream criticality** (how many of the next `L` layers touch the gate's qubits), ties broken by shorter path; (3) a fill pass routes any still-unrouted gate on a fresh disjoint path, so each step is always maximal. Routes more gates per step → usually fewer routing steps on contended circuits (not universal; see below). |
 | `boost` | Boost Graph Library-based router. Only available when the binary is built with Boost support; otherwise it errors out. |
 
 > **Operand distance** is the length of a *trial* shortest path between a gate's two
@@ -211,6 +240,30 @@ of two modes via `--t-routing-mode` (or the `t_routing_mode` config field):
   retries it in a later step, up to `--patience-threshold <n>` (integer `≥ 0`)
   deferrals before giving up.
 - `normal_t_routing` — routes to the nearest free magic state immediately, no deferral.
+
+### Example: when packing loses (`qft_n200`)
+
+`packing` usually opens more disjoint corridors per step on contended circuits,
+so it is the strongest choice there — but it is not universally best. On
+`qft_n200` (gaussian mapping, `cube`, same 31×31 grid for both), the simpler
+`naive_critical` routes better on *every* axis:
+
+| Router (cube) | Routing steps | Avg parallelism | Non-routed | Routing time |
+|---|---|---|---|---|
+| `naive_critical` | **1192** | **6.36 / 9.55** | **22.3%** | **0.16 s** |
+| `packing`        | 1360     | 5.57 / 9.55     | 23.9%      | 1.62 s     |
+
+`naive_critical` (and plain `naive`, which behaves similarly here) gets ~12% fewer
+steps, higher parallelism, and fewer non-routed layers — while routing ~10×
+faster, since packing's per-gate candidate search and criticality selection are
+pure overhead when they don't improve the packing. **Rule of thumb:** packing for
+contended circuits, but benchmark `naive_critical` on regular/structured ones like
+QFT.
+
+Note the safe-passage interaction too: under `connectivity` (26×26) both routers
+collapse on `qft_n200` — `packing` balloons to 4769 steps with 64.6% non-routed
+layers. So QFT strongly prefers `cube`, the exact opposite of `ising_n420` above.
+Both safe-passage **and** router choice are circuit-specific.
 
 ## Run benchmarks through JSON in config/
 

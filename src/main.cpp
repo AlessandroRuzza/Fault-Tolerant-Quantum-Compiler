@@ -405,7 +405,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     int x = 10;
     int y = 11;
     int dimension_offset = 0;  // signed delta on auto-computed grid (x<0 mode)
-    std::string routing_strategy = "congestion";
+    std::string routing_strategy = "naive_critical";
     std::string t_routing_mode = "normal_t_routing";
     int patience_threshold = 3;
     bool use_layer_cache = true;
@@ -1416,7 +1416,7 @@ int run_bench_mode(
                 {"routing_strategy", "routing-strategy", "routing_method", "routing-method", "routing"}
             );
             if (routing_strategy_csv.empty()) {
-                routing_strategy_csv = "congestion";
+                routing_strategy_csv = "naive_critical";
             }
             std::string t_routing_mode_csv = get_json_field(
                 entry,
