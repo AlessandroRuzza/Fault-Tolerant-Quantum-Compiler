@@ -293,25 +293,27 @@ S(v) \;=\;
 \end{equation}
 optionally plus a constant border bonus. The four families are:
 
-\paragraph{Magic-state fields}
+\vspace{2pt}
+\subsubsection{Magic-state fields}
 one Gaussian per magic tile, whose sign and weight encode $q$'s $T$ demand.
 % T-heavy qubits make them attractive (pull toward magic states), T-light qubits
 % make them repulsive (push away, freeing magic neighbourhoods for qubits that
 % need them), and average qubits zero them out.
 
-\paragraph{CNOT (partner) fields}
-attractive Gaussians centred on the already-mapped tiles of frequent
+\subsubsection{CNOT (partner) fields}
+attractive Gaussians centred on the already-mapped tiles of
 interaction partners $p\in P(q)$. Strongly coupled qubits are pulled closer 
 so that their future surgeries traverse shorter corridors.
 
-\paragraph{Repulsion (mapped) fields}
+\subsubsection{Repulsion (mapped) fields}
 one repulsive Gaussian centred on every already-placed qubit, discouraging
 overcrowding and preserving routing space.
 
-\paragraph{Baseline field}
+\subsubsection{Baseline field}
 a single attractive Gaussian at the grid centre that keeps the overall mapping
 compact.
 
+\vspace{2pt}
 Figure~\ref{fig:fields} illustrates the four families and their superposition
 into the score surface $S$.
 
@@ -602,25 +604,23 @@ baseline needs to match field placement, if ever, and at what grid-area cost;
 finishes in seconds.}
 
 % ============================================================
-\section{Related Work}
-\label{sec:related}
+% \section{Related Work}
+% \label{sec:related}
 
-\textbf{NISQ mapping and routing.} Heuristic mapping-and-$\SWAP{}$ methods such as
-SABRE~\cite{li2019sabre} and Qiskit~\cite{qiskit}, and
-exact/$\NP$-hardness treatments~\cite{siraichi2018qubit} target a fixed coupling
-graph and minimise $\SWAP{}$ count or depth. Our cost model has no $\SWAP{}$s and a
-per-step reconfigurable topology, so these objectives do not transfer directly,
-though the greedy, lookahead-driven spirit does.
+% \textbf{NISQ mapping and routing.} Heuristic mapping-and-$\SWAP{}$ methods such as
+% SABRE~\cite{li2019sabre} and Qiskit~\cite{qiskit}, and
+% exact/$\NP$-hardness treatments~\cite{siraichi2018qubit} target a fixed coupling
+% graph and minimise $\SWAP{}$ count or depth. Our cost model has no $\SWAP{}$s and a
+% per-step reconfigurable topology, so these objectives do not transfer directly,
+% though the greedy, lookahead-driven spirit does.
 
-\textbf{Fault-tolerant compilation.} Lattice surgery~\cite{horsman2012lattice}
-and its surface-code resource analyses~\cite{litinski2019game,
-beverland2022surface} establish the routing primitives and cost units we
-optimise; magic-state distillation and consumption~\cite{bravyi2005magic} make
-T-gate placement the central tension our magic-state fields address. WISQ~\cite{wisq}
-is a recent end-to-end fault-tolerant compiler that we use as an external
-baseline. Relative to solver- and search-heavy schedulers, our contribution is
-a cheap, interpretable \emph{placement} prior---the superposed Gaussian field---
-that produces routable mappings for a simple downstream router.
+% \textbf{Fault-tolerant compilation.} Lattice surgery~\cite{horsman2012lattice}
+% and its surface-code resource analyses~\cite{litinski2019game,
+% beverland2022surface} establish the routing primitives and cost metrics we optimise. 
+% WISQ~\cite{wisq} is a recent end-to-end fault-tolerant compiler that we use as an external
+% baseline. Relative to solver- and search-heavy schedulers, our contribution is
+% a cheap, interpretable \emph{placement} heuristic that produces routable mappings 
+% for a simple downstream router.
 
 % \textbf{Potential-field methods.} The idea of attractive and repulsive
 % potential fields comes from robot motion planning, where a robot is pulled
@@ -634,11 +634,11 @@ that produces routable mappings for a simple downstream router.
 
 We presented a Gaussian potential-field heuristic for the placement sub-problem
 of fault-tolerant compilation. The method superposes attractive magic-state and
-partner fields with repulsive spread-out fields, then places each qubit at the
-safe maximum of the result. This folds three competing objectives---$T$-gate
-locality, interaction clustering, and corridor preservation---into a single fast
-scoring pass, while the safe-passage filter keeps every mapping routable. We
-implement it in an open-source OpenQASM-to-lattice-surgery compiler and evaluate
+partner fields with repulsive fields, then places each qubit at the
+safe maximum of the result. This folds $T$-gate
+locality, interaction clustering, and corridor preservation into a single fast
+scoring pass, while safe-passage keeps every mapping routable. We
+implement this heuristic in an open-source OpenQASM-to-lattice-surgery compiler and evaluate
 it against a rule-based baseline and the WISQ compiler.
 \todo{State the headline empirical result once tables are filled.}
 Limitations include the greedy, single-pass nature of placement and reliance on
