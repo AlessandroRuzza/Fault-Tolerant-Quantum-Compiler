@@ -1,6 +1,6 @@
 # Fault-Tolerant-Quantum-Compiler
 
-Fault-Tolerant-Quantum-Compiler is a C++20 project that parses OpenQASM circuits, maps them onto a target architecture with configurable strategies, and performs routing (congestion-aware or naive).
+Fault-Tolerant-Quantum-Compiler is a C++20 project that parses OpenQASM circuits, maps them onto a target architecture with configurable strategies, and performs routing with several selectable strategies (congestion-aware, naive, naive-critical, packing, and an optional Boost-based router).
 
 The repository also includes:
 - Benchmark execution from JSON configs.
@@ -172,6 +172,45 @@ Border-independent weights:
 
 † `MAGIC_LOW` = 1 for `border_distance_percentage` ≤ 10, else 0 (fine / cube only).
 ‡ Robust argmin is 20, but the curve is flat above ~1.6.
+
+## Routing strategies
+
+Pick the corridor router with `--routing-strategy <name>` (aliases also accepted:
+`--routing`, `--routing-method`) or the `routing_strategy` config field. The
+default is `congestion`.
+
+| Strategy (aliases) | What it does |
+|---|---|
+| `congestion` (`congestion_aware`) | Shortest-path corridors with a congestion penalty (scale `0.35`, static global) that steers paths away from already-busy nodes. Gates routed one-by-one, shortest operand-distance first. **Default.** |
+| `naive` | Plain shortest-path corridors, no congestion penalty. Gates routed one-by-one, shortest operand-distance first. |
+| `naive_critical` (`critical`, `naivecritical`) | Same shortest-path routing as `naive`, but orders each layer's gates by **criticality** (dependency-chain tail length) first, operand distance second, so gates on the critical path claim corridors first. |
+| `packing` (`pack`, `disjoint`, `disjoint_paths`) | Maximises the set of **vertex-disjoint** corridors opened per layer instead of routing greedily one-by-one. Per layer: (1) generate up to `k` candidate paths per gate (penalised re-search for 2-qubit gates, nearest free magic states for T gates); (2) greedily select a conflict-free subset, prioritising **downstream criticality** (how many of the next `L` layers touch the gate's qubits), ties broken by shorter path; (3) a fill pass routes any still-unrouted gate on a fresh disjoint path, so each step is always maximal. Routes more gates per step → fewer routing steps. |
+| `boost` | Boost Graph Library-based router. Only available when the binary is built with Boost support; otherwise it errors out. |
+
+> **Operand distance** is the length of a *trial* shortest path between a gate's two
+> operand tiles on the free lattice, computed before the layer's corridors are committed.
+> A compile-time flag (`ORDER_GATES_BY_MANHATTAN`, off by default) swaps it for plain
+> Manhattan distance between the two tiles.
+
+### Packing tunables
+
+Defaults are the tuned values (`k=2`, `L=4`, tuned on a `qft`/`qaoa`/`randomcircuit`
+n50–n100 sweep); override via environment only when re-deriving them in a sweep:
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `FTQC_PACKING_CANDIDATES` | `2` | `k`: candidate paths generated per gate |
+| `FTQC_PACKING_LOOKAHEAD` | `4` | `L`: layers of downstream lookahead for the criticality weight |
+
+### T-gate routing
+
+Independently of the corridor strategy, magic-state delivery for T gates uses one
+of two modes via `--t-routing-mode` (or the `t_routing_mode` config field):
+
+- `smart_t_routing` — when no magic state is reachable, defers the T gate and
+  retries it in a later step, up to `--patience-threshold <n>` (integer `≥ 0`)
+  deferrals before giving up.
+- `normal_t_routing` — routes to the nearest free magic state immediately, no deferral.
 
 ## Run benchmarks through JSON in config/
 

@@ -454,8 +454,8 @@ compiler~\cite{ftqc} that parses OpenQASM, generates the rectangular architectur
 magic-state placement, runs the mapping of Section~\ref{sec:approach}, and
 routes the result with a lattice-surgery router. The default \emph{packing}
 router maximises the vertex-disjoint corridors opened per step, prioritising
-downstream-critical gates; a \emph{naive} shortest-path variant is
-also provided. $T$ gates use a dedicated magic-state routing strategy.
+downstream-critical gates (full algorithm in the artifact~\cite{ftqc}); a
+\emph{naive} shortest-path variant is also provided. $T$ gates use a dedicated magic-state routing strategy.
 The lattice dimensions are sized automatically from the qubit count, the
 interaction degree, and the magic-state budget.
 
