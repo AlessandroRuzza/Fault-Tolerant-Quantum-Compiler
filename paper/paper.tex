@@ -67,12 +67,13 @@
 
 % ── Metadata ─────────────────────────────────────────────────
 \title{%
-    Qubit Mapping and Routing for Fault-Tolerant Compilation:\\
-    \large A Gaussian Potential-Field Placement Heuristic%
+    Qubit Mapping for Fault-Tolerant Compilation\\[2pt]
+    \huge A Gaussian Potential-Field Placement Heuristic%
+    \vspace{-7pt}
 }
 
 \author{%
-    \IEEEauthorblockN{%
+    \IEEEauthorblockN{
         Alessandro Ruzza\IEEEauthorrefmark{1},
         Federico Quartieri\IEEEauthorrefmark{1},
         Daniele Salvi\IEEEauthorrefmark{1}
@@ -328,6 +329,7 @@ into the score surface $S$.
     ($\circ$), and already-placed patches ($\square$); the red marker on $S$ is
     its safe maximum.}
     \label{fig:fields}
+    \vspace{-0.5cm}
 \end{figure}
 
 \subsection{Weight Assignment: Coarse and Fine}
@@ -433,6 +435,7 @@ Figure~\ref{fig:frames} shows a mapping forming.
     squares are committed patches, red stars magic tiles; repulsion carves a well
     at each patch, spacing qubits apart.}
     \label{fig:frames}
+    \vspace{-0.5cm}
 \end{figure}
 
 \begin{remark}
@@ -488,49 +491,48 @@ the non-routed-layer percentage.
 
 \paragraph{Routing quality}
 Table~\ref{tab:results} reports routing steps and compile time across the
-benchmark suite for both Gaussian variants and the three baselines.
+benchmark suite for the Gaussian method and the randomized-restart and WISQ
+baselines.
 Figure~\ref{fig:scatter} plots per-circuit routing steps of the Gaussian method
 against WISQ; points below the diagonal favour our method, and the WISQ entries
 of Table~\ref{tab:results} flag circuits where WISQ fails or times out
 while the Gaussian method completes.
 
 % ---- TABLE: main comparison (full width, two panels) ----
-\begin{table*}[t]
+\begin{table}[t]
     \centering
-    \caption{Routing steps and compile time per benchmark. ``G-coarse'' and
-    ``G-fine'' are the Gaussian variants; ``MA'' is the rule-based magic-aware
-    baseline; ``Rand'' is the best of $k$ randomized restarts; WISQ is the
-    external compiler (\,---\,$=$ failure/timeout). Compile time is reported
-    per method, since each strategy runs its own mapping and routing.
-    $L_{\min}$ is the circuit's dependency-layer count (from its layered form),
-    a lower bound on the routing steps any method can achieve.
+    \caption{Routing steps and compile time per benchmark. ``Gauss'' is the
+    (fine) Gaussian placement, ``Rand'' the best of \todo{???} randomized baselines. 
+    $L_{\min}$ is the circuit's depth in dependency-layered form (its layer count)---
+    a lower bound on routing steps, since data-dependent layers cannot share a step.
     \todo{Fill from \texttt{best\_params\_benchmark\_runs.csv} and
-    \texttt{wisq\_docker} CSVs.}}
+    \texttt{wisq\_docker.csv}.}}
     \label{tab:results}
-    \setlength{\tabcolsep}{4pt}
-    \footnotesize
-    \begin{tabular}{l r r rrrrr rrrrr}
+    \setlength{\tabcolsep}{3pt}
+    \scriptsize
+    \begin{tabular}{l r r rrr rrr}
         \toprule
         \textbf{Circuit} & \textbf{$|\Q_L|$} & \textbf{$L_{\min}$}
-            & \multicolumn{5}{c}{\textbf{Routing steps}}
-            & \multicolumn{5}{c}{\textbf{Compile time (s)}} \\
-        \cmidrule(lr){4-8}\cmidrule(lr){9-13}
-            & & & \textbf{G-coarse} & \textbf{G-fine} & \textbf{MA} & \textbf{Rand} & \textbf{WISQ}
-              & \textbf{G-coarse} & \textbf{G-fine} & \textbf{MA} & \textbf{Rand} & \textbf{WISQ} \\
+            & \multicolumn{3}{c}{\textbf{Routing steps}}
+            & \multicolumn{3}{c}{\textbf{Compile time (s)}} \\
+        \cmidrule(lr){4-6}\cmidrule(lr){7-9}
+            & & & \textbf{Gauss} & \textbf{Rand} & \textbf{WISQ}
+              & \textbf{Gauss} & \textbf{Rand} & \textbf{WISQ} \\
         \midrule
-        \texttt{adder\_n28}        & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{qft\_20}           & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{multiplier\_n45}   & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{square\_root\_n45} & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{bwt\_n21}          & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{hhl\_n10}          & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-        \texttt{factor247\_n15}    & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-        ~~$\vdots$ & & & & & & & & & & & & \\
+        \texttt{adder\_n28}        & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{qft\_20}           & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{multiplier\_n45}   & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{square\_root\_n45} & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{bwt\_n21}          & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{hhl\_n10}          & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{factor247\_n15}    & -- & -- & -- & -- & -- & -- & -- & -- \\
+        ~~$\vdots$ & & & & & & & & \\
         \midrule
-        \textbf{Mean}    & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+        \textbf{Mean}    & -- & -- & -- & -- & -- & -- & -- & -- \\
         \bottomrule
     \end{tabular}
-\end{table*}
+    \vspace{-0.5cm}
+\end{table}
 
 % ---- FIGURE: per-circuit scatter vs WISQ (single column) ----
 \begin{figure}[t]
@@ -540,6 +542,7 @@ while the Gaussian method completes.
     Points below the diagonal indicate fewer routing steps for our method. 
     \todo{Generate from merged benchmark CSVs.}}
     \label{fig:scatter}
+    \vspace{-0.5cm}
 \end{figure}
 
 \paragraph{Tuned parameters}
@@ -588,13 +591,12 @@ project repository~\cite{ftqc}.
 \fi
 
 \paragraph{Discussion}
-\todo{2--4 sentences once numbers are in: (i) coarse vs.\ fine trade-off;
-(ii) where the field method beats / loses to magic-aware and WISQ and why
-(magic-state proximity vs.\ corridor crowding); (iii) the value of
+\todo{2--4 sentences once numbers are in:
+(i) where the field method beats / loses to WISQ and why; (ii) the value of
 circuit-structure information --- how many randomized restarts the random
 baseline needs to match field placement, if ever, and at what grid-area cost;
-(iv) scalability --- circuits on which WISQ times out but field placement
-finishes in seconds.}
+(iii) scalability --- circuits on which WISQ times out (too large search space) 
+but field placement finishes fast.}
 
 % ============================================================
 % \section{Related Work}
