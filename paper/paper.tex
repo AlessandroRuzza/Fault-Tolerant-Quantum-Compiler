@@ -182,14 +182,21 @@ conclude.
 \section{Background and Problem Formulation}
 \label{sec:background}
 
-\subsection{Architecture and Circuit Model}
+\subsection{Architecture Graph}
 
 We target a rectangular $W\times H$ grid of surface-code patches. We model it as
 an \emph{architecture graph} $\A = (V, E)$ whose vertices $V$ are tiles
 with integer coordinates $(x,y)$, and whose edges $E$ connect orthogonally
 adjacent tiles (the corridors along which lattice surgery can merge patches). A
 fixed subset $V_{\mathrm{m}} \subset V$ of tiles hosts \emph{magic states};
-their number and placement are configuration parameters. 
+their number and placement are configuration parameters.
+
+Each lattice cell is a surface-code patch; we equivalently call it a vertex or a
+tile when discussing the graph geometry. A tile either holds a data patch (a
+placed logical qubit) or is free, in which case it holds an ancilla patch, reset
+each step.
+
+\subsection{Circuit Model}
 
 A circuit $\C$ over logical qubits $\Q_L$ is taken in the Clifford$+T$ basis.
 From $\C$ we extract, per logical qubit $q$, its $T$-count $t(q)$ (i.e.\ magic-state demand) 
@@ -225,8 +232,8 @@ admitting a placement whenever reachability still holds; it packs tightly and so
 maps and routes on smaller lattices. \emph{Cube} instead forbids placement on any tile 
 within the $3\times3$ neighbourhood of an occupied patch. This requires a larger grid
 area but yields consistently shorter routes in our experiments, since the
-reserved spacing leaves more routing alternatives; we therefore treat
-\emph{cube} as the default and \emph{connectivity} for when lattice
+spacing leaves more routing options; we therefore treat
+\emph{cube} as the default and leave \emph{connectivity} for when lattice
 area is constrained.
 
 \begin{definition}[Qubit Mapping]
@@ -312,12 +319,12 @@ into the score surface $S$.
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/gaussian_fields.pdf}
-    \caption{Decomposition of the Gaussian placement score for one qubit: the
+    \caption{Decomposition of the Gaussian fields for one qubit: the
     magic-state, CNOT-partner, repulsion, and baseline field families (heatmaps,
     left) and their superposition $S$ as a surface over the lattice (right).
     Markers denote the magic tiles ($\star$), the qubit's interaction partners
     ($\circ$), and already-placed patches ($\square$); the red marker on $S$ is
-    its safe maximum---the tile where the qubit is committed.}
+    its safe maximum.}
     \label{fig:fields}
 \end{figure}
 
@@ -387,7 +394,7 @@ plain importance order, as a dense interaction graph offers no locality to explo
 every free tile, sort the tiles by decreasing $S$, and commit the first that
 passes safe-passage of Section~\ref{sec:background}; a repulsion field is
 then added at that tile. Algorithm~\ref{alg:main} summarises the procedure, and
-Figure~\ref{fig:frames} shows a layout forming.
+Figure~\ref{fig:frames} shows a mapping forming.
 
 \begin{algorithm}[t]
 \caption{Gaussian field placement}
@@ -445,8 +452,10 @@ low-order polynomial.
 \subsubsection{Implementation} The method is implemented in an open-source C++20
 compiler~\cite{ftqc} that parses OpenQASM, generates the rectangular architecture and
 magic-state placement, runs the mapping of Section~\ref{sec:approach}, and
-routes the result with a lattice-surgery router (naive or congestion-aware
-shortest-path corridors, with a dedicated $T$-gate-to-magic routing strategy).
+routes the result with a lattice-surgery router. The default \emph{packing}
+router maximises the vertex-disjoint corridors opened per step, prioritising
+downstream-critical gates; a \emph{naive} shortest-path variant is
+also provided. $T$ gates use a dedicated magic-state routing strategy.
 The lattice dimensions are sized automatically from the qubit count, the
 interaction degree, and the magic-state budget.
 
@@ -597,8 +606,7 @@ finishes in seconds.}
 \label{sec:related}
 
 \textbf{NISQ mapping and routing.} Heuristic mapping-and-$\SWAP{}$ methods such as
-SABRE~\cite{li2019sabre}, the routing passes of
-\mbox{t$|$ket$\rangle$}~\cite{sivarajah2020tket} and Qiskit~\cite{qiskit}, and
+SABRE~\cite{li2019sabre} and Qiskit~\cite{qiskit}, and
 exact/$\NP$-hardness treatments~\cite{siraichi2018qubit} target a fixed coupling
 graph and minimise $\SWAP{}$ count or depth. Our cost model has no $\SWAP{}$s and a
 per-step reconfigurable topology, so these objectives do not transfer directly,
@@ -614,10 +622,11 @@ baseline. Relative to solver- and search-heavy schedulers, our contribution is
 a cheap, interpretable \emph{placement} prior---the superposed Gaussian field---
 that produces routable mappings for a simple downstream router.
 
-% \textbf{Potential-field methods.} Artificial potential fields are classic in
-% robot motion planning; we adapt the attractive/repulsive-field idea to discrete
-% lattice placement, where magic states and partners act as attractors and placed
-% patches as repellers, under a hard connectivity (safe-passage) constraint.
+% \textbf{Potential-field methods.} The idea of attractive and repulsive
+% potential fields comes from robot motion planning, where a robot is pulled
+% toward its goal and pushed away from obstacles. We borrow this idea for tile
+% placement: magic states and interaction partners attract, placed patches
+% repel, subject to a hard safe-passage constraint.
 
 % ============================================================
 \section{Conclusion}
