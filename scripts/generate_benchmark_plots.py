@@ -88,12 +88,14 @@ HEATMAP_METRIC_SPECS = (
     ("routing_steps", "routing_steps", "Routing heatmap", "success only", "mean routing steps", "{:.2f}"),
     ("execution_time", "execution_time", "Execution-time heatmap", "success only", "mean duration (s)", "{:.2f}"),
     ("non_routed_layer_pct", "non_routed_layer_pct", "Non-routed layer % heatmap", "success only", "mean non-routed layer pct (%)", "{:.2f}"),
+    ("avg_parallelism", "avg_parallelism", "Avg-parallelism heatmap", "success only", "mean avg parallelism", "{:.2f}"),
 )
 AXIS_BARPLOT_METRIC_SPECS = (
     ("success_rate", "success", "Success Rate by", "all runs", "success rate (%)", "{:.1f}", "#2A9D8F"),
     ("routing_steps", "routing_steps", "Routing Steps by", "success only", "routing steps", "{:.2f}", "#577590"),
     ("execution_time", "execution_time", "Execution Time by", "success only", "duration (s)", "{:.2f}", "#E76F51"),
     ("non_routed_layer_pct", "non_routed_layer_pct", "Non-routed Layer % by", "success only", "non-routed layer pct (%)", "{:.2f}", "#E9C46A"),
+    ("avg_parallelism", "avg_parallelism", "Avg Parallelism by", "success only", "avg parallelism", "{:.2f}", "#9B5DE5"),
 )
 PER_CIRCUIT_BARPLOT_DIR = "barplots_by_circuit"
 HEATMAP_DIR = "heatmap"
@@ -1161,6 +1163,7 @@ COMPACT_ROW_FIELDS = (
     "duration_s_f",
     "routing_steps_f",
     "non_routed_layer_pct_f",
+    "avg_parallelism_f",
     "interaction_pressure_f",
     "data_density_f",
     "overall_density_f",
@@ -1475,6 +1478,7 @@ _DROP_RAW_FIELDS_AFTER_PREP = (
     "mapped_gaussian_weight", "base_gaussian_weight", "external_weight",
     "gaussian_confidence",
     "non_routed_layer_pct",
+    "avg_parallelism",
     "interaction_pressure", "data_density", "overall_density",
     "exit_code",
     "total_nodes",
@@ -1533,6 +1537,7 @@ def prepare_row_for_analysis(row):
         row["duration_s_f"] = None
     row["routing_steps_f"] = to_float_interned(pick_first(row, "routing_steps", "total_routing_steps"))
     row["non_routed_layer_pct_f"] = to_float_interned(row.get("non_routed_layer_pct"))
+    row["avg_parallelism_f"] = to_float_interned(row.get("avg_parallelism"))
     row["interaction_pressure_f"] = to_float_interned(row.get("interaction_pressure"))
     row["data_density_f"] = to_float_interned(row.get("data_density"))
     row["overall_density_f"] = to_float_interned(row.get("overall_density"))
@@ -4206,6 +4211,7 @@ def heatmap_metric_display_label(metric, sample_scope=None):
         "routing_steps": "routing steps",
         "execution_time": "execution time",
         "non_routed_layer_pct": "non-routed layer %",
+        "avg_parallelism": "avg parallelism",
     }
     label = metric_titles.get(metric, str(metric))
     if sample_scope:
@@ -4406,6 +4412,8 @@ def axis_boxplot_values(rows, metric):
         return non_empty([row["duration_s_f"] for row in rows])
     if metric == "non_routed_layer_pct":
         return non_empty([row["non_routed_layer_pct_f"] for row in rows])
+    if metric == "avg_parallelism":
+        return non_empty([row["avg_parallelism_f"] for row in rows])
     raise ValueError(f"Unknown axis boxplot metric: {metric}")
 
 
@@ -4708,11 +4716,15 @@ def plot_axis_barplots_by_circuit(
     rows_success_with_non_routed = [
         row for row in rows if row["success"] and row["non_routed_layer_pct_f"] is not None
     ]
+    rows_success_with_avg_parallelism = [
+        row for row in rows if row["success"] and row["avg_parallelism_f"] is not None
+    ]
     rows_by_metric = {
         "success_rate": rows,
         "routing_steps": rows_success_with_routing,
         "execution_time": rows_success_with_duration,
         "non_routed_layer_pct": rows_success_with_non_routed,
+        "avg_parallelism": rows_success_with_avg_parallelism,
     }
     circuits = sorted({row["circuit_name"] for row in rows if row["circuit_name"]})
 
@@ -5991,11 +6003,15 @@ def _build_heatmap_rows_by_metric(rows, rows_success_with_routing):
     rows_success_with_non_routed = [
         row for row in rows if row["success"] and row["non_routed_layer_pct_f"] is not None
     ]
+    rows_success_with_avg_parallelism = [
+        row for row in rows if row["success"] and row["avg_parallelism_f"] is not None
+    ]
     heatmap_rows_by_metric = {
         "success_rate": rows,
         "routing_steps": rows_success_with_routing,
         "execution_time": rows_success_with_duration,
         "non_routed_layer_pct": rows_success_with_non_routed,
+        "avg_parallelism": rows_success_with_avg_parallelism,
     }
     axis_boxplot_rows_by_metric = dict(heatmap_rows_by_metric)
     return heatmap_rows_by_metric, axis_boxplot_rows_by_metric

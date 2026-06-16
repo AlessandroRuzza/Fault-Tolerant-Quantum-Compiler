@@ -994,6 +994,7 @@ int run_bench_mode(
 
             std::string routing_steps;
             std::string non_routed_pct;
+            std::string avg_parallelism_str;
             std::string error_excerpt;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
@@ -1170,6 +1171,7 @@ int run_bench_mode(
                     if (worker_result.non_routed_layer_pct >= 0.0) {
                         non_routed_pct = format_pct(worker_result.non_routed_layer_pct);
                     }
+                    avg_parallelism_str = std::to_string(worker_result.avg_parallelism);
                     if (worker_result.resolved_graph_x >= 0) {
                         resolved_graph_x = std::to_string(worker_result.resolved_graph_x);
                     }
@@ -1481,7 +1483,8 @@ int run_bench_mode(
                 mid_non_routed_pct_str,
                 lower_non_routed_pct_str,
                 resolved_n_magic,
-                ew.empty() ? "0" : ew
+                ew.empty() ? "0" : ew,
+                avg_parallelism_str
             };
 
             std::ostringstream progress;

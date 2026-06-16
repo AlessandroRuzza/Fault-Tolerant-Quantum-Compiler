@@ -217,6 +217,7 @@ def prepare_rows(raw_rows):
         r["duration_s_f"]    = dur_s if dur_s is not None else (dur_ms / 1000.0 if dur_ms is not None else None)
         r["routing_steps_f"] = _to_float(_pick_first(r, "routing_steps", "total_routing_steps"))
         r["non_routed_layer_pct_f"] = _to_float(r.get("non_routed_layer_pct"))
+        r["avg_parallelism_f"] = _to_float(r.get("avg_parallelism"))
         r["exit_code_i"]     = _to_int(r.get("exit_code"))
         r["success"]         = _normalize_text(r.get("status")) in SUCCESS_STATUSES
         r["placement_variant"] = _classify_placement(r)
@@ -368,11 +369,11 @@ def _make_heatmap(
 
 
 def _plot_pair_heatmaps(
-    rows_all, rows_routing, rows_duration, rows_non_routed,
+    rows_all, rows_routing, rows_duration, rows_non_routed, rows_avg,
     row_key, col_key, row_label, col_label,
     prefix, output_dir, generated, skipped=None, subfolder=None,
 ):
-    """Emit four heatmaps (success rate, routing steps, duration, non-routed layer %) for one axis pair."""
+    """Emit five heatmaps (success rate, routing steps, duration, non-routed layer %, avg parallelism) for one axis pair."""
 
     def mean_routing(subset):
         vals = _non_empty([r["routing_steps_f"] for r in subset])
@@ -386,6 +387,10 @@ def _plot_pair_heatmaps(
         vals = _non_empty([r["non_routed_layer_pct_f"] for r in subset])
         return float(np.mean(vals)) if vals else None
 
+    def mean_avg_parallelism(subset):
+        vals = _non_empty([r["avg_parallelism_f"] for r in subset])
+        return float(np.mean(vals)) if vals else None
+
     def success_rate(subset):
         return (100.0 * sum(r["success"] for r in subset) / len(subset)) if subset else None
 
@@ -394,6 +399,7 @@ def _plot_pair_heatmaps(
         (rows_routing,     "routing_steps",   mean_routing,    f"Routing Steps: {row_label} × {col_label}",         "mean routing steps",          "{:.0f}"),
         (rows_duration,    "duration",        mean_duration,   f"Duration (s): {row_label} × {col_label}",          "mean duration (s)",           "{:.2f}"),
         (rows_non_routed,  "non_routed_pct",  mean_non_routed, f"Non-routed Layer %: {row_label} × {col_label}",    "mean non-routed layer pct (%)", "{:.2f}"),
+        (rows_avg,         "avg_parallelism", mean_avg_parallelism, f"Avg Parallelism: {row_label} × {col_label}",  "mean avg parallelism",          "{:.2f}"),
     ]
     for pool, tag, value_fn, title, cbar, fmt in specs:
         hm_rows = _filter_heatmap(pool, row_key, col_key)
@@ -606,6 +612,7 @@ def main():
     rows_routing     = [r for r in rows if r["success"] and r["routing_steps_f"] is not None]
     rows_duration    = [r for r in rows if r["success"] and r["duration_s_f"] is not None]
     rows_non_routed  = [r for r in rows if r["success"] and r["non_routed_layer_pct_f"] is not None]
+    rows_avg         = [r for r in rows if r["success"] and r["avg_parallelism_f"] is not None]
 
     generated, skipped = [], []
 
@@ -620,20 +627,24 @@ def main():
     plot_boxplot(rows_non_routed, "circuit_name", "non_routed_layer_pct_f",
                  "Non-routed Layer % by Circuit (success only)", "non-routed layer pct (%)",
                  "03_non_routed_pct_by_circuit.png", output_dir, generated, skipped)
+    plot_boxplot(rows_avg, "circuit_name", "avg_parallelism_f",
+                 "Avg Parallelism by Circuit (success only)", "avg parallelism",
+                 "04_avg_parallelism_by_circuit.png", output_dir, generated, skipped)
 
-    # heatmaps for each correlated pair (success rate + routing + duration + non-routed %)
-    for idx, (row_key, col_key, row_label, col_label, filter_fn) in enumerate(HEATMAP_PAIRS, start=4):
+    # heatmaps for each correlated pair (success rate + routing + duration + non-routed % + avg parallelism)
+    for idx, (row_key, col_key, row_label, col_label, filter_fn) in enumerate(HEATMAP_PAIRS, start=5):
         if filter_fn is not None:
             pair_all         = [r for r in rows if filter_fn(r)]
             pair_routing     = [r for r in rows_routing if filter_fn(r)]
             pair_duration    = [r for r in rows_duration if filter_fn(r)]
             pair_non_routed  = [r for r in rows_non_routed if filter_fn(r)]
+            pair_avg         = [r for r in rows_avg if filter_fn(r)]
         else:
-            pair_all, pair_routing, pair_duration, pair_non_routed = rows, rows_routing, rows_duration, rows_non_routed
+            pair_all, pair_routing, pair_duration, pair_non_routed, pair_avg = rows, rows_routing, rows_duration, rows_non_routed, rows_avg
 
         subfolder = f"pair_{idx:02d}_{row_key}"
         _plot_pair_heatmaps(
-            pair_all, pair_routing, pair_duration, pair_non_routed,
+            pair_all, pair_routing, pair_duration, pair_non_routed, pair_avg,
             row_key, col_key, row_label, col_label,
             f"{idx:02d}", output_dir, generated, skipped, subfolder=subfolder,
         )
