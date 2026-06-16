@@ -549,7 +549,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
              routing_steps < best_routing_steps);
 
         if (is_new_best) {
-            std::cout << "NEW BEST! #" << repetition << std::endl;
+            if(repetition_count > 1) std::cout << "NEW BEST! #" << repetition << std::endl;
             best_routing_steps = routing_steps;
             best_avg_parallelism = avg_parallelism;
             best_non_routed_layer_pct = non_routed_layer_pct;
@@ -626,8 +626,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Circuit time:    " << circ_time_seconds << " s\n";
     std::cout << "Graph init time: " << graph_time_seconds << " s\n";
     std::cout << "Mapping time:    " << mapping_time_seconds << " s\n";
-    std::cout << "Routing time:    " << routing_time_seconds << " s\n";
-    std::cout << "Total mapping + routing time: " << total_mr_time_seconds << " s\n\n";
+    std::cout << "Routing time:    " << routing_time_seconds << " s\n\n";
+    // std::cout << "Total mapping + routing time: " << total_mr_time_seconds << " s\n\n";
     std::cout << "Total time: " << total_time_seconds << " s\n\n";
     
     (void)best_layered;
