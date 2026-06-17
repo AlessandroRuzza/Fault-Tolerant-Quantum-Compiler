@@ -103,11 +103,10 @@ scored by summing attractive Gaussian fields---pulling $T$-heavy qubits toward
 magic states and tightly interacting qubits toward their partners---and
 repulsive fields that preserve routing space; a \emph{safe-passage} test keeps
 every mapping routable. We implement the method in an open-source C++20 OpenQASM
-compiler and evaluate it against rule-based, randomized-restart, and WISQ
+compiler and evaluate it against randomized-restart and WISQ
 baselines.
-\todo{Insert one or two headline numbers once tables are filled (e.g.\ mean
-routing-step reduction vs.\ baseline; compile time; circuits where WISQ
-times out but our method succeeds).}
+\todo{Insert one or two results once tables are filled (e.g.\ mean
+routing-step reduction vs.\ baseline; compilation time).}
 \end{abstract}
 
 % IEEE keywords
@@ -168,16 +167,15 @@ scheduler.
     per-qubit $T$-count and per-pair CNOT statistics.
     \item We provide an open-source C++20 implementation~\cite{ftqc} (OpenQASM
     front-end, lattice-surgery router, benchmark harness) and evaluate it
-    against rule-based magic-aware and randomized-restart baselines and the
-    WISQ compiler (Section~\ref{sec:eval}).
+    against a randomized-restart baseline and the WISQ compiler
+    (Section~\ref{sec:eval}).
 \end{itemize}
 
 The rest of the paper is organised as follows.
 Section~\ref{sec:background} fixes the architecture and circuit model and
 states the placement problem. Section~\ref{sec:approach} describes the Gaussian
 field method. Section~\ref{sec:eval} reports the experimental evaluation.
-Sections~\ref{sec:related} and~\ref{sec:conclusion} discuss related work and
-conclude.
+Section~\ref{sec:conclusion} concludes.
 
 % ============================================================
 \section{Background and Problem Formulation}
@@ -253,7 +251,7 @@ area is constrained.
 \section{Proposed Approach: Gaussian Field Placement}
 \label{sec:approach}
 
-The core idea is to convert the soft, competing objectives of fault-tolerant
+The core idea is to convert the objectives of fault-tolerant
 placement---``be near magic states if T-heavy'', ``cluster with frequent
 partners'', ``leave room to route''---into an additive scalar field on the
 lattice, then place each qubit at the field's maximum that respects safe passage.
@@ -285,11 +283,11 @@ the field is evaluated, independently of its width $\sigma$.
 
 For the qubit $q$ currently being placed, the total score at a free tile $v$ is
 \begin{equation}
-S(v) \;=\;
+S(v)\!=\!\!\!
    \underbrace{\sum_{m\in V_{\mathrm m}}\! g^{\mathrm{mag}}_m(v)}_{\text{magic-state pull/push}}
- + \underbrace{\sum_{p\in P(q)}\! g^{\mathrm{cnot}}_p(v)}_{\text{partner clustering}}
+ +\!\underbrace{\sum_{p\in P(q)}\! g^{\mathrm{cnot}}_p(v)}_{\text{partner clustering}}
  + \underbrace{\sum_{u\in \M}\! g^{\mathrm{rep}}_u(v)}_{\text{spread-out}}
- + \underbrace{b(v)}_{\text{centering}},
+ +\!\underbrace{b(v)}_{\text{centering}}\!\!,
 \label{eq:score}
 \end{equation}
 optionally plus a constant border bonus. The four families are:
@@ -364,10 +362,10 @@ w^{\mathrm{cnot}}_{p} \;=\;
 \paragraph{Fine} replaces the thresholds with linear interpolation. For the magic
 fields,
 \begin{equation*}
-w \;=\;
+w =\!
 \begin{cases}
-\textsc{magic-high}, & \hspace{-1cm} |t(q)-\bar t|>\sigma_t,\\[2pt]
-\mathrm{lerp}\big(\textsc{magic-low},\textsc{magic-high},\tfrac{|t(q)-\bar t|}{\sigma_t}\big), & \hspace{-0.2cm} \text{otherwise},
+\textsc{magic-high}, & \hspace{-30pt} |t(q)-\bar t|>\sigma_t,\\[2pt]
+\mathrm{lerp}\big(\textsc{magic-low},\textsc{magic-high},\tfrac{|t(q)-\bar t|}{\sigma_t}\big), & \hspace{15pt} \text{else},
 \end{cases}
 \end{equation*}
 attractive when $t(q)>\bar t$ and repulsive when $t(q)<\bar t$. The CNOT fields are weighted analogously from the per-pair count
@@ -442,8 +440,6 @@ Figure~\ref{fig:frames} shows a mapping forming.
 Field evaluation is $O(|V|\cdot(|V_{\mathrm m}|+|P(q)|+|\M|))$ per qubit; with
 the lattice sized as $\Theta(|\Q_L|+|V_{\mathrm m}|)$ tiles, placement is
 low-order polynomial. 
-%In practice the per-candidate safe-passage connectivity checks dominate placement time. 
-% \todo{Insert measured placement/compile times from the benchmark CSVs.}
 \end{remark} 
 
 % ============================================================
@@ -455,7 +451,7 @@ low-order polynomial.
 \subsubsection{Implementation} The method is implemented in an open-source C++20
 compiler~\cite{ftqc} that parses OpenQASM, generates the rectangular architecture and
 magic-state placement, runs the mapping of Section~\ref{sec:approach}, and
-routes the result with a lattice-surgery router. The default \emph{packing}
+routes the result with a lattice-surgery router. The \emph{packing}
 router maximises the vertex-disjoint corridors opened per step, prioritising
 downstream-critical gates (full algorithm in the artifact~\cite{ftqc}); a
 \emph{naive} shortest-path variant is also provided. $T$ gates use a dedicated magic-state routing strategy.
@@ -469,28 +465,22 @@ and structured/state-prep (\texttt{ghz}, \texttt{wstate}, \texttt{ising},
 \texttt{qaoa}) families, with logical qubit counts from \todo{min} to
 \todo{max}.
 
-\subsubsection{Baselines and metrics} We compare the coarse and fine Gaussian variants
-against three baselines that share the same architecture generator and router:
-(i) \emph{magic-aware}, a rule-based greedy placement that sends each qubit to a
-magic-state neighbourhood or beside its heaviest CNOT partner according to
-threshold rules on its $T$- and CNOT-counts; (ii) \emph{random}, a fast
-placement that scatters qubits over a sparse, magic-avoiding sublattice whose
-enforced spacing makes every mapping trivially routable; and (iii) the external
-WISQ compiler~\cite{wisq}. The random baseline is the natural speed reference:
-because each restart is cheap---no field evaluation and no per-candidate
-connectivity test---it is run for many randomized repetitions and the
-best-routing mapping is kept, whereas the Gaussian and magic-aware placements are
-deterministic and run once. Random buys this speed with grid area: lacking any
-circuit-structure information, it is allotted a larger, sparser lattice, while
-the Gaussian and magic-aware methods pack onto a roughly one-third smaller grid
-and recover routability through the safe-passage test. The primary metric is the
-number of routing steps; we also report compile time, average parallelism, and
-the non-routed-layer percentage.
+\subsubsection{Baselines and metrics} We compare our (fine) Gaussian method
+against two baselines:
+(i) \emph{random}, a fast placement that scatters qubits over a sparse
+sublattice, enforcing $3\times3$ spacing to make every mapping trivially
+routable and using the same router as Gaussian; and 
+(ii) the external WISQ compiler~\cite{wisq}. The random baseline is
+the natural speed reference: each restart is so cheap that we run it for \todo{N}
+repetitions and keep the best result, whereas the Gaussian placement
+is deterministic and runs once. The primary metrics are the number of
+routing steps and compilation time; our implementation also provides average parallelism and average 
+non-routed-gate percentage across layers.
 
 \subsection{Results}
 
 \paragraph{Routing quality}
-Table~\ref{tab:results} reports routing steps and compile time across the
+Table~\ref{tab:results} reports routing steps and compilation time across the
 benchmark suite for the Gaussian method and the randomized-restart and WISQ
 baselines.
 Figure~\ref{fig:scatter} plots per-circuit routing steps of the Gaussian method
@@ -501,12 +491,13 @@ while the Gaussian method completes.
 % ---- TABLE: main comparison (full width, two panels) ----
 \begin{table}[t]
     \centering
-    \caption{Routing steps and compile time per benchmark. ``Gauss'' is the
-    (fine) Gaussian placement, ``Rand'' the best of \todo{???} randomized baselines. 
-    $L_{\min}$ is the circuit's depth in dependency-layered form (its layer count)---
-    a lower bound on routing steps, since data-dependent layers cannot share a step.
-    \todo{Fill from \texttt{best\_params\_benchmark\_runs.csv} and
-    \texttt{wisq\_docker.csv}.}}
+    \caption{Routing steps and compilation time per benchmark.\\[2pt]
+    ``Gauss'' is the (tuned) Gaussian ``fine'' placement,\\
+    ``Rand'' is the best of \todo{N} randomized baselines. \\ 
+    $L_{\min}$ is the circuit layer count (minimum routing steps).\\
+    $|\Q_L|$ is the circuit qubit count.\\
+    \todo{Fill table from CSV runs + WISQ.}
+    }
     \label{tab:results}
     \setlength{\tabcolsep}{3pt}
     \scriptsize
@@ -514,7 +505,7 @@ while the Gaussian method completes.
         \toprule
         \textbf{Circuit} & \textbf{$|\Q_L|$} & \textbf{$L_{\min}$}
             & \multicolumn{3}{c}{\textbf{Routing steps}}
-            & \multicolumn{3}{c}{\textbf{Compile time (s)}} \\
+            & \multicolumn{3}{c}{\textbf{Compilation time (s)}} \\
         \cmidrule(lr){4-6}\cmidrule(lr){7-9}
             & & & \textbf{Gauss} & \textbf{Rand} & \textbf{WISQ}
               & \textbf{Gauss} & \textbf{Rand} & \textbf{WISQ} \\
@@ -531,18 +522,18 @@ while the Gaussian method completes.
         \textbf{Mean}    & -- & -- & -- & -- & -- & -- & -- & -- \\
         \bottomrule
     \end{tabular}
-    \vspace{-0.5cm}
+    \vspace{-0.2cm}
 \end{table}
 
 % ---- FIGURE: per-circuit scatter vs WISQ (single column) ----
 \begin{figure}[t]
     \centering
     \figslot{1.6in}
-    \caption{Per-circuit routing step ratios: Gaussian field placement / WISQ~\cite{wisq}. 
+    \caption{Per-circuit routing step ratios: Gaussian / WISQ~\cite{wisq}. 
     Points below the diagonal indicate fewer routing steps for our method. 
-    \todo{Generate from merged benchmark CSVs.}}
+    \todo{Generate from CSVs.}}
     \label{fig:scatter}
-    \vspace{-0.5cm}
+    \vspace{-0.2cm}
 \end{figure}
 
 \paragraph{Tuned parameters}
@@ -595,8 +586,7 @@ project repository~\cite{ftqc}.
 (i) where the field method beats / loses to WISQ and why; (ii) the value of
 circuit-structure information --- how many randomized restarts the random
 baseline needs to match field placement, if ever, and at what grid-area cost;
-(iii) scalability --- circuits on which WISQ times out (too large search space) 
-but field placement finishes fast.}
+(iii) scalability comparison.}
 
 % ============================================================
 % \section{Related Work}
@@ -634,8 +624,8 @@ safe maximum of the result. This folds $T$-gate
 locality, interaction clustering, and corridor preservation into a single fast
 scoring pass, while safe-passage keeps every mapping routable. We
 implement this heuristic in an open-source OpenQASM-to-lattice-surgery compiler and evaluate
-it against a rule-based baseline and the WISQ compiler.
-\todo{State the headline empirical result once tables are filled.}
+it against a randomized-restart baseline and the WISQ compiler.
+\todo{State the result once tables are filled.}
 Limitations include the greedy, single-pass nature of placement and reliance on
 hand-tuned field weights. A natural next step is to learn or jointly optimise
 the field weights and to feed the field gradient back into the router so that
