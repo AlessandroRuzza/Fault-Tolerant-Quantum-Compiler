@@ -12,6 +12,30 @@ void draw_routing_layer(
     const Routing& routing
 );
 
+namespace {
+
+// Two gates commute iff every qubit they share plays the SAME role in both.
+// Only CX-CX pairs are considered commuting; any pair involving a non-CX gate
+// (h, t, ...) is treated as non-commuting (conservative — never reorder past it).
+//   CX(a,b) , CX(a,c)  -> share a as control in both        -> commute
+//   CX(a,b) , CX(c,b)  -> share b as target in both         -> commute
+//   CX(a,b) , CX(b,c)  -> share b: target in one, control   -> do NOT commute
+bool gates_commute(const Gate& g1, const Gate& g2) {
+    if (g1.name != "cx" || g2.name != "cx") return false;
+    if (g1.qubits.size() != 2 || g2.qubits.size() != 2) return false;
+    const uint32_t c1 = g1.qubits[0], t1 = g1.qubits[1];
+    const uint32_t c2 = g2.qubits[0], t2 = g2.qubits[1];
+    for (const uint32_t q : {c1, t1}) {
+        if (q != c2 && q != t2) continue;          // not a shared qubit
+        const bool is_control_in_1 = (q == c1);
+        const bool is_control_in_2 = (q == c2);
+        if (is_control_in_1 != is_control_in_2) return false;  // shared, different role
+    }
+    return true;
+}
+
+}  // namespace
+
 std::unordered_set<int> PackingQubitRouter::base_blocked_nodes() const {
     std::unordered_set<int> blocked;
     for (int qubit = 0; qubit < circuit.getQubitsVectorSize(); ++qubit) {
@@ -95,11 +119,79 @@ Path PackingQubitRouter::penalized_shortest_path(
     return path;
 }
 
+std::pair<int, int> PackingQubitRouter::gate_priority(const Gate& /*g*/, int qubit_pressure_sum) const {
+    // Base "packing": prioritise by downstream qubit pressure only. Secondary key
+    // is 0 (inert) so the selection order is exactly as before this hook existed.
+    return {qubit_pressure_sum, 0};
+}
+
+void CriticalPackingQubitRouter::compute_gate_criticality(const Circuit& circuit) {
+    // Reverse pass over the circuit's gate sequence. Gates touching the same qubit
+    // form a linear dependency chain (textual order), so a gate's tail is
+    // 1 + max tail of the next gate on each of its qubits. Mirrors
+    // QubitRouter::compute_gate_criticality so "critical_packing" and
+    // "naive_critical" share the exact same criticality definition.
+    const std::vector<Gate>& gates = circuit.getGates();
+    gate_tail_by_id.clear();
+    gate_tail_by_id.reserve(gates.size());
+
+    std::unordered_map<uint32_t, int> next_tail_on_qubit;  // qubit -> tail of next gate on it
+    for (auto it = gates.rbegin(); it != gates.rend(); ++it) {
+        const Gate& g = *it;
+        int tail = 1;
+        for (const uint32_t q : g.qubits) {
+            const auto found = next_tail_on_qubit.find(q);
+            if (found != next_tail_on_qubit.end()) {
+                tail = std::max(tail, 1 + found->second);
+            }
+        }
+        gate_tail_by_id[g.id] = tail;
+        for (const uint32_t q : g.qubits) {
+            next_tail_on_qubit[q] = tail;
+        }
+    }
+}
+
 Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const {
     const std::unordered_set<int> blocked = base_blocked_nodes();
 
     // Deterministic gate order independent of Gate::id (same trick as QubitRouter).
     std::vector<Gate> ordered_gates(layer_gates.begin(), layer_gates.end());
+
+    // packing_commute: widen the candidate set with CX gates from deeper layers
+    // that can legally execute now. A deeper gate g' is "executable now" iff, on
+    // every one of its qubits, every pending predecessor (a gate on that qubit in
+    // a shallower layer) commutes with g'. Such a gate may substitute the top
+    // gate on a busy qubit if it packs better; the node-disjoint selection still
+    // routes at most one gate per qubit. The search window equals the criticality
+    // lookahead, and update_layers_within removes routed gates from that window.
+    if (enable_commute) {
+        const int window = std::max(1, criticality_lookahead);
+        const int nlayers = circuit.getNumLayers();
+        const auto executable_now = [&](const Gate& gp, int depth) -> bool {
+            for (const uint32_t u : gp.qubits) {
+                for (int dd = 0; dd < depth; ++dd) {
+                    for (const Gate& h : circuit.getLayer(dd)) {
+                        bool shares = false;
+                        for (const uint32_t hq : h.qubits) {
+                            if (hq == u) { shares = true; break; }
+                        }
+                        if (shares && !gates_commute(gp, h)) return false;
+                    }
+                }
+            }
+            return true;
+        };
+        for (int d = 1; d <= window && d < nlayers; ++d) {
+            for (const Gate& gp : circuit.getLayer(d)) {
+                if (gp.qubits.size() != 2 || gp.name != "cx") continue;  // CX substitution only
+                if (executable_now(gp, d)) {
+                    ordered_gates.push_back(gp);
+                }
+            }
+        }
+    }
+
     std::sort(ordered_gates.begin(), ordered_gates.end(),
         [](const Gate& a, const Gate& b) {
             if (a.name != b.name) return a.name < b.name;
@@ -134,7 +226,8 @@ Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const 
     struct Candidate {
         Gate gate;
         Path path;
-        int crit;
+        int crit;      // primary selection key (gate_priority.first)
+        int crit2;     // secondary selection key (gate_priority.second)
         bool is_t;
         int magic;     // -1 for non-T
         int order;     // insertion order, final tie-break
@@ -156,7 +249,8 @@ Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const 
             continue;
         }
 
-        const int crit = criticality_of(gate);
+        const int pressure_sum = criticality_of(gate);
+        const std::pair<int, int> prio = gate_priority(gate, pressure_sum);
 
         if (gate.qubits.size() == 2) {
             const int node1 = mapping.get_mapped_node(gate.qubits[0]);
@@ -180,7 +274,7 @@ Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const 
                     penalties[path[k]] += diversity_penalty;
                 }
                 gate_paths.push_back(path);
-                candidates.push_back({gate, std::move(path), crit, false, -1, insertion_order++});
+                candidates.push_back({gate, std::move(path), prio.first, prio.second, false, -1, insertion_order++});
             }
             pending.push_back(gate);
         } else if (gate.name == "t") {
@@ -204,8 +298,8 @@ Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const 
                 });
             const int keep = std::min<int>(num_candidates, static_cast<int>(ranked.size()));
             for (int c = 0; c < keep; ++c) {
-                candidates.push_back({gate, std::move(ranked[c].second.second), crit, true,
-                                      ranked[c].second.first, insertion_order++});
+                candidates.push_back({gate, std::move(ranked[c].second.second), prio.first, prio.second,
+                                      true, ranked[c].second.first, insertion_order++});
             }
             pending.push_back(gate);
         } else {
@@ -219,6 +313,7 @@ Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const 
     std::stable_sort(candidates.begin(), candidates.end(),
         [](const Candidate& a, const Candidate& b) {
             if (a.crit != b.crit) return a.crit > b.crit;
+            if (a.crit2 != b.crit2) return a.crit2 > b.crit2;
             if (a.path.size() != b.path.size()) return a.path.size() < b.path.size();
             return a.order < b.order;
         });
@@ -250,13 +345,38 @@ Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const 
     std::unordered_set<int> fill_blocked = blocked;
     fill_blocked.insert(selected_nodes.begin(), selected_nodes.end());
 
+    // With commutation on, two candidate gates can share a qubit, so the fill
+    // pass must not route a second gate onto a qubit already used this step. The
+    // selection loop is already protected (the qubit node is in selected_nodes),
+    // but the fill pass starts paths from the qubit node, so guard it explicitly.
+    // Without commutation each qubit appears once per step, so this is inert.
+    std::unordered_set<int> claimed_qubit_nodes;
+    if (enable_commute) {
+        for (const auto& kv : routing) {
+            for (const uint32_t q : kv.first.qubits) {
+                const int n = mapping.get_mapped_node(q);
+                if (n >= 0) claimed_qubit_nodes.insert(n);
+            }
+        }
+    }
+
     std::stable_sort(pending.begin(), pending.end(),
-        [&criticality_of](const Gate& a, const Gate& b) {
-            return criticality_of(a) > criticality_of(b);
+        [this, &criticality_of](const Gate& a, const Gate& b) {
+            // std::pair compares lexicographically: primary key then tiebreak.
+            return gate_priority(a, criticality_of(a)) > gate_priority(b, criticality_of(b));
         });
 
     for (const Gate& gate : pending) {
         if (gate_is_routed(gate)) continue;
+
+        if (enable_commute) {
+            bool qubit_taken = false;
+            for (const uint32_t q : gate.qubits) {
+                const int n = mapping.get_mapped_node(q);
+                if (n >= 0 && claimed_qubit_nodes.count(n)) { qubit_taken = true; break; }
+            }
+            if (qubit_taken) continue;
+        }
 
         Path path;
         if (gate.qubits.size() == 2) {
@@ -281,6 +401,12 @@ Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const 
         if (!path.empty()) {
             fill_blocked.insert(path.begin(), path.end());
             if (gate.name == "t") used_magic_states.insert(path.back());
+            if (enable_commute) {
+                for (const uint32_t q : gate.qubits) {
+                    const int n = mapping.get_mapped_node(q);
+                    if (n >= 0) claimed_qubit_nodes.insert(n);
+                }
+            }
             routing.emplace(gate, std::move(path));
         }
     }
@@ -350,7 +476,14 @@ void PackingQubitRouter::route_circuit() {
         }
 
         routing_steps.push_back(std::move(route));
-        circuit.update_layers(used_gates);
+        if (enable_commute) {
+            // Routed gates may have been pulled from deeper layers (within the
+            // commute window), so remove them across that window, not just the top.
+            circuit.update_layers_within(
+                used_gates, static_cast<std::size_t>(std::max(1, criticality_lookahead)));
+        } else {
+            circuit.update_layers(used_gates);
+        }
     }
 }
 

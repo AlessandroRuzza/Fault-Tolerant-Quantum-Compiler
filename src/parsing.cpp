@@ -197,6 +197,7 @@ std::string normalize_routing_method(std::string value) {
     if (value == "simple" ) return "naive";
     if (value == "naivecritical" || value == "critical" ) return "naive_critical";
     if (value == "pack" || value == "disjoint" || value == "disjoint_paths" ) return "packing";
+    if (value == "criticalpacking" || value == "critpacking" || value == "crit_packing" ) return "critical_packing";
     return value;
 }
 
@@ -210,7 +211,7 @@ std::string normalize_t_routing_mode(std::string value) {
 
 void validate_routing_method(const std::string& value, const char* executable) {
     const std::string normalized = normalize_routing_method(value);
-    const std::vector<std::string> valid_methods = {"congestion", "naive", "naive_critical", "packing", "boost"};
+    const std::vector<std::string> valid_methods = {"congestion", "naive", "naive_critical", "packing", "critical_packing", "boost"};
     if (std::find(valid_methods.begin(), valid_methods.end(), normalized) == valid_methods.end()) {
         std::cerr << "Invalid routing method: " << value << "\n";
         print_usage(executable);
@@ -331,12 +332,13 @@ void print_usage(const char* executable) {
               << "[--bfs-density-threshold <float>, default=0.70 | CNOT-graph density below which CNOT-BFS order is used; <0 always heap; env FTQC_BFS_DENSITY_THRESHOLD overrides]\n"
               << "[--gaussian-sigma <float> > 0, default=0.4 | absolute gaussian stddev, same on both axes, graph-independent]\n"
 #if FTOQC_HAS_BOOST_ROUTER
-              << "[--routing-strategy [congestion|naive|naive_critical|packing|boost]]\n"
+              << "[--routing-strategy [congestion|naive|naive_critical|packing|critical_packing|boost]]\n"
 #else
-              << "[--routing-strategy [congestion|naive|naive_critical|packing]] (boost unavailable in this build)\n"
+              << "[--routing-strategy [congestion|naive|naive_critical|packing|critical_packing]] (boost unavailable in this build)\n"
 #endif
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"
+              << "[--packing-commute <true|false>] (commutation-aware frontier; used only by packing/critical_packing)\n"
               << "[--x <int>: >0 explicit | 0 heuristic upper bound | <0 auto-size]\n"
               << "[--y <int>: same sentinels as --x]\n"
               << "[--use-layer-cache <true|false>]\n"
@@ -383,7 +385,8 @@ void apply_config_overrides(
     int& repetition_count,
     bool& use_layer_cache_explicit,
     double& cnot_formula_scale,
-    double& mapped_formula_scale
+    double& mapped_formula_scale,
+    bool& packing_commute
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -723,6 +726,15 @@ void apply_config_overrides(
         }
     }
 
+    // Commutation-aware frontier widening. Only consumed by the "packing" /
+    // "critical_packing" routers; ignored by every other strategy.
+    if (config_json.contains("packing_commute") || config_json.contains("packing-commute")) {
+        const char* key = config_json.contains("packing_commute") ? "packing_commute" : "packing-commute";
+        if (!config_json[key].is_boolean()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
+        }
+        packing_commute = config_json[key].get<bool>();
+    }
 
 }
 
@@ -756,7 +768,8 @@ void argument_parsing(
     bool& use_layer_cache,
     bool& metrics_only,
     int& repetition,
-    bool& use_layer_cache_explicit
+    bool& use_layer_cache_explicit,
+    bool& packing_commute
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -1077,6 +1090,23 @@ void argument_parsing(
             }
             if (repetition <= 0) {
                 throw std::runtime_error("--repetition must be > 0");
+            }
+            continue;
+        }
+
+        if (arg == "--packing-commute" || arg == "--packing_commute") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --packing-commute\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --packing-commute");
+            }
+            const std::string val = argv[++i];
+            if (val == "true" || val == "1") {
+                packing_commute = true;
+            } else if (val == "false" || val == "0") {
+                packing_commute = false;
+            } else {
+                throw std::runtime_error("Invalid boolean value for --packing-commute: " + val);
             }
             continue;
         }

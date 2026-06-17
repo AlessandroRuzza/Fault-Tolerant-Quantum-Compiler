@@ -414,6 +414,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     bool use_layer_cache_explicit = false;
     double cnot_formula_scale = 1.0;
     double mapped_formula_scale = 1.0;
+    bool packing_commute = false;  // commutation-aware frontier; only packing/critical_packing
 
     apply_config_overrides(
         argc,
@@ -448,7 +449,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         repetition_count,
         use_layer_cache_explicit,
         cnot_formula_scale,
-        mapped_formula_scale
+        mapped_formula_scale,
+        packing_commute
     );
 
     argument_parsing(
@@ -481,7 +483,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         use_layer_cache,
         metrics_only,
         repetition_count,
-        use_layer_cache_explicit
+        use_layer_cache_explicit,
+        packing_commute
     );
 
     std::cout << "circuit path: " << path << std::endl;
@@ -509,6 +512,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     }
     std::cout << "border_distance_percentage: " << border_distance_percentage << std::endl;
     std::cout << "routing strategy: " << routing_strategy << std::endl;
+    std::cout << "packing_commute: " << (packing_commute ? "true" : "false") << std::endl;
     std::cout << "use_layer_cache: " << (use_layer_cache ? "true" : "false") << std::endl;
     std::cout << "metrics_only: " << (metrics_only ? "true" : "false") << std::endl;
     if (!graph_path.empty()) {
@@ -552,7 +556,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         repetition_count,
         use_layer_cache_explicit,
         cnot_formula_scale,
-        mapped_formula_scale
+        mapped_formula_scale,
+        packing_commute
     );
     write_benchmark_result_file_if_requested(result);
 

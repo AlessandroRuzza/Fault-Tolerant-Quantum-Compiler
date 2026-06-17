@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
-"""Plot per-circuit comparison between best config, worst config, and WISQ.
+"""Plot per-circuit comparison between our runs and WISQ, from TWO separate CSVs.
 
-Reads a CSV produced by compare_wisq_2.py (--bench or single-run mode) and
-generates one figure per circuit. Each figure has two subplots:
-  - Left:  routing steps  (mine best / mine worst / wisq)
-  - Right: wall-clock time (my_duration_s / my_duration_s / wisq_duration_s)
+Same output as plot_wisq_comparison.py (one figure per circuit: routing steps and
+wall-clock time for best config / worst config / WISQ, plus two cross-circuit
+summary figures) — but the data comes from two files joined on `circuit`:
 
-Best/worst are chosen by my_routing_steps (tiebreak: my_duration_s).
-Plots are saved to data/results/wisq_plots/.
+  1. WISQ_CSV  — a WISQ-only table as produced by extract_wisq.py
+                 (columns: circuit, n_qubits, wisq_x, wisq_y, wisq_routing_steps,
+                  wisq_duration_s, wisq_status, ...). One row per circuit.
+  2. RUNS_CSV  — our benchmark runs CSV (e.g. data/old_results/.../*_runs.csv;
+                 columns: circuit, graph_x, graph_y, routing_strategy, ...,
+                 routing_steps, status, duration_seconds, ...). Many rows per
+                 circuit (one per config); best/worst are picked from these.
+
+Only circuits present in BOTH files (with a successful WISQ result and at least
+one successful run) are plotted.
+
+Best/worst are chosen by our routing_steps (tiebreak: duration_seconds).
+Plots are saved to data/results/wisq_plots2/.
 
 Usage:
-    python scripts/plot_wisq_comparison.py --input data/results/wisq_3circ_out.csv
-    python scripts/plot_wisq_comparison.py --input data/results/wisq_3circ_out.csv \
-        --output data/results/wisq_plots
+    python scripts/plot_wisq_comparison2.py data/best_wisq_per_circuit.csv \
+        data/old_results/old_results_11june/t_prop_circuits_runs.csv
+    python scripts/plot_wisq_comparison2.py WISQ_CSV RUNS_CSV --output data/results/wisq_plots2
 """
 
 from __future__ import annotations
@@ -31,10 +41,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "data" / "results" / "wisq_plots"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "data" / "results" / "wisq_plots2"
 
+# Runs-CSV column names (our execution).
+RUNS_STEPS = "routing_steps"
+RUNS_TIME = "duration_seconds"
+RUNS_X = "graph_x"
+RUNS_Y = "graph_y"
+RUNS_STATUS = "status"
+
+# Config fields used for the best/worst bar label, mapped to the runs-CSV names.
 CONFIG_LABEL_FIELDS = [
-    ("type", {"gaussian": "gauss", "magic_aware": "magic", "homogeneous": "homo"}),
+    ("mapping_type", {"gaussian": "gauss", "magic_aware": "magic", "homogeneous": "homo"}),
     ("gaussian_strategy", {"coarse": "coarse", "fine": "fine"}),
     ("safe_passage_strategy", {"cube": "cube", "connectivity": "conn", "passage_no_subgraphs": "pass"}),
     ("routing_strategy", {"naive": "naive", "congestion": "cong"}),
@@ -43,7 +61,7 @@ CONFIG_LABEL_FIELDS = [
 ]
 
 
-def to_float(v: str) -> float | None:
+def to_float(v) -> float | None:
     try:
         return float(v)
     except (ValueError, TypeError):
@@ -53,52 +71,62 @@ def to_float(v: str) -> float | None:
 def config_label(row: dict) -> str:
     parts = []
     for field, abbrev in CONFIG_LABEL_FIELDS:
-        val = row.get(field, "").strip()
+        val = (row.get(field) or "").strip()
         if not val:
             continue
-        val = abbrev.get(val, val)
-        parts.append(val)
+        parts.append(abbrev.get(val, val))
     return "/".join(parts) if parts else "?"
 
 
-def load_rows(path: Path) -> dict[str, list[dict]]:
-    """Load CSV, keep only rows with wisq_status=success and valid numeric fields."""
-    by_circuit: dict[str, list[dict]] = {}
+def load_wisq(path: Path) -> dict[str, dict]:
+    """circuit -> wisq row (success only, numeric wisq_routing_steps). One per circuit."""
+    by_circuit: dict[str, dict] = {}
     with path.open(newline="") as f:
         for row in csv.DictReader(f):
-            if row.get("wisq_status", "").strip() != "success":
-                continue
-            if to_float(row.get("my_routing_steps")) is None:
+            status = (row.get("wisq_status") or "").strip()
+            if status and status != "success":
                 continue
             if to_float(row.get("wisq_routing_steps")) is None:
                 continue
-            circuit = row["circuit"]
-            by_circuit.setdefault(circuit, []).append(row)
+            by_circuit[row["circuit"].strip()] = row
+    return by_circuit
+
+
+def load_runs(path: Path) -> dict[str, list[dict]]:
+    """circuit -> list of our run rows (status=success, numeric routing_steps)."""
+    by_circuit: dict[str, list[dict]] = {}
+    with path.open(newline="") as f:
+        for row in csv.DictReader(f):
+            if (row.get(RUNS_STATUS) or "").strip() != "success":
+                continue
+            if to_float(row.get(RUNS_STEPS)) is None:
+                continue
+            by_circuit.setdefault(row["circuit"].strip(), []).append(row)
     return by_circuit
 
 
 def pick_best_worst(rows: list[dict]) -> tuple[dict, dict]:
-    """Return (best, worst) by my_routing_steps, tiebreak my_duration_s."""
+    """Return (best, worst) by routing_steps, tiebreak duration_seconds."""
     def sort_key(r: dict):
-        steps = to_float(r["my_routing_steps"]) or float("inf")
-        dur = to_float(r.get("my_duration_s")) or float("inf")
+        steps = to_float(r.get(RUNS_STEPS)) or float("inf")
+        dur = to_float(r.get(RUNS_TIME)) or float("inf")
         return (steps, dur)
 
     sorted_rows = sorted(rows, key=sort_key)
     return sorted_rows[0], sorted_rows[-1]
 
 
-def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
-    best, worst = pick_best_worst(rows)
+def plot_circuit(circuit: str, runs: list[dict], wisq: dict, out_dir: Path) -> None:
+    best, worst = pick_best_worst(runs)
 
-    wisq_steps = to_float(best["wisq_routing_steps"])
-    wisq_time = to_float(best.get("wisq_duration_s"))
-    grid = f"{best.get('wisq_x', '?')}x{best.get('wisq_y', '?')}"
+    wisq_steps = to_float(wisq.get("wisq_routing_steps"))
+    wisq_time = to_float(wisq.get("wisq_duration_s"))
+    grid = f"{wisq.get('wisq_x', '?')}x{wisq.get('wisq_y', '?')}"
 
-    best_steps = to_float(best["my_routing_steps"])
-    worst_steps = to_float(worst["my_routing_steps"])
-    best_time = to_float(best.get("my_duration_s"))
-    worst_time = to_float(worst.get("my_duration_s"))
+    best_steps = to_float(best.get(RUNS_STEPS))
+    worst_steps = to_float(worst.get(RUNS_STEPS))
+    best_time = to_float(best.get(RUNS_TIME))
+    worst_time = to_float(worst.get(RUNS_TIME))
 
     best_label = config_label(best)
     worst_label = config_label(worst)
@@ -109,23 +137,21 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
     steps_vals = [best_steps, worst_steps, wisq_steps]
     time_vals = [best_time, worst_time, wisq_time]
 
-    # Grid size per bar: ours (best/worst) use my_x×my_y, WISQ uses wisq_x×wisq_y.
-    # Drawn inside each bar so a larger WISQ grid is immediately visible.
+    # Grid size per bar: ours uses graph_x×graph_y, WISQ uses wisq_x×wisq_y.
     def grid_str(row: dict, xkey: str, ykey: str) -> str:
         x, y = str(row.get(xkey, "")).strip(), str(row.get(ykey, "")).strip()
         return f"{x}×{y}" if x and y else ""
 
     grids = [
-        grid_str(best, "my_x", "my_y"),
-        grid_str(worst, "my_x", "my_y"),
-        grid_str(best, "wisq_x", "wisq_y"),
+        grid_str(best, RUNS_X, RUNS_Y),
+        grid_str(worst, RUNS_X, RUNS_Y),
+        grid_str(wisq, "wisq_x", "wisq_y"),
     ]
 
     fig, (ax_steps, ax_time) = plt.subplots(1, 2, figsize=(11, 5))
-    fig.suptitle(f"{circuit}  —  grid {grid}", fontsize=13, fontweight="bold")
+    fig.suptitle(f"{circuit}  —  WISQ grid {grid}", fontsize=13, fontweight="bold")
 
     def pct_label(val: float | None, ref: float | None) -> str:
-        """Return '+X%' / '-X%' / '0%' relative to ref. Empty string if missing."""
         if val is None or ref is None or ref == 0:
             return ""
         pct = (val - ref) / ref * 100
@@ -134,7 +160,6 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
         return f"{pct:+.1f}%"
 
     def annotate_bars(ax, bars, vals, ref_val, fmt_val):
-        """Draw value label + percentage-vs-best below it for each bar."""
         max_val = max(v for v in vals if v is not None)
         y_pad = max_val * 0.02
         for bar, val in zip(bars, vals):
@@ -151,7 +176,6 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
                         ha="center", va="bottom", fontsize=9, color=color)
 
     def label_grids(ax, bars, vals):
-        """Write the grid size centred inside each bar (white text on the bar)."""
         for bar, val, g in zip(bars, vals, grids):
             if val is None or not g:
                 continue
@@ -176,10 +200,9 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
     annotate_bars(ax_time, bars2, time_vals, best_time, lambda v: f"{v:.2f}s")
     label_grids(ax_time, bars2, time_vals)
 
-    # number of configs shown as footnote
-    n_configs = len(rows)
+    n_configs = len(runs)
     fig.text(0.5, 0.01,
-             f"Based on {n_configs} config(s). Best/worst by routing steps (tiebreak: time).",
+             f"Based on {n_configs} run(s). Best/worst by routing steps (tiebreak: time).",
              ha="center", fontsize=8, color="gray")
 
     plt.tight_layout(rect=[0, 0.04, 1, 1])
@@ -189,41 +212,34 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
     print(f"  saved: {out_path}")
 
 
-def plot_summary(by_circuit: dict[str, list[dict]], out_dir: Path, metric: str) -> None:
-    """One overview figure across all circuits: grouped bars (ours-best vs WISQ).
-
-    metric = "steps" -> routing steps; metric = "time" -> wall-clock seconds.
-    Only circuits where both our best config and WISQ have a valid value are shown.
-    """
+def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metric: str) -> None:
+    """One overview figure across all circuits: grouped bars (ours-best vs WISQ)."""
     if metric == "steps":
-        my_key, wisq_key = "my_routing_steps", "wisq_routing_steps"
+        my_key, wisq_key = RUNS_STEPS, "wisq_routing_steps"
         ylabel, title, fname = "routing steps", "Routing steps: ours (best) vs WISQ", "summary_routing_steps.png"
     else:
-        my_key, wisq_key = "my_duration_s", "wisq_duration_s"
+        my_key, wisq_key = RUNS_TIME, "wisq_duration_s"
         ylabel, title, fname = "seconds", "Wall-clock time: ours (best) vs WISQ", "summary_time.png"
 
-    # One point per circuit: our best config (by routing steps, tiebreak time).
     entries = []
-    for circuit, rows in by_circuit.items():
-        best, _ = pick_best_worst(rows)
+    for circuit, (runs, wisq) in joined.items():
+        best, _ = pick_best_worst(runs)
         mine = to_float(best.get(my_key))
-        wisq = to_float(best.get(wisq_key))
-        if mine is None or wisq is None:
+        wisq_val = to_float(wisq.get(wisq_key))
+        if mine is None or wisq_val is None:
             continue
-        nq = to_float(best.get("n_qubits")) or 0.0
-        entries.append((circuit, nq, mine, wisq))
+        nq = to_float(wisq.get("n_qubits")) or 0.0
+        entries.append((circuit, nq, mine, wisq_val))
 
     if not entries:
         print(f"  (no data for summary '{metric}')")
         return
 
-    # Sort by qubit count, then name, for a natural left-to-right progression.
     entries.sort(key=lambda e: (e[1], e[0]))
     circuits = [e[0] for e in entries]
     mine_vals = [e[2] for e in entries]
     wisq_vals = [e[3] for e in entries]
 
-    # Win/tie/loss tally (lower is better for both metrics).
     EPS = 1e-9
     ours_wins = sum(1 for m, w in zip(mine_vals, wisq_vals) if m < w - EPS)
     ties = sum(1 for m, w in zip(mine_vals, wisq_vals) if abs(m - w) <= EPS)
@@ -237,14 +253,12 @@ def plot_summary(by_circuit: dict[str, list[dict]], out_dir: Path, metric: str) 
     ax.bar(x - width / 2, mine_vals, width, label="ours (best)", color="#2196F3")
     ax.bar(x + width / 2, wisq_vals, width, label="WISQ", color="#E53935")
 
-    # Win summary box (ours beats WISQ = strictly lower value).
     summary = (f"ours wins: {ours_wins}   ties: {ties}   WISQ wins: {wisq_wins}"
                f"   (of {total})")
     ax.text(0.5, 0.97, summary, transform=ax.transAxes, ha="center", va="top",
             fontsize=11, fontweight="bold",
             bbox=dict(boxstyle="round", facecolor="#FFF9C4", edgecolor="#BDBDBD"))
 
-    # Log scale when the values span a wide range and are all positive.
     allv = mine_vals + wisq_vals
     if min(allv) > 0 and max(allv) / min(allv) > 50:
         ax.set_yscale("log")
@@ -266,38 +280,56 @@ def plot_summary(by_circuit: dict[str, list[dict]], out_dir: Path, metric: str) 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Plot best/worst config vs WISQ, one figure per circuit."
+        description="Plot our runs vs WISQ (joined from a WISQ CSV and a runs CSV), one figure per circuit.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--input", "-i", required=True,
-        help="CSV produced by compare_wisq_2.py",
-    )
-    parser.add_argument(
-        "--output", "-o", default=str(DEFAULT_OUTPUT_DIR),
-        help=f"Output directory for PNGs (default: {DEFAULT_OUTPUT_DIR})",
-    )
+    parser.add_argument("wisq_csv", help="WISQ-only CSV (e.g. data/best_wisq_per_circuit.csv from extract_wisq.py)")
+    parser.add_argument("runs_csv", help="Our benchmark runs CSV (e.g. *_runs.csv)")
+    parser.add_argument("--output", "-o", default=str(DEFAULT_OUTPUT_DIR),
+                        help=f"Output directory for PNGs (default: {DEFAULT_OUTPUT_DIR})")
     args = parser.parse_args()
 
-    in_path = Path(args.input)
-    if not in_path.exists():
-        print(f"ERROR: input file not found: {in_path}", file=sys.stderr)
+    wisq_path = Path(args.wisq_csv)
+    runs_path = Path(args.runs_csv)
+    for p in (wisq_path, runs_path):
+        if not p.exists():
+            print(f"ERROR: input file not found: {p}", file=sys.stderr)
+            return 1
+
+    wisq_by_circuit = load_wisq(wisq_path)
+    runs_by_circuit = load_runs(runs_path)
+    if not wisq_by_circuit:
+        print("No successful WISQ rows found in the WISQ CSV.", file=sys.stderr)
+        return 1
+    if not runs_by_circuit:
+        print("No successful runs found in the runs CSV.", file=sys.stderr)
+        return 1
+
+    # Join on circuit: keep only those present (successfully) in both files.
+    joined: dict[str, tuple[list[dict], dict]] = {}
+    for circuit, runs in runs_by_circuit.items():
+        wisq = wisq_by_circuit.get(circuit)
+        if wisq is not None:
+            joined[circuit] = (runs, wisq)
+
+    missing = sorted(set(runs_by_circuit) - set(wisq_by_circuit))
+    if missing:
+        print(f"Note: {len(missing)} circuit(s) in runs CSV have no WISQ result and are skipped: "
+              f"{', '.join(missing[:10])}{' ...' if len(missing) > 10 else ''}", file=sys.stderr)
+
+    if not joined:
+        print("No circuits in common between the two CSVs.", file=sys.stderr)
         return 1
 
     out_dir = Path(args.output)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    by_circuit = load_rows(in_path)
-    if not by_circuit:
-        print("No successful rows found in the CSV.", file=sys.stderr)
-        return 1
+    print(f"Plotting {len(joined)} circuit(s) → {out_dir}")
+    for circuit, (runs, wisq) in sorted(joined.items()):
+        plot_circuit(circuit, runs, wisq, out_dir)
 
-    print(f"Plotting {len(by_circuit)} circuit(s) → {out_dir}")
-    for circuit, rows in sorted(by_circuit.items()):
-        plot_circuit(circuit, rows, out_dir)
-
-    # Two cross-circuit overview figures: routing steps and time.
-    plot_summary(by_circuit, out_dir, "steps")
-    plot_summary(by_circuit, out_dir, "time")
+    plot_summary(joined, out_dir, "steps")
+    plot_summary(joined, out_dir, "time")
 
     return 0
 

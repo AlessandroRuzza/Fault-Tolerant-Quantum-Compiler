@@ -256,6 +256,11 @@ private:
     int num_candidates;
     int criticality_lookahead;
     float diversity_penalty;
+    // "packing_commute": when true, widen each step's candidate set with gates
+    // pulled from deeper layers that commute (CX same-control / same-target) with
+    // all pending predecessors on their qubits. Off by default → behaviour is
+    // byte-identical to before. The commute window equals criticality_lookahead.
+    bool enable_commute;
 
     std::vector<Routing> routing_steps;
     std::unordered_map<std::size_t, std::size_t> non_routed_histogram;
@@ -271,6 +276,14 @@ private:
     ) const;
     Routing route_layer_packing(const Layer& layer_gates) const;
 
+protected:
+    // Selection priority for a gate within a step: {primary, secondary}, higher
+    // is routed first (std::pair compares lexicographically). Base "packing"
+    // returns {downstream qubit pressure, 0}, so the secondary key is inert and
+    // behaviour is unchanged. The "critical_packing" subclass overrides this to
+    // use the true dependency-chain tail (critical path) as the primary key.
+    virtual std::pair<int, int> gate_priority(const Gate& g, int qubit_pressure_sum) const;
+
 public:
     PackingQubitRouter(
         const Mapping& m,
@@ -278,13 +291,15 @@ public:
         const Graph& g,
         int num_candidates = 2,
         int criticality_lookahead = 4,
-        float diversity_penalty = 1.0f
+        float diversity_penalty = 1.0f,
+        bool enable_commute = false
     ) : mapping(m),
         circuit(c),
         graph(g),
         num_candidates(std::max(1, num_candidates)),
         criticality_lookahead(std::max(0, criticality_lookahead)),
-        diversity_penalty(diversity_penalty) {}
+        diversity_penalty(diversity_penalty),
+        enable_commute(enable_commute) {}
 
     void route_circuit() override;
     inline int get_routing_length() const override { return static_cast<int>(routing_steps.size()); }
@@ -307,6 +322,49 @@ public:
     inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
     void print_routing(int i) const;
     void print_non_routed_histogram() const;
+};
+
+/*
+ * CriticalPackingQubitRouter ("critical_packing")
+ *
+ * Identical per-step disjoint-path packing as PackingQubitRouter, but gates are
+ * prioritised by their true critical-path criticality — the length of the
+ * longest dependency chain hanging off the gate (its "tail") — instead of the
+ * base router's downstream qubit pressure. The pressure is kept as the tiebreak.
+ *
+ * Rationale: pressure is a breadth measure over a short lookahead window and
+ * misses the depth of long serial cascades (e.g. QFT), where routing the
+ * longest-chain gate first is what reduces the step count. Using the tail as the
+ * primary key recovers that, while the pressure tiebreak preserves the base
+ * router's behaviour on circuits whose tails are flat (e.g. QAOA).
+ */
+class CriticalPackingQubitRouter : public PackingQubitRouter {
+private:
+    // gate.id -> longest dependency-chain tail. Computed once from the circuit's
+    // textual gate order; stays valid as routed gates are removed, so it is never
+    // recomputed per step.
+    std::unordered_map<int, int> gate_tail_by_id;
+    void compute_gate_criticality(const Circuit& circuit);
+
+protected:
+    std::pair<int, int> gate_priority(const Gate& g, int qubit_pressure_sum) const override {
+        const auto it = gate_tail_by_id.find(g.id);
+        const int tail = (it != gate_tail_by_id.end()) ? it->second : 0;
+        return {tail, qubit_pressure_sum};  // tail primary, pressure tiebreak
+    }
+
+public:
+    CriticalPackingQubitRouter(
+        const Mapping& m,
+        LayeredCircuit& c,
+        const Graph& g,
+        int num_candidates = 2,
+        int criticality_lookahead = 4,
+        float diversity_penalty = 1.0f,
+        bool enable_commute = false
+    ) : PackingQubitRouter(m, c, g, num_candidates, criticality_lookahead, diversity_penalty, enable_commute) {
+        compute_gate_criticality(c);
+    }
 };
 
 #endif // ROUTING_HPP

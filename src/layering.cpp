@@ -123,6 +123,44 @@ void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
         remove_trailing_empty_layers();
     }
 }
+void LayeredCircuit::update_layers_within(const std::vector<Gate>& routed_gates, std::size_t max_depth) {
+    if (routed_gates.empty() || layers.empty()) {
+        return;
+    }
+
+    std::unordered_set<Gate> routed_set(routed_gates.begin(), routed_gates.end());
+
+    // Remove the routed gates from the bounded window [0, max_depth]. The packing
+    // commutation mode only ever routes gates from this window, so this is enough
+    // in practice; the safety scan below covers any unexpected leftover without
+    // paying the full O(layers) cost on the common path.
+    const std::size_t windowed_last = std::min(max_depth, layers.size() - 1);
+    auto erase_routed_from_layer = [&](Layer& layer) {
+        for (auto it = layer.begin(); it != layer.end() && !routed_set.empty(); ) {
+            if (routed_set.count(*it) > 0) {
+                routed_set.erase(*it);
+                it = layer.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    };
+
+    for (std::size_t d = 0; d <= windowed_last && !routed_set.empty(); ++d) {
+        erase_routed_from_layer(layers[d]);
+    }
+    for (std::size_t d = windowed_last + 1; d < layers.size() && !routed_set.empty(); ++d) {
+        erase_routed_from_layer(layers[d]);
+    }
+
+    if (layers.front().empty()) {
+        remove_leading_empty_layers();
+    } else {
+        pull_gates_into_top_layer(layer_pull_lookahead);
+        remove_trailing_empty_layers();
+    }
+}
+
 void LayeredCircuit::reset(){
     ignored_gates.clear();
     build_layers();

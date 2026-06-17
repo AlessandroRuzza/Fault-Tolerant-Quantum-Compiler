@@ -36,6 +36,11 @@ public:
     }
 
     void update_layers(const std::vector<Gate>& routed_gates);
+    // Like update_layers, but removes routed gates from any of the top
+    // (max_depth + 1) layers, not just the front one. Needed by the packing
+    // router's commutation mode, which may route a gate pulled from a deeper
+    // layer. Scanning is bounded by max_depth so it stays cheap per step.
+    void update_layers_within(const std::vector<Gate>& routed_gates, std::size_t max_depth);
     inline void set_layer_pull_lookahead(std::size_t lookahead_layers) {
         layer_pull_lookahead = std::max<std::size_t>(1, lookahead_layers);
     }

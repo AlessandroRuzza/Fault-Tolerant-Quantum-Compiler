@@ -119,7 +119,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     bool metrics_only, int repetition_count,
     bool use_layer_cache_explicit = false,
     double cnot_formula_scale = 1.0,
-    double mapped_formula_scale = 1.0) {
+    double mapped_formula_scale = 1.0,
+    bool packing_commute = false) {
 
     // Clear any stale partial state (a worker process runs exactly one
     // one_execution, but resetting keeps the timeout handler honest).
@@ -486,7 +487,24 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
                 try { packing_lookahead = std::stoi(env); } catch (...) {}
             }
             routerPtr = std::make_unique<PackingQubitRouter>(
-                *mapping, *layeredCircuit, *graph, packing_candidates, packing_lookahead);
+                *mapping, *layeredCircuit, *graph, packing_candidates, packing_lookahead,
+                /*diversity_penalty=*/1.0f, packing_commute);
+        } else if (routing_strategy == "critical_packing") {
+            // Same per-step disjoint-path packing as "packing", but gates are
+            // prioritised by their true dependency-chain tail (critical path)
+            // with downstream qubit pressure as the tiebreak. Shares the same
+            // candidate/lookahead tunables and env overrides as "packing".
+            int packing_candidates = 2;
+            int packing_lookahead = 4;
+            if (const char* env = std::getenv("FTQC_PACKING_CANDIDATES")) {
+                try { packing_candidates = std::stoi(env); } catch (...) {}
+            }
+            if (const char* env = std::getenv("FTQC_PACKING_LOOKAHEAD")) {
+                try { packing_lookahead = std::stoi(env); } catch (...) {}
+            }
+            routerPtr = std::make_unique<CriticalPackingQubitRouter>(
+                *mapping, *layeredCircuit, *graph, packing_candidates, packing_lookahead,
+                /*diversity_penalty=*/1.0f, packing_commute);
         } else {
             constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
             constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;
