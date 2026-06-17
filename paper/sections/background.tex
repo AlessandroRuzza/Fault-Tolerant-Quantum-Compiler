@@ -1,0 +1,90 @@
+% ============================================================
+\section{Background and Problem Formulation}
+\label{sec:background}
+
+This section recalls the fault-tolerant substrate our compiler targets,
+formalises it as a graph, and states the placement problem.
+Figure~\ref{fig:overview} previews the pipeline from a circuit to a
+lattice-surgery schedule.
+
+\input{figures/fig_overview}
+
+\subsection{Surface Codes and Lattice Surgery}
+
+Physical qubits are too noisy to compute on directly, so fault-tolerant quantum
+computation (FTQC) encodes each \emph{logical} qubit into many physical qubits
+with a quantum error-correcting (QEC) code and operates on the encoded
+information while errors are continually detected and corrected. The leading
+choice is the \emph{surface code}, which stores one logical qubit in a
+two-dimensional \emph{patch} of physical qubits; enlarging the patch---its code
+distance---suppresses the logical error rate
+exponentially~\cite{fowler2012surface}. A computation is compiled into the
+Clifford$+T$ gate set, and each gate becomes a spatial operation on patches.
+
+A logical two-qubit gate is realised by \emph{lattice surgery}: a strip of free
+ancilla patches between the two operands is temporarily \emph{merged} with them to
+measure a joint Pauli operator and then \emph{split}, the pair of operations
+together implementing the gate~\cite{horsman2012lattice,litinski2019game}. The
+non-Clifford $T$ gate cannot be done this way; it is teleported by consuming a
+distilled \emph{magic state}, which must be delivered from a magic-state factory
+to the operand patch through a free lane of the lattice~\cite{bravyi2005magic}.
+Both kinds of operation therefore need a free \emph{corridor} of ancilla
+patches---joining the two operands, or an operand and a magic state---for the
+duration of the surgery, and these corridors are the resource the compiler must
+schedule.
+
+\subsection{Architecture Graph, Routing, and Safe Passage}
+
+We model the processor as an \emph{architecture graph} $\A=(V,E)$ over a
+rectangular $W\times H$ grid of patches. Each vertex $v\in V$ is a tile with
+integer coordinates $(x,y)$; edges connect orthogonally adjacent tiles, the
+corridors along which surgery can merge patches. A fixed subset
+$V_{\mathrm m}\subset V$ hosts magic states, whose number and positions are
+configuration parameters. At any instant a tile either holds a \emph{data
+patch}---a placed logical qubit---or is \emph{free}, carrying an ancilla patch
+that is reset each step and available for routing.
+
+A circuit $\C$ over logical qubits $\Q_L$ is given in the Clifford$+T$ basis. From
+it we extract, for each qubit $q$, its $T$-count $t(q)$ (its magic-state demand)
+and, for each pair $(q,q')$, the two-qubit interaction count $c(q,q')$; we write
+$\bar t,\sigma_t$ and $\bar c,\sigma_c$ for the mean and standard deviation of the
+per-qubit $T$- and CNOT-counts. These summary statistics are the only circuit
+information the placement uses (Section~\ref{sec:approach}), and the pair counts
+define the \emph{CNOT interaction graph} whose density later separates sparse from
+dense circuits.
+
+Given a mapping, the router processes the circuit in layers. At each step it must
+realise the active two-qubit gates by reserving vertex-disjoint paths in $\A$
+between operand tiles, and the active $T$ gates by reserving a path from the
+operand to a free magic-state tile; gates whose corridors would overlap are
+deferred to a later step. Serving the largest set of gates at once is exactly a
+maximum vertex-disjoint paths problem on $\A$, which is $\NP$-hard in
+general~\cite{beverland2022surface,siraichi2018qubit}, so practical routers are
+heuristic. We minimise the number of \emph{routing steps}---the lattice-surgery
+time-depth---and secondarily track the average gate parallelism per step.
+
+A placement is only useful if it stays routable as it grows. We say it satisfies
+\emph{safe passage} if, after a qubit is committed, (i) every pair of
+already-placed CNOT partners is still joined by some free path, (ii) every placed
+patch with $T$ demand can still reach a magic state, and (iii) at least one
+magic-state tile keeps a free neighbouring entry for the qubits with $T$ demand
+not yet placed. We use two tests of this condition. The \emph{connectivity} test
+checks reachability (i)--(iii) directly on the free lattice and admits any
+placement that preserves it; it packs patches tightly and fits on smaller grids.
+The \emph{cube} test is stricter, forbidding placement within the $3\times3$
+neighbourhood of an occupied patch; it needs more area, but the extra spacing
+leaves more routing options and yields consistently shorter routes in our
+experiments, so we take \emph{cube} as the default and reserve \emph{connectivity}
+for area-constrained instances.
+
+\begin{definition}[Qubit Mapping]
+    Given circuit $\C$ and architecture $\A$, a \emph{mapping}
+    $\M : \Q_L \to V\setminus V_{\mathrm m}$ is an injective assignment of
+    logical qubits to non-magic tiles.
+\end{definition}
+
+\begin{problem}[Routable Placement]
+    Find a mapping $\M$ that (a) satisfies safe passage and (b) minimises the
+    expected number of lattice-surgery routing steps required to execute $\C$
+    on $\A$.
+\end{problem}

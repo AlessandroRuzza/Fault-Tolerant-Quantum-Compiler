@@ -1,0 +1,24 @@
+% ── Abstract and keywords ────────────────────────────────────
+\begin{abstract}
+Running a quantum circuit fault-tolerantly on a surface-code processor reduces
+to two coupled tasks: placing logical qubits on a two-dimensional lattice and
+scheduling the lattice-surgery operations that execute its gates, each
+non-Clifford gate consuming a magic state. Unlike the near-term (NISQ) setting,
+the bottleneck is not $\SWAP{}$ insertion but the routing corridors---free lanes
+of lattice that must stay open so interacting patches can be joined on demand. We
+present a \emph{Gaussian potential-field} heuristic for the placement
+sub-problem: each candidate tile is scored by superposing attractive Gaussian
+fields---pulling $T$-heavy qubits toward magic states and tightly interacting
+qubits toward their partners---with repulsive fields that preserve routing space,
+and a \emph{safe-passage} test keeps every mapping routable. We implement the
+method in an open-source C++20 OpenQASM compiler and evaluate it against a
+randomized-restart baseline and the WISQ compiler. On \todo{$N$} circuits the
+field placement reduces routing steps by \todo{$X$}\% on average over the
+randomized baseline and is competitive with WISQ---completing several instances
+on which WISQ times out---at a fraction of the compilation time.
+\end{abstract}
+
+\begin{IEEEkeywords}
+qubit mapping, qubit routing, fault-tolerant compilation, surface code,
+lattice surgery, magic states, quantum circuit compilation, heuristic placement
+\end{IEEEkeywords}

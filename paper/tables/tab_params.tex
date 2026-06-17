@@ -1,0 +1,38 @@
+% ---- TABLE: tuned Gaussian parameters per regime (full width) ----
+% Currently kept in the project README ("Tuned Gaussian mapping parameters").
+% To show it in the paper, remove the \iffalse ... \fi wrapper and re-point the
+% "tuned per regime" sentence in sections/evaluation.tex to Table~\ref{tab:params}.
+\iffalse
+\begin{table*}[t]
+    \centering
+    \caption{Tuned Gaussian parameters by regime (weighting variant $\times$
+    lattice geometry). Common to all configurations: \texttt{external\_weight}
+    $=0$, \texttt{base\_gaussian\_weight}$=1$, \texttt{cnot\_low}$=0$,
+    \texttt{number\_of\_magic\_states}$=-1$ (auto), \texttt{center\_circle}
+    magic placement with a border margin, and naive routing with smart
+    $T$-routing. ``mapped'' is the repulsion-field weight and $\kappa$ the
+    confidence of \eqref{eq:sigma}; \textsc{magic-high} depends on the border
+    margin $b$ (percent), while all other weights do not.}
+    \label{tab:params}
+    \setlength{\tabcolsep}{5pt}
+    \footnotesize
+    \begin{tabular}{l cccc ccccc}
+        \toprule
+        & \multicolumn{4}{c}{\textbf{Border-independent weights}}
+        & \multicolumn{5}{c}{\textbf{\textsc{magic-high} by border $b$ (\%)}} \\
+        \cmidrule(lr){2-5}\cmidrule(lr){6-10}
+        \textbf{Regime} & \textbf{$\kappa$} & \textbf{\textsc{cnot-high}} & \textbf{mapped} & \textbf{\textsc{magic-low}}
+            & $b{=}0$ & $b{=}5$ & $b{=}10$ & $b{=}20$ & $b{=}30$ \\
+        \midrule
+        \regime{coarse}{cube} & 0.999999 & 1.5 & 0   & 0              & 0               & 0.2 & 0.2 & 0.2 & 1.6 \\
+        \regime{coarse}{conn} & 0.99999  & 1.5 & 2.0 & 0              & 0               & 0.2 & 0.8 & 0.8 & 0.2 \\
+        \regime{fine}{cube}   & 0.999999 & 0.5 & 0   & $1^{\dagger}$  & $20^{\ddagger}$ & 3   & 1.6 & 0   & 0   \\
+        \regime{fine}{conn}   & 0.99999  & 0.5 & 1.5 & 0              & 3               & 1.6 & 0.4 & 0.4 & 0.2 \\
+        \bottomrule
+    \end{tabular}
+
+    \vspace{2pt}
+    {\footnotesize $^{\dagger}$\,\textsc{magic-low}$=1$ for border $b\le10\%$, else $0$ (fine\,/\,cube only).\quad
+    $^{\ddagger}$\,Robust argmin is $20$, but the curve is flat above ${\sim}1.6$.}
+\end{table*}
+\fi

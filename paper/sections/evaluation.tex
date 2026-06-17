@@ -1,0 +1,52 @@
+% ============================================================
+\section{Evaluation}
+\label{sec:eval}
+
+We ask whether a cheap geometry-aware placement routes as well as far more
+expensive joint schedulers. This section describes the implementation and
+benchmark suite, the baselines we compare against, and the routing-quality
+results.
+
+\subsection{Experimental Setup}
+
+The method is implemented in an open-source C++20 compiler~\cite{ftqc} that parses
+OpenQASM, generates the rectangular architecture and its magic-state placement,
+runs the mapping of Section~\ref{sec:approach}, and routes the result with a
+lattice-surgery router; the lattice dimensions are sized automatically from the
+qubit count, the interaction degree, and the magic-state budget. The benchmark
+suite spans \todo{$N$} circuits from three families---arithmetic
+(\texttt{adder}, \texttt{multiplier}, \texttt{square\_root}), algorithmic
+(\texttt{qft}, \texttt{qpe}, \texttt{bwt}, \texttt{hhl}, \texttt{factor247}), and
+structured or state-preparation (\texttt{ghz}, \texttt{wstate}, \texttt{ising},
+\texttt{qaoa})---with logical qubit counts from \todo{min} to \todo{max}.
+
+We compare our (fine) Gaussian placement against two baselines. The first,
+\emph{random}, scatters qubits over a sparse sublattice with $3\times3$ spacing
+that makes every mapping trivially routable, and routes it with the same router as
+Gaussian; since each restart is so cheap, we run it for \todo{N} repetitions and
+keep the best result, whereas the Gaussian placement is deterministic and runs
+once. The second is the external WISQ compiler~\cite{wisq}. The primary metrics
+are the number of routing steps (the lattice-surgery time-depth) and the
+compilation time; our implementation additionally reports the average gate
+parallelism and the average non-routed-gate percentage per layer.
+
+\subsection{Results}
+
+Table~\ref{tab:results} reports routing steps and compilation time across the
+suite for the Gaussian method and the two baselines, and Figure~\ref{fig:scatter}
+plots per-circuit routing steps of the Gaussian method against WISQ: points below
+the diagonal favour our method, while the WISQ column of the table flags circuits
+where WISQ fails or times out though the Gaussian method completes. The field
+weights of Section~\ref{sec:fields} were tuned per regime---the four combinations
+of weighting variant (coarse or fine) and safe-passage strategy (cube or
+connectivity)---by benchmark sweeps, with the full values provided in the project
+repository~\cite{ftqc}.
+
+\input{tables/tab_results}
+\input{figures/fig_scatter}
+\input{tables/tab_params}
+
+\todo{Discussion, 2--4 sentences once numbers are in: (i) where the field method
+beats or loses to WISQ and why; (ii) how many randomized restarts the random
+baseline needs to match field placement, if ever, and at what grid-area cost;
+(iii) scalability.}

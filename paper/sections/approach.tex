@@ -1,0 +1,155 @@
+% ============================================================
+\section{Gaussian Field Placement}
+\label{sec:approach}
+
+This is the core of the method. We first define the influence field that a single
+source casts on the lattice and the score that superposes them, then give the two
+ways we set field weights from circuit statistics, and finally describe the
+placement-and-routing loop that consumes the score. Throughout, the guiding
+objective is the informal one---be near magic states when $T$-heavy, cluster with
+frequent partners, and leave room to route---turned into a scalar field whose
+safe maximum is the chosen tile.
+
+\subsection{Influence Fields and the Placement Score}
+\label{sec:fields}
+
+A single \emph{influence field} is an axis-aligned 2D Gaussian centred at a tile
+$(\mu_x,\mu_y)$,
+\begin{equation}
+g(x,y) \;=\; w\,\exp\!\Big(\!-\tfrac{(x-\mu_x)^2}{2\sigma_x^2}
+                              -\tfrac{(y-\mu_y)^2}{2\sigma_y^2}\Big),
+\label{eq:gauss}
+\end{equation}
+with a non-negative weight $w$. A field is either \emph{attractive}, contributing
+$g(x,y)$, or \emph{repulsive}, contributing the valley
+$\max\!\big(w-g(x,y),\,0\big)$, which is near zero at the centre and rises to $w$
+far away; attractive sources thus pull a qubit in, repulsive sources push it out.
+Both widths follow from a single interpretable parameter, the \emph{confidence}
+$\kappa\in(0,1)$: writing $R_{x/y}$ for the half-extent of the grid along an axis,
+\begin{equation}
+\sigma_{x/y} \;=\; \frac{R_{x/y}}{\sqrt{-2\ln(1-\kappa)}},
+\label{eq:sigma}
+\end{equation}
+so a field keeps a fraction $(1-\kappa)$ of its peak at distance $R$ from the
+centre, and larger $\kappa$ gives broader, longer-range influence. To bound work,
+each field is evaluated only within a fixed multiple of $\sigma$ of its centre and
+treated as zero beyond it.
+
+When placing a qubit $q$, the score at a free tile $v$ superposes four families of
+fields,
+\begin{equation}
+S(v)\!=\!\!\!
+   \underbrace{\sum_{m\in V_{\mathrm m}}\! g^{\mathrm{mag}}_m(v)}_{\text{magic-state pull/push}}
+ +\!\underbrace{\sum_{p\in P(q)}\! g^{\mathrm{cnot}}_p(v)}_{\text{partner clustering}}
+ + \underbrace{\sum_{u\in \M}\! g^{\mathrm{rep}}_u(v)}_{\text{spread-out}}
+ +\!\underbrace{b(v)}_{\text{centering}}\!\!,
+\label{eq:score}
+\end{equation}
+where $P(q)$ is the set of $q$'s interaction partners (the qubits sharing a gate
+with $q$) and $\M$ is the set of already-placed qubits. The \emph{magic-state}
+term puts one Gaussian on every magic tile $m\in V_{\mathrm m}$, whose sign and
+weight encode $q$'s $T$ demand: a $T$-heavy qubit makes them attractive and is
+drawn toward magic states, whereas a $T$-light qubit makes them repulsive,
+clearing those neighbourhoods for the qubits that need them. The
+\emph{partner} term puts an attractive Gaussian on the tile of each
+already-mapped partner $p\in P(q)$, pulling strongly coupled qubits together so
+their future surgeries traverse short corridors. The \emph{repulsion} term puts a
+repulsive Gaussian on every already-placed qubit $u\in\M$, discouraging
+overcrowding and preserving routing lanes. Finally $b(v)$ is a single attractive
+Gaussian at the grid centre that keeps the overall mapping compact; an optional
+constant bonus on border tiles is added when magic states sit on the boundary.
+Figure~\ref{fig:fields} shows the four families and their superposition. Crucially,
+only partners and patches \emph{already committed} contribute, so the field a
+qubit sees depends on the placement order---which we exploit in
+Section~\ref{sec:loop}.
+
+\input{figures/fig_fields}
+
+\subsection{Coarse and Fine Weighting}
+
+The two variants differ only in how each field's weight $w$ and its
+attractive/repulsive sign are read off the circuit statistics. Both use a small
+set of non-negative tuned constants---\textsc{magic-high}, \textsc{magic-low} for
+the magic fields and \textsc{cnot-high} for the partner fields---whose values are
+fixed per regime by the sweeps of Section~\ref{sec:eval} and listed in the
+repository~\cite{ftqc}.
+
+The \emph{coarse} variant makes discrete decisions from a qubit's $T$-count $t(q)$
+and its largest single-partner CNOT count $c_{\max}(q)=\max_{p}c(q,p)$: the qubit
+is \emph{$T$-bound} when $t(q)>c_{\max}(q)$ and \emph{partner-driven} otherwise.
+Its magic-field weight switches on only for qubits whose $T$ demand is more than
+one standard deviation from the mean,
+\begin{equation*}
+w^{\mathrm{mag}}_q \;=\;
+\begin{cases}
+\textsc{magic-high}, & |t(q)-\bar t|>\sigma_t,\\[2pt]
+0, & \text{otherwise,}
+\end{cases}
+\end{equation*}
+the field being attractive if $t(q)>c_{\max}(q)$ and repulsive if
+$t(q)\le c_{\max}(q)$. In the partner-driven regime it also adds an attractive
+CNOT field at every mapped partner $p$ with above-average interaction
+($c(q,p)\ge\bar c$), and triples the pull toward the single dominant partner
+$p^{\star}=\arg\max_p c(q,p)$,
+\begin{equation*}
+w^{\mathrm{cnot}}_{p} \;=\;
+\begin{cases}
+3\,\textsc{cnot-high}, & p=p^{\star},\\[2pt]
+\textsc{cnot-high}, & \text{otherwise.}
+\end{cases}
+\end{equation*}
+
+The \emph{fine} variant replaces the thresholds with linear interpolation, writing
+$\mathrm{lerp}(a,b,s)=a+s\,(b-a)$ for $s\in[0,1]$. For the magic fields,
+\begin{equation*}
+w^{\mathrm{mag}}_q =\!
+\begin{cases}
+\textsc{magic-high}, & \hspace{-40pt} |t(q)-\bar t|>\sigma_t,\\[2pt]
+\mathrm{lerp}\!\big(\textsc{magic-low},\textsc{magic-high},\tfrac{|t(q)-\bar t|}{\sigma_t}\big), & \hspace{5pt} \text{else},
+\end{cases}
+\end{equation*}
+attractive when $t(q)>\bar t$ and repulsive when $t(q)<\bar t$; the CNOT fields are
+weighted analogously from the per-pair count $c(q,p)$ relative to $\bar c$ and
+$\sigma_c$. Fine thus reacts smoothly to how far a qubit deviates from the
+circuit's average resource profile, while coarse commits to a hard on/off split.
+
+\subsection{Placement-and-Routing Loop}
+\label{sec:loop}
+
+Placement is greedy and proceeds in a single pass. We first rank qubits by
+\emph{interaction importance}---a qubit's $T$-count plus its largest single-partner
+CNOT count---and commit the most important first, so the mapping forms around the
+qubits that constrain it most while the lattice is still empty. Because a qubit's
+partner fields act only on partners that are already placed, the visiting order
+matters on sparse circuits: when the CNOT interaction graph has density below a
+threshold $\tau$ ($0.7$ by default) we expand placement in \emph{CNOT-BFS} order,
+starting from the highest-importance qubits and visiting each interaction
+neighbourhood breadth-first, heaviest partner first, so every qubit finds its
+strongest partner already in place; on dense graphs, which offer no such locality,
+we keep the plain importance order. For each qubit we evaluate the score $S$ of
+\eqref{eq:score} on every free tile, sort the tiles by decreasing $S$, and commit
+the first that passes the safe-passage test of Section~\ref{sec:background},
+adding a repulsion field there; if no tile passes, placement reports failure.
+Algorithm~\ref{alg:main} summarises the loop and Figure~\ref{fig:frames} shows a
+mapping forming, the repulsion valleys spacing patches apart while peaks stay near
+the magic tiles.
+
+\input{algorithms/alg_placement}
+
+The resulting mapping is handed to the router. Our \emph{packing} router 
+opens as many vertex-disjoint corridors per step as it can,
+prioritising gates that are critical to the downstream schedule, and serves $T$
+gates with a dedicated strategy that reserves a lane to the nearest free
+magic-state tile; a simpler \emph{naive} shortest-path router is also available.
+Because safe passage already guarantees a routable mapping, the router never
+deadlocks: its only job is to pack each step densely. The full router is described
+in the artifact~\cite{ftqc}.
+
+\input{figures/fig_frames}
+
+\begin{remark}
+Evaluating the field for one qubit costs
+$O(|V|\cdot(|V_{\mathrm m}|+|P(q)|+|\M|))$, and with the lattice sized as
+$\Theta(|\Q_L|+|V_{\mathrm m}|)$ tiles the whole placement is low-order
+polynomial in the qubit count.
+\end{remark}

@@ -1,0 +1,16 @@
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented a Gaussian potential-field heuristic for the placement sub-problem of
+fault-tolerant compilation. The method superposes attractive magic-state and
+partner fields with repulsive fields and places each qubit at the safe maximum of
+the result, folding $T$-gate locality, interaction clustering, and corridor
+preservation into a single fast scoring pass while safe passage keeps every
+mapping routable. Implemented in an open-source OpenQASM-to-lattice-surgery
+compiler and evaluated against a randomized-restart baseline and the WISQ
+compiler, it \todo{state the headline result once the tables are filled}. Its main
+limitations are the greedy, single-pass nature of placement and the reliance on
+hand-tuned field weights; a natural next step is to learn or jointly optimise
+those weights, and to feed the field gradient back into the router so that
+placement and scheduling co-adapt.

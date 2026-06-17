@@ -1,0 +1,74 @@
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+Fault-tolerant quantum computation protects each logical qubit inside a patch of
+a quantum error-correcting code, most commonly the surface code laid out on a
+two-dimensional grid of physical qubits~\cite{fowler2012surface}. On such
+hardware a logical two-qubit gate is performed via \emph{lattice surgery}, which 
+temporarily merges and then splits a strip of
+ancilla patches between the two operands~\cite{horsman2012lattice,litinski2019game}. 
+The non-Clifford $T$
+gate that completes a universal Clifford$+T$ set cannot be applied transversally;
+it is teleported by consuming a distilled \emph{magic state}, which must travel
+from a magic-state factory to the operand through a free corridor of the
+lattice~\cite{bravyi2005magic}. Computation thus becomes a choreography of
+patches and of the empty lanes between them.
+
+Compiling a logical circuit onto this fabric splits into two coupled
+sub-problems. \emph{Mapping} assigns each logical qubit to a patch; \emph{routing}
+then schedules the lattice-surgery operations in time, reserving disjoint ancilla
+corridors at every step. Superficially this mirrors the NISQ map-and-route
+pipeline of compilers such as SABRE~\cite{li2019sabre} and the Qiskit
+transpiler~\cite{qiskit}, but the cost model differs in kind. There are no
+$\SWAP{}$ gates and no fixed coupling graph: connectivity is rebuilt from scratch
+at each step, and the scarce resource is free \emph{space}---lanes for corridors
+and access to magic states. The
+initial placement is decisive, because a $T$-heavy qubit stranded far from a
+magic state, or a pair of frequent partners scattered across the grid, forces
+lattice surgeries to serialise and inflates the routing depth.
+
+We address the placement sub-problem with a \emph{potential-field} heuristic
+borrowed from robot motion planning~\cite{khatib1986potential}. Each candidate
+tile is scored by a scalar
+field obtained by superposing two-dimensional Gaussians: attractive bumps that
+pull a $T$-heavy qubit toward magic states and tightly coupled qubits toward
+their partners, and repulsive valleys around already-placed patches that keep
+routing lanes open. Every qubit is committed to the highest-scoring tile that
+passes a \emph{safe-passage} test---a fast reachability check guaranteeing that no
+placement traps a patch away from its partners or its magic states---so the
+resulting mapping is always routable. The whole pass is deterministic and runs in
+low-order polynomial time, in contrast to the search- and solver-based schedulers
+that dominate current fault-tolerant toolchains.
+
+Qubit mapping and routing are well studied in the NISQ regime, where heuristics
+such as SABRE~\cite{li2019sabre} and the Qiskit transpiler~\cite{qiskit} insert
+$\SWAP{}$ gates to satisfy a fixed coupling graph and the underlying allocation
+problem is known to be $\NP$-hard~\cite{siraichi2018qubit}; these methods
+minimise $\SWAP{}$ count or depth, objectives that do not transfer to a setting
+with no $\SWAP{}$s and a per-step reconfigurable topology. On the fault-tolerant
+side, Litinski's \emph{game of surface codes}~\cite{litinski2019game} fixes the
+lattice-surgery cost model and tile budgets we optimise against, while Beverland
+et al.~\cite{beverland2022surface} formalise surface-code routing as an
+edge-disjoint-paths problem and compile circuits by solving it. WISQ~\cite{wisq}
+is a recent end-to-end fault-tolerant compiler that treats placement and
+scheduling jointly with a dependency-aware solver; it produces high-quality
+schedules but scales poorly and can time out on larger circuits. Relative to all
+of these, our contribution is deliberately lightweight: instead of solving
+placement and routing together by search, we compute a cheap, interpretable
+placement up front and hand it to a simple downstream router.
+
+\smallskip
+\noindent\textbf{Contributions.}
+We formulate fault-tolerant initial placement as the maximisation of a Gaussian
+potential field over the lattice, sourced by magic states, mapped interaction
+partners and already-placed qubits, and we pair it with a safe-passage filter
+that certifies routability before any routing is attempted. We give two
+weightings of the field---a discrete \emph{coarse} variant and a continuous
+\emph{fine} variant that interpolates field strength from per-qubit $T$-count and
+per-pair CNOT statistics---and implement everything in an open-source C++20
+OpenQASM-to-lattice-surgery compiler~\cite{ftqc}. On \todo{$N$} arithmetic,
+algorithmic and state-preparation circuits the field placement reduces routing
+steps by \todo{$X$}\% on average over a random baseline and matches
+or improves on WISQ (by \todo{$M_{low}-M_{high}\times$}) for \todo{$k$ of $N$} 
+circuits, while compiling \todo{$Y$}$\times$ faster (Section~\ref{sec:eval}).
