@@ -226,28 +226,40 @@
 % ---------- 4. PLACEMENT MATTERS ----------
 \begin{frame}{A good \emph{placement} decides everything downstream}
   \begin{columns}[T]
-  \begin{column}{0.5\textwidth}
+  \begin{column}{0.4\textwidth}
     \centering {\color{ftred}\bfseries Bad: $T$-heavy qubit far from $\star$}\\[4pt]
     \begin{tikzpicture}[scale=0.62]
       \latgrid{6}{4}
-      \node[data] at (0,0){}; \node[qlabel] at (0,0){$q$};
+      \node[data] at (0,0){}; \node[qlabel] at (0,0){$q1$};
+      \node[data] at (0,4){}; \node[qlabel] at (0,4){$q2$};
       \node[magic] at (6,4){}; \node[mstar] at (6,4){};
+      \node[magic] at (6,0){}; \node[mstar] at (6,0){};
       \foreach \c in {(1,0),(2,0),(2,1),(3,1),(3,2),(4,2),(4,3),(5,3),(5,4)}
         \node[corridor] at \c{};
       \draw[pin,ftred,thick]
         (0,0)--(2,0)--(2,1)--(3,1)--(3,2)--(4,2)--(4,3)--(5,3)--(5,4)--(6,4);
-      \node[ftred,font=\scriptsize] at (3,-0.9){long corridor $\to$ serialised steps};
+      \node[ftred,font=\scriptsize] at (3,-0.9){long corridor $\to$ block other paths};
     \end{tikzpicture}
   \end{column}
-  \begin{column}{0.5\textwidth}
+  \begin{column}{0.1\textwidth}
+    \centering
+    Circuit\\[5pt]
+    T q1 \\[5pt]
+    T q2
+  \end{column}
+  \begin{column}{0.4\textwidth}
     \centering {\color{ftgreen!55!black}\bfseries Good: $q$ hugs its $\star$}\\[4pt]
     \begin{tikzpicture}[scale=0.62]
       \latgrid{6}{4}
-      \node[data] at (4,2){}; \node[qlabel] at (4,2){$q$};
-      \node[magic] at (6,2){}; \node[mstar] at (6,2){};
-      \node[corridor] at (5,2){};
-      \draw[pin,ftgreen!55!black,thick] (4,2) -- (6,2);
-      \node[ftgreen!55!black,font=\scriptsize] at (3,-0.9){short corridor $\to$ parallel routing};
+      \node[data] at (4,3){}; \node[qlabel] at (4,3){$q1$};
+      \node[data] at (4,1){}; \node[qlabel] at (4,1){$q2$};
+      \node[magic] at (6,3){}; \node[mstar] at (6,3){};
+      \node[magic] at (6,1){}; \node[mstar] at (6,1){};
+      \node[corridor] at (5,3){};
+      \node[corridor] at (5,1){};
+      \draw[pin,ftgreen!55!black,thick] (4,3) -- (6,3);
+      \draw[pin,ftgreen!55!black,thick] (4,1) -- (6,1);
+      \node[ftgreen!55!black,font=\scriptsize] at (3,-0.9){short corridor $\to$ more parallelism};
     \end{tikzpicture}
   \end{column}
   \end{columns}
@@ -256,7 +268,7 @@
   \centering
   \begin{tikzpicture}
     \node[draw=ftblue,fill=ftblue!8,rounded corners,inner sep=6pt,font=\small]{
-      \textbf{Goal:} a cheap, geometry-aware placement that \emph{routes well} --- and stays routable.};
+      \textbf{Goal:} a cheap, geometry-aware heuristic for routable placements that \emph{route well}.};
   \end{tikzpicture}
 \end{frame}
 
@@ -364,12 +376,12 @@
     \centering {\bfseries\color{ftgreen!55!black} Connectivity}\\[3pt]
     \begin{tikzpicture}[scale=0.6]
       \latgrid{5}{4}
-      \node[data] at (1,1){}; \node[data] at (3,3){};
-      \node[magic] at (5,0){}; \node[mstar] at (5,0){};
-      \foreach \c in {(1,2),(1,3),(2,3),(2,1),(3,1),(4,1),(4,0)}
+      \node[data] at (2,2){}; \node[data] at (3,3){};
+      \node[magic] at (3,1){}; \node[mstar] at (3,1){};
+      \foreach \c in {(2,3),(2,1),(3,2)}
         \node[corridor] at \c{};
-      \draw[pin,ftgreen!55!black] (1,1)--(1,3)--(3,3);
-      \draw[pin,ftgreen!55!black] (1,1)--(4,1)--(4,0)--(5,0);
+      \draw[pin,ftgreen!55!black] (2,2)--(2,3)--(3,3);
+      \draw[pin,ftgreen!55!black] (2,2)--(2,1)--(3,1);
     \end{tikzpicture}\\[2pt]
     {\scriptsize admit if reachability still holds $\Rightarrow$\\ \textbf{packs tightly}, smaller area}
   \end{column}
