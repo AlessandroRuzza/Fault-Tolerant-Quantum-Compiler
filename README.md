@@ -1,4 +1,4 @@
-# Fault-Tolerant-Quantum-Compiler
+# Fault-Tolerant Quantum Compiler - Gaussian Potential-Field mapping
 
 Fault-Tolerant-Quantum-Compiler is a C++20 project that parses OpenQASM circuits, maps them onto a target architecture with configurable strategies, and performs routing with several selectable strategies (congestion-aware, naive, naive-critical, packing, and an optional Boost-based router).
 
@@ -150,7 +150,7 @@ Common to all configurations:
 | `CNOT_LOW` | `0` | |
 | `number_of_magic_states` | `-1` | auto |
 | `MagicStatePlacementStrategy` | `center_circle` | with `border_distance_percentage` |
-| `routing_strategy` / `t-routing-mode` | `naive` / `smart_t_routing` | |
+| `routing_strategy` / `t-routing-mode` | `naive_critical` / `smart_t_routing` | |
 
 Border-independent weights:
 
@@ -181,10 +181,10 @@ on *both* axes — it routes optimally on a much smaller lattice (gaussian mappi
 `naive_critical` routing):
 
 | Config | Grid | Routing steps | Avg parallelism | Non-routed | Exec. time |
-|---			 |---	 |---	 |---				 |---	  |---	   |
+|---|---|---|---|---|---|
 | `cube`         | 42×42 | 5     | 167.6 / 209.5     | 2.51%  | 0.21 s |
 | `connectivity` | 24×24 | **4** | **209.5 / 209.5** | **0%** | 0.28 s |
-| WISQ           | 45x45 | 43    | —                 | —      | 93 s   |
+| WISQ           | 45×45 | 43    | —                 | —      | 93 s   |
 
 `connectivity` reaches full parallelism (209.5 / 209.5) with zero non-routed
 layers in 4 steps on a 24×24 grid, while `cube` needs 42×42 yet takes 5 steps and
@@ -371,7 +371,7 @@ Benchmark mode writes persistent artifacts in three places:
 - Aggregated benchmark CSV:
 	- `benchmarks/results/<bench_name>_runs.csv`
 
-CSV rows include status fields such as `status`, `exit_code`, `duration_seconds`, `timeout_reached`, `routing_steps`, and log path.
+CSV rows include status fields such as `status`, `exit_code`, `duration_seconds`, `timeout_reached`, `routing_steps`, `avg_parallelism`, and log path.
 
 Benchmark workers disable shared visualization/QASM artifact generation so parallel runs do not interfere with each other; logs and CSV outputs remain the persistent benchmark outputs.
 
@@ -393,17 +393,15 @@ If `timeout` is set in a case, execution is wrapped with `timeout`; timed-out ru
 
 ## Analyze benchmark outputs
 
-Merge multiple benchmark CSVs and generate plots:
+Merge every benchmark CSV in `benchmarks/results/` and generate the full plot set:
 
 ```bash
-python3 scripts/merge_and_plot_results.py
+python3 scripts/generate_benchmark_plots.py --glob
 ```
 
-Defaults:
-
-- input dir: `benchmarks/results/`
-- merged CSV: `benchmarks/results/merged_runs.csv`
-- plots dir: `benchmarks/results/plots/`
+`--glob` concatenates all CSVs in the results directory (writing a merged CSV to
+the output directory). Use `--distinct` instead to de-duplicate repeated runs by
+configuration, or `--output-dir <dir>` to change where plots are written.
 
 Generate plots from a single benchmark CSV:
 
