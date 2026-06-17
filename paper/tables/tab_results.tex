@@ -4,7 +4,7 @@
     \caption{Routing steps and compilation time per benchmark.\\[2pt]
     ``Gauss'' is the (tuned) Gaussian ``fine'' placement,\\
     ``Rand'' is the best of \todo{N} randomized baselines. \\
-    $L_{\min}$ is the circuit layer count (minimum routing steps).\\
+    $\Rmin$ is the minimum routing steps (the circuit layer count).\\
     $|\Q_L|$ is the circuit qubit count.\\
     \todo{Fill table from CSV runs + WISQ.}
     }
@@ -13,8 +13,8 @@
     \scriptsize
     \begin{tabular}{l r r rrr rrr}
         \toprule
-        \textbf{Circuit} & \textbf{$|\Q_L|$} & \textbf{$L_{\min}$}
-            & \multicolumn{3}{c}{\textbf{Routing steps}}
+        \textbf{Circuit} & \textbf{$|\Q_L|$} & \textbf{$\Rmin$}
+            & \multicolumn{3}{c}{\textbf{Routing steps} $|\Rout|$}
             & \multicolumn{3}{c}{\textbf{Compilation time (s)}} \\
         \cmidrule(lr){4-6}\cmidrule(lr){7-9}
             & & & \textbf{Gauss} & \textbf{Rand} & \textbf{WISQ}
@@ -22,6 +22,8 @@
         \midrule
         \texttt{adder}        & 28 & -- & -- & -- & -- & -- & -- & -- \\
         \texttt{qft}          & 20 & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{ising}        & 26 & -- & -- & -- & -- & -- & -- & -- \\
+        \texttt{ising}       & 420 & -- & -- & -- & -- & -- & -- & -- \\
         \texttt{multiplier}   & 45 & -- & -- & -- & -- & -- & -- & -- \\
         \texttt{square\_root} & 45 & -- & -- & -- & -- & -- & -- & -- \\
         \texttt{bwt}          & 21 & -- & -- & -- & -- & -- & -- & -- \\

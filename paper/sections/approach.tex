@@ -46,7 +46,8 @@ S(v)\!=\!\!\!
 \label{eq:score}
 \end{equation}
 where $P(q)$ is the set of $q$'s interaction partners (the qubits sharing a gate
-with $q$) and $\M$ is the set of already-placed qubits. The \emph{magic-state}
+with $q$) and the repulsion sum ranges over the qubits already committed by the
+partial mapping $\M$ (Definition~\ref{def:mapping}). The \emph{magic-state}
 term puts one Gaussian on every magic tile $m\in V_{\mathrm m}$, whose sign and
 weight encode $q$'s $T$ demand: a $T$-heavy qubit makes them attractive and is
 drawn toward magic states, whereas a $T$-light qubit makes them repulsive,
@@ -128,22 +129,25 @@ neighbourhood breadth-first, heaviest partner first, so every qubit finds its
 strongest partner already in place; on dense graphs, which offer no such locality,
 we keep the plain importance order. For each qubit we evaluate the score $S$ of
 \eqref{eq:score} on every free tile, sort the tiles by decreasing $S$, and commit
-the first that passes the safe-passage test of Section~\ref{sec:background},
-adding a repulsion field there; if no tile passes, placement reports failure.
+the first that keeps the mapping in safe passage
+(Definition~\ref{def:safepassage}), adding a repulsion field there; if no tile
+passes, placement reports failure.
 Algorithm~\ref{alg:main} summarises the loop and Figure~\ref{fig:frames} shows a
 mapping forming, the repulsion valleys spacing patches apart while peaks stay near
 the magic tiles.
 
 \input{algorithms/alg_placement}
 
-The resulting mapping is handed to the router. Our \emph{packing} router 
-opens as many vertex-disjoint corridors per step as it can,
-prioritising gates that are critical to the downstream schedule, and serves $T$
-gates with a dedicated strategy that reserves a lane to the nearest free
-magic-state tile; a simpler \emph{naive} shortest-path router is also available.
-Because safe passage already guarantees a routable mapping, the router never
-deadlocks: its only job is to pack each step densely. The full router is described
-in the artifact~\cite{ftqc}.
+The resulting mapping is handed to the router, which turns it into a routing
+$\Rout$ (Definition~\ref{def:routing}). Our \emph{packing} router opens as many
+vertex-disjoint corridors per step $P_i$ as it can, prioritising gates that are
+critical to the downstream schedule, and serves $T$ gates with a dedicated
+strategy that reserves a lane to the nearest free magic-state tile; a simpler
+\emph{naive} shortest-path router is also available. Because the mapping already
+satisfies safe passage (Definition~\ref{def:safepassage}), every gate stays
+reachable and the router never deadlocks---its only job is to keep $|\Rout|$ small
+by packing each step densely. The full router is described in the
+artifact~\cite{ftqc}.
 
 \input{figures/fig_frames}
 
