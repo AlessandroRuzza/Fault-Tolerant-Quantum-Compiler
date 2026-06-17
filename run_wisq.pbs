@@ -6,7 +6,7 @@
 
 cd "$PBS_O_WORKDIR"
 
-mkdir -p benchmarks/results benchmarks/logs config universal_set_qasms qasm_graphs logs visualization
+mkdir -p benchmarks/results benchmarks/logs config qasms universal_set_qasms qasm_graphs logs visualization
 
 LOG_FILE="logs/wisq_${PBS_JOBID}.log"
 
@@ -28,6 +28,7 @@ apptainer exec \
   --env OMP_DISPLAY_ENV=TRUE \
   --bind "$PWD/scripts:/app/scripts" \
   --bind "$PWD/config:/app/config" \
+  --bind "$PWD/qasms:/app/qasms" \
   --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
   --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
   --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \

@@ -14,7 +14,7 @@ cd "$PBS_O_WORKDIR"
 PROCESSOR="${PROCESSOR:-0}"
 BENCH_PROCESS_COUNT="${BENCH_PROCESS_COUNT:-1}"
 
-mkdir -p benchmarks/results benchmarks/logs config universal_set_qasms qasm_graphs logs
+mkdir -p benchmarks/results benchmarks/logs config qasms universal_set_qasms qasm_graphs logs
 
 LOG_FILE="logs/ftqc_${PBS_JOBID}_p${PROCESSOR}.log"
 
@@ -63,6 +63,7 @@ apptainer run \
   --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
   --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
   --bind "$PWD/config:/app/config" \
+  --bind "$PWD/qasms:/app/qasms" \
   --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
   --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
   ftqc.sif >> "$LOG_FILE" 2>&1
