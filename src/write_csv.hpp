@@ -62,12 +62,12 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
     "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
     "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,resolved_n_magic,"
-    "external_weight,avg_parallelism,max_parallelism,min_routing_steps";
+    "external_weight,avg_parallelism,max_parallelism,min_routing_steps,cnot_interaction_density";
 
-// V19: the 47-column layout before max_parallelism and min_routing_steps were
-// appended as the final two columns. Identical to current minus those trailing
-// columns; migration appends two empty columns (already-recorded runs carry no
-// max parallelism or min routing steps).
+// V19: the 47-column layout before max_parallelism, min_routing_steps and
+// cnot_interaction_density were appended as the final three columns. Identical
+// to current minus those trailing columns; migration appends three empty
+// columns (already-recorded runs carry none of those metrics).
 inline constexpr const char *kBenchmarkRunsCsvHeaderV19 =
     "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
     "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
@@ -633,9 +633,9 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 migrated.resize(47);
             } else if (from_v18) {
                 // V18 is the current layout minus the trailing avg_parallelism,
-                // max_parallelism and min_routing_steps columns; pass the 46
-                // columns through and append the new empty columns below. Column
-                // 16 already holds gaussian_sigma, keep it.
+                // max_parallelism, min_routing_steps and cnot_interaction_density
+                // columns; pass the 46 columns through and append the new empty
+                // columns below. Column 16 already holds gaussian_sigma, keep it.
                 migrated = parsed;
                 migrated.resize(46);
             } else if (from_v17) {
@@ -1164,10 +1164,16 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 migrated.resize(48);
             }
 
-            // min_routing_steps is a new trailing column not present in any prior
-            // layout; leave it empty for every migrated row.
+            // min_routing_steps is a trailing column absent before the current
+            // layout; leave it empty for every row migrated from an older layout.
             if (migrated.size() < 49) {
                 migrated.resize(49);
+            }
+
+            // cnot_interaction_density is a new trailing column not present in any
+            // prior layout; leave it empty for every migrated row.
+            if (migrated.size() < 50) {
+                migrated.resize(50);
             }
 
             out << render_row(migrated) << '\n';

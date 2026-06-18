@@ -100,6 +100,9 @@ AXIS_BARPLOT_METRIC_SPECS = (
 PER_CIRCUIT_BARPLOT_DIR = "barplots_by_circuit"
 HEATMAP_DIR = "heatmap"
 TIME_ANALYSIS_DIR = "time_analysis"
+# Routing-steps-vs-circuit-characteristic scatters (max_parallelism,
+# min_routing_steps). Always generated; not gated behind --time.
+PARALLELISM_ANALYSIS_DIR = "parallelism_analysis"
 # Gates the time_analysis/ subfolder: when False, save_fig drops any plot that
 # would land there. Flipped on by --time in main().
 INCLUDE_TIME_ANALYSIS = False
@@ -1164,6 +1167,9 @@ COMPACT_ROW_FIELDS = (
     "routing_steps_f",
     "non_routed_layer_pct_f",
     "avg_parallelism_f",
+    "max_parallelism_f",
+    "min_routing_steps_f",
+    "cnot_interaction_density_f",
     "interaction_pressure_f",
     "data_density_f",
     "overall_density_f",
@@ -1479,6 +1485,9 @@ _DROP_RAW_FIELDS_AFTER_PREP = (
     "gaussian_confidence",
     "non_routed_layer_pct",
     "avg_parallelism",
+    "max_parallelism",
+    "min_routing_steps",
+    "cnot_interaction_density",
     "interaction_pressure", "data_density", "overall_density",
     "exit_code",
     "total_nodes",
@@ -1538,6 +1547,9 @@ def prepare_row_for_analysis(row):
     row["routing_steps_f"] = to_float_interned(pick_first(row, "routing_steps", "total_routing_steps"))
     row["non_routed_layer_pct_f"] = to_float_interned(row.get("non_routed_layer_pct"))
     row["avg_parallelism_f"] = to_float_interned(row.get("avg_parallelism"))
+    row["max_parallelism_f"] = to_float_interned(row.get("max_parallelism"))
+    row["min_routing_steps_f"] = to_float_interned(row.get("min_routing_steps"))
+    row["cnot_interaction_density_f"] = to_float_interned(row.get("cnot_interaction_density"))
     row["interaction_pressure_f"] = to_float_interned(row.get("interaction_pressure"))
     row["data_density_f"] = to_float_interned(row.get("data_density"))
     row["overall_density_f"] = to_float_interned(row.get("overall_density"))
@@ -2120,6 +2132,175 @@ def scatter_plot(
     ax.set_ylabel(ylabel)
     ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
     save_fig(fig, output_dir, filename, generated)
+
+
+def plot_routing_steps_vs_parallelism(rows_success_with_routing, output_dir, generated, skipped=None):
+    """Scatter routing_steps against per-circuit structural characteristics.
+
+    Two relationship plots, coloured by routing strategy so different routers
+    can be compared on the same circuits:
+
+      * routing_steps vs max_parallelism  -- max_parallelism is the average
+        number of gates per layer (gates / layering depth); it measures how
+        much work the circuit packs into each layer.
+      * routing_steps vs min_routing_steps -- min_routing_steps is the layering
+        depth, a hard lower bound on routing_steps (a perfect router needs at
+        least one step per layer). The y=x reference line marks that bound, so
+        the vertical gap above it shows how close routing gets to optimal.
+      * routing_steps vs cnot_interaction_density -- circuit interaction density
+        (unique CNOT pairs / all possible pairs, in [0, 1]); how connected the
+        circuit's interaction graph is.
+    """
+    specs = (
+        (
+            "max_parallelism_f",
+            "max parallelism (avg gates / layer)",
+            "Routing Steps vs Max Parallelism",
+            "routing_steps_vs_max_parallelism.png",
+            False,
+        ),
+        (
+            "min_routing_steps_f",
+            "min routing steps (layering depth)",
+            "Routing Steps vs Min Routing Steps",
+            "routing_steps_vs_min_routing_steps.png",
+            True,
+        ),
+        (
+            "cnot_interaction_density_f",
+            "circuit density (unique CNOT pairs / max pairs)",
+            "Routing Steps vs Circuit Density",
+            "routing_steps_vs_circuit_density.png",
+            False,
+        ),
+    )
+    for x_key, xlabel, title, filename, identity_line in specs:
+        points = []
+        for r in rows_success_with_routing:
+            x = r.get(x_key)
+            y = r.get("routing_steps_f")
+            if x is None or y is None:
+                continue
+            if (isinstance(x, float) and math.isnan(x)) or (isinstance(y, float) and math.isnan(y)):
+                continue
+            points.append((x, y, str(r.get("routing_strategy_norm") or "unknown")))
+
+        if not points:
+            record_skipped_plot(
+                skipped,
+                filename,
+                f"no successful rows with numeric {x_key} and routing_steps",
+            )
+            continue
+
+        labels = sorted({p[2] for p in points})
+        colors = category_color_map(labels)
+        fig, ax = plt.subplots(figsize=(9, 6))
+        for label in labels:
+            subset = [p for p in points if p[2] == label]
+            ax.scatter(
+                [p[0] for p in subset],
+                [p[1] for p in subset],
+                label=legend_label_with_sample_count(label, len(subset)),
+                alpha=0.7,
+                s=28,
+                color=colors[label],
+            )
+
+        if identity_line:
+            bound = min(min(p[0] for p in points), min(p[1] for p in points))
+            top = max(max(p[0] for p in points), max(p[1] for p in points))
+            ax.plot(
+                [bound, top],
+                [bound, top],
+                color="#444444",
+                linestyle="--",
+                linewidth=1.0,
+                label="y = x (lower bound)",
+                zorder=1,
+            )
+
+        # Routing steps span orders of magnitude across circuits, so use a log
+        # y-axis. On the step-vs-step plot, log the x-axis too so the y=x lower
+        # bound stays a straight line.
+        ax.set_yscale("log")
+        if identity_line:
+            ax.set_xscale("log")
+
+        ax.set_title(f"{title} (n={len(points)})")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("routing steps (log scale)")
+        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+        save_fig(fig, output_dir, filename, generated, subfolder=PARALLELISM_ANALYSIS_DIR)
+
+
+def plot_routing_optimality(rows_success_with_routing, output_dir, generated, skipped=None):
+    """Scatter routing optimality against circuit parallelism.
+
+    optimality = min_routing_steps / routing_steps, i.e. the layering-depth
+    lower bound over the steps actually taken:
+
+      * optimality = 1  -> perfect routing (one step per layer).
+      * optimality -> 0  -> never reached; the worst case is fully serial
+        routing (one gate per step, routing_steps = num_gates), giving the
+        minimum optimality min_routing_steps / num_gates = 1 / max_parallelism.
+
+    Plotted against max_parallelism, that floor is exactly the y = 1/x curve, so
+    every point sits in the band between y = 1/x (worst) and y = 1 (perfect).
+    """
+    points = []
+    for r in rows_success_with_routing:
+        steps = r.get("routing_steps_f")
+        min_steps = r.get("min_routing_steps_f")
+        x = r.get("max_parallelism_f")
+        if steps is None or min_steps is None or x is None:
+            continue
+        if any(isinstance(v, float) and math.isnan(v) for v in (steps, min_steps, x)):
+            continue
+        if steps <= 0:
+            continue
+        optimality = min_steps / steps
+        points.append((x, optimality, str(r.get("routing_strategy_norm") or "unknown")))
+
+    filename = "routing_optimality_vs_max_parallelism.png"
+    if not points:
+        record_skipped_plot(
+            skipped,
+            filename,
+            "no successful rows with numeric min_routing_steps, routing_steps and max_parallelism",
+        )
+        return
+
+    labels = sorted({p[2] for p in points})
+    colors = category_color_map(labels)
+    fig, ax = plt.subplots(figsize=(9, 6))
+    for label in labels:
+        subset = [p for p in points if p[2] == label]
+        ax.scatter(
+            [p[0] for p in subset],
+            [p[1] for p in subset],
+            label=legend_label_with_sample_count(label, len(subset)),
+            alpha=0.7,
+            s=28,
+            color=colors[label],
+        )
+
+    # y = 1: perfect routing (ceiling).
+    ax.axhline(1.0, color="#2A9D8F", linestyle="--", linewidth=1.0, label="optimality = 1 (perfect)", zorder=1)
+    # y = 1/x: minimum achievable optimality (fully serial routing).
+    x_min = max(1e-9, min(p[0] for p in points))
+    x_max = max(p[0] for p in points)
+    if x_max > x_min:
+        xs = np.linspace(x_min, x_max, 200)
+        ax.plot(xs, 1.0 / xs, color="#E76F51", linestyle=":", linewidth=1.2,
+                label="optimality = 1/max_parallelism (worst)", zorder=1)
+
+    ax.set_ylim(0.0, 1.05)
+    ax.set_title(f"Routing Optimality vs Max Parallelism (n={len(points)})")
+    ax.set_xlabel("max parallelism (avg gates / layer)")
+    ax.set_ylabel("optimality (min_routing_steps / routing_steps)")
+    ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+    save_fig(fig, output_dir, filename, generated, subfolder=PARALLELISM_ANALYSIS_DIR)
 
 
 def plot_gaussian_weight_combinations(rows, output_dir, generated, skipped=None):
@@ -7268,6 +7449,13 @@ def main():
     rows_success_with_non_routed = [
         r for r in rows_no_timeout if r["success"] and r["non_routed_layer_pct_f"] is not None
     ]
+
+    # Routing-steps-vs-circuit-characteristic scatters and the routing
+    # optimality plot. Always generated (not gated behind --time): they answer
+    # "how do routing steps track circuit parallelism / the layering-depth
+    # lower bound, and how close to optimal does routing get".
+    plot_routing_steps_vs_parallelism(rows_success_with_routing, output_dir, generated, skipped)
+    plot_routing_optimality(rows_success_with_routing, output_dir, generated, skipped)
 
     if INCLUDE_TIME_ANALYSIS:
         rows_gaussian_with_routing = [

@@ -249,6 +249,9 @@ void write_benchmark_result_file_if_requested(const benchmarkResult &result) {
     if (result.min_routing_steps >= 0) {
         payload["min_routing_steps"] = result.min_routing_steps;
     }
+    if (result.cnot_interaction_density >= 0.0) {
+        payload["cnot_interaction_density"] = result.cnot_interaction_density;
+    }
 
     write_benchmark_worker_payload_if_requested(payload);
 }
@@ -316,6 +319,9 @@ benchmarkResult benchmark_result_from_worker_payload(const json &payload) {
     }
     if (payload.contains("min_routing_steps") && payload.at("min_routing_steps").is_number_integer()) {
         result.min_routing_steps = payload.at("min_routing_steps").get<int>();
+    }
+    if (payload.contains("cnot_interaction_density") && payload.at("cnot_interaction_density").is_number()) {
+        result.cnot_interaction_density = payload.at("cnot_interaction_density").get<double>();
     }
     return result;
 }
@@ -1012,6 +1018,7 @@ int run_bench_mode(
             std::string avg_parallelism_str;
             std::string max_parallelism_str;
             std::string min_routing_steps_str;
+            std::string cnot_interaction_density_str;
             std::string error_excerpt;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
@@ -1192,6 +1199,9 @@ int run_bench_mode(
                     max_parallelism_str = std::to_string(worker_result.max_parallelism);
                     if (worker_result.min_routing_steps >= 0) {
                         min_routing_steps_str = std::to_string(worker_result.min_routing_steps);
+                    }
+                    if (worker_result.cnot_interaction_density >= 0.0) {
+                        cnot_interaction_density_str = std::to_string(worker_result.cnot_interaction_density);
                     }
                     if (worker_result.resolved_graph_x >= 0) {
                         resolved_graph_x = std::to_string(worker_result.resolved_graph_x);
@@ -1507,7 +1517,8 @@ int run_bench_mode(
                 ew.empty() ? "0" : ew,
                 avg_parallelism_str,
                 max_parallelism_str,
-                min_routing_steps_str
+                min_routing_steps_str,
+                cnot_interaction_density_str
             };
 
             std::ostringstream progress;

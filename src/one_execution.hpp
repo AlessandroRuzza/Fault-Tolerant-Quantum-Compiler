@@ -40,6 +40,7 @@ struct benchmarkResult {
     int resolved_number_of_magic_states = -1;
     double max_parallelism = -1;
     int min_routing_steps = -1;
+    double cnot_interaction_density = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -646,6 +647,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << best_routing_steps << "\n";
     std::cout << "Minimum routing steps (layering depth): " << min_routing_steps << "\n";
     std::cout << "Achieved avg parallelism (" << routing_strategy << "): " << best_avg_parallelism << " / " << max_parallelism << "\n";
+    std::cout << "CNOT interaction density: " << metrics.cnot_interaction_density << "\n";
     std::cout << "Average non-routed % (" << routing_strategy << "): " << best_non_routed_layer_pct << "%\n\n";
 
     total_mr_time_seconds = mapping_time_seconds + routing_time_seconds;
@@ -672,6 +674,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         best_non_routed_layer_pct,
         number_of_magic_states,
         max_parallelism,
-        min_routing_steps
+        min_routing_steps,
+        metrics.cnot_interaction_density
     };
 }
