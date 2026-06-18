@@ -62,6 +62,22 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
     "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
     "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,resolved_n_magic,"
+    "external_weight,avg_parallelism,max_parallelism,min_routing_steps";
+
+// V19: the 47-column layout before max_parallelism and min_routing_steps were
+// appended as the final two columns. Identical to current minus those trailing
+// columns; migration appends two empty columns (already-recorded runs carry no
+// max parallelism or min routing steps).
+inline constexpr const char *kBenchmarkRunsCsvHeaderV19 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,gaussian_sigma,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,resolved_n_magic,"
     "external_weight,avg_parallelism";
 
 // V18: the 46-column layout before avg_parallelism was appended as the final
@@ -547,7 +563,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV18 ||
+        (first_line == kBenchmarkRunsCsvHeaderV19 ||
+         first_line == kBenchmarkRunsCsvHeaderV18 ||
          first_line == kBenchmarkRunsCsvHeaderV17 ||
          first_line == kBenchmarkRunsCsvHeaderV16 ||
          first_line == kBenchmarkRunsCsvHeaderV15 ||
@@ -586,6 +603,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v19 = (first_line == kBenchmarkRunsCsvHeaderV19);
             const bool from_v18 = (first_line == kBenchmarkRunsCsvHeaderV18);
             const bool from_v17 = (first_line == kBenchmarkRunsCsvHeaderV17);
             const bool from_v16 = (first_line == kBenchmarkRunsCsvHeaderV16);
@@ -607,10 +625,17 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v18) {
-                // V18 is the current layout minus the trailing avg_parallelism
-                // column; pass the 46 columns through and append the new empty
+            if (from_v19) {
+                // V19 is the current layout minus the trailing max_parallelism
+                // column; pass the 47 columns through and append the new empty
                 // column below. Column 16 already holds gaussian_sigma, keep it.
+                migrated = parsed;
+                migrated.resize(47);
+            } else if (from_v18) {
+                // V18 is the current layout minus the trailing avg_parallelism,
+                // max_parallelism and min_routing_steps columns; pass the 46
+                // columns through and append the new empty columns below. Column
+                // 16 already holds gaussian_sigma, keep it.
                 migrated = parsed;
                 migrated.resize(46);
             } else if (from_v17) {
@@ -1078,10 +1103,10 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
                 };
             }
 
-            // V17/V18 already carry the 46-column layout; skip every structural
+            // V17/V18/V19 already carry the 46+-column layout; skip every structural
             // fix-up below (they would corrupt it). Column 16 is blanked afterwards
-            // for V17 only (V18 already stores gaussian_sigma).
-            if (!from_v17 && !from_v18) {
+            // for V17 only (V18/V19 already store gaussian_sigma).
+            if (!from_v17 && !from_v18 && !from_v19) {
             if (!migrated.empty()) {
                 migrated[0] = config_id_from_log_file(at_or_empty(migrated, 29), migrated[0]);
             }
@@ -1122,15 +1147,27 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
 
             // Column 16 was gaussian_confidence in every layout up to V17; it is
             // now gaussian_sigma. Pre-V18 rows carry no sigma, so drop the stale
-            // value. V18 already stores gaussian_sigma, so keep it.
-            if (!from_v18 && migrated.size() > 16) {
+            // value. V18/V19 already store gaussian_sigma, so keep it.
+            if (!from_v18 && !from_v19 && migrated.size() > 16) {
                 migrated[16] = "";
             }
 
-            // avg_parallelism is a new trailing column not present in any prior
-            // layout; leave it empty for every migrated row.
+            // avg_parallelism is a trailing column absent before V19; leave it
+            // empty for every row migrated from an older layout.
             if (migrated.size() < 47) {
                 migrated.resize(47);
+            }
+
+            // max_parallelism is a trailing column absent before the current
+            // layout; leave it empty for every row migrated from an older layout.
+            if (migrated.size() < 48) {
+                migrated.resize(48);
+            }
+
+            // min_routing_steps is a new trailing column not present in any prior
+            // layout; leave it empty for every migrated row.
+            if (migrated.size() < 49) {
+                migrated.resize(49);
             }
 
             out << render_row(migrated) << '\n';

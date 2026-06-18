@@ -38,6 +38,8 @@ struct benchmarkResult {
     int max_interaction_degree = -1;
     double non_routed_layer_pct = -1.0;
     int resolved_number_of_magic_states = -1;
+    double max_parallelism = -1;
+    int min_routing_steps = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -390,7 +392,10 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double best_avg_parallelism = 0.0;
     double best_non_routed_layer_pct = -1.0;
     double max_parallelism = -1;
-    
+    // Lower bound on routing steps: the circuit's layering depth (number of
+    // layers). A perfect router needs at least this many steps — one per layer.
+    int min_routing_steps = -1;
+
     if (repetition_count < 1) {
         repetition_count = 1;
     }
@@ -450,6 +455,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             max_parallelism = num_layers > 0
             ? static_cast<double>(layeredCircuit->getNumGates()) / num_layers
             : 0.0;
+            // Layering depth is circuit-intrinsic (same every repetition); the
+            // routing step count can never drop below it.
+            min_routing_steps = num_layers;
         }
         const auto layering_end = std::chrono::steady_clock::now();
         circ_time_seconds +=
@@ -636,6 +644,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     if (PRINT_ROUTING) best_router->print_routing_steps();
 
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << best_routing_steps << "\n";
+    std::cout << "Minimum routing steps (layering depth): " << min_routing_steps << "\n";
     std::cout << "Achieved avg parallelism (" << routing_strategy << "): " << best_avg_parallelism << " / " << max_parallelism << "\n";
     std::cout << "Average non-routed % (" << routing_strategy << "): " << best_non_routed_layer_pct << "%\n\n";
 
@@ -661,6 +670,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         qubitsNumber,
         max_deg,
         best_non_routed_layer_pct,
-        number_of_magic_states
+        number_of_magic_states,
+        max_parallelism,
+        min_routing_steps
     };
 }

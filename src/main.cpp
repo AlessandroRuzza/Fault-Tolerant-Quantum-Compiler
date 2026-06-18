@@ -226,7 +226,8 @@ void write_benchmark_result_file_if_requested(const benchmarkResult &result) {
     json payload = {
         {"status", "success"},
         {"routing_steps", result.routing_steps},
-        {"avg_parallelism", result.avg_parallelism}
+        {"avg_parallelism", result.avg_parallelism},
+        {"max_parallelism", result.max_parallelism}
     };
 
     if (result.resolved_graph_x >= 0 && result.resolved_graph_y >= 0) {
@@ -244,6 +245,9 @@ void write_benchmark_result_file_if_requested(const benchmarkResult &result) {
     }
     if (result.resolved_number_of_magic_states >= 0) {
         payload["resolved_number_of_magic_states"] = result.resolved_number_of_magic_states;
+    }
+    if (result.min_routing_steps >= 0) {
+        payload["min_routing_steps"] = result.min_routing_steps;
     }
 
     write_benchmark_worker_payload_if_requested(payload);
@@ -288,6 +292,9 @@ benchmarkResult benchmark_result_from_worker_payload(const json &payload) {
     if (payload.contains("avg_parallelism") && payload.at("avg_parallelism").is_number()) {
         result.avg_parallelism = payload.at("avg_parallelism").get<double>();
     }
+    if (payload.contains("max_parallelism") && payload.at("max_parallelism").is_number()) {
+        result.max_parallelism = payload.at("max_parallelism").get<double>();
+    }
     if (payload.contains("resolved_graph_x") && payload.at("resolved_graph_x").is_number_integer()) {
         result.resolved_graph_x = payload.at("resolved_graph_x").get<int>();
     }
@@ -306,6 +313,9 @@ benchmarkResult benchmark_result_from_worker_payload(const json &payload) {
     if (payload.contains("resolved_number_of_magic_states") &&
         payload.at("resolved_number_of_magic_states").is_number_integer()) {
         result.resolved_number_of_magic_states = payload.at("resolved_number_of_magic_states").get<int>();
+    }
+    if (payload.contains("min_routing_steps") && payload.at("min_routing_steps").is_number_integer()) {
+        result.min_routing_steps = payload.at("min_routing_steps").get<int>();
     }
     return result;
 }
@@ -1000,6 +1010,8 @@ int run_bench_mode(
             std::string routing_steps;
             std::string non_routed_pct;
             std::string avg_parallelism_str;
+            std::string max_parallelism_str;
+            std::string min_routing_steps_str;
             std::string error_excerpt;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
@@ -1177,6 +1189,10 @@ int run_bench_mode(
                         non_routed_pct = format_pct(worker_result.non_routed_layer_pct);
                     }
                     avg_parallelism_str = std::to_string(worker_result.avg_parallelism);
+                    max_parallelism_str = std::to_string(worker_result.max_parallelism);
+                    if (worker_result.min_routing_steps >= 0) {
+                        min_routing_steps_str = std::to_string(worker_result.min_routing_steps);
+                    }
                     if (worker_result.resolved_graph_x >= 0) {
                         resolved_graph_x = std::to_string(worker_result.resolved_graph_x);
                     }
@@ -1489,7 +1505,9 @@ int run_bench_mode(
                 lower_non_routed_pct_str,
                 resolved_n_magic,
                 ew.empty() ? "0" : ew,
-                avg_parallelism_str
+                avg_parallelism_str,
+                max_parallelism_str,
+                min_routing_steps_str
             };
 
             std::ostringstream progress;
