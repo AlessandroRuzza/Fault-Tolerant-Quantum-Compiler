@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -66,6 +67,14 @@ def to_float(v) -> float | None:
         return float(v)
     except (ValueError, TypeError):
         return None
+
+
+def circuit_family(name: str) -> str:
+    """Group key for a circuit: strip the trailing size token.
+    qft_n50 -> qft, vqe_su2_n100 -> vqe_su2, qft_20 -> qft, adder_n64_transpiled -> adder."""
+    base = re.sub(r"_n\d+.*$", "", name)   # drop _n<size> (and any suffix like _transpiled)
+    base = re.sub(r"_\d+$", "", base)       # drop a bare _<size> (e.g. qft_20)
+    return base or name
 
 
 def config_label(row: dict) -> str:
@@ -212,8 +221,13 @@ def plot_circuit(circuit: str, runs: list[dict], wisq: dict, out_dir: Path) -> N
     print(f"  saved: {out_path}")
 
 
-def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metric: str) -> None:
-    """One overview figure across all circuits: grouped bars (ours-best vs WISQ)."""
+def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metric: str,
+                 family: str | None = None) -> None:
+    """One overview figure: grouped bars (ours-best vs WISQ).
+
+    family=None covers all circuits (summary_*.png); otherwise only circuits of
+    that family are shown (summary_<family>_*.png).
+    """
     if metric == "steps":
         my_key, wisq_key = RUNS_STEPS, "wisq_routing_steps"
         ylabel, title, fname = "routing steps", "Routing steps: ours (best) vs WISQ", "summary_routing_steps.png"
@@ -221,8 +235,14 @@ def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metr
         my_key, wisq_key = RUNS_TIME, "wisq_duration_s"
         ylabel, title, fname = "seconds", "Wall-clock time: ours (best) vs WISQ", "summary_time.png"
 
+    if family is not None:
+        fname = fname.replace("summary_", f"summary_{family}_", 1)
+        title = f"[{family}] {title}"
+
     entries = []
     for circuit, (runs, wisq) in joined.items():
+        if family is not None and circuit_family(circuit) != family:
+            continue
         best, _ = pick_best_worst(runs)
         mine = to_float(best.get(my_key))
         wisq_val = to_float(wisq.get(wisq_key))
@@ -231,6 +251,9 @@ def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metr
         nq = to_float(wisq.get("n_qubits")) or 0.0
         entries.append((circuit, nq, mine, wisq_val))
 
+    # A per-family chart needs at least 2 circuits to be a meaningful trend.
+    if family is not None and len(entries) < 2:
+        return
     if not entries:
         print(f"  (no data for summary '{metric}')")
         return
@@ -330,6 +353,13 @@ def main() -> int:
 
     plot_summary(joined, out_dir, "steps")
     plot_summary(joined, out_dir, "time")
+
+    # Per-family overview figures (same as the summaries, restricted to each
+    # family: qft, qaoa, vqe_su2, ...). Families with a single circuit are skipped.
+    families = sorted({circuit_family(c) for c in joined})
+    for fam in families:
+        plot_summary(joined, out_dir, "steps", family=fam)
+        plot_summary(joined, out_dir, "time", family=fam)
 
     return 0
 
