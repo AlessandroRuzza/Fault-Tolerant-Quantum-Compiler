@@ -99,6 +99,24 @@ def circuit_family(name: str) -> str:
     return base or name
 
 
+def grid_area(x, y) -> float | None:
+    """Physical-qubit footprint = grid cells (x*y). None if either dim is missing."""
+    xf, yf = to_float(x), to_float(y)
+    if xf is None or yf is None:
+        return None
+    return xf * yf
+
+
+def wisq_extra_qubit_pct(our_x, our_y, wisq_x, wisq_y) -> float | None:
+    """How many more physical qubits (grid area x*y) WISQ used than ours, in %.
+    (wisq_area - our_area) / our_area * 100. None if a dimension is missing."""
+    our_area = grid_area(our_x, our_y)
+    wisq_area = grid_area(wisq_x, wisq_y)
+    if not our_area or wisq_area is None:
+        return None
+    return 100.0 * (wisq_area - our_area) / our_area
+
+
 def config_label(row: dict) -> str:
     parts = []
     for field, abbrev in CONFIG_LABEL_FIELDS:
@@ -271,7 +289,9 @@ def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metr
         if mine is None or wisq_val is None:
             continue
         nq = to_float(wisq.get("n_qubits")) or 0.0
-        entries.append((circuit, nq, mine, wisq_val))
+        qpct = wisq_extra_qubit_pct(best.get(RUNS_X), best.get(RUNS_Y),
+                                    wisq.get("wisq_x"), wisq.get("wisq_y"))
+        entries.append((circuit, nq, mine, wisq_val, qpct))
 
     # A per-family chart needs at least 2 circuits to be a meaningful trend.
     if family is not None and len(entries) < 2:
@@ -284,6 +304,7 @@ def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metr
     circuits = [e[0] for e in entries]
     mine_vals = [e[2] for e in entries]
     wisq_vals = [e[3] for e in entries]
+    qpcts = [e[4] for e in entries]
 
     EPS = 1e-9
     ours_wins = sum(1 for m, w in zip(mine_vals, wisq_vals) if m < w - EPS)
@@ -296,7 +317,18 @@ def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metr
 
     fig, ax = plt.subplots(figsize=(max(8, len(circuits) * 0.5), 6))
     ax.bar(x - width / 2, mine_vals, width, label="ours (best)", color="#2196F3")
-    ax.bar(x + width / 2, wisq_vals, width, label="WISQ", color="#E53935")
+    wisq_bars = ax.bar(x + width / 2, wisq_vals, width, label="WISQ", color="#E53935")
+
+    # Per-family chart only: above each WISQ bar, the % of extra physical qubits
+    # (grid area x*y) WISQ used vs our best config for that circuit.
+    if family is not None:
+        for bar, qpct in zip(wisq_bars, qpcts):
+            if qpct is None:
+                continue
+            ax.annotate(f"{qpct:+.0f}%",
+                        (bar.get_x() + bar.get_width() / 2, bar.get_height()),
+                        xytext=(0, 2), textcoords="offset points",
+                        ha="center", va="bottom", fontsize=7, color="#555555")
 
     summary = (f"ours wins: {ours_wins}   ties: {ties}   WISQ wins: {wisq_wins}"
                f"   (of {total})")
@@ -312,7 +344,10 @@ def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metr
     ax.set_xticks(x)
     ax.set_xticklabels(circuits, rotation=90, fontsize=8)
     ax.set_ylabel(ylabel)
-    ax.set_title(f"{title}  ({len(circuits)} circuits)", fontweight="bold")
+    title_full = f"{title}  ({len(circuits)} circuits)"
+    if family is not None:
+        title_full += "\n(% over WISQ bars = extra physical qubits, grid x·y, vs ours)"
+    ax.set_title(title_full, fontweight="bold", fontsize=10 if family is not None else 12)
     ax.legend()
     ax.grid(axis="y", linestyle=":", alpha=0.4)
 
