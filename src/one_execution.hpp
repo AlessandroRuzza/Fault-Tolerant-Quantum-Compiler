@@ -458,6 +458,23 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             }
         }
 
+        // Mapping-only mode: the mapping succeeded (every qubit placed) at this
+        // grid size, which is all scripts/analyze_dimensions.py needs to bisect
+        // the min/max feasible dimensions. Skip layering/routing and return the
+        // resolved dimensions. "resolved graph dimensions: NxN" was already
+        // printed above, so the script can parse it regardless.
+        if (mapping_only_mode_enabled()) {
+            std::cout << "MAPPING_ONLY is enabled — stopping after mapping.\n";
+            benchmarkResult mapping_only_result;
+            mapping_only_result.routing_steps = 0;
+            mapping_only_result.avg_parallelism = 0.0;
+            mapping_only_result.resolved_graph_x = resolved_graph_x;
+            mapping_only_result.resolved_graph_y = resolved_graph_y;
+            mapping_only_result.num_qubits = qubitsNumber;
+            mapping_only_result.max_interaction_degree = max_deg;
+            return mapping_only_result;
+        }
+
 
         const auto layering_start = std::chrono::steady_clock::now();
         auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers

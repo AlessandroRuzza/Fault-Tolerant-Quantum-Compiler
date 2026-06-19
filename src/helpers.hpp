@@ -201,6 +201,15 @@ inline bool benchmark_artifacts_enabled() {
     return !benchmark_worker_mode_enabled();
 }
 
+// True when FTQC_MAPPING_ONLY is set to a truthy value. In this mode
+// one_execution() stops right after a complete mapping and skips
+// layering/routing: used by scripts/analyze_dimensions.py to probe, per grid
+// size, whether the circuit can be mapped at all (routing success/time is
+// irrelevant to the min/max-dimension question and only slows the search).
+inline bool mapping_only_mode_enabled() {
+    return env_flag_is_truthy("FTQC_MAPPING_ONLY");
+}
+
 
 inline std::string format_now_date(const std::chrono::system_clock::time_point &tp) {
     const std::time_t tt = std::chrono::system_clock::to_time_t(tp);
