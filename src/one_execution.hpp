@@ -86,11 +86,11 @@ void clear_visualization_outputs() {
         return;
     }
 
-    // Only wipe visualization/ when this run is actually going to produce new
-    // artifacts there (gaussian frames are opt-in via FTQC_SAVE_FRAMES, routing
-    // drawings via PRINT_DRAW_ROUTING). Otherwise a plain interactive run would
-    // delete frames the user generated on purpose.
-    if (!env_flag_is_truthy("FTQC_SAVE_FRAMES") && !PRINT_DRAW_ROUTING) {
+    // Only wipe visualization/ when this run will actually produce new
+    // artifacts there (gaussian frames via the SAVE_GAUSSIAN_FRAMES define or
+    // FTQC_SAVE_FRAMES env, routing drawings via PRINT_DRAW_ROUTING).
+    // Otherwise a plain interactive run would delete frames kept on purpose.
+    if (!SAVE_GAUSSIAN_FRAMES && !env_flag_is_truthy("FTQC_SAVE_FRAMES") && !PRINT_DRAW_ROUTING) {
         return;
     }
 

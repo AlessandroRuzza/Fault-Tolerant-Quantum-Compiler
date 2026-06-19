@@ -1,0 +1,70 @@
+#!/bin/bash
+#PBS -q cpu
+#PBS -l walltime=12:00:00
+#PBS -N ftqc_dims
+#PBS -j oe
+#PBS -V
+
+# Drives scripts/analyze_dimensions.py: for every circuit in the config it finds
+# the min/max mappable grid size (MAPPING_ONLY mode) and writes dimensions.csv.
+#
+# REQUIREMENT: the .sif must contain analyze_dimensions.py AND a binary built
+# with FTQC_MAPPING_ONLY support. Both live ONLY on branch
+# `port-dimension-analysis` — the published ftqc.sif does NOT have them, so
+# rebuild the image from that branch before submitting this job.
+#
+# Tunables (override at submit time, e.g. `qsub -v JOBS=28,CONFIG=... run_analyze_dimensions.pbs`):
+#   JOBS        parallel mapping workers (each binary run uses OMP_NUM_THREADS=1). Default 28 (cluster scales ~linearly to 28).
+#   CONFIG      config file under config/. Default mapping_only_benchmark.json
+#   OUTPUT      output CSV under benchmarks/results/. Default dimensions.csv
+#   TIMEOUT     per-run timeout in seconds. Default 60
+#   EXTRA_FLAGS extra args passed verbatim (e.g. "--fresh", "--only adder qft", "--min-dim 2")
+
+cd "$PBS_O_WORKDIR"
+
+JOBS="${JOBS:-28}"
+CONFIG="${CONFIG:-mapping_only_benchmark.json}"
+OUTPUT="${OUTPUT:-dimensions.csv}"
+TIMEOUT="${TIMEOUT:-60}"
+EXTRA_FLAGS="${EXTRA_FLAGS:-}"
+
+mkdir -p benchmarks/results config logs
+
+LOG_FILE="logs/dims_${PBS_JOBID}.log"
+echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
+
+{
+echo "JOBID=$PBS_JOBID"
+echo "HOSTNAME=$(hostname)"
+echo "WORKDIR=$(pwd)"
+echo "JOBS=$JOBS"
+echo "CONFIG=$CONFIG"
+echo "OUTPUT=$OUTPUT"
+echo "TIMEOUT=$TIMEOUT"
+echo "EXTRA_FLAGS=$EXTRA_FLAGS"
+date
+} >> "$LOG_FILE" 2>&1
+
+if [ ! -f "config/$CONFIG" ]; then
+    echo "ERROR: config/$CONFIG not found" >> "$LOG_FILE" 2>&1
+    exit 1
+fi
+
+# The script resolves ROOT from its own path, so running /app/scripts/...
+# makes it use the container binary (/app/build/...) and the bound config/output.
+apptainer exec \
+  --bind "$PWD/config:/app/config" \
+  --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
+  ftqc.sif \
+  python3 /app/scripts/analyze_dimensions.py \
+    --config "/app/config/$CONFIG" \
+    --output "/app/benchmarks/results/$OUTPUT" \
+    --jobs "$JOBS" \
+    --timeout "$TIMEOUT" \
+    ${EXTRA_FLAGS} \
+  >> "$LOG_FILE" 2>&1
+
+{
+echo "END_DIMS=$PBS_JOBID"
+date
+} >> "$LOG_FILE" 2>&1

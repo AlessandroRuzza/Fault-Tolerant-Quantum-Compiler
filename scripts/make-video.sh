@@ -1,7 +1,10 @@
 #!/usr/bin/env sh
-# NOTE: gaussian frames are opt-in now. Generate them first with
+# NOTE: gaussian frames are OFF by default (slow gnuplot render). Enable them
+# either by flipping SAVE_GAUSSIAN_FRAMES in src/defines.cpp (+rebuild) or, for
+# a one-off, with the env var:
 #   FTQC_SAVE_FRAMES=1 ./build/FaultTolerantQuantumCompiler --type gaussian ...
 # (frames land in visualization/gaussian_frames/), then run this script.
+# Benchmark workers (FTQC_BENCH_WORKER=1) never render frames.
 set -eu
 
 PROJECT="${PROJECT:-$(cd "$(dirname "$0")/.." && pwd)}"

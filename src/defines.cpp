@@ -34,7 +34,7 @@ const bool PRINT_PARSING = kPrintAllowed && false;
 const bool PRINT_CIRCUIT = kPrintAllowed && false;
 
 const bool PRINT_MAPPING = kPrintAllowed && false;
-const bool PRINT_MAPPING_GRAPH = kPrintAllowed && false;
+const bool PRINT_MAPPING_GRAPH = kPrintAllowed && true;
 const bool MAPPING_VERBOSE = kPrintAllowed && false;
 
 const bool PRINT_SAFE_PASSAGE = kPrintAllowed && false;
@@ -43,6 +43,12 @@ const bool PRINT_LAYER = kPrintAllowed && false;
 const bool PRINT_ROUTING = kPrintAllowed && false;
 const bool PRINT_DRAW_ROUTING = kPrintAllowed && false;
 const bool PRINT_ROUTING_PROGRESS = kPrintAllowed && false;
+
+// Gaussian frame PNG rendering. OFF by default: the gnuplot render is very
+// expensive (~670x on qft_n18). Flip to true to always render on interactive
+// runs, or set FTQC_SAVE_FRAMES=1 at runtime for a one-off (no rebuild).
+// Benchmark workers force it off regardless (kPrintAllowed + bench guard).
+const bool SAVE_GAUSSIAN_FRAMES = kPrintAllowed && false;
 
 const bool PRINT_CACHE_METRICS = kPrintAllowed && false;
 const bool PRINT_CIRCUIT_METRICS = kPrintAllowed && false;

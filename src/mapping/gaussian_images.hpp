@@ -3,6 +3,7 @@
 
 #include "gaussian.hpp"
 #include "../helpers.hpp"
+#include "defines.hpp"
 
 
 namespace GaussianMappingVisualization {
@@ -166,11 +167,14 @@ void save_gaussian_frame(
     const Qubit& qubit,
     double external_weight
 ) {
-    // Frame writing is opt-in via FTQC_SAVE_FRAMES=1. Gating on "not a bench
-    // worker" made every interactive gaussian run pay the gnuplot frames
-    // inside the timed mapping region (measured ~670x on qft_n18), so manual
-    // timings were meaningless and visualization/ was rewritten on every run.
-    if (!env_flag_is_truthy("FTQC_SAVE_FRAMES")) {
+    // Benchmark workers never render figures (the gnuplot pass is ~670x on
+    // qft_n18 and would wreck their timings). For interactive runs figures are
+    // opt-in and OFF by default: enable them via the SAVE_GAUSSIAN_FRAMES
+    // define (rebuild) or FTQC_SAVE_FRAMES=1 at runtime (no rebuild).
+    if (!benchmark_artifacts_enabled()) {
+        return;
+    }
+    if (!SAVE_GAUSSIAN_FRAMES && !env_flag_is_truthy("FTQC_SAVE_FRAMES")) {
         return;
     }
 
