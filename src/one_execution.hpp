@@ -41,6 +41,16 @@ struct benchmarkResult {
     double max_parallelism = -1;
     int min_routing_steps = -1;
     double cnot_interaction_density = -1;
+    double cnot_graph_modularity = -1;
+    double cnot_graph_diameter = -1;
+    double cnot_graph_avg_shortest_path = -1;
+    int max_cnot_degree = -1;
+    int min_cnot_degree = -1;
+    double avg_cnot_degree = -1;
+    double cnot_degree_gini = -1;
+    double cnot_pair_rep_gini = -1;
+    double cnot_edge_weight_stddev = -1;
+    double cnot_graph_clustering_coeff = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -648,6 +658,15 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "Minimum routing steps (layering depth): " << min_routing_steps << "\n";
     std::cout << "Achieved avg parallelism (" << routing_strategy << "): " << best_avg_parallelism << " / " << max_parallelism << "\n";
     std::cout << "CNOT interaction density: " << metrics.cnot_interaction_density << "\n";
+    std::cout << "CNOT graph modularity: " << metrics.cnot_graph_modularity << "\n";
+    std::cout << "CNOT graph diameter: " << metrics.cnot_graph_diameter << "\n";
+    std::cout << "CNOT graph avg shortest path: " << metrics.cnot_graph_avg_shortest_path << "\n";
+    std::cout << "CNOT degree (max/min/avg): " << metrics.max_cnot_degree << " / "
+              << metrics.min_cnot_degree << " / " << metrics.avg_cnot_degree << "\n";
+    std::cout << "CNOT degree Gini: " << metrics.cnot_degree_gini
+              << "  pair-rep Gini: " << metrics.cnot_pair_rep_gini << "\n";
+    std::cout << "CNOT edge-weight stddev: " << metrics.cnot_edge_weight_stddev << "\n";
+    std::cout << "CNOT graph clustering coeff: " << metrics.cnot_graph_clustering_coeff << "\n";
     std::cout << "Average non-routed % (" << routing_strategy << "): " << best_non_routed_layer_pct << "%\n\n";
 
     total_mr_time_seconds = mapping_time_seconds + routing_time_seconds;
@@ -675,6 +694,16 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         number_of_magic_states,
         max_parallelism,
         min_routing_steps,
-        metrics.cnot_interaction_density
+        metrics.cnot_interaction_density,
+        metrics.cnot_graph_modularity,
+        metrics.cnot_graph_diameter,
+        metrics.cnot_graph_avg_shortest_path,
+        metrics.max_cnot_degree,
+        metrics.min_cnot_degree,
+        metrics.avg_cnot_degree,
+        metrics.cnot_degree_gini,
+        metrics.cnot_pair_rep_gini,
+        metrics.cnot_edge_weight_stddev,
+        metrics.cnot_graph_clustering_coeff
     };
 }

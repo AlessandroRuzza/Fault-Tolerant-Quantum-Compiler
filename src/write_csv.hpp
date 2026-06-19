@@ -62,6 +62,27 @@ inline constexpr const char *kBenchmarkRunsCsvHeader =
     "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
     "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
     "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,resolved_n_magic,"
+    "external_weight,avg_parallelism,max_parallelism,min_routing_steps,cnot_interaction_density,"
+    "cnot_graph_modularity,cnot_graph_diameter,cnot_graph_avg_shortest_path,"
+    "max_cnot_degree,min_cnot_degree,avg_cnot_degree,cnot_degree_gini,cnot_pair_rep_gini,"
+    "cnot_edge_weight_stddev,cnot_graph_clustering_coeff";
+
+// V20: the 50-column layout before the interaction-graph characterization
+// columns (cnot_graph_modularity, cnot_graph_diameter, cnot_graph_avg_shortest_path,
+// max_cnot_degree, min_cnot_degree, avg_cnot_degree, cnot_degree_gini,
+// cnot_pair_rep_gini, cnot_edge_weight_stddev, cnot_graph_clustering_coeff) were
+// appended as the final ten columns. Identical to current minus those columns;
+// migration appends ten empty columns (already-recorded runs carry none of them).
+inline constexpr const char *kBenchmarkRunsCsvHeaderV20 =
+    "id,run_date,run_datetime,circuit,graph_x,graph_y,circuit_graph_label,mapping_type,"
+    "magic_aware_strategy,gaussian_strategy,magic_high,magic_low,cnot_high,cnot_low,"
+    "mapped_gaussian_weight,base_gaussian_weight,gaussian_sigma,"
+    "safe_passage_strategy,magic_state_placement_strategy,"
+    "border_distance_percentage,number_of_magic_states,routing_strategy,t_routing_mode,use_layer_cache,routing_steps,timeout_reached,"
+    "status,exit_code,duration_seconds,log_file,error_excerpt,"
+    "mid_x,mid_y,mid_duration_seconds,mid_routing_steps,mid_status,"
+    "lower_x,lower_y,lower_duration_seconds,lower_routing_steps,lower_status,"
+    "non_routed_layer_pct,mid_non_routed_layer_pct,lower_non_routed_layer_pct,resolved_n_magic,"
     "external_weight,avg_parallelism,max_parallelism,min_routing_steps,cnot_interaction_density";
 
 // V19: the 47-column layout before max_parallelism, min_routing_steps and
@@ -563,7 +584,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
     }
 
     if (header == kBenchmarkRunsCsvHeader &&
-        (first_line == kBenchmarkRunsCsvHeaderV19 ||
+        (first_line == kBenchmarkRunsCsvHeaderV20 ||
+         first_line == kBenchmarkRunsCsvHeaderV19 ||
          first_line == kBenchmarkRunsCsvHeaderV18 ||
          first_line == kBenchmarkRunsCsvHeaderV17 ||
          first_line == kBenchmarkRunsCsvHeaderV16 ||
@@ -603,6 +625,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
         out << header << '\n';
         for (const std::string &row : rows) {
             const std::vector<std::string> parsed = parse_row(row);
+            const bool from_v20 = (first_line == kBenchmarkRunsCsvHeaderV20);
             const bool from_v19 = (first_line == kBenchmarkRunsCsvHeaderV19);
             const bool from_v18 = (first_line == kBenchmarkRunsCsvHeaderV18);
             const bool from_v17 = (first_line == kBenchmarkRunsCsvHeaderV17);
@@ -625,7 +648,14 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             const bool from_legacy = (first_line == kLegacyBenchmarkRunsCsvHeader);
 
             std::vector<std::string> migrated;
-            if (from_v19) {
+            if (from_v20) {
+                // V20 is the current layout minus the trailing ten
+                // interaction-graph characterization columns; pass the 50 columns
+                // through and append the new empty columns below. Column 16 already
+                // holds gaussian_sigma, keep it.
+                migrated = parsed;
+                migrated.resize(50);
+            } else if (from_v19) {
                 // V19 is the current layout minus the trailing max_parallelism
                 // column; pass the 47 columns through and append the new empty
                 // column below. Column 16 already holds gaussian_sigma, keep it.
@@ -1105,8 +1135,8 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
 
             // V17/V18/V19 already carry the 46+-column layout; skip every structural
             // fix-up below (they would corrupt it). Column 16 is blanked afterwards
-            // for V17 only (V18/V19 already store gaussian_sigma).
-            if (!from_v17 && !from_v18 && !from_v19) {
+            // for V17 only (V18/V19/V20 already store gaussian_sigma).
+            if (!from_v17 && !from_v18 && !from_v19 && !from_v20) {
             if (!migrated.empty()) {
                 migrated[0] = config_id_from_log_file(at_or_empty(migrated, 29), migrated[0]);
             }
@@ -1148,7 +1178,7 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             // Column 16 was gaussian_confidence in every layout up to V17; it is
             // now gaussian_sigma. Pre-V18 rows carry no sigma, so drop the stale
             // value. V18/V19 already store gaussian_sigma, so keep it.
-            if (!from_v18 && !from_v19 && migrated.size() > 16) {
+            if (!from_v18 && !from_v19 && !from_v20 && migrated.size() > 16) {
                 migrated[16] = "";
             }
 
@@ -1174,6 +1204,14 @@ inline void ensure_initialized(const std::filesystem::path &csv_path, const std:
             // prior layout; leave it empty for every migrated row.
             if (migrated.size() < 50) {
                 migrated.resize(50);
+            }
+
+            // The ten interaction-graph characterization columns
+            // (cnot_graph_modularity ... cnot_graph_clustering_coeff) were all
+            // appended after V20; leave them empty for every row migrated from an
+            // older layout.
+            if (migrated.size() < 60) {
+                migrated.resize(60);
             }
 
             out << render_row(migrated) << '\n';

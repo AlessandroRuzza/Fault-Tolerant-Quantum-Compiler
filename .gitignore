@@ -20,6 +20,7 @@
 *.png
 benchmarks/**/*_plots/
 benchmarks/**/*_plots_*/
+*.lock
 
 # Linker files
 *.ilk

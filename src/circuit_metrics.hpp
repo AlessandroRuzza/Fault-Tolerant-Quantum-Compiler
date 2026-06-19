@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <sstream>
@@ -63,6 +64,7 @@ struct CircuitMetrics {
     double avg_cnot_pair_rep = 0.0;
     double cnot_interaction_density = 0.0;  // unique_pairs / (n*(n-1)/2)
     int max_cnot_degree = 0;                // max neighbours any qubit has in CNOT graph
+    int min_cnot_degree = 0;                // min neighbours over qubits with ≥1 CNOT edge
     int t_qubit_diversity = 0;              // distinct qubits that receive a T/Tdg gate
 
     // CNOT graph topology metrics
@@ -70,6 +72,10 @@ struct CircuitMetrics {
     double cnot_degree_gini = 0.0;      // Gini coeff of degree distribution [0=uniform, 1=star]
     double cnot_graph_modularity = 0.0; // greedy Louvain modularity [0=random/regular, ~1=clustered]
     double cnot_pair_rep_gini = 0.0;    // Gini of per-pair repetition counts [0=all pairs equally used (QFT), 1=one dominant pair]
+    double cnot_graph_diameter = 0.0;          // longest shortest path (hopcount) in the largest connected component
+    double cnot_graph_avg_shortest_path = 0.0; // mean hopcount over all node pairs in the largest connected component
+    double cnot_edge_weight_stddev = 0.0;      // std dev of per-pair CNOT repetition counts (weighted-graph edge weights)
+    double cnot_graph_clustering_coeff = 0.0;  // mean local clustering coefficient [0=tree-like, 1=fully clustered]
 
     // Layer structure (depth, parallelism)
     int num_layers = 0;
@@ -159,11 +165,19 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
         cnot_interaction_density = static_cast<double>(num_unique_cnot_pairs) / max_pairs;
     }
 
-    // Max degree in the CNOT interaction graph: predicts whether a single qubit
-    // is a "hub" that talks to many others (mapping is harder).
+    // Max/min degree in the CNOT interaction graph: predicts whether a single
+    // qubit is a "hub" that talks to many others (mapping is harder). Min degree
+    // is taken over qubits with ≥1 CNOT edge only (isolated qubits are not part
+    // of the interaction graph); 0 when no qubit has a CNOT edge.
     int max_cnot_degree = 0;
-    for (const std::pair<const int, std::unordered_set<int>>& entry : cnot_adj) {
-        max_cnot_degree = std::max(max_cnot_degree, static_cast<int>(entry.second.size()));
+    int min_cnot_degree = 0;
+    if (!cnot_adj.empty()) {
+        min_cnot_degree = std::numeric_limits<int>::max();
+        for (const std::pair<const int, std::unordered_set<int>>& entry : cnot_adj) {
+            const int deg = static_cast<int>(entry.second.size());
+            max_cnot_degree = std::max(max_cnot_degree, deg);
+            min_cnot_degree = std::min(min_cnot_degree, deg);
+        }
     }
 
     const int t_qubit_diversity = static_cast<int>(t_qubits.size());
@@ -192,6 +206,23 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
                                  - static_cast<double>(n_p + 1) / n_p;
             cnot_pair_rep_gini = std::max(0.0, cnot_pair_rep_gini);
         }
+    }
+
+    // 0b. Standard deviation of the per-pair CNOT repetition counts (the edge
+    //     weights of the weighted interaction graph). The reference paper uses
+    //     this "adjacency matrix std dev" as a key descriptor: a large value
+    //     means a few qubit pairs interact far more than the rest (uneven weight
+    //     distribution), a value near 0 means every used pair repeats equally
+    //     (QFT-like). Population std dev over the used pairs.
+    double cnot_edge_weight_stddev = 0.0;
+    if (!cnot_pair_counts.empty()) {
+        double var = 0.0;
+        for (const auto& kv : cnot_pair_counts) {
+            const double d = static_cast<double>(kv.second) - avg_cnot_pair_rep;
+            var += d * d;
+        }
+        var /= static_cast<double>(cnot_pair_counts.size());
+        cnot_edge_weight_stddev = std::sqrt(var);
     }
 
     // 1. Average degree (over qubits that participate in at least one CNOT)
@@ -316,6 +347,115 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
             Q += static_cast<double>(ec) / m_d - (kc / two_m) * (kc / two_m);
         }
         cnot_graph_modularity = std::max(0.0, Q);
+    }
+
+    // 4. Diameter and average shortest path (hopcount) of the undirected CNOT
+    //    interaction graph, measured on its largest connected component. The
+    //    graph is frequently disconnected (qubits that never share a CNOT, or
+    //    several independent clusters); restricting to the largest component
+    //    keeps both metrics finite and matches the "assume connected" treatment
+    //    of the interaction graph in the reference paper. diameter = longest
+    //    shortest path; avg_shortest_path = mean hopcount over all ordered node
+    //    pairs in that component. Both stay 0 when fewer than 2 nodes are
+    //    connected (e.g. a circuit with no CNOTs). All-pairs BFS, O(V*(V+E)).
+    double cnot_graph_diameter = 0.0;
+    double cnot_graph_avg_shortest_path = 0.0;
+    if (cnot_adj.size() >= 2) {
+        // Contiguous 0..nn-1 indexing of the interaction-graph nodes.
+        const int nn = static_cast<int>(cnot_adj.size());
+        std::vector<int> node_ids;
+        node_ids.reserve(nn);
+        std::unordered_map<int, int> node_idx;
+        node_idx.reserve(nn);
+        for (const auto& kv : cnot_adj) {
+            node_idx[kv.first] = static_cast<int>(node_ids.size());
+            node_ids.push_back(kv.first);
+        }
+        std::vector<std::vector<int>> adj(nn);
+        for (int i = 0; i < nn; i++) {
+            for (int nb : cnot_adj.at(node_ids[i]))
+                adj[i].push_back(node_idx.at(nb));
+        }
+
+        // Largest connected component via iterative flood fill.
+        std::vector<int> comp(nn, -1);
+        int best_comp = -1, best_size = 0, num_comps = 0;
+        for (int s = 0; s < nn; s++) {
+            if (comp[s] != -1) continue;
+            const int cid = num_comps++;
+            int sz = 0;
+            std::vector<int> stack = {s};
+            comp[s] = cid;
+            while (!stack.empty()) {
+                const int u = stack.back();
+                stack.pop_back();
+                sz++;
+                for (int v : adj[u]) if (comp[v] == -1) { comp[v] = cid; stack.push_back(v); }
+            }
+            if (sz > best_size) { best_size = sz; best_comp = cid; }
+        }
+
+        // All-pairs BFS within the largest component.
+        if (best_size >= 2) {
+            long long dist_sum = 0;
+            long long pair_count = 0;
+            int diameter = 0;
+            std::vector<int> dist(nn);
+            for (int s = 0; s < nn; s++) {
+                if (comp[s] != best_comp) continue;
+                std::fill(dist.begin(), dist.end(), -1);
+                std::vector<int> queue;
+                queue.reserve(best_size);
+                queue.push_back(s);
+                dist[s] = 0;
+                size_t head = 0;
+                while (head < queue.size()) {
+                    const int u = queue[head++];
+                    for (int v : adj[u]) {
+                        if (dist[v] == -1) {
+                            dist[v] = dist[u] + 1;
+                            queue.push_back(v);
+                        }
+                    }
+                }
+                for (int t = 0; t < nn; t++) {
+                    if (t == s || comp[t] != best_comp || dist[t] <= 0) continue;
+                    dist_sum += dist[t];
+                    pair_count++;
+                    diameter = std::max(diameter, dist[t]);
+                }
+            }
+            cnot_graph_diameter = static_cast<double>(diameter);
+            cnot_graph_avg_shortest_path = pair_count > 0
+                ? static_cast<double>(dist_sum) / static_cast<double>(pair_count)
+                : 0.0;
+        }
+    }
+
+    // 5. Average local clustering coefficient (Watts–Strogatz): for each qubit,
+    //    the fraction of its neighbour pairs that are themselves connected,
+    //    averaged over all qubits in the interaction graph (degree < 2 → 0).
+    //    The reference paper's "clustering coefficient": ~1 means the graph is
+    //    locally dense / clique-like (worst case for mapping), ~0 means tree-like.
+    //    O(Σ d_i²) neighbour-pair membership checks against cnot_adj.
+    double cnot_graph_clustering_coeff = 0.0;
+    if (!cnot_adj.empty()) {
+        double sum_local = 0.0;
+        for (const auto& kv : cnot_adj) {
+            const std::unordered_set<int>& neigh = kv.second;
+            const int d = static_cast<int>(neigh.size());
+            if (d < 2) continue;  // local clustering undefined → counts as 0
+            std::vector<int> nb(neigh.begin(), neigh.end());
+            long long links = 0;
+            for (size_t a = 0; a + 1 < nb.size(); a++) {
+                const std::unordered_set<int>& adj_a = cnot_adj.at(nb[a]);
+                for (size_t b = a + 1; b < nb.size(); b++) {
+                    if (adj_a.count(nb[b])) links++;
+                }
+            }
+            sum_local += 2.0 * static_cast<double>(links) / (static_cast<double>(d) * (d - 1));
+        }
+        cnot_graph_clustering_coeff = sum_local / static_cast<double>(cnot_adj.size());
     }
 
     // ---- Layer fingerprints (numeric hash: gate name + qubits in textual order) ----
@@ -451,11 +591,16 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
         .avg_cnot_pair_rep            = avg_cnot_pair_rep,
         .cnot_interaction_density     = cnot_interaction_density,
         .max_cnot_degree              = max_cnot_degree,
+        .min_cnot_degree              = min_cnot_degree,
         .t_qubit_diversity            = t_qubit_diversity,
         .avg_cnot_degree              = avg_cnot_degree,
         .cnot_degree_gini             = cnot_degree_gini,
         .cnot_graph_modularity        = cnot_graph_modularity,
         .cnot_pair_rep_gini           = cnot_pair_rep_gini,
+        .cnot_graph_diameter          = cnot_graph_diameter,
+        .cnot_graph_avg_shortest_path = cnot_graph_avg_shortest_path,
+        .cnot_edge_weight_stddev      = cnot_edge_weight_stddev,
+        .cnot_graph_clustering_coeff  = cnot_graph_clustering_coeff,
         .num_layers                   = num_layers,
         .num_unique_layers            = num_unique_layers,
         .layer_reuse_ratio            = layer_reuse_ratio,
@@ -554,8 +699,10 @@ inline void write_metrics_csv(const CircuitMetrics& metrics,
         "num_cnot,num_t_tdg,num_other_gates,"
         "t_count_ratio,cnot_ratio,other_gate_ratio,"
         "num_unique_cnot_pairs,max_cnot_pair_repetition,avg_cnot_pair_repetition,"
-        "cnot_interaction_density,max_cnot_degree,t_qubit_diversity,"
+        "cnot_interaction_density,max_cnot_degree,min_cnot_degree,t_qubit_diversity,"
         "avg_cnot_degree,cnot_degree_gini,cnot_graph_modularity,cnot_pair_rep_gini,"
+        "cnot_graph_diameter,cnot_graph_avg_shortest_path,"
+        "cnot_edge_weight_stddev,cnot_graph_clustering_coeff,"
         "total_layers,num_unique_layers,layer_reuse_ratio,depth_width_ratio,"
         "avg_layer_size,max_layer_size,avg_cnot_per_layer,avg_t_per_layer,"
         "max_t_in_layer,max_cnot_in_layer,t_depth,cnot_depth,t_layer_ratio,"
@@ -602,8 +749,10 @@ inline void write_metrics_csv(const CircuitMetrics& metrics,
         << metrics.num_cnot << ',' << metrics.num_t_tdg << ',' << metrics.num_other_gates << ','
         << metrics.t_ratio << ',' << metrics.cnot_ratio << ',' << metrics.other_gate_ratio << ','
         << metrics.num_unique_cnot_pairs << ',' << metrics.max_cnot_pair_rep << ',' << metrics.avg_cnot_pair_rep << ','
-        << metrics.cnot_interaction_density << ',' << metrics.max_cnot_degree << ',' << metrics.t_qubit_diversity << ','
+        << metrics.cnot_interaction_density << ',' << metrics.max_cnot_degree << ',' << metrics.min_cnot_degree << ',' << metrics.t_qubit_diversity << ','
         << metrics.avg_cnot_degree << ',' << metrics.cnot_degree_gini << ',' << metrics.cnot_graph_modularity << ',' << metrics.cnot_pair_rep_gini << ','
+        << metrics.cnot_graph_diameter << ',' << metrics.cnot_graph_avg_shortest_path << ','
+        << metrics.cnot_edge_weight_stddev << ',' << metrics.cnot_graph_clustering_coeff << ','
         << metrics.num_layers << ',' << metrics.num_unique_layers << ',' << metrics.layer_reuse_ratio << ',' << metrics.depth_width_ratio << ','
         << metrics.avg_layer_size << ',' << metrics.max_layer_size << ',' << metrics.avg_cnot_per_layer << ',' << metrics.avg_t_per_layer << ','
         << metrics.max_t_in_layer << ',' << metrics.max_cnot_in_layer << ',' << metrics.t_depth << ',' << metrics.cnot_depth << ',' << metrics.t_layer_ratio << ','

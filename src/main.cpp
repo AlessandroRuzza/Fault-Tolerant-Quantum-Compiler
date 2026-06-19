@@ -252,6 +252,36 @@ void write_benchmark_result_file_if_requested(const benchmarkResult &result) {
     if (result.cnot_interaction_density >= 0.0) {
         payload["cnot_interaction_density"] = result.cnot_interaction_density;
     }
+    if (result.cnot_graph_modularity >= 0.0) {
+        payload["cnot_graph_modularity"] = result.cnot_graph_modularity;
+    }
+    if (result.cnot_graph_diameter >= 0.0) {
+        payload["cnot_graph_diameter"] = result.cnot_graph_diameter;
+    }
+    if (result.cnot_graph_avg_shortest_path >= 0.0) {
+        payload["cnot_graph_avg_shortest_path"] = result.cnot_graph_avg_shortest_path;
+    }
+    if (result.max_cnot_degree >= 0) {
+        payload["max_cnot_degree"] = result.max_cnot_degree;
+    }
+    if (result.min_cnot_degree >= 0) {
+        payload["min_cnot_degree"] = result.min_cnot_degree;
+    }
+    if (result.avg_cnot_degree >= 0.0) {
+        payload["avg_cnot_degree"] = result.avg_cnot_degree;
+    }
+    if (result.cnot_degree_gini >= 0.0) {
+        payload["cnot_degree_gini"] = result.cnot_degree_gini;
+    }
+    if (result.cnot_pair_rep_gini >= 0.0) {
+        payload["cnot_pair_rep_gini"] = result.cnot_pair_rep_gini;
+    }
+    if (result.cnot_edge_weight_stddev >= 0.0) {
+        payload["cnot_edge_weight_stddev"] = result.cnot_edge_weight_stddev;
+    }
+    if (result.cnot_graph_clustering_coeff >= 0.0) {
+        payload["cnot_graph_clustering_coeff"] = result.cnot_graph_clustering_coeff;
+    }
 
     write_benchmark_worker_payload_if_requested(payload);
 }
@@ -322,6 +352,36 @@ benchmarkResult benchmark_result_from_worker_payload(const json &payload) {
     }
     if (payload.contains("cnot_interaction_density") && payload.at("cnot_interaction_density").is_number()) {
         result.cnot_interaction_density = payload.at("cnot_interaction_density").get<double>();
+    }
+    if (payload.contains("cnot_graph_modularity") && payload.at("cnot_graph_modularity").is_number()) {
+        result.cnot_graph_modularity = payload.at("cnot_graph_modularity").get<double>();
+    }
+    if (payload.contains("cnot_graph_diameter") && payload.at("cnot_graph_diameter").is_number()) {
+        result.cnot_graph_diameter = payload.at("cnot_graph_diameter").get<double>();
+    }
+    if (payload.contains("cnot_graph_avg_shortest_path") && payload.at("cnot_graph_avg_shortest_path").is_number()) {
+        result.cnot_graph_avg_shortest_path = payload.at("cnot_graph_avg_shortest_path").get<double>();
+    }
+    if (payload.contains("max_cnot_degree") && payload.at("max_cnot_degree").is_number_integer()) {
+        result.max_cnot_degree = payload.at("max_cnot_degree").get<int>();
+    }
+    if (payload.contains("min_cnot_degree") && payload.at("min_cnot_degree").is_number_integer()) {
+        result.min_cnot_degree = payload.at("min_cnot_degree").get<int>();
+    }
+    if (payload.contains("avg_cnot_degree") && payload.at("avg_cnot_degree").is_number()) {
+        result.avg_cnot_degree = payload.at("avg_cnot_degree").get<double>();
+    }
+    if (payload.contains("cnot_degree_gini") && payload.at("cnot_degree_gini").is_number()) {
+        result.cnot_degree_gini = payload.at("cnot_degree_gini").get<double>();
+    }
+    if (payload.contains("cnot_pair_rep_gini") && payload.at("cnot_pair_rep_gini").is_number()) {
+        result.cnot_pair_rep_gini = payload.at("cnot_pair_rep_gini").get<double>();
+    }
+    if (payload.contains("cnot_edge_weight_stddev") && payload.at("cnot_edge_weight_stddev").is_number()) {
+        result.cnot_edge_weight_stddev = payload.at("cnot_edge_weight_stddev").get<double>();
+    }
+    if (payload.contains("cnot_graph_clustering_coeff") && payload.at("cnot_graph_clustering_coeff").is_number()) {
+        result.cnot_graph_clustering_coeff = payload.at("cnot_graph_clustering_coeff").get<double>();
     }
     return result;
 }
@@ -1019,6 +1079,16 @@ int run_bench_mode(
             std::string max_parallelism_str;
             std::string min_routing_steps_str;
             std::string cnot_interaction_density_str;
+            std::string cnot_graph_modularity_str;
+            std::string cnot_graph_diameter_str;
+            std::string cnot_graph_avg_shortest_path_str;
+            std::string max_cnot_degree_str;
+            std::string min_cnot_degree_str;
+            std::string avg_cnot_degree_str;
+            std::string cnot_degree_gini_str;
+            std::string cnot_pair_rep_gini_str;
+            std::string cnot_edge_weight_stddev_str;
+            std::string cnot_graph_clustering_coeff_str;
             std::string error_excerpt;
             std::string resolved_graph_x;
             std::string resolved_graph_y;
@@ -1202,6 +1272,36 @@ int run_bench_mode(
                     }
                     if (worker_result.cnot_interaction_density >= 0.0) {
                         cnot_interaction_density_str = std::to_string(worker_result.cnot_interaction_density);
+                    }
+                    if (worker_result.cnot_graph_modularity >= 0.0) {
+                        cnot_graph_modularity_str = std::to_string(worker_result.cnot_graph_modularity);
+                    }
+                    if (worker_result.cnot_graph_diameter >= 0.0) {
+                        cnot_graph_diameter_str = std::to_string(worker_result.cnot_graph_diameter);
+                    }
+                    if (worker_result.cnot_graph_avg_shortest_path >= 0.0) {
+                        cnot_graph_avg_shortest_path_str = std::to_string(worker_result.cnot_graph_avg_shortest_path);
+                    }
+                    if (worker_result.max_cnot_degree >= 0) {
+                        max_cnot_degree_str = std::to_string(worker_result.max_cnot_degree);
+                    }
+                    if (worker_result.min_cnot_degree >= 0) {
+                        min_cnot_degree_str = std::to_string(worker_result.min_cnot_degree);
+                    }
+                    if (worker_result.avg_cnot_degree >= 0.0) {
+                        avg_cnot_degree_str = std::to_string(worker_result.avg_cnot_degree);
+                    }
+                    if (worker_result.cnot_degree_gini >= 0.0) {
+                        cnot_degree_gini_str = std::to_string(worker_result.cnot_degree_gini);
+                    }
+                    if (worker_result.cnot_pair_rep_gini >= 0.0) {
+                        cnot_pair_rep_gini_str = std::to_string(worker_result.cnot_pair_rep_gini);
+                    }
+                    if (worker_result.cnot_edge_weight_stddev >= 0.0) {
+                        cnot_edge_weight_stddev_str = std::to_string(worker_result.cnot_edge_weight_stddev);
+                    }
+                    if (worker_result.cnot_graph_clustering_coeff >= 0.0) {
+                        cnot_graph_clustering_coeff_str = std::to_string(worker_result.cnot_graph_clustering_coeff);
                     }
                     if (worker_result.resolved_graph_x >= 0) {
                         resolved_graph_x = std::to_string(worker_result.resolved_graph_x);
@@ -1518,7 +1618,17 @@ int run_bench_mode(
                 avg_parallelism_str,
                 max_parallelism_str,
                 min_routing_steps_str,
-                cnot_interaction_density_str
+                cnot_interaction_density_str,
+                cnot_graph_modularity_str,
+                cnot_graph_diameter_str,
+                cnot_graph_avg_shortest_path_str,
+                max_cnot_degree_str,
+                min_cnot_degree_str,
+                avg_cnot_degree_str,
+                cnot_degree_gini_str,
+                cnot_pair_rep_gini_str,
+                cnot_edge_weight_stddev_str,
+                cnot_graph_clustering_coeff_str
             };
 
             std::ostringstream progress;
