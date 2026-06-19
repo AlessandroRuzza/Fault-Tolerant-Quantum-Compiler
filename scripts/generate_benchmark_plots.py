@@ -103,6 +103,32 @@ TIME_ANALYSIS_DIR = "time_analysis"
 # Routing-steps-vs-circuit-characteristic scatters (max_parallelism,
 # min_routing_steps). Always generated; not gated behind --time.
 PARALLELISM_ANALYSIS_DIR = "parallelism_analysis"
+# CNOT interaction-graph characterization metrics (the columns added by the
+# "Add more circuit metrics to csv output" change). Each is plotted as an x-axis
+# against routing_steps and against routing optimality, the same way
+# cnot_interaction_density already was. (csv column, x-axis label, title phrase,
+# filename slug). cnot_interaction_density keeps the legacy "circuit_density"
+# slug so its filenames do not change.
+CNOT_GRAPH_METRIC_SPECS = (
+    ("cnot_interaction_density", "circuit density (unique CNOT pairs / max pairs)", "Circuit Density", "circuit_density"),
+    ("cnot_graph_modularity", "CNOT graph modularity (community structure)", "CNOT Graph Modularity", "cnot_graph_modularity"),
+    ("cnot_graph_diameter", "CNOT graph diameter (max hop distance)", "CNOT Graph Diameter", "cnot_graph_diameter"),
+    ("cnot_graph_avg_shortest_path", "CNOT graph avg shortest path (hops)", "CNOT Graph Avg Shortest Path", "cnot_graph_avg_shortest_path"),
+    ("max_cnot_degree", "max CNOT degree (busiest qubit)", "Max CNOT Degree", "max_cnot_degree"),
+    ("min_cnot_degree", "min CNOT degree (over qubits with a CNOT)", "Min CNOT Degree", "min_cnot_degree"),
+    ("avg_cnot_degree", "avg CNOT degree", "Avg CNOT Degree", "avg_cnot_degree"),
+    ("cnot_degree_gini", "CNOT degree Gini (degree inequality)", "CNOT Degree Gini", "cnot_degree_gini"),
+    ("cnot_pair_rep_gini", "CNOT pair-repetition Gini (interaction skew)", "CNOT Pair-Repetition Gini", "cnot_pair_rep_gini"),
+    ("cnot_edge_weight_stddev", "CNOT edge-weight stddev (adjacency std)", "CNOT Edge-Weight Stddev", "cnot_edge_weight_stddev"),
+    ("cnot_graph_clustering_coeff", "CNOT graph clustering coefficient", "CNOT Graph Clustering Coeff", "cnot_graph_clustering_coeff"),
+)
+# The derived float fields (cnot_*_f) produced from the columns above.
+CNOT_GRAPH_METRIC_F_FIELDS = tuple(f"{spec[0]}_f" for spec in CNOT_GRAPH_METRIC_SPECS)
+# The new columns only (density is already kept/registered elsewhere).
+CNOT_GRAPH_METRIC_NEW_COLUMNS = tuple(
+    spec[0] for spec in CNOT_GRAPH_METRIC_SPECS if spec[0] != "cnot_interaction_density"
+)
+CNOT_GRAPH_METRIC_NEW_F_FIELDS = tuple(f"{col}_f" for col in CNOT_GRAPH_METRIC_NEW_COLUMNS)
 # Gates the time_analysis/ subfolder: when False, save_fig drops any plot that
 # would land there. Flipped on by --time in main().
 INCLUDE_TIME_ANALYSIS = False
@@ -1170,6 +1196,7 @@ COMPACT_ROW_FIELDS = (
     "max_parallelism_f",
     "min_routing_steps_f",
     "cnot_interaction_density_f",
+    *CNOT_GRAPH_METRIC_NEW_F_FIELDS,
     "interaction_pressure_f",
     "data_density_f",
     "overall_density_f",
@@ -1488,6 +1515,7 @@ _DROP_RAW_FIELDS_AFTER_PREP = (
     "max_parallelism",
     "min_routing_steps",
     "cnot_interaction_density",
+    *CNOT_GRAPH_METRIC_NEW_COLUMNS,
     "interaction_pressure", "data_density", "overall_density",
     "exit_code",
     "total_nodes",
@@ -1550,6 +1578,8 @@ def prepare_row_for_analysis(row):
     row["max_parallelism_f"] = to_float_interned(row.get("max_parallelism"))
     row["min_routing_steps_f"] = to_float_interned(row.get("min_routing_steps"))
     row["cnot_interaction_density_f"] = to_float_interned(row.get("cnot_interaction_density"))
+    for _col in CNOT_GRAPH_METRIC_NEW_COLUMNS:
+        row[f"{_col}_f"] = to_float_interned(row.get(_col))
     row["interaction_pressure_f"] = to_float_interned(row.get("interaction_pressure"))
     row["data_density_f"] = to_float_interned(row.get("data_density"))
     row["overall_density_f"] = to_float_interned(row.get("overall_density"))
@@ -2161,11 +2191,12 @@ def plot_routing_steps_vs_parallelism(rows_success_with_routing, output_dir, gen
         depth, a hard lower bound on routing_steps (a perfect router needs at
         least one step per layer). The y=x reference line marks that bound, so
         the vertical gap above it shows how close routing gets to optimal.
-      * routing_steps vs cnot_interaction_density -- circuit interaction density
-        (unique CNOT pairs / all possible pairs, in [0, 1]); how connected the
-        circuit's interaction graph is.
+      * routing_steps vs each CNOT interaction-graph metric (density, modularity,
+        diameter, avg shortest path, degree statistics, Gini coefficients,
+        edge-weight stddev, clustering) -- how the circuit's interaction-graph
+        structure relates to the steps routing needs. See CNOT_GRAPH_METRIC_SPECS.
     """
-    specs = (
+    specs = [
         (
             "max_parallelism_f",
             "max parallelism (avg gates / layer)",
@@ -2180,14 +2211,17 @@ def plot_routing_steps_vs_parallelism(rows_success_with_routing, output_dir, gen
             "routing_steps_vs_min_routing_steps.png",
             True,
         ),
+    ]
+    specs += [
         (
-            "cnot_interaction_density_f",
-            "circuit density (unique CNOT pairs / max pairs)",
-            "Routing Steps vs Circuit Density",
-            "routing_steps_vs_circuit_density.png",
+            f"{col}_f",
+            xlabel,
+            f"Routing Steps vs {title}",
+            f"routing_steps_vs_{slug}.png",
             False,
-        ),
-    )
+        )
+        for col, xlabel, title, slug in CNOT_GRAPH_METRIC_SPECS
+    ]
     for x_key, xlabel, title, filename, identity_line in specs:
         points = []
         for r in rows_success_with_routing:
@@ -2264,11 +2298,12 @@ def plot_routing_optimality(rows_success_with_routing, output_dir, generated, sk
 
       * vs max_parallelism -- that floor is exactly the y = 1/x curve, so every
         point sits in the band between y = 1/x (worst) and y = 1 (perfect).
-      * vs cnot_interaction_density -- circuit interaction density (unique CNOT
-        pairs / max pairs, in [0, 1]); shows whether denser interaction graphs
-        are harder to route close to optimal.
+      * vs each CNOT interaction-graph metric (density, modularity, diameter, avg
+        shortest path, degree statistics, Gini coefficients, edge-weight stddev,
+        clustering) -- whether more tangled interaction graphs route further from
+        optimal. See CNOT_GRAPH_METRIC_SPECS.
     """
-    specs = (
+    specs = [
         (
             "max_parallelism_f",
             "max parallelism (avg gates / layer)",
@@ -2276,14 +2311,17 @@ def plot_routing_optimality(rows_success_with_routing, output_dir, generated, sk
             "routing_optimality_vs_max_parallelism.png",
             True,
         ),
+    ]
+    specs += [
         (
-            "cnot_interaction_density_f",
-            "circuit density (unique CNOT pairs / max pairs)",
-            "Routing Optimality vs Circuit Density",
-            "routing_optimality_vs_circuit_density.png",
+            f"{col}_f",
+            xlabel,
+            f"Routing Optimality vs {title}",
+            f"routing_optimality_vs_{slug}.png",
             False,
-        ),
-    )
+        )
+        for col, xlabel, title, slug in CNOT_GRAPH_METRIC_SPECS
+    ]
     for x_key, xlabel, title, filename, worst_case_curve in specs:
         points = []
         for r in rows_success_with_routing:
