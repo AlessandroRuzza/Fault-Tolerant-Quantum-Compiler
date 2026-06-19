@@ -27,6 +27,10 @@ private:
     void remove_leading_empty_layers();
     void remove_trailing_empty_layers();
     void pull_gates_into_top_layer(std::size_t max_lookahead_layers);
+    // Normalise the layer deque after routed gates were removed: drop leading
+    // empties, pull independent gates up into the top layer, drop trailing
+    // empties. The pull depth depends on whether the top layer was fully routed.
+    void compact_top_layer();
 
 public:
     LayeredCircuit(const Circuit& circuit, std::size_t lookahead_layers = 8)

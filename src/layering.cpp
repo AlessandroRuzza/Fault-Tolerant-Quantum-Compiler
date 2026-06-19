@@ -3,6 +3,13 @@
 // Definition of static member
 const Layer LayeredCircuit::emptyLayer = {};
 
+namespace {
+// Shallow pull depth used after a layer is fully routed. 
+// This runs every normal step, so
+// its value is 1 to keep negligible cost.
+constexpr std::size_t FULLY_ROUTED_PULL_LOOKAHEAD = 1;
+} // namespace
+
 void LayeredCircuit::build_layers() {
     layers.clear();
     std::unordered_map<int, int> qubit_last_layer;
@@ -100,6 +107,22 @@ void LayeredCircuit::pull_gates_into_top_layer(std::size_t max_lookahead_layers)
     }
 }
 
+void LayeredCircuit::compact_top_layer() {
+    // Decide the pull depth *before* dropping leading empty layers — that step
+    // erases the "was the top fully routed?" signal we need here.
+    //   front empty  -> top was fully routed: a shallow backfill is enough, and
+    //                   this path runs every normal step so it must stay cheap.
+    //   front filled -> gates were postponed: pull deeper to re-flatten the
+    //                   staircase those postponed gates left behind.
+    const std::size_t pull_lookahead = (!layers.empty() && layers.front().empty())
+        ? FULLY_ROUTED_PULL_LOOKAHEAD
+        : layer_pull_lookahead;
+
+    remove_leading_empty_layers();
+    pull_gates_into_top_layer(pull_lookahead);
+    remove_trailing_empty_layers();
+}
+
 void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
     if (routed_gates.empty()) {
         return;
@@ -115,13 +138,7 @@ void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
     if (layers.empty())
         return;
 
-    if (layers.front().empty()) {
-        remove_leading_empty_layers();
-    }
-    else{
-        pull_gates_into_top_layer(layer_pull_lookahead);
-        remove_trailing_empty_layers();
-    }
+    compact_top_layer();
 }
 void LayeredCircuit::update_layers_within(const std::vector<Gate>& routed_gates, std::size_t max_depth) {
     if (routed_gates.empty() || layers.empty()) {
@@ -153,12 +170,7 @@ void LayeredCircuit::update_layers_within(const std::vector<Gate>& routed_gates,
         erase_routed_from_layer(layers[d]);
     }
 
-    if (layers.front().empty()) {
-        remove_leading_empty_layers();
-    } else {
-        pull_gates_into_top_layer(layer_pull_lookahead);
-        remove_trailing_empty_layers();
-    }
+    compact_top_layer();
 }
 
 void LayeredCircuit::reset(){
