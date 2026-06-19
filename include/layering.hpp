@@ -23,6 +23,7 @@ protected:
     // When true, build_layers() reorders commuting CX gates to pack a shallower
     // layering (fewer layers) instead of the order-preserving ASAP pass.
     bool commute_layering;
+    bool layers_need_compaction = false;
 
 private:
     void build_layers();
@@ -34,10 +35,11 @@ private:
     void remove_routed_from_topLayer(const std::unordered_set<Gate>& routed_set);
     void remove_leading_empty_layers();
     void remove_trailing_empty_layers();
-    void pull_gates_into_top_layer(std::size_t max_lookahead_layers);
+    // Returns true if at least one gate was pulled up into the top layer.
+    bool pull_gates_into_top_layer(std::size_t max_lookahead_layers);
     // Normalise the layer deque after routed gates were removed: drop leading
-    // empties, pull independent gates up into the top layer, drop trailing
-    // empties. The pull depth depends on whether the top layer was fully routed.
+    // empties, then (if layers_need_compaction) pull independent gates up
+    // into the top layer, finally drop trailing empties.
     void compact_top_layer();
 
 public:

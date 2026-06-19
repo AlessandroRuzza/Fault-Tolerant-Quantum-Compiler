@@ -4,19 +4,15 @@
 // Definition of static member
 const Layer LayeredCircuit::emptyLayer = {};
 
-namespace {
-// Shallow pull depth used after a layer is fully routed. 
-// This runs every normal step, so
-// its value is 1 to keep negligible cost.
-constexpr std::size_t FULLY_ROUTED_PULL_LOOKAHEAD = 1;
-} // namespace
-
 void LayeredCircuit::build_layers() {
     if (commute_layering) {
         build_layers_commute();
         return;
     }
     layers.clear();
+    // ASAP placement below puts every gate at its earliest legal layer, so the
+    // result has no movable gates: start clean.
+    layers_need_compaction = false;
     std::unordered_map<int, int> qubit_last_layer;
     std::vector<Gate> g;
     for (Gate& gate : this->gates){
@@ -125,11 +121,12 @@ inline void LayeredCircuit::remove_trailing_empty_layers() {
     }
 }
 
-void LayeredCircuit::pull_gates_into_top_layer(std::size_t max_lookahead_layers) {
+bool LayeredCircuit::pull_gates_into_top_layer(std::size_t max_lookahead_layers) {
     if (layers.empty() || max_lookahead_layers == 0 || layers.size() < 2) {
-        return;
+        return false;
     }
 
+    bool moved_any = false;
     std::unordered_set<uint32_t> blocked_qubits;
     for (const Gate& gate : layers[0]) {
         for (uint32_t q : gate.qubits) {
@@ -158,6 +155,7 @@ void LayeredCircuit::pull_gates_into_top_layer(std::size_t max_lookahead_layers)
         for (const Gate& gate : movable_gates) {
             layers[layer_idx].erase(gate);
             layers[0].insert(gate);
+            moved_any = true;
             for (uint32_t q : gate.qubits) {
                 blocked_qubits.insert(q);
             }
@@ -169,21 +167,23 @@ void LayeredCircuit::pull_gates_into_top_layer(std::size_t max_lookahead_layers)
             }
         }
     }
+
+    return moved_any;
 }
 
 void LayeredCircuit::compact_top_layer() {
-    // Decide the pull depth *before* dropping leading empty layers — that step
-    // erases the "was the top fully routed?" signal we need here.
-    //   front empty  -> top was fully routed: a shallow backfill is enough, and
-    //                   this path runs every normal step so it must stay cheap.
-    //   front filled -> gates were postponed: pull deeper to re-flatten the
-    //                   staircase those postponed gates left behind.
-    const std::size_t pull_lookahead = (!layers.empty() && layers.front().empty())
-        ? FULLY_ROUTED_PULL_LOOKAHEAD
-        : layer_pull_lookahead;
-
     remove_leading_empty_layers();
-    pull_gates_into_top_layer(pull_lookahead);
+
+    // A pristine ASAP layering has no movable gates, so the pull scan is pure
+    // overhead until a postponement (or an earlier pull) creates a hole. Run it
+    // only when such a hole might exist; the caller sets the flag when it does.
+    if (layers_need_compaction) {
+        const bool moved = pull_gates_into_top_layer(layer_pull_lookahead);
+        // Pulling gates out of deeper layers can expose more movable gates, so stay dirty.
+        // Once a pull moves nothing, we can stop scanning.
+        layers_need_compaction = moved;
+    }
+
     remove_trailing_empty_layers();
 }
 
@@ -198,9 +198,16 @@ void LayeredCircuit::update_layers(const std::vector<Gate>& routed_gates){
 
     std::unordered_set<Gate> routed_set(routed_gates.begin(), routed_gates.end());
     remove_routed_from_topLayer(routed_set);
-    
+
     if (layers.empty())
         return;
+
+    // route_layer only routes gates from the top layer, so a non-empty front
+    // after removal means some gates were postponed — their layer-below
+    // dependents may now be movable. Mark dirty so compact_top_layer pulls.
+    if (!layers.front().empty()) {
+        layers_need_compaction = true;
+    }
 
     compact_top_layer();
 }
@@ -216,22 +223,33 @@ void LayeredCircuit::update_layers_within(const std::vector<Gate>& routed_gates,
     // in practice; the safety scan below covers any unexpected leftover without
     // paying the full O(layers) cost on the common path.
     const std::size_t windowed_last = std::min(max_depth, layers.size() - 1);
-    auto erase_routed_from_layer = [&](Layer& layer) {
+    auto erase_routed_from_layer = [&](Layer& layer) -> std::size_t {
+        std::size_t erased = 0;
         for (auto it = layer.begin(); it != layer.end() && !routed_set.empty(); ) {
             if (routed_set.count(*it) > 0) {
                 routed_set.erase(*it);
                 it = layer.erase(it);
+                ++erased;
             } else {
                 ++it;
             }
         }
+        return erased;
     };
 
+    // Removing a gate from any layer below the front leaves a hole that can make
+    // gates further down movable, so track whether that happened.
+    bool removed_below_front = false;
     for (std::size_t d = 0; d <= windowed_last && !routed_set.empty(); ++d) {
-        erase_routed_from_layer(layers[d]);
+        const std::size_t erased = erase_routed_from_layer(layers[d]);
+        if (d > 0 && erased > 0) removed_below_front = true;
     }
     for (std::size_t d = windowed_last + 1; d < layers.size() && !routed_set.empty(); ++d) {
-        erase_routed_from_layer(layers[d]);
+        if (erase_routed_from_layer(layers[d]) > 0) removed_below_front = true;
+    }
+
+    if (removed_below_front || !layers.front().empty()) {
+        layers_need_compaction = true;
     }
 
     compact_top_layer();
