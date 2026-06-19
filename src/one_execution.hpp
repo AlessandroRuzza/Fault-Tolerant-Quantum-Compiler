@@ -251,6 +251,17 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     const int max_deg = circuit.getMaxInteractionDegree();
 
     if (use_generated_graph) {
+        // Valid grid sentinels: -1 = auto-size, 0 = upper bound, >0 = exact.
+        // Anything below -1 is rejected: the magnitude carries no meaning, so a
+        // value like -2 used to silently behave like -1. Shift the auto-sized
+        // grid with dimension_offset, never with a more-negative x/y.
+        if (x < -1 || y < -1) {
+            throw std::runtime_error(
+                "Invalid grid dimension: --x/--y must be >= -1 (-1 = auto-size, "
+                "0 = upper bound, >0 = exact). Use dimension_offset to shift the "
+                "auto-sized grid, not a more-negative x/y."
+            );
+        }
         if (x == 0 || y == 0) {
             x = compute_upper_dimensions(qubitsNumber, max_deg);
             y = x;

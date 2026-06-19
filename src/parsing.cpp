@@ -992,9 +992,9 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --x");
             }
             // Sentinels match the JSON config: >0 explicit, 0 upper-bound
-            // heuristic, <0 auto-size + dimension_offset. The old guard also
-            // failed to consume the value, so "--x -1" fell through to the
-            // unknown-option error.
+            // heuristic, -1 auto-size + dimension_offset. Values below -1 are
+            // rejected later (one_execution): the magnitude is meaningless, so
+            // grid shifts must go through dimension_offset, not negative x/y.
             x = parse_integer(argv[++i], "--x");
             continue;
         }
