@@ -386,7 +386,8 @@ void apply_config_overrides(
     bool& use_layer_cache_explicit,
     double& cnot_formula_scale,
     double& mapped_formula_scale,
-    bool& packing_commute
+    bool& packing_commute,
+    bool& layering_commute
 ) {
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--help") {
@@ -736,6 +737,17 @@ void apply_config_overrides(
         packing_commute = config_json[key].get<bool>();
     }
 
+    // Commutation-aware circuit layering: reorder commuting CX gates to produce a
+    // shallower layering (fewer layers). Independent of packing_commute; affects
+    // the layering fed to every router and the reported layering depth.
+    if (config_json.contains("layering_commute") || config_json.contains("layering-commute")) {
+        const char* key = config_json.contains("layering_commute") ? "layering_commute" : "layering-commute";
+        if (!config_json[key].is_boolean()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a boolean");
+        }
+        layering_commute = config_json[key].get<bool>();
+    }
+
 }
 
 void argument_parsing(
@@ -769,7 +781,8 @@ void argument_parsing(
     bool& metrics_only,
     int& repetition,
     bool& use_layer_cache_explicit,
-    bool& packing_commute
+    bool& packing_commute,
+    bool& layering_commute
 ) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -1107,6 +1120,23 @@ void argument_parsing(
                 packing_commute = false;
             } else {
                 throw std::runtime_error("Invalid boolean value for --packing-commute: " + val);
+            }
+            continue;
+        }
+
+        if (arg == "--layering-commute" || arg == "--layering_commute") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --layering-commute\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --layering-commute");
+            }
+            const std::string val = argv[++i];
+            if (val == "true" || val == "1") {
+                layering_commute = true;
+            } else if (val == "false" || val == "0") {
+                layering_commute = false;
+            } else {
+                throw std::runtime_error("Invalid boolean value for --layering-commute: " + val);
             }
             continue;
         }

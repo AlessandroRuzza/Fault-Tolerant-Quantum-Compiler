@@ -20,9 +20,17 @@ protected:
     std::deque<Layer> layers;
     std::unordered_set<Gate> ignored_gates;
     std::size_t layer_pull_lookahead;
+    // When true, build_layers() reorders commuting CX gates to pack a shallower
+    // layering (fewer layers) instead of the order-preserving ASAP pass.
+    bool commute_layering;
 
 private:
     void build_layers();
+    // Commutation-aware variant of build_layers(): greedily fills each layer
+    // front-to-back, pulling a later gate forward when it commutes with every
+    // earlier still-unplaced gate on its qubits (same predicate the packing
+    // router's commute mode uses). Reduces depth without changing the unitary.
+    void build_layers_commute();
     void remove_routed_from_topLayer(const std::unordered_set<Gate>& routed_set);
     void remove_leading_empty_layers();
     void remove_trailing_empty_layers();
@@ -33,9 +41,11 @@ private:
     void compact_top_layer();
 
 public:
-    LayeredCircuit(const Circuit& circuit, std::size_t lookahead_layers = 8)
+    LayeredCircuit(const Circuit& circuit, std::size_t lookahead_layers = 8,
+                   bool commute_layering = false)
         : Circuit(circuit),
-          layer_pull_lookahead(std::max<std::size_t>(1, lookahead_layers)) {
+          layer_pull_lookahead(std::max<std::size_t>(1, lookahead_layers)),
+          commute_layering(commute_layering) {
         build_layers();
     }
 

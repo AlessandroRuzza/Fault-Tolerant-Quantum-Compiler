@@ -133,7 +133,8 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     bool use_layer_cache_explicit = false,
     double cnot_formula_scale = 1.0,
     double mapped_formula_scale = 1.0,
-    bool packing_commute = false) {
+    bool packing_commute = false,
+    bool layering_commute = false) {
 
     // Clear any stale partial state (a worker process runs exactly one
     // one_execution, but resetting keeps the timeout handler honest).
@@ -488,7 +489,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
 
         const auto layering_start = std::chrono::steady_clock::now();
-        auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD); 
+        auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD, layering_commute);
         if(max_parallelism < 0){
             const int num_layers = layeredCircuit->getNumLayers();
             max_parallelism = num_layers > 0

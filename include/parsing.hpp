@@ -38,7 +38,8 @@ void apply_config_overrides(
     bool& use_layer_cache_explicit,
     double& cnot_formula_scale,
     double& mapped_formula_scale,
-    bool& packing_commute
+    bool& packing_commute,
+    bool& layering_commute
 );
 void argument_parsing(
     int argc,
@@ -71,7 +72,8 @@ void argument_parsing(
     bool& metrics_only,
     int& repetition,
     bool& use_layer_cache_explicit,
-    bool& packing_commute
+    bool& packing_commute,
+    bool& layering_commute
 );
 
 #endif // PARSING_HPP

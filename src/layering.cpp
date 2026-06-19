@@ -1,4 +1,5 @@
 #include "layering.hpp"
+#include "commute.hpp"  // gates_commute (shared with the packing router)
 
 // Definition of static member
 const Layer LayeredCircuit::emptyLayer = {};
@@ -11,6 +12,10 @@ constexpr std::size_t FULLY_ROUTED_PULL_LOOKAHEAD = 1;
 } // namespace
 
 void LayeredCircuit::build_layers() {
+    if (commute_layering) {
+        build_layers_commute();
+        return;
+    }
     layers.clear();
     std::unordered_map<int, int> qubit_last_layer;
     std::vector<Gate> g;
@@ -29,6 +34,65 @@ void LayeredCircuit::build_layers() {
         layers[max_layer].insert(gate);
         for (const int q : gate.qubits)
             qubit_last_layer[q] = max_layer;
+    }
+}
+
+void LayeredCircuit::build_layers_commute() {
+    layers.clear();
+
+    // Gates in textual order, skipping any ignored ones (same filter as the
+    // ASAP build). Pointers into `remaining` stay valid for one pass below.
+    std::vector<Gate> remaining;
+    remaining.reserve(this->gates.size());
+    for (const Gate& gate : this->gates) {
+        if (ignored_gates.count(gate) == 0)
+            remaining.push_back(gate);
+    }
+
+    // Greedy front-to-back. Each pass emits one layer: a maximal set of gates,
+    // qubit-disjoint within the layer, where a gate may jump ahead of earlier
+    // still-unplaced gates only if it commutes with every one it shares a qubit
+    // with. Non-CX gates never commute (gates_commute), so they act as full
+    // barriers on their qubits — order across them is always preserved. The
+    // first remaining gate is always placeable, so each pass shrinks `remaining`
+    // and the loop terminates. With commutation disabled everywhere this reduces
+    // to the same depth as the ASAP build; commuting gates only ever pack tighter.
+    while (!remaining.empty()) {
+        Layer layer;
+        std::unordered_set<uint32_t> used_qubits;  // qubits already busy this layer
+        // Earlier gates we skipped this pass, indexed by qubit. A candidate must
+        // commute with every skipped gate on each of its qubits to move ahead.
+        std::unordered_map<uint32_t, std::vector<const Gate*>> blockers;
+        std::vector<Gate> next_remaining;
+        next_remaining.reserve(remaining.size());
+
+        for (const Gate& g : remaining) {
+            bool placeable = true;
+            for (const uint32_t q : g.qubits) {
+                if (used_qubits.count(q)) { placeable = false; break; }
+            }
+            if (placeable) {
+                for (const uint32_t q : g.qubits) {
+                    const auto it = blockers.find(q);
+                    if (it == blockers.end()) continue;
+                    for (const Gate* h : it->second) {
+                        if (!gates_commute(g, *h)) { placeable = false; break; }
+                    }
+                    if (!placeable) break;
+                }
+            }
+
+            if (placeable) {
+                layer.insert(g);
+                for (const uint32_t q : g.qubits) used_qubits.insert(q);
+            } else {
+                next_remaining.push_back(g);
+                for (const uint32_t q : g.qubits) blockers[q].push_back(&g);
+            }
+        }
+
+        layers.push_back(std::move(layer));
+        remaining = std::move(next_remaining);
     }
 }
 
