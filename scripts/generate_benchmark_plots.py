@@ -1778,6 +1778,20 @@ def category_color_map(labels):
     return {label: cmap(i) for i, label in enumerate(labels)}
 
 
+def circuit_class(circuit_name):
+    """Circuit class from a "<class>_n<qubits>" / "<class>_<qubits>" name.
+
+    Strips the trailing qubit-count suffix and any extension, e.g.
+    "qft_n50.qasm" -> "qft", "ising_n26" -> "ising", "graphstate_n100" ->
+    "graphstate". Falls back to the whole stem when there is no qubit suffix.
+    """
+    if not circuit_name:
+        return "unknown"
+    stem = os.path.splitext(os.path.basename(circuit_name))[0]
+    match = re.match(r"^(.*?)_n?\d+$", stem)
+    return match.group(1) if match and match.group(1) else stem
+
+
 def label_with_sample_count(label, count):
     return f"{label}\n(n={count})"
 
@@ -2235,7 +2249,7 @@ def plot_routing_steps_vs_parallelism(rows_success_with_routing, output_dir, gen
 
 
 def plot_routing_optimality(rows_success_with_routing, output_dir, generated, skipped=None):
-    """Scatter routing optimality against circuit parallelism.
+    """Scatter routing optimality against circuit structural characteristics.
 
     optimality = min_routing_steps / routing_steps, i.e. the layering-depth
     lower bound over the steps actually taken:
@@ -2245,62 +2259,86 @@ def plot_routing_optimality(rows_success_with_routing, output_dir, generated, sk
         routing (one gate per step, routing_steps = num_gates), giving the
         minimum optimality min_routing_steps / num_gates = 1 / max_parallelism.
 
-    Plotted against max_parallelism, that floor is exactly the y = 1/x curve, so
-    every point sits in the band between y = 1/x (worst) and y = 1 (perfect).
+    Two x-axes, coloured by routing strategy so different routers compare on the
+    same circuits:
+
+      * vs max_parallelism -- that floor is exactly the y = 1/x curve, so every
+        point sits in the band between y = 1/x (worst) and y = 1 (perfect).
+      * vs cnot_interaction_density -- circuit interaction density (unique CNOT
+        pairs / max pairs, in [0, 1]); shows whether denser interaction graphs
+        are harder to route close to optimal.
     """
-    points = []
-    for r in rows_success_with_routing:
-        steps = r.get("routing_steps_f")
-        min_steps = r.get("min_routing_steps_f")
-        x = r.get("max_parallelism_f")
-        if steps is None or min_steps is None or x is None:
+    specs = (
+        (
+            "max_parallelism_f",
+            "max parallelism (avg gates / layer)",
+            "Routing Optimality vs Max Parallelism",
+            "routing_optimality_vs_max_parallelism.png",
+            True,
+        ),
+        (
+            "cnot_interaction_density_f",
+            "circuit density (unique CNOT pairs / max pairs)",
+            "Routing Optimality vs Circuit Density",
+            "routing_optimality_vs_circuit_density.png",
+            False,
+        ),
+    )
+    for x_key, xlabel, title, filename, worst_case_curve in specs:
+        points = []
+        for r in rows_success_with_routing:
+            steps = r.get("routing_steps_f")
+            min_steps = r.get("min_routing_steps_f")
+            x = r.get(x_key)
+            if steps is None or min_steps is None or x is None:
+                continue
+            if any(isinstance(v, float) and math.isnan(v) for v in (steps, min_steps, x)):
+                continue
+            if steps <= 0:
+                continue
+            optimality = min_steps / steps
+            points.append((x, optimality, circuit_class(r.get("circuit_name"))))
+
+        if not points:
+            record_skipped_plot(
+                skipped,
+                filename,
+                f"no successful rows with numeric min_routing_steps, routing_steps and {x_key}",
+            )
             continue
-        if any(isinstance(v, float) and math.isnan(v) for v in (steps, min_steps, x)):
-            continue
-        if steps <= 0:
-            continue
-        optimality = min_steps / steps
-        points.append((x, optimality, str(r.get("routing_strategy_norm") or "unknown")))
 
-    filename = "routing_optimality_vs_max_parallelism.png"
-    if not points:
-        record_skipped_plot(
-            skipped,
-            filename,
-            "no successful rows with numeric min_routing_steps, routing_steps and max_parallelism",
-        )
-        return
+        labels = sorted({p[2] for p in points})
+        colors = category_color_map(labels)
+        fig, ax = plt.subplots(figsize=(9, 6))
+        for label in labels:
+            subset = [p for p in points if p[2] == label]
+            ax.scatter(
+                [p[0] for p in subset],
+                [p[1] for p in subset],
+                label=legend_label_with_sample_count(label, len(subset)),
+                alpha=0.7,
+                s=28,
+                color=colors[label],
+            )
 
-    labels = sorted({p[2] for p in points})
-    colors = category_color_map(labels)
-    fig, ax = plt.subplots(figsize=(9, 6))
-    for label in labels:
-        subset = [p for p in points if p[2] == label]
-        ax.scatter(
-            [p[0] for p in subset],
-            [p[1] for p in subset],
-            label=legend_label_with_sample_count(label, len(subset)),
-            alpha=0.7,
-            s=28,
-            color=colors[label],
-        )
+        # y = 1: perfect routing (ceiling).
+        ax.axhline(1.0, color="#2A9D8F", linestyle="--", linewidth=1.0, label="optimality = 1 (perfect)", zorder=1)
+        # y = 1/x: minimum achievable optimality (fully serial routing). Only the
+        # parallelism axis has this closed-form floor.
+        if worst_case_curve:
+            x_min = max(1e-9, min(p[0] for p in points))
+            x_max = max(p[0] for p in points)
+            if x_max > x_min:
+                xs = np.linspace(x_min, x_max, 200)
+                ax.plot(xs, 1.0 / xs, color="#E76F51", linestyle=":", linewidth=1.2,
+                        label="optimality = 1/max_parallelism (worst)", zorder=1)
 
-    # y = 1: perfect routing (ceiling).
-    ax.axhline(1.0, color="#2A9D8F", linestyle="--", linewidth=1.0, label="optimality = 1 (perfect)", zorder=1)
-    # y = 1/x: minimum achievable optimality (fully serial routing).
-    x_min = max(1e-9, min(p[0] for p in points))
-    x_max = max(p[0] for p in points)
-    if x_max > x_min:
-        xs = np.linspace(x_min, x_max, 200)
-        ax.plot(xs, 1.0 / xs, color="#E76F51", linestyle=":", linewidth=1.2,
-                label="optimality = 1/max_parallelism (worst)", zorder=1)
-
-    ax.set_ylim(0.0, 1.05)
-    ax.set_title(f"Routing Optimality vs Max Parallelism (n={len(points)})")
-    ax.set_xlabel("max parallelism (avg gates / layer)")
-    ax.set_ylabel("optimality (min_routing_steps / routing_steps)")
-    ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
-    save_fig(fig, output_dir, filename, generated, subfolder=PARALLELISM_ANALYSIS_DIR)
+        ax.set_ylim(0.0, 1.05)
+        ax.set_title(f"{title} (n={len(points)})")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("optimality (min_routing_steps / routing_steps)")
+        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+        save_fig(fig, output_dir, filename, generated, subfolder=PARALLELISM_ANALYSIS_DIR)
 
 
 def plot_gaussian_weight_combinations(rows, output_dir, generated, skipped=None):

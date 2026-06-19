@@ -50,6 +50,9 @@ RUNS_TIME = "duration_seconds"
 RUNS_X = "graph_x"
 RUNS_Y = "graph_y"
 RUNS_STATUS = "status"
+RUNS_MIN_STEPS = "min_routing_steps"
+RUNS_PARALLELISM = "max_parallelism"
+RUNS_DENSITY = "cnot_interaction_density"
 
 # Config fields used for the best/worst bar label, mapped to the runs-CSV names.
 CONFIG_LABEL_FIELDS = [
@@ -301,6 +304,79 @@ def plot_summary(joined: dict[str, tuple[list[dict], dict]], out_dir: Path, metr
     print(f"  saved: {out_path}")
 
 
+def plot_optimality(joined: dict[str, tuple[list[dict], dict]], out_dir: Path) -> None:
+    """Two scatter figures of our routing optimality, coloured by circuit family.
+
+    optimality = min_routing_steps / routing_steps (layering-depth lower bound
+    over the steps actually taken): 1 is perfect, smaller is further from optimal.
+
+      * vs max_parallelism      -- the worst-case floor is the y = 1/x curve, so
+        every point sits between y = 1/x (worst) and y = 1 (perfect).
+      * vs cnot_interaction_density -- interaction density (unique CNOT pairs /
+        max pairs, in [0, 1]); whether denser circuits route further from optimal.
+
+    Needs the min_routing_steps / max_parallelism / cnot_interaction_density
+    columns in the runs CSV; rows missing them are skipped.
+    """
+    specs = (
+        (RUNS_PARALLELISM, "max parallelism (avg gates / layer)",
+         "Routing Optimality vs Max Parallelism", "optimality_vs_max_parallelism.png", True),
+        (RUNS_DENSITY, "circuit density (unique CNOT pairs / max pairs)",
+         "Routing Optimality vs Circuit Density", "optimality_vs_circuit_density.png", False),
+    )
+    for x_key, xlabel, title, fname, worst_case_curve in specs:
+        by_family: dict[str, list[tuple[float, float]]] = {}
+        for circuit, (runs, _wisq) in joined.items():
+            fam = circuit_family(circuit)
+            for r in runs:
+                steps = to_float(r.get(RUNS_STEPS))
+                min_steps = to_float(r.get(RUNS_MIN_STEPS))
+                x = to_float(r.get(x_key))
+                if steps is None or min_steps is None or x is None or steps <= 0:
+                    continue
+                by_family.setdefault(fam, []).append((x, min_steps / steps))
+
+        if not by_family:
+            print(f"  (no rows with {RUNS_MIN_STEPS} + {x_key}; skipping {fname})")
+            continue
+
+        families = sorted(by_family)
+        cmap = plt.get_cmap("tab20", max(1, len(families)))
+        fig, ax = plt.subplots(figsize=(9, 6))
+        n_points = 0
+        for i, fam in enumerate(families):
+            pts = by_family[fam]
+            n_points += len(pts)
+            ax.scatter([p[0] for p in pts], [p[1] for p in pts],
+                       label=f"{fam} (n={len(pts)})", alpha=0.7, s=28, color=cmap(i))
+
+        # y = 1: perfect routing (ceiling).
+        ax.axhline(1.0, color="#2A9D8F", linestyle="--", linewidth=1.0,
+                   label="optimality = 1 (perfect)", zorder=1)
+        # y = 1/x: minimum achievable optimality (fully serial). Only the
+        # parallelism axis has this closed-form floor.
+        if worst_case_curve:
+            xs_all = [p[0] for pts in by_family.values() for p in pts]
+            x_min = max(1e-9, min(xs_all))
+            x_max = max(xs_all)
+            if x_max > x_min:
+                xs = np.linspace(x_min, x_max, 200)
+                ax.plot(xs, 1.0 / xs, color="#E76F51", linestyle=":", linewidth=1.2,
+                        label="optimality = 1/max_parallelism (worst)", zorder=1)
+
+        ax.set_ylim(0.0, 1.05)
+        ax.set_title(f"{title}  (n={n_points})", fontweight="bold")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("optimality (min_routing_steps / routing_steps)")
+        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+        ax.grid(True, linestyle=":", alpha=0.4)
+        plt.tight_layout()
+        out_path = out_dir / fname
+        plt.savefig(out_path, dpi=150)
+        plt.close(fig)
+        print(f"  saved: {out_path}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Plot our runs vs WISQ (joined from a WISQ CSV and a runs CSV), one figure per circuit.",
@@ -353,6 +429,9 @@ def main() -> int:
 
     plot_summary(joined, out_dir, "steps")
     plot_summary(joined, out_dir, "time")
+
+    # Routing-optimality scatters (ours), coloured by circuit family.
+    plot_optimality(joined, out_dir)
 
     # Per-family overview figures (same as the summaries, restricted to each
     # family: qft, qaoa, vqe_su2, ...). Families with a single circuit are skipped.
