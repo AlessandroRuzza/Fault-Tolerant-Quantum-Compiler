@@ -488,7 +488,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
 
 
         const auto layering_start = std::chrono::steady_clock::now();
-        auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD); //Lookahead only 2 layers
+        auto layeredCircuit = std::make_unique<LayeredCircuit>(circuit, LAYERING_LOOKAHEAD); 
         if(max_parallelism < 0){
             const int num_layers = layeredCircuit->getNumLayers();
             max_parallelism = num_layers > 0
@@ -662,7 +662,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
         throw std::runtime_error("Mapping/routing repetitions produced no result.");
     }
 
-    if (PRINT_MAPPING_GRAPH) best_graph->print_rectangular();
+    if (PRINT_MAPPING_GRAPH_END) best_graph->print_rectangular();
 
     // Fill in the mapping-dependent metrics (path lengths) using the best
     // repetition's mapping/graph, then update the CSV in a single write.

@@ -12,6 +12,7 @@ constexpr const char* RED    = "\033[31m";
 constexpr const char* GREEN  = "\033[32m";
 constexpr const char* BLUE   = "\033[34m";
 constexpr const char* YELLOW = "\033[33m";
+constexpr const char* PURPLE = "\033[35m";
 
 std::unordered_set<int> make_active_qubit_set(const Layer& layer_gates, const Mapping& mapping) {
     std::unordered_set<int> active_nodes;
@@ -24,6 +25,22 @@ std::unordered_set<int> make_active_qubit_set(const Layer& layer_gates, const Ma
         }
     }
     return active_nodes;
+}
+
+std::unordered_set<int> make_delayed_qubit_set(const Layer& layer_gates, const Routing& routing, const Mapping& mapping) {
+    std::unordered_set<int> delayed_nodes;
+    for (const Gate& gate : layer_gates) {
+        if (routing.find(gate) != routing.end()) {
+            continue;
+        }
+        for (int qubit : gate.qubits) {
+            const int node = mapping.get_mapped_node(qubit);
+            if (node >= 0) {
+                delayed_nodes.insert(node);
+            }
+        }
+    }
+    return delayed_nodes;
 }
 
 std::unordered_set<int> make_magic_set(const Graph& graph) {
@@ -83,12 +100,14 @@ void draw_routing_layer(
     const std::unordered_set<int> magic_nodes = make_magic_set(graph);
     const std::unordered_set<int> route_nodes = make_route_set(routing);
     const std::unordered_set<int> active_qubit_nodes = make_active_qubit_set(layer_gates, mapping);
+    const std::unordered_set<int> delayed_qubit_nodes = make_delayed_qubit_set(layer_gates, routing, mapping);
 
     std::cout << "\n=== Routing Layer " << step_index << " ===\n";
     std::cout << "Legend: "
               << GREEN << "magic states" << RESET << ", "
               << RED << "idle qubits" << RESET << ", "
               << YELLOW << "active qubits" << RESET << ", "
+              << PURPLE << "delayed qubits" << RESET << ", "
               << BLUE << "routes" << RESET << "\n\n";
 
     for (int y = 0; y < height; ++y) {
@@ -99,10 +118,13 @@ void draw_routing_layer(
             const bool is_qubit = graph.is_occupied(node_id);
             const bool is_route = route_nodes.count(node_id) > 0;
             const bool is_active_qubit = active_qubit_nodes.count(node_id) > 0;
+            const bool is_delayed_qubit = delayed_qubit_nodes.count(node_id) > 0;
 
             const char* color = RESET;
             if (is_magic) {
                 color = GREEN;
+            } else if (is_delayed_qubit) {
+                color = PURPLE;
             } else if (is_active_qubit) {
                 color = YELLOW;
             } else if (is_route) {
@@ -116,25 +138,28 @@ void draw_routing_layer(
         std::cout << "\n";
     }
 
-    std::cout << "\nRouted gates in this layer:\n";
-    if (routing.empty()) {
-        std::cout << "  none\n";
-    } else {
-        for (const auto& item : routing) {
-            const Gate& gate = item.first;
-            const Path& path = item.second;
-            std::cout << "  " << gate_on_graph_string(gate, mapping) << " -> ";
-            print_route_path(path);
-            std::cout << "\n";
+    std::cout << "\n";
+    if(PRINT_ROUTING){
+        std::cout << "Routed gates in this layer:\n";
+        if (routing.empty()) {
+            std::cout << "  none\n";
+        } else {
+            for (const auto& item : routing) {
+                const Gate& gate = item.first;
+                const Path& path = item.second;
+                std::cout << "  " << gate_on_graph_string(gate, mapping) << " -> ";
+                print_route_path(path);
+                std::cout << "\n";
+            }
         }
     }
 
     for (const Gate& gate : layer_gates) {
         if (routing.find(gate) == routing.end()) {
             std::cout << YELLOW
-                      << "WARNING: gate not routed, postponed to next layer: "
-                      << gate_on_graph_string(gate, mapping)
-                      << RESET << "\n";
+                    << "WARNING: gate not routed, postponed to next layer: "
+                    << gate_on_graph_string(gate, mapping)
+                    << RESET << "\n";
         }
     }
 

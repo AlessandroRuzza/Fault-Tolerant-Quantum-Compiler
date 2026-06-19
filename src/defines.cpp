@@ -34,7 +34,8 @@ const bool PRINT_PARSING = kPrintAllowed && false;
 const bool PRINT_CIRCUIT = kPrintAllowed && false;
 
 const bool PRINT_MAPPING = kPrintAllowed && false;
-const bool PRINT_MAPPING_GRAPH = kPrintAllowed && true;
+const bool PRINT_MAPPING_GRAPH = kPrintAllowed && false;
+const bool PRINT_MAPPING_GRAPH_END = PRINT_MAPPING_GRAPH || (kPrintAllowed && true);
 const bool MAPPING_VERBOSE = kPrintAllowed && false;
 
 const bool PRINT_SAFE_PASSAGE = kPrintAllowed && false;

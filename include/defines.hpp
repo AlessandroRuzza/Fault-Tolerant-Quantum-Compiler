@@ -8,6 +8,7 @@ extern const bool PRINT_CIRCUIT; // controls circuit printing
 
 extern const bool PRINT_MAPPING; // controls mapping steps printing
 extern const bool PRINT_MAPPING_GRAPH; // controls mapping graph printing
+extern const bool PRINT_MAPPING_GRAPH_END; // controls mapping graph printing (once) at end of run
 extern const bool MAPPING_VERBOSE; // controls verbose mapping logs
 
 extern const bool PRINT_SAFE_PASSAGE; // controls safe passage checking printing
