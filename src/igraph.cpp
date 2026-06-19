@@ -48,21 +48,21 @@ void IGraph::print_rectangular() const {
             }
             const bool is_magic =
                 std::find(magic_states_ids.begin(), magic_states_ids.end(), node_id) != magic_states_ids.end();
-
+            
             if (is_magic) {
                 // Print magic-state nodes in green.
                 std::cout << "\033[1;32m";
-                printf("%3d", node_id);
+                printf("%4d", node_id);
                 std::cout << "\033[0m";
             } else if (is_occupied(node_id)) {
                 // Print occupied non-magic nodes in red.
                 std::cout << "\033[1;31m";
-                printf("%3d", node_id);
+                printf("%4d", node_id);
                 std::cout << "\033[0m";
             } else {
-                printf("%3d", node_id);
+                printf("%4d", node_id);
             }
-            std::cout << " ";
+            // std::cout << " ";
         }
         std::cout << std::endl;
     }
@@ -90,18 +90,18 @@ void IGraph::print_rectangular(const std::unordered_set<int>& candidates) const 
 
             if (is_magic) {
                 std::cout << "\033[1;32m";
-                printf("%3d", node_id);
+                printf("%4d", node_id);
                 std::cout << "\033[0m";
             } else if (is_occupied(node_id)) {
                 std::cout << "\033[1;31m";
-                printf("%3d", node_id);
+                printf("%4d", node_id);
                 std::cout << "\033[0m";
             } else if (candidates.count(node_id)) {
                 std::cout << "\033[1;33m";
-                printf("%3d", node_id);
+                printf("%4d", node_id);
                 std::cout << "\033[0m";
             } else {
-                printf("%3d", node_id);
+                printf("%4d", node_id);
             }
             std::cout << " ";
         }
