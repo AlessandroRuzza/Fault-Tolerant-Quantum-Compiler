@@ -210,6 +210,14 @@ inline bool mapping_only_mode_enabled() {
     return env_flag_is_truthy("FTQC_MAPPING_ONLY");
 }
 
+inline void disable_mapping_only_mode_for_process() {
+#if defined(_WIN32)
+    _putenv_s("FTQC_MAPPING_ONLY", "0");
+#else
+    setenv("FTQC_MAPPING_ONLY", "0", 1);
+#endif
+}
+
 
 inline std::string format_now_date(const std::chrono::system_clock::time_point &tp) {
     const std::time_t tt = std::chrono::system_clock::to_time_t(tp);

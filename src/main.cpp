@@ -1109,10 +1109,12 @@ int run_bench_mode(
                 resolved_graph_y = planned_y;
             }
 
-            // For dimension 0, look up upper/lower dims from dimensions.csv.
+            // x == -2 is the "dimension classes" sentinel: look up the circuit's
+            // low/mid/high grid sizes from dimensions.csv and run all three.
             // If the circuit is missing or has invalid dimensions, skip the run.
+            // (x == 0 stays the plain upper-bound run, consistent with one_execution.)
             const DimCsvEntry *dim_entry_ptr = nullptr;
-            if (planned_x == "0") {
+            if (planned_x == "-2") {
                 const std::string circuit_key = get_json_field(entry, {"circuit"});
                 const auto it = dim_csv.find(circuit_key);
                 if (it == dim_csv.end()) {
@@ -1133,7 +1135,7 @@ int run_bench_mode(
 
             try {
                 json run_entry = entry;
-                if (planned_x == "0" && dim_entry_ptr) {
+                if (planned_x == "-2" && dim_entry_ptr) {
                     run_entry["x"] = dim_entry_ptr->max_x;
                     run_entry["y"] = dim_entry_ptr->max_y;
                 }
@@ -1149,7 +1151,7 @@ int run_bench_mode(
                 std::filesystem::remove(temp_result_path, remove_ec);
 
                 const std::string worker_env =
-                    "FTQC_BENCH_WORKER=1 FTQC_BENCH_RESULT_FILE=" +
+                    "FTQC_BENCH_WORKER=1 FTQC_MAPPING_ONLY=0 FTQC_BENCH_RESULT_FILE=" +
                     shell_quote(temp_result_path.string()) + " ";
 
                 std::string command;
@@ -1337,7 +1339,7 @@ int run_bench_mode(
             std::string mid_status_str;
             std::string mid_non_routed_pct_str;
 
-            if (planned_x == "0" && result.status == "success" && dim_entry_ptr != nullptr
+            if (planned_x == "-2" && result.status == "success" && dim_entry_ptr != nullptr
                 && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0
                 && dim_entry_ptr->max_x > 0 && dim_entry_ptr->max_y > 0) {
                 const int mid_dim_x = (dim_entry_ptr->min_x + dim_entry_ptr->max_x) / 2;
@@ -1374,7 +1376,7 @@ int run_bench_mode(
                     std::filesystem::remove(temp_mid_result, remove_ec);
 
                     const std::string mid_worker_env =
-                        "FTQC_BENCH_WORKER=1 FTQC_BENCH_RESULT_FILE=" +
+                        "FTQC_BENCH_WORKER=1 FTQC_MAPPING_ONLY=0 FTQC_BENCH_RESULT_FILE=" +
                         shell_quote(temp_mid_result.string()) + " ";
 
                     std::string mid_cmd;
@@ -1434,7 +1436,7 @@ int run_bench_mode(
             std::string lower_status_str;
             std::string lower_non_routed_pct_str;
 
-            if (planned_x == "0" && result.status == "success" && dim_entry_ptr != nullptr
+            if (planned_x == "-2" && result.status == "success" && dim_entry_ptr != nullptr
                 && dim_entry_ptr->min_x > 0 && dim_entry_ptr->min_y > 0) {
                 const int lower_dim_x = dim_entry_ptr->min_x;
                 const int lower_dim_y = dim_entry_ptr->min_y;
@@ -1470,7 +1472,7 @@ int run_bench_mode(
                     std::filesystem::remove(temp_lower_result, remove_ec);
 
                     const std::string lower_worker_env =
-                        "FTQC_BENCH_WORKER=1 FTQC_BENCH_RESULT_FILE=" +
+                        "FTQC_BENCH_WORKER=1 FTQC_MAPPING_ONLY=0 FTQC_BENCH_RESULT_FILE=" +
                         shell_quote(temp_lower_result.string()) + " ";
 
                     std::string lower_cmd;

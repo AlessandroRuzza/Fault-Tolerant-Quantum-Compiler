@@ -272,26 +272,20 @@ spingere mapped in alto (era ottimo ma non certo).
 
 ---
 
-## Appendice A — Strumenti di analisi prodotti (mantenuti)
+## Appendice A — Metodo, dati e figure
 
-| script | cosa fa |
-|---|---|
-| `analyze_sigma_sweep.py` | profilo sigma + best per regime |
-| `analyze_sigma_weights.py` | best combo (sigma,cnot,mapped,magic,border) per regime + tabella magic×border |
-| `analyze_sigma_dim.py` | sigma* per taglia di griglia |
-| `analyze_revalidation.py` | best combo cnot×mapped×magic per regime (binario confidence) |
-| `analyze_mapped_corr.py` | mapped* in funzione di un altro asse (cnot/sigma/border) |
-| `analyze_weight_vs_dim.py` | optimum di un peso per taglia di griglia |
-| `analyze_border_corr.py` | marginale border + border* per taglia |
-| `analyze_mapped_sigma_law.py` | fit `mapped·σ² = C` + esponente log-log |
-| `plot_tuning_figures.py` | genera le 6 figure di questo report in `figures/` |
+Gli script Python di generazione config e di analisi erano **usa-e-getta** e sono stati
+cancellati dopo l'uso: il valore è in questo documento, nei `.md` e nelle figure. Restano:
+- **config** in `data/config/*.json` (i sweep);
+- **risultati** dei sweep in `data/results/*_runs.csv`;
+- **figure** in `metric_analysis_outcomes/figures/`: `fig1_sigma_optimum`, `fig2_mapped_cnot_ridge`,
+  `fig3_mapped_sigma`, `fig4_sigma_ridge`, `fig5_finetune_vs_reval`, `fig6_mapped_vs_dim`.
 
-> Gli script generatori delle config (`gen_*`) sono cancellati per scelta dell'utente:
-> servono solo i file di config prodotti + gli analizzatori.
-
-**Figure** (`metric_analysis_outcomes/figures/`, rigenerabili con `python3 scripts/plot_tuning_figures.py`):
-`fig1_sigma_optimum`, `fig2_mapped_cnot_ridge`, `fig3_mapped_sigma`, `fig4_sigma_ridge`,
-`fig5_finetune_vs_reval`, `fig6_mapped_vs_dim`.
+**Metodologia di analisi** (riproducibile): per ogni combinazione di pesi, **best-per-circuito**
+(min sugli assi nuisance: dimensione e gli assi non in esame) poi **media sui circuiti** con
+copertura piena. Mai medie pesate sul numero di righe (robuste ai duplicati da resume).
+Per le domande su **magic** filtrare ai soli circuiti **T-bearing** (`resolved_n_magic > 0`),
+altrimenti il segnale è diluito dai circuiti senza T.
 
 ## Appendice B — Note di igiene dei dati
 

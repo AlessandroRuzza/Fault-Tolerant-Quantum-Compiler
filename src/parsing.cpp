@@ -633,8 +633,10 @@ void apply_config_overrides(
         set_border_distance_percentage_from_config("BorderDistancePercentage");
     }
 
-    // Sentinels: x>0 explicit; 0 -> low/mid/high from dimensions.csv;
-    // x<0 -> auto-size via compute_dimensions(...) + dimension_offset.
+    // Sentinels: x>0 explicit; 0 -> upper bound (compute_upper_dimensions);
+    // -1 -> auto-size via compute_dimensions(...) + dimension_offset;
+    // -2 -> (bench mode only) low/mid/high from dimensions.csv. Single runs
+    // reject x < -1 — shift the auto grid with dimension_offset, not negative x.
     if (config_json.contains("x")) {
         if (!config_json["x"].is_number_integer()) {
             throw std::runtime_error("Config key 'x' must be an integer");

@@ -1,244 +1,135 @@
 # Pesi tunati — regime BFS
 
-Riepilogo dei pesi gaussiani ottimi nel **regime BFS** (CNOT-BFS mapping order,
-gate `density < bfs_density_threshold`, default **0.70**). Metrica di ottimizzazione:
-`non_routed_layer_pct` mean-no-out (più basso = meglio). Dettagli e analisi in
-[metric_analysis.txt](metric_analysis.txt).
-
 ## Comuni a tutte le configurazioni
 
 | parametro | valore | note |
 |---|---|---|
-| `external_weight` | **≈ −15** (vedi nota) | NEGATIVO batte lo `0` storico ovunque; satura (cube da −5, noncube da −15) |
+| `external_weight` | **negativo, ≈ −5** | qualsiasi negativo ≈ ottimo, satura subito; `0` costa ~−1.5pp nel noncube (cube basta −5; noncube plateau da ~−15) |
 | `base_gaussian_weight` | **1** | |
-| `bfs_density_threshold` | **0.70** | soglia densità BFS↔heap; post-fix BFS batte heap quasi ovunque (plateau ottimo 0.65–0.90, vedi [bfs threshold re-tune](#)); configurabile JSON/CLI, env `FTQC_BFS_DENSITY_THRESHOLD` override |
-| `cnot_low` | **0** | verificato inerte sotto BFS (cl=0/0.5/1/1.5 → non_routed identico) |
+| `bfs_density_threshold` | **0.70** | soglia densità BFS↔heap; post-fix BFS batte heap quasi ovunque (plateau ottimo 0.65–0.90); JSON/CLI, env `FTQC_BFS_DENSITY_THRESHOLD` override |
+| `cnot_low` | **0** | inerte (0/0.5/1/1.5 → non_routed identico; ≥4 fa male) |
+| `magic_low` | **0** | usato solo in `fine`; gap aperto (vedi sezione magic) |
 | `number_of_magic_states` | **−1** | auto |
 | magic placement | **center_circle + border%** | mai right_row |
 | routing / t-routing | naive / smart_t_routing | |
 
-## Per regime (geometria × strategia)
+## Valori tunati per regime
 
-| regime | confidence | `cnot_high` | `mapped` | `magic_high` | `magic_low` |
-|---|---|---|---|---|---|
-| **coarse / cube** | **0.99999999** (8 nove) | 1.5 | **0** | dipende da border (sotto) | 0 |
-| **coarse / noncube** | **0.999999999999** (12 nove; non satura) | 1.5 | 2.0 | dipende da border (sotto) | 0 |
-| **fine / cube** | **0.9999** | 0.5 | **0** | dipende da border (sotto) | **1 se border ≤ 10**, altrimenti 0 |
-| **fine / noncube** | **0.999999999999** (12 nove; non satura) | 0.5 | 1.5 | dipende da border (sotto) | 0 |
+`sigma`, `mapped`, `cnot_high` validati su `optimum_sweep` (48 circ; σ 0.2–4, mapped 10–60,
+cnot=mapped/2.5 ±4, dim ×10). Sono **centri di plateau**: l'esatto valore conta poco (i pesi
+spostano ≤1.4pp, la dimensione ~8pp). `external`, `magic_low`, `cnot_low` sono comuni a tutti
+i regimi (vedi tabella in alto).
 
-### `magic_high` per border (al `mapped` raccomandato della tabella sopra)
-
-| regime | b=0 | b=5 | b=10 | b=20 | b=30 | andamento |
+| regime | sigma | mapped | cnot_high | magic_high | border | non_routed best |
 |---|---|---|---|---|---|---|
-| **coarse / cube** | 0 | 0.2 | 0.2 | 0.2 | 1.6 | piatto basso |
-| **coarse / noncube** | 0 | 0.2 | 0.8 | 0.8 | 0.2 | basso, nessun trend |
-| **fine / cube** | 20* | 3 | 1.6 | 0 | 0 | decresce col border |
-| **fine / noncube** | 3 | 1.6 | 0.4 | 0.4 | 0.2 | decresce col border |
+| coarse / cube    | **0.7** | **15** | **6** | 0 | 10–15 | ~2.87 |
+| fine / cube      | **0.7** | **15** | **6** | 0 *(≈1 di un soffio)* | 10–15 | ~2.88 |
+| coarse / noncube | **0.7** | **20** | **8** | 0 | 10–15 | ~3.29 |
+| fine / noncube   | **0.7** | **20** | **8** | 0 | 10–15 | ~3.30 |
 
-\* fine/cube a b=0: l'argmin robusto è 20, MA la curva è piatta sopra ~1.6 (spread
-~0.2pp = rumore: 1.6/3/6/12/20/30 sono in pratica equivalenti) e il minimo ASSOLUTO
-di non_routed è a magic basso (magic_high=0.2, 13.72pp). Quindi a b=0 il valore non è
-affidabile: tieni magic basso come negli altri border stretti.
+Set unico robusto: **σ=0.7, mapped=20, cnot=8, magic 0/0, border 10–15, external −5, base 1**.
+Marginali: σ ottimo 0.65–0.75 (0.2 degenera, ≥3 troppo diffuso); mapped plateau 10–30 (≥40 nessun
+guadagno; cube piatto); cnot piatto attorno a ~mapped/2.5.
 
-In sintesi: **coarse** = magic_high piatto e basso (~0.2) a ogni border, sale a ~1.6 solo
-a b=30 nel cube. **fine** = magic_high **decresce col border**, da ~1.6–3 a b=0 fino a ~0
-a border largo. In tutti i casi magic alto (≥6) fa male, catastrofico nel noncube.
+## Modello sulla cresta mapped ↔ cnot ↔ σ
 
-## Note di lettura
+`mapped` e `cnot` non hanno un ottimo isolato: vivono su una **cresta** lungo la retta
+`cnot = mapped / 2.5` (coppie basso-basso ↔ alto-alto equivalenti). **σ resta ≈ 0.7 costante lungo
+la cresta** (`ridge_sigma_sweep`: mapped 1→40, esponente log-log ≈ 0). L'anti-correlazione
+"mapped↑ → σ↓" vista off-cresta era solo un artefatto di sbilancio attrazione/repulsione a cnot
+fisso — niente legge `σ = √(C/mapped)` (testata e respinta).
 
-- **`cnot_high` = ginocchio + plateau.** Il valore conta come *minimo necessario*:
-  `0` costa +3–4pp, sopra il ginocchio è piatto (valori alti né aiutano né fanno male).
-  Non scendere sotto; il valore esatto dentro il plateau è indifferente.
-- **`mapped`**: cube → `0` (vuole repulsione minima, è al pavimento). noncube → minimo
-  interno genuino (conca ~1.5–2.0, peggio sia a 0 che a valori alti).
-- **`magic_high`**: dipende dal border (vedi tabella). Coarse = piatto basso (~0.2);
-  fine = decresce col border. Magic alto (≥6) fa male; nel **noncube è catastrofico**
-  (+3–8pp).
-- **`magic_low`**: il coarse non lo usa (inerte → 0). Nel fine ha effetto debole:
-  `1` aiuta un po' solo in **fine/cube con border ≤ 10**; altrove `0` (alto fa male).
-- **cube: `mapped=0` + `magic_high` basso.** La vecchia regola "border largo → magic alto"
-  era un artefatto del tenere `mapped>0`; in assoluto `mapped=0 + magic basso` vince
-  (−0.52pp coarse, −1.05pp fine).
-- **`confidence`** (sweep 0.5→12 nove, pesi fissati):
-  - **noncube** (coarse+fine): leva fortissima (da 0.5 a 6-nove ~−5/−6pp), poi continua a
-    scendere **dolcemente fino al limite di rappresentazione — NON satura** (deep sweep:
-    miglior bucket = 1e-13..1e-16). Oltre `1e-12` il guadagno è <0.1pp e **non loggabile**
-    (il CSV tronca a ~12 cifre, e il double a 1e-16). => usa **0.999999999999 (12 nove)**:
-    il valore più profondo ancora distinguibile, già al fondo del beneficio. Mai sotto 6 nove.
-  - **coarse/cube**: monotòno ↓, **NON satura**: migliora fino a `0.99999999` (8 nove, max
-    testato). Span piccolo (~0.4pp) ma sempre meglio salire.
-  - **fine/cube**: conca con minimo a `0.9999`, poi **peggiora** lievemente (oltre 0.99999
-    +0.1pp). NON spingere all'estremo: vuole confidence media.
-- **`external_weight`** (sweep 0 → −30, pesi fissati + intorno altri pesi): **NEGATIVO
-  vince ovunque**, lo `0` storico è battuto (i vecchi sweep testavano solo ≥0). Direzione
-  univoca: più negativo = meglio, poi **SATURA in un plateau** (confermato estendendo a −30):
-  - **noncube** (coarse+fine): leva FORTE, ~**−1.5/−2pp**. Satura entro **−15**
-    (−15/−20/−30 identici, excess 0.12). Il "−15 ancora in discesa" del primo sweep era
-    rumore: è plateau.
-  - **cube**: leva debole (coarse ~−0.07pp, fine ~−0.27/−0.6pp), satura prestissimo (~**−5**).
-  - **Robusto agli altri pesi** (controllato variando cnot/mapped/magic attorno all'ottimo).
-  - **Raccomandazione: `external ≈ −15`** (plateau sicuro per tutti; −5 basta al cube).
-    Oltre −20 inutile. Nota: a external molto negativo i noncube perdono qualche run per
-    safe_passage_failed (non incide sull'ottimo).
+In sintesi: `σ ≈ 0.7`, `cnot = mapped/2.5`, `mapped ≈ 5–20` (noncube 5–20, cube 10–20; oltre 40
+peggiora). Miglior non_routed sulla cresta: ~4.2–4.5 noncube, ~3.4–4.0 cube.
 
-## Attenzione
+## magic_high & border (46 circuiti T-bearing)
 
-- **Niente d-scaling in regime BFS**: `cnot_high`/`mapped` sono piccole COSTANTI, non
-  scalano con la dimensione (l'ordine BFS fa il lavoro strutturale). Le vecchie formule
-  `peso ∝ dim` valgono solo nel regime heap (`density ≥ bfs_density_threshold`, ora 0.70).
-- **`cnot` e `mapped` interagiscono** (cresta antagonista: mapped respinge, cnot attrae).
-  Non scalare `mapped` da solo; tienili entrambi piccoli.
-- **qft**: con la soglia a 0.70 quasi tutti i qft finiscono in regime BFS e vogliono
-  `cnot` basso ~0.5–1 (qft_n50 dens 0.65 e qft_n64 dens 0.53 ora sono BFS — recuperati
-  rispetto al vecchio 0.40 dove restavano heap). Restano heap solo i densissimi
-  (randomcircuit ~0.97), che infatti preferiscono heap.
-- **synth_d040** è completamente inerte sotto BFS (ottimo a pesi nulli): l'ordine basta.
+Sweep dedicato `magic_tune_tbear` (46 circuiti **tutti con T gate** — sugli altri il segnale si
+diluiva: solo ~21/48 hanno T). Aggregazione **best-per-circuito** (min su border/cnot/mapped/
+external/sigma/dim) poi **media**. Effetto di `magic_high` per regime:
 
-## Correlazione sigma ↔ mapped (binario GAUSSIAN_SIGMA, post-confidence)
+| regime | mh=0 | 0.2 | 0.5 | 1 | 2 | 4 | ottimo |
+|---|---|---|---|---|---|---|---|
+| coarse / connectivity | **6.310** | 6.577 | 6.627 | 6.684 | 6.979 | 7.002 | **0** (−0.69pp salendo) |
+| coarse / cube         | **5.939** | 5.995 | 6.023 | 6.122 | 6.175 | 6.149 | **0** (−0.24pp) |
+| fine / connectivity   | **6.453** | 6.772 | 6.770 | 6.833 | 7.009 | 7.156 | **0** (−0.70pp) |
+| fine / cube           | 5.986 | 5.967 | 5.939 | **5.922** | 5.927 | 5.953 | **≈1** (+0.06pp, conca piatta) |
 
-Sul binario con `GAUSSIAN_SIGMA` (sigma assoluto al posto di confidence), `sigma` e
-`mapped` sono in **anti-correlazione netta**: mapped basso vuole sigma largo, mapped
-alto vuole sigma stretto. `sigma*` (miglior sigma) per valore di `mapped`, per regime
-(sweep `sigma_dim_sweep`, 29 circuiti, best-per-circuito su cnot/border/dim):
+- **`magic_high = 0` è l'ottimo in 3 regimi su 4**, e alzarlo **peggiora monotonicamente** — forte nel
+  **noncube/connectivity** (−0.7pp), lieve nel **cube** (−0.24pp). **Unica eccezione: `fine/cube`**:
+  conca piatta con ottimo a `magic_high ≈ 1` (guadagno minuscolo, ~0.06pp).
+- **`border` ha un ottimo netto ~10–15** (cube 5–15, noncube 10–20): `border=0` è **catastrofico**
+  (+2–3pp), ≥25 peggiora. Marginali (T-bearing): noncube 10:7.18 / 15:7.20; cube 5:6.35 / 15:6.52.
 
-| regime | mapped 5 | mapped 10 | mapped 20 |
-|---|---|---|---|
-| coarse / noncube | σ 2.5 | σ 1.0 | σ 0.7 |
-| coarse / cube | σ 1.0 | σ 0.7 | σ 0.7 |
-| fine / noncube | σ 1.6 | σ 0.7 | σ 0.7 |
-| fine / cube | σ 1.3 | σ 0.7 | σ 0.7 |
+**Perché magic_high non aiuta (verifica codice 2026-06-20, nessun bug)**: la metrica (`naive` →
+`QubitRouter`) **conta i T-gate** in `first_exposure` ([routing.cpp:514](../src/routing.cpp#L514)),
+`weight=0` dà davvero contributo nullo ([gaussian.cpp:39-48](../src/gaussian.cpp#L39-L48)), e le
+magic_gaussians **entrano** nello score. Il meccanismo funziona ma non serve perché (1)
+`center_circle` mette le magic già al centro, dove il **baseline** tira comunque (ridondanza); (2)
+l'attrazione è verso la **somma** di tutte le magic (il centroide), non verso la più vicina → ammucchia
+i qubit al centro → congestione che danneggia il routing dei **CNOT** (la maggioranza dei gate anche
+nei T-bearing); (3) i T-gate vanno comunque alla magic libera più vicina via Dijkstra.
 
-**NB (correzione):** quel "mapped alto ≥20 + σ 0.7" vale solo perché in `sigma_dim` mapped
-era agganciato a cnot alto. Lo sweep denso `mapped_sigma_sweep` (mapped 0.5→48 × σ 0.3→3,
-**cnot fisso a 5**) mostra che:
-- l'**ottimo di mapped non ha vita propria**: con cnot=5 il minimo è a **mapped ≈ 8–16**
-  (noncube) / basso (cube); oltre (32,48) **peggiora** → lo decide la cresta `mapped≈2.5·cnot`.
-- **NON esiste una legge σ(mapped)** tipo `σ=√(C/mapped)`: testata e respinta (fit log-log
-  esponente **≈ −0.15÷−0.19**, non −0.5; `C=mapped·σ²` cresce, non è costante).
-- `σ` è una **regolazione secondaria debole** (~0.7–1.3 su quasi tutto il range di mapped),
-  non legata a mapped da una formula.
+**⚠ Gap aperto — `magic_low`**: in `magic_tune_tbear` `magic_low` è stato tenuto **fisso a 0** in tutti
+i blocchi. È stato variato ≠0 solo in `external_magic_sweep` (non ristretto ai T-bearing, non focalizzato
+su `fine`) dove 0.5/1 peggioravano ~0.1–0.2pp. Ma `magic_low` agisce **solo in `fine`** (in `coarse` è
+ignorato, vedi [gaussian_mapping.cpp:424-428](../src/mapping/gaussian_mapping.cpp#L424-L428)) e
+rimodella la banda di T attorno alla media — incl. il caso `magic_high=0, magic_low>0` (rampa inversa).
+Dato che **`fine/cube` è l'unico regime dove magic aiuta**, `magic_low>0` lì è genuinamente non testato.
+→ sweep dedicato `magic_low_tune` (solo regimi fine, 46 T-bearing) preparato, da lanciare.
 
-Quindi: il knob libero vero è la **posizione sulla cresta mapped↔cnot**; `σ` ~0.7–1.3 a parte.
-Vanno comunque tarati insieme (mapped↔cnot stessa direzione; mapped↔σ opposta ma blanda).
+→ **magic_high = 0** (fissa e dimentica; `fine/cube` ≈ 1 di un soffio), **border ≈ 10–15**,
+**magic_low = 0** (da confermare con `magic_low_tune`).
 
-#### Conferma: σ SULLA cresta è costante (`ridge_sigma_sweep`)
+---
 
-Misurando σ **lungo la cresta** (cnot=mapped/2.5, mapped 1→40, σ 0.3→3), σ* resta **≈ 0.7**
-a ogni mapped (esponente log-log ≈ 0.00÷−0.11 → nessuna dipendenza). L'"anti-correlazione
-σ↔mapped" vista prima era un **artefatto off-cresta**: alzando mapped a cnot fisso, σ
-compensava lo sbilancio; sulla cresta il bilancio attrazione/repulsione è mantenuto e σ
-non si muove.
+## Matrice completa delle correlazioni (riepilogo unico)
 
-**Modello finale (binario sigma):**
-- `σ ≈ 0.7` (costante, ~universale);
-- `cnot = mapped / 2.5` (cresta);
-- `mapped ≈ 5–20` (posizione migliore sulla cresta: noncube ~5–20, cube ~10–20; oltre 40 peggiora);
-- `magic` basso, `border ≈ 10`, `external ≈ −15`, `base = 1`.
+Consolidamento di **tutte** le relazioni trovate finora sul binario sigma (espande il
+riepilogo breve qui sopra). Forza = quanto una variabile sposta l'ottimo dell'altra;
+direzione = concorde (↗ insieme) / opposta (↘ una sale, l'altra scende) / nessuna.
 
-Miglior non_routed sulla cresta: ~4.2–4.5 noncube, ~3.4–4.0 cube.
+### A. Pesi ↔ pesi
 
-#### Valori tunati per regime — `sigma`, `mapped`, `cnot_high`
-
-Validati su `optimum_sweep` (48 circ; σ 0.2–4, mapped 10–60, cnot=mapped/2.5 ±4, dim ×10).
-Sono **centri di plateau** (l'esatto valore conta poco: i pesi spostano ≤1.4pp, la dimensione
-~8pp — vedi sotto):
-
-| regime | sigma | mapped | cnot_high | (magic_high / magic_low) | non_routed best |
-|---|---|---|---|---|---|
-| coarse / cube    | **0.7** | **15** | **6**  | 0 / 0     | ~2.87 |
-| fine / cube      | **0.7** | **15** | **6**  | 0 / 1     | ~2.88 |
-| coarse / noncube | **0.7** | **20** | **8**  | 0.2 / 0   | ~3.29 |
-| fine / noncube   | **0.7** | **20** | **8**  | 0.4 / 0   | ~3.30 |
-
-Set unico robusto: **σ=0.7, mapped=20, cnot=8** (magic basso, border 10, external −5 = qualsiasi
-negativo, satura subito; base 1).
-Validazione marginali: σ ottimo 0.65–0.75 (σ=0.2 degenera, σ≥3 troppo diffuso); mapped plateau
-10–30 (≥40 nessun guadagno; cube piatto); cnot piatto nella zona ~mapped/2.5.
-
-#### Dipendenza dalla dimensione (taglia griglia / padding)
-La **dimensione domina**: `non_routed` cala col padding di **~8–9pp noncube**, **~2–3pp cube**
-(da cramped a roomy). I **pesi** invece pesano poco: usare il set globale fisso sopra invece di
-ri-tarare i pesi per ogni taglia costa **≤1.4pp** (solo griglie piccole noncube; <0.3pp nel cube,
-<0.2pp dalle griglie medie in su). → **non adattare i pesi alla taglia; dimensiona generosamente
-la griglia.** Unica eccezione: griglie strettissime vogliono σ più largo (fino a ~3).
-
-#### external, magic, cnot_low (binario sigma, ai pesi tunati)
-
-Da `corr_sweep` (external×magic_high×mapped×cnot_high×sigma) + `external_magic_sweep` (external 15
-valori + magic_h×magic_l + cnot_low, ai pesi tunati) + `cnotlow_sweep`:
-
-| param | valore | note |
-|---|---|---|
-| **external** | **qualsiasi negativo (−1 ÷ −5)** | satura **subito**: ai pesi tunati −1 ≈ −30 (tutti ~uguali); `0` costa **~−1.5pp**. NB: col mapped alto basta pochissimo external (sono ridondanti) — niente più bisogno del vecchio −15 |
-| **magic_high** | **0** (fine: 0–1) | inerte/lieve danno; coarse 0; **fine/cube** preferisce ~1 di un soffio |
-| **magic_low** | **0** | confermato ovunque (0.5/1 peggiorano ~0.1–0.2pp), anche fine/cube |
-| **cnot_low** | **0** | INERTE: 0–2 danno non_routed identico; ≥4 fa male; non avvicinare a cnot_high |
-
-**Correlazioni di external e magic_high** (da `corr_sweep`):
-- `external` ↔ `sigma`: **nessuna** (σ*=0.7 a ogni external); ↔ `cnot_high`: **nessuna**; ↔ `mapped`:
-  **debole/ridondante** (external e mapped sono entrambi "repulsivi": con external negativo mapped
-  alto smette di far male; a external=0 mapped alto peggiora).
-- `magic_high` ↔ tutto (`mapped`/`cnot_high`/`sigma`/`external`): **nessuna** — nessun ottimo si
-  sposta al variare di magic_high. È un parametro da **fissare basso e ignorare**.
-- `cnot_low` ↔ tutto: **nessuna** — disaccoppiato, non sposta gli ottimi degli altri.
-
-In pratica: **external = −1÷−5** (knob indipendente, satura subito), **magic_high ≈ 0** (fine/cube ~1),
-**magic_low = 0**, **cnot_low = 0**. Nessuno di questi richiede co-tuning con sigma/mapped/cnot.
-
-### Correlazione sigma ↔ cnot — DEBOLE
-
-A differenza di mapped, il `sigma` ottimo è quasi **indipendente da cnot**. `best σ` per cnot:
-
-| regime | cnot 0.5 | 1.5 | 3 | 6 | (cnot 5 / 10, run nuova) |
-|---|---|---|---|---|---|
-| coarse / noncube | 0.5 | 0.7 | 0.5 | *(2)* | 0.7 / 1.3 |
-| coarse / cube | 1.5 | 1.5 | 1.5 | 1.5 | 0.7 / 0.7 |
-| fine / noncube | 0.7 | 0.7 | 0.6 | *(2)* | 0.7 / 0.7 |
-| fine / cube | 0.8 | 0.6 | 0.7 | *(2)* | 0.7 / 0.7 |
-
-\*cnot=6 è degenere (non_routed +5–6pp): il "σ=2" è rumore tra opzioni pessime, non un ottimo.
-
-Nel range sano di cnot il sigma ottimo non si muove (~0.5–0.7 noncube, ~1.5 cube run vecchia /
-~0.7 run nuova). Unico accenno: coarse/noncube, cnot 5→10 alza σ 0.7→1.3. **Conclusione: il
-sigma lo governa `mapped`, non `cnot`** → si può fissare cnot a un buon valore e co-tarare solo
-`mapped × sigma`.
-
-### Correlazione mapped ↔ cnot — FORTE positiva (cresta antagonista)
-
-`best mapped` per cnot (da `sigma_weights`, esclusi cnot 0 e 45 degeneri):
-
-| regime | cnot 1 | 2 | 3 | 5 | 10 |
-|---|---|---|---|---|---|
-| coarse / noncube | 2 | 5 | 5 | 10 | 25 |
-| coarse / cube | 1 | 0.5 | 0.5 | 10 | 10 |
-| fine / noncube | 3 | 5 | 10 | 10 | 25 |
-| fine / cube | 1 | 10 | 10 | 10 | 25 |
-
-La tabella 2D mapped×cnot ha una **valle diagonale**: il minimo corre lungo mapped e cnot che
-crescono **insieme**. Nel noncube il rapporto è **mapped ≈ 2.5·cnot** (cnot 2→mapped 5,
-cnot 10→mapped 25, stesso non_routed ~4.3). Quindi non c'è un singolo ottimo ma una **cresta di
-coppie equivalenti**: basso-basso (cnot 2 / mapped 5) o alto-alto (cnot 10 / mapped 25) rendono
-uguale → ecco perché "railano" insieme.
-
-### Correlazione pesi ↔ dimensione (taglia griglia)
-
-`peso*` per taglia (piccola→grande); mapped/cnot da `sigma_weights`, sigma da `sigma_dim`:
-
-| peso | piccole | medie | grandi | dipendenza |
+| relazione | forza | direzione | cosa significa in pratica | sweep |
 |---|---|---|---|---|
-| **mapped** | 0–1 | 10 | **10–25** | **FORTE** (scala su con la griglia) |
-| **sigma** cube | 0.3–0.4 | 0.7–1.3 (fine: picco 2–4) | ~0.7–1 | media-forte |
-| **sigma** noncube | ~1.3 | ~1.3 | ~0.7 | media (cala) |
-| **cnot** | ~1–5 (piatto) | ~1–5 | ~1–5 | **assente** (cnot 45 sempre male) |
-| **magic** | basso | basso | basso | assente |
-| **border** | ~10–20 | ~10–20 | ~10–20 (accenno ↑) | trascurabile |
+| **mapped ↔ cnot** | **FORTE** | **concorde** | cresta antagonista: `mapped ≈ 2.5·cnot`. Non c'è un ottimo singolo ma una **cresta di coppie equivalenti** (basso-basso ↔ alto-alto). Tararli **insieme**, mai mapped da solo. | `sigma_weights`, `optimum_sweep`, `mapped_sigma_sweep` |
+| **mapped ↔ sigma** | FORTE off-cresta, **NULLA sulla cresta** | opposta (apparente) | l'anti-correlazione "mapped↑→σ↓" è un **artefatto** di sbilancio attrazione/repulsione a cnot fisso. **Sulla cresta σ resta ≈0.7 costante** a ogni mapped (esponente log-log ≈0). Niente legge `σ=√(C/mapped)` (respinta). | `sigma_dim`, `mapped_sigma_sweep`, `ridge_sigma_sweep` |
+| **sigma ↔ cnot** | debole/assente | — | σ lo governa `mapped`, non `cnot`. Nel range sano di cnot σ* non si muove (~0.7). → si può fissare cnot e co-tarare solo `mapped×σ`. | `sigma_weights` |
+| **external ↔ mapped** | debole/**ridondante** | concorde-funzionale | entrambi **repulsivi**: con external negativo, mapped alto smette di far male; a external=0 mapped alto peggiora. Col mapped alto basta pochissimo external. | `corr_sweep`, `optimum_neighborhood` |
+| **external ↔ sigma / cnot** | **nessuna** | — | external è un knob **indipendente** che satura subito (qualsiasi negativo −1÷−5 ≈ ottimo; `0` costa ~−1.5pp noncube). | `corr_sweep`, `external_magic_sweep` |
+| **magic_high ↔ tutto** (mapped/cnot/sigma/external) | **nessuna** | — | nessun ottimo si sposta variando magic_high → **fissa basso e ignora**. | `corr_sweep` |
+| **cnot_low ↔ tutto** | **nessuna** | — | disaccoppiato e **inerte** (0–2 identici; ≥4 fa male). | `cnotlow_sweep`, `external_magic_sweep` |
+| **magic_low ↔ magic_high** (solo `fine`) | **GAP** | — | mai testato ≠0 sui T-bearing nei regimi fine; rimodella la banda di T centrale (incl. `magic_high=0, magic_low>0`). | `magic_low_tune` (pendente) |
 
-**La dimensione la assorbe il duo anti-correlato `mapped ↔ sigma`:** dove sigma è fisso stretto
-(0.6/0.7) lo scaling va tutto su `mapped` (0→25); dove i pesi sono medi, una parte la prende
-`sigma` (cube 0.3→1). `cnot`, `magic`, `border` **non dipendono dalla taglia**.
+### B. Pesi ↔ dimensione (taglia griglia / padding)
 
-### Riepilogo correlazioni (binario sigma)
-- **mapped ↔ cnot**: forte, **stessa direzione** (cresta mapped≈2.5·cnot).
-- **mapped ↔ sigma**: forte, **opposta** (mapped alto → sigma stretto ~0.7).
-- **sigma ↔ cnot**: debole/assente (sigma lo fissa mapped).
-- **pesi ↔ dimensione**: la assorbe **mapped** (e in parte **sigma** nel cube); cnot/magic/border indipendenti.
+| peso | dipendenza dalla taglia | nota |
+|---|---|---|
+| **mapped** | **FORTE, concorde** | assorbe quasi tutto lo scaling (piccole ~0–1 → grandi ~10–25). |
+| **sigma** | media (cube) / cala (noncube) | griglie **strettissime → σ più largo** (fino ~3); è l'altra metà dello scaling nel cube. |
+| **cnot / magic / border / cnot_low** | **assente** | costanti rispetto alla taglia. |
+
+> La **dimensione è la leva dominante in assoluto**: `non_routed` cala **~8–9pp noncube / ~2–3pp
+> cube** da griglia stretta a larga, contro **≤1.4pp** di tutti i pesi messi insieme. → dimensiona
+> generosamente la griglia e **non** ri-tarare i pesi per taglia.
+
+### C. Pesi ↔ geometria / regime
+
+| relazione | effetto | nota |
+|---|---|---|
+| **magic_high ↔ geometria** | sì | noncube/connectivity: alzarlo **danneggia forte** (−0.7pp); cube: lieve (−0.24pp); **`fine/cube`** unica conca con ottimo a **~1** (+0.06pp). |
+| **magic_high ↔ border** | **nessuna** (smentita) | `magic*=0` a **ogni** border. La vecchia "border largo→magic alto" era artefatto `mapped>0`/heap rotto. |
+| **border ↔ pesi/dimensione** | trascurabile | ottimo **10–15** stabile ovunque; `border=0` catastrofico (+2–3pp), ≥25 peggiora. |
+| **mapped ↔ geometria** | sì | **cube → mapped basso/0** (vuole repulsione minima); **noncube → conca interna ~15–20**. |
+
+### D. Gerarchia delle leve (dalla più forte alla più debole)
+1. **dimensione** (≫ tutto, ~8pp noncube) →
+2. **posizione sulla cresta mapped↔cnot** (mapped 5–20, cnot=mapped/2.5) →
+3. **external** (negativo, satura subito; ~1.5pp noncube) →
+4. **border** (ottimo 10–15; 0 catastrofico) →
+5. **sigma** (~0.7 costante sulla cresta; largo solo su griglie strette) →
+6. **magic_high / magic_low / cnot_low** (≈inerti: fissa 0, salvo fine/cube magic≈1).
+
+**Regola pratica unica:** σ=0.7, `cnot=mapped/2.5` con mapped 15–20, external −5, border 10–15,
+magic 0/0, cnot_low 0, base 1 — e **dimensiona la griglia con largo padding** (la vera leva).

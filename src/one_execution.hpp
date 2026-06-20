@@ -484,6 +484,7 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             mapping_only_result.resolved_graph_y = resolved_graph_y;
             mapping_only_result.num_qubits = qubitsNumber;
             mapping_only_result.max_interaction_degree = max_deg;
+            disable_mapping_only_mode_for_process();
             return mapping_only_result;
         }
 
