@@ -2,38 +2,35 @@
 \section{Gaussian Field Placement}
 \label{sec:approach}
 
-This is the core of the method. We first define the influence field that a single
-source casts on the lattice and the score that superposes them, then give the two
-ways we set field weights from circuit statistics, and finally describe the
-placement-and-routing loop that consumes the score. Throughout, the guiding
-objective is the informal one---be near magic states when $T$-heavy, cluster with
-frequent partners, and leave room to route---turned into a scalar field whose
-safe maximum is the chosen tile.
+At the heart of the method is one idea: turn the informal placement goal---sit
+near magic states when $T$-heavy, cluster with frequent interaction partners, and
+leave room to route---into a scalar field over the lattice whose safe maximum is
+the tile we pick. The rest of this section makes that precise. We first define the
+influence field cast by a single source and the score that superposes many of them
+(\S\ref{sec:fields}), then give the two recipes---\emph{coarse} and \emph{fine}---that
+read the field weights off the circuit statistics, and finally describe the greedy
+placement-and-routing loop that consumes the score (\S\ref{sec:loop}).
 
 \subsection{Influence Fields and the Placement Score}
 \label{sec:fields}
 
-A single \emph{influence field} is an axis-aligned 2D Gaussian centred at a tile
+A single \emph{influence field} is an isotropic 2D Gaussian centred at a tile
 $(\mu_x,\mu_y)$,
 \begin{equation}
-g(x,y) \;=\; w\,\exp\!\Big(\!-\tfrac{(x-\mu_x)^2}{2\sigma_x^2}
-                              -\tfrac{(y-\mu_y)^2}{2\sigma_y^2}\Big),
+g(x,y) \;=\; w\,\exp\!\Big(\!-\frac{(x-\mu_x)^2+(y-\mu_y)^2}{2\sigma^2}\Big),
 \label{eq:gauss}
 \end{equation}
 with a non-negative weight $w$. A field is either \emph{attractive}, contributing
 $g(x,y)$, or \emph{repulsive}, contributing the valley
 $\max\!\big(w-g(x,y),\,0\big)$, which is near zero at the centre and rises to $w$
 far away; attractive sources thus pull a qubit in, repulsive sources push it out.
-Both widths follow from a single interpretable parameter, the \emph{confidence}
-$\kappa\in(0,1)$: writing $R_{x/y}$ for the half-extent of the grid along an axis,
-\begin{equation}
-\sigma_{x/y} \;=\; \frac{R_{x/y}}{\sqrt{-2\ln(1-\kappa)}},
-\label{eq:sigma}
-\end{equation}
-so a field keeps a fraction $(1-\kappa)$ of its peak at distance $R$ from the
-centre, and larger $\kappa$ gives broader, longer-range influence. To bound work,
-each field is evaluated only within a fixed multiple of $\sigma$ of its centre and
-treated as zero beyond it.
+A single width $\sigma$---the same on both axes and independent of the grid
+size---sets the reach of every field: a larger $\sigma$ spreads a source's
+influence over more tiles, a smaller one keeps it local. We use one tuned value of
+$\sigma$ for all fields (Section~\ref{sec:eval}). To bound work, each field is
+evaluated only within a bounded window around its centre, where its contribution
+is non-negligible, and takes its limiting value beyond it---zero for an attractive
+field, $w$ for a repulsive valley.
 
 When placing a qubit $q$, the score at a free tile $v$ superposes four families of
 fields,
@@ -57,8 +54,10 @@ already-mapped partner $p\in P(q)$, pulling strongly coupled qubits together so
 their future surgeries traverse short corridors. The \emph{repulsion} term puts a
 repulsive Gaussian on every already-placed qubit $u\in\M$, discouraging
 overcrowding and preserving routing lanes. Finally $b(v)$ is a single attractive
-Gaussian at the grid centre that keeps the overall mapping compact; an optional
-constant bonus on border tiles is added when magic states sit on the boundary.
+Gaussian at the grid centre that keeps the overall mapping compact; in the regime
+where magic states sit on the lattice boundary we also add a tuned constant to
+every border tile---in practice a penalty that pushes patches inward, away from the
+magic lane.
 Figure~\ref{fig:fields} shows the four families and their superposition. Crucially,
 only partners and patches \emph{already committed} contribute, so the field a
 qubit sees depends on the placement order---which we exploit in

@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -q cpu
-#PBS -l walltime=12:00:00
+#PBS -l walltime=48:00:00
 #PBS -N ftqc_dims
 #PBS -j oe
 #PBS -V

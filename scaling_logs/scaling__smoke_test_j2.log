@@ -1,4 +1,0 @@
-Benchmark processor filter: processor=0
-Benchmark parallelism: up to 2 OpenMP worker(s).
-[2/2] OK id=2 routing_steps=11 non_routed_pct=0.0000 duration=0.006s safe_passage_strategy=cube type=gaussian
-[1/2] OK id=1 routing_steps=10 non_routed_pct=0.0000 duration=0.006s safe_passage_strategy=cube type=gaussian
