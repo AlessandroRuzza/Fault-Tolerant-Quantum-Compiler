@@ -1,0 +1,139 @@
+
+### confidence_deep_noncube_runs.csv  (gaussian rows used=4601; mapping_types=['gaussian'])
+  [AGREE ] gaussian_confidence        coarse/noncube   nc=47  P*_nr=1      P*_steps=1      agree= 85% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0.999999999=7.623 0.9999999999=7.486 0.99999999999=7.521 0.999999999999=7.282 [1=6.815]
+        steps(rel):0.999999999=1.051 0.9999999999=1.044 0.99999999999=1.037 0.999999999999=1.028 [1=1.001]
+  [AGREE ] gaussian_confidence        fine/noncube     nc=47  P*_nr=1      P*_steps=1      agree= 87% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0.999999999=7.483 0.9999999999=7.356 0.99999999999=7.271 0.999999999999=7.187 [1=6.606]
+        steps(rel):0.999999999=1.042 0.9999999999=1.037 0.99999999999=1.031 0.999999999999=1.017 [1=1.002]
+
+### confidence_knee_noncube_runs.csv  (gaussian rows used=5809; mapping_types=['gaussian'])
+  [AGREE ] gaussian_confidence        coarse/noncube   nc=47  P*_nr=0.999999999999 P*_steps=0.999999999999 agree= 66% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0.9999=8.753 0.99999=8.343 0.999999=7.975 0.9999995=7.893 0.9999999=8.071 0.99999999=7.720 0.999999999=7.623 0.9999999999=7.486 0.99999999999=7.521 [0.999999999999=7.282]
+        steps(rel):0.9999=1.084 0.99999=1.058 0.999999=1.049 0.9999995=1.043 0.9999999=1.040 0.99999999=1.027 0.999999999=1.034 0.9999999999=1.027 0.99999999999=1.019 [0.999999999999=1.011]
+  [AGREE ] gaussian_confidence        fine/noncube     nc=47  P*_nr=0.999999999999 P*_steps=0.999999999999 agree= 72% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0.9999=8.698 0.99999=8.236 0.999999=7.999 0.9999995=7.938 0.9999999=7.706 0.99999999=7.600 0.999999999=7.483 0.9999999999=7.356 0.99999999999=7.271 [0.999999999999=7.187]
+        steps(rel):0.9999=1.089 0.99999=1.073 0.999999=1.062 0.9999995=1.050 0.9999999=1.040 0.99999999=1.032 0.999999999=1.033 0.9999999999=1.029 0.99999999999=1.022 [0.999999999999=1.008]
+
+### confidence_sweep_fine_cube_runs.csv  (gaussian rows used=3253; mapping_types=['gaussian'])
+  [AGREE ] gaussian_confidence        fine/cube        nc=47  P*_nr=0.9999 P*_steps=0.9999 agree= 68% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0.5=6.526 0.7=6.396 0.8=6.177 0.85=5.859 0.9=5.529 0.95=5.151 0.98=4.859 0.99=4.769 0.999=4.536 [0.9999=4.399] 0.99999=4.485 0.999999=4.441 0.9999999=4.446 0.99999999=4.536
+        steps(rel):0.5=1.167 0.7=1.165 0.8=1.156 0.85=1.128 0.9=1.088 0.95=1.054 0.98=1.028 0.99=1.021 0.999=1.014 [0.9999=1.014] 0.99999=1.017 0.999999=1.016 0.9999999=1.019 0.99999999=1.025
+
+### confidence_sweep_runs.csv  (gaussian rows used=11364; mapping_types=['gaussian'])
+  [differ~] gaussian_confidence        coarse/cube      nc=47  P*_nr=0.99999999 P*_steps=0.9999999 agree= 72% | regret: nr+0.07pp steps+0.07%
+        nonrouted: 0.5=4.582 0.7=4.515 0.8=4.525 0.85=4.526 0.9=4.485 0.95=4.478 0.98=4.466 0.99=4.447 0.999=4.343 0.9999=4.327 0.99999=4.245 0.999999=4.192 0.9999999=4.094 [0.99999999=4.023]
+        steps(rel):0.5=1.025 0.7=1.023 0.8=1.023 0.85=1.020 0.9=1.021 0.95=1.018 0.98=1.021 0.99=1.019 0.999=1.017 0.9999=1.015 0.99999=1.014 0.999999=1.012 [0.9999999=1.009] 0.99999999=1.010
+  [AGREE ] gaussian_confidence        coarse/noncube   nc=47  P*_nr=0.99999999 P*_steps=0.99999999 agree= 66% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0.5=13.903 0.7=12.828 0.8=12.298 0.85=12.032 0.9=11.347 0.95=10.734 0.98=10.154 0.99=9.782 0.999=8.901 0.9999=8.753 0.99999=8.343 0.999999=7.975 0.9999999=8.071 [0.99999999=7.720]
+        steps(rel):0.5=1.386 0.7=1.301 0.8=1.262 0.85=1.239 0.9=1.214 0.95=1.162 0.98=1.139 0.99=1.121 0.999=1.084 0.9999=1.059 0.99999=1.033 0.999999=1.025 0.9999999=1.017 [0.99999999=1.004]
+  [AGREE ] gaussian_confidence        fine/noncube     nc=47  P*_nr=0.99999999 P*_steps=0.99999999 agree= 70% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0.5=14.394 0.7=13.506 0.8=12.704 0.85=12.385 0.9=11.778 0.95=10.894 0.98=10.419 0.99=9.990 0.999=9.107 0.9999=8.698 0.99999=8.236 0.999999=7.999 0.9999999=7.706 [0.99999999=7.600]
+        steps(rel):0.5=1.444 0.7=1.357 0.8=1.307 0.85=1.289 0.9=1.269 0.95=1.186 0.98=1.148 0.99=1.140 0.999=1.099 0.9999=1.063 0.99999=1.047 0.999999=1.036 0.9999999=1.016 [0.99999999=1.009]
+
+### external_neigh_sweep_runs.csv  (gaussian rows used=169758; mapping_types=['gaussian'])
+  [AGREE ] external_weight            coarse/cube      nc=47  P*_nr=-30    P*_steps=-30    agree= 98% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [-30=3.825] -20=3.825 -15=3.825 -5=3.830 -0.5=3.884
+        steps(rel):[-30=1.000] -20=1.000 -15=1.000 -5=1.000 -0.5=1.002
+  [AGREE ] external_weight            coarse/noncube   nc=47  P*_nr=-30    P*_steps=-30    agree= 98% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [-30=4.740] -20=4.740 -15=4.740 -5=4.750 -0.5=6.200
+        steps(rel):[-30=1.000] -20=1.000 -15=1.000 -5=1.002 -0.5=1.101
+  [AGREE ] external_weight            fine/cube        nc=47  P*_nr=-30    P*_steps=-30    agree= 98% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [-30=3.665] -20=3.665 -15=3.665 -5=3.675 -0.5=3.886
+        steps(rel):[-30=1.000] -20=1.000 -15=1.000 -5=1.000 -0.5=1.006
+  [AGREE ] external_weight            fine/noncube     nc=47  P*_nr=-30    P*_steps=-30    agree= 98% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [-30=4.245] -20=4.245 -15=4.245 -5=4.247 -0.5=5.405
+        steps(rel):[-30=1.000] -20=1.000 -15=1.000 -5=1.000 -0.5=1.080
+
+### external_sweep_runs.csv  (gaussian rows used=9865; mapping_types=['gaussian'])
+  [differ~] external_weight            coarse/cube      nc=47  P*_nr=0      P*_steps=-15    agree= 96% | regret: nr+0.00pp steps+0.15%
+        nonrouted: -15=4.024 -8=4.028 -5=4.037 -3=4.039 -2=4.039 -1=4.042 -0.5=4.043 -0.3=4.044 -0.1=4.044 [0=4.023]
+        steps(rel):[-15=1.000] -8=1.000 -5=1.000 -3=1.000 -2=1.000 -1=1.000 -0.5=1.001 -0.3=1.002 -0.1=1.002 0=1.002
+  [AGREE ] external_weight            coarse/noncube   nc=47  P*_nr=-15    P*_steps=-15    agree= 89% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [-15=5.593] -8=5.593 -5=5.654 -3=5.621 -2=5.837 -1=6.448 -0.5=7.235 -0.3=7.545 -0.1=8.034 0=7.975
+        steps(rel):[-15=1.001] -8=1.001 -5=1.006 -3=1.008 -2=1.021 -1=1.072 -0.5=1.126 -0.3=1.139 -0.1=1.162 0=1.164
+  [differ~] external_weight            fine/cube        nc=47  P*_nr=-5     P*_steps=-15    agree= 74% | regret: nr+0.00pp steps+0.01%
+        nonrouted: -15=4.289 -8=4.289 [-5=4.285] -3=4.292 -2=4.308 -1=4.321 -0.5=4.354 -0.3=4.321 -0.1=4.394 0=4.399
+        steps(rel):[-15=1.001] -8=1.001 -5=1.001 -3=1.002 -2=1.003 -1=1.004 -0.5=1.006 -0.3=1.007 -0.1=1.009 0=1.014
+  [AGREE ] external_weight            fine/noncube     nc=47  P*_nr=-15    P*_steps=-15    agree= 85% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [-15=5.487] -8=5.487 -5=5.487 -3=5.510 -2=5.573 -1=5.916 -0.5=7.122 -0.3=7.294 -0.1=7.763 0=7.706
+        steps(rel):[-15=1.008] -8=1.008 -5=1.008 -3=1.011 -2=1.019 -1=1.051 -0.5=1.113 -0.3=1.140 -0.1=1.164 0=1.154
+
+### finetune_coarse_cube_runs.csv  (gaussian rows used=485032; mapping_types=['gaussian'])
+  [differ~] border_distance_percentage coarse/cube      nc=47  P*_nr=20     P*_steps=50     agree= 79% | regret: nr+0.07pp steps+0.23%
+        nonrouted: 0=5.287 5=4.432 10=3.856 15=3.732 [20=3.713] 30=4.115 50=3.784
+        steps(rel):0=1.104 5=1.050 10=1.021 15=1.005 20=1.006 30=1.020 [50=1.003]
+  [differ~] cnot_high                  coarse/cube      nc=47  P*_nr=1.2    P*_steps=1.5    agree= 83% | regret: nr+0.01pp steps+0.07%
+        nonrouted: 0=5.422 0.8=3.714 [1.2=3.700] 1.5=3.712 2=3.733 2.5=3.745 16=3.767
+        steps(rel):0=1.098 0.8=1.007 1.2=1.005 [1.5=1.005] 2=1.006 2.5=1.009 16=1.007
+  [differ~] magic_high                 coarse/cube      nc=47  P*_nr=2      P*_steps=0.4    agree= 85% | regret: nr+0.03pp steps+0.13%
+        nonrouted: 0=4.657 0.1=3.880 0.2=3.814 0.3=3.758 0.4=3.773 0.8=3.780 [2=3.742] 30=3.750
+        steps(rel):0=1.053 0.1=1.007 0.2=1.007 0.3=1.007 [0.4=1.005] 0.8=1.007 2=1.006 30=1.005
+  [AGREE ] mapped_gaussian_weight     coarse/cube      nc=47  P*_nr=0      P*_steps=0      agree= 79% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [0=3.726] 0.4=3.854 0.8=3.884 1.5=3.949 3=4.033 15=5.211
+        steps(rel):[0=1.005] 0.4=1.013 0.8=1.011 1.5=1.019 3=1.019 15=1.150
+
+### finetune_coarse_noncube_runs.csv  (gaussian rows used=709937; mapping_types=['gaussian'])
+  [DIFFER*] border_distance_percentage coarse/noncube   nc=47  P*_nr=10     P*_steps=50     agree= 68% | regret: nr+0.04pp steps+1.29%
+        nonrouted: 0=7.210 5=6.630 [10=6.323] 15=6.512 20=6.689 30=7.042 50=6.364
+        steps(rel):0=1.060 5=1.039 10=1.018 15=1.015 20=1.026 30=1.036 [50=1.005]
+  [AGREE ] cnot_high                  coarse/noncube   nc=47  P*_nr=1.2    P*_steps=1.2    agree= 74% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0=9.249 0.8=6.365 [1.2=6.276] 1.5=6.315 2=6.362 2.5=6.339 16=6.906
+        steps(rel):0=1.195 0.8=1.005 [1.2=1.003] 1.5=1.007 2=1.004 2.5=1.005 16=1.032
+  [differ~] magic_high                 coarse/noncube   nc=47  P*_nr=2      P*_steps=30     agree= 74% | regret: nr+0.19pp steps+0.17%
+        nonrouted: 0=6.844 0.1=6.711 0.2=6.692 0.3=6.681 0.4=6.661 0.8=6.473 [2=6.184] 30=6.376
+        steps(rel):0=1.046 0.1=1.042 0.2=1.041 0.3=1.033 0.4=1.033 0.8=1.024 2=1.005 [30=1.003]
+  [AGREE ] mapped_gaussian_weight     coarse/noncube   nc=47  P*_nr=1      P*_steps=1      agree= 66% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0=9.584 [1=6.320] 1.5=6.531 2=6.558 2.5=6.585 15=6.966
+        steps(rel):0=1.143 [1=1.007] 1.5=1.018 2=1.023 2.5=1.025 15=1.024
+
+### finetune_fine_cube_runs.csv  (gaussian rows used=232124; mapping_types=['gaussian'])
+  [AGREE ] border_distance_percentage fine/cube        nc=47  P*_nr=5      P*_steps=5      agree= 91% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0=5.208 [5=4.093] 10=4.245 15=4.962 20=4.928 30=5.168 50=4.977
+        steps(rel):0=1.071 [5=1.001] 10=1.013 15=1.050 20=1.053 30=1.068 50=1.055
+  [differ~] cnot_high                  fine/cube        nc=47  P*_nr=1      P*_steps=0.5    agree= 89% | regret: nr+0.06pp steps+0.06%
+        nonrouted: 0=5.712 0.3=4.171 0.5=4.177 [1=4.114] 16=4.196
+        steps(rel):0=1.094 0.3=1.007 [0.5=1.004] 1=1.005 16=1.007
+  [AGREE ] magic_high                 fine/cube        nc=47  P*_nr=30     P*_steps=30     agree= 89% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0=4.772 0.2=4.517 0.4=4.526 1=4.253 [30=4.048]
+        steps(rel):0=1.036 0.2=1.016 0.4=1.015 1=1.007 [30=1.003]
+  [differ~] magic_low                  fine/cube        nc=47  P*_nr=5      P*_steps=0      agree= 79% | regret: nr+0.02pp steps+0.69%
+        nonrouted: 0=4.104 1=4.123 [5=4.079]
+        steps(rel):[0=1.001] 1=1.004 5=1.008
+  [AGREE ] mapped_gaussian_weight     fine/cube        nc=47  P*_nr=0      P*_steps=0      agree= 89% | regret: nr+0.00pp steps+0.00%
+        nonrouted: [0=4.098] 0.4=4.273 1=4.470 15=5.350
+        steps(rel):[0=1.003] 0.4=1.023 1=1.048 15=1.137
+
+### finetune_fine_noncube_runs.csv  (gaussian rows used=369647; mapping_types=['gaussian'])
+  [differ~] border_distance_percentage fine/noncube     nc=47  P*_nr=5      P*_steps=10     agree= 83% | regret: nr+0.14pp steps+0.01%
+        nonrouted: 0=7.093 [5=6.564] 10=6.708 15=6.993 20=7.162 30=7.381 50=6.966
+        steps(rel):0=1.046 5=1.013 [10=1.013] 15=1.049 20=1.054 30=1.061 50=1.044
+  [AGREE ] cnot_high                  fine/noncube     nc=47  P*_nr=0.5    P*_steps=0.5    agree= 89% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0=9.384 0.3=6.542 [0.5=6.454] 1=6.494 16=7.433
+        steps(rel):0=1.203 0.3=1.007 [0.5=1.003] 1=1.003 16=1.091
+  [AGREE ] magic_high                 fine/noncube     nc=47  P*_nr=30     P*_steps=30     agree= 91% | regret: nr+0.00pp steps+0.00%
+        nonrouted: 0=6.858 0.2=6.761 0.4=6.739 1=6.568 [30=6.448]
+        steps(rel):0=1.046 0.2=1.043 0.4=1.039 1=1.032 [30=1.001]
+  [differ~] mapped_gaussian_weight     fine/noncube     nc=47  P*_nr=1.5    P*_steps=1      agree= 77% | regret: nr+0.04pp steps+0.26%
+        nonrouted: 0=9.117 1=6.603 [1.5=6.561] 2.5=6.588 15=6.761
+        steps(rel):0=1.120 [1=1.006] 1.5=1.009 2.5=1.013 15=1.036
+
+
+================= GLOBAL SUMMARY =================
+cells: 33  AGREE=21  DIFFER=12 (of which consequential=1, within-noise=11)
+
+--- CONSEQUENTIAL disagreements (regret nr>0.2pp or steps>1%), sorted by max regret ---
+  finetune_coarse_noncube_runs.csv               border_distance_percentage coarse/noncube nr*=10    steps*=50    agree= 68% | nr+0.04pp steps+1.29%
+
+--- within-noise disagreements (adjacent plateau values; regret tiny) ---
+  finetune_fine_cube_runs.csv                    magic_low              fine/cube      nr*=5     steps*=0     | nr+0.02pp steps+0.69%
+  finetune_fine_noncube_runs.csv                 mapped_gaussian_weight fine/noncube   nr*=1.5   steps*=1     | nr+0.04pp steps+0.26%
+  finetune_coarse_cube_runs.csv                  border_distance_percentage coarse/cube    nr*=20    steps*=50    | nr+0.07pp steps+0.23%
+  finetune_coarse_noncube_runs.csv               magic_high             coarse/noncube nr*=2     steps*=30    | nr+0.19pp steps+0.17%
+  external_sweep_runs.csv                        external_weight        coarse/cube    nr*=0     steps*=-15   | nr+0.00pp steps+0.15%
+  finetune_fine_noncube_runs.csv                 border_distance_percentage fine/noncube   nr*=5     steps*=10    | nr+0.14pp steps+0.01%
+  finetune_coarse_cube_runs.csv                  magic_high             coarse/cube    nr*=2     steps*=0.4   | nr+0.03pp steps+0.13%
+  finetune_coarse_cube_runs.csv                  cnot_high              coarse/cube    nr*=1.2   steps*=1.5   | nr+0.01pp steps+0.07%
+  confidence_sweep_runs.csv                      gaussian_confidence    coarse/cube    nr*=0.99999999 steps*=0.9999999 | nr+0.07pp steps+0.07%
+  finetune_fine_cube_runs.csv                    cnot_high              fine/cube      nr*=1     steps*=0.5   | nr+0.06pp steps+0.06%
+  external_sweep_runs.csv                        external_weight        fine/cube      nr*=-5    steps*=-15   | nr+0.00pp steps+0.01%
