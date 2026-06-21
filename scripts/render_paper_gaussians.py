@@ -161,7 +161,7 @@ def _style_3d(ax):
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
         axis.set_pane_color((1, 1, 1, 0))
         axis.line.set_linewidth(0.4)
-    ax.tick_params(labelsize=5, pad=-2, length=2)
+    ax.tick_params(labelsize=6, pad=-1, length=2)
     ax.set_zticks([])
     ax.grid(False)
 
@@ -217,10 +217,17 @@ def render_fields(args):
             if v > best_v:
                 best_v, best = v, (xx, yy)
 
-    set_style()
-    fig = plt.figure(figsize=(args.fields_w, args.fields_h))
-    gs = fig.add_gridspec(2, 3, width_ratios=[1, 1, 1.5], wspace=0.32, hspace=0.42)
+    from matplotlib.lines import Line2D
 
+    set_style()
+    fig = plt.figure(figsize=(args.fields_w, args.fields_h), constrained_layout=True)
+    # extra short bottom row holds the shared marker legend
+    gs = fig.add_gridspec(3, 3, width_ratios=[1, 1, 1.45],
+                          height_ratios=[1, 1, 0.30])
+
+    # Each family is shown on its own colour scale (with its own colourbar): the
+    # repulsion field sums many inverse Gaussians into a tall plateau, so a single
+    # shared scale would crush the lower-magnitude magic/CNOT/baseline panels.
     panels = [
         (f_magic, "magic-state", gs[0, 0]),
         (f_cnot, "CNOT-partner", gs[0, 1]),
@@ -229,31 +236,65 @@ def render_fields(args):
     ]
     for F, title, cell in panels:
         ax = fig.add_subplot(cell)
-        ax.imshow(F, origin="lower", extent=[0, maxX, 0, maxY],
-                  cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
+        im = ax.imshow(F, origin="lower", extent=[0, maxX, 0, maxY],
+                       cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
         ax.set_title(title, pad=2)
         ax.set_xticks([])
         ax.set_yticks([])
         if title == "magic-state":
             for (mx, my) in magic:
-                ax.plot(mx, my, marker="*", color="white", ms=4, mew=0.4, mec="black")
+                ax.plot(mx, my, marker="*", color="white", ms=8, mew=0.7, mec="black")
         if title == "CNOT-partner":
             for (mx, my) in partners:
-                ax.plot(mx, my, marker="o", color="white", ms=2.5, mew=0.3, mec="black")
+                ax.plot(mx, my, marker="o", color="white", ms=5, mew=0.6, mec="black")
         if title == "repulsion":
             for (mx, my) in placed:
-                ax.plot(mx, my, marker="s", color="white", ms=2.2, mew=0.3, mec="black")
+                ax.plot(mx, my, marker="s", color="white", ms=5, mew=0.6, mec="black")
+        cbf = fig.colorbar(im, ax=ax, location="right", shrink=0.9,
+                           aspect=12, pad=0.03)
+        cbf.ax.tick_params(labelsize=6.5, length=1.5)
+        cbf.set_ticks([float(F.min()), float(F.max())])
+        cbf.ax.set_yticklabels([f"{F.min():.1f}", f"{F.max():.1f}"])
 
-    ax3 = fig.add_subplot(gs[:, 2], projection="3d")
-    ax3.plot_surface(XX, YY, S, cmap=SURF_CMAP, linewidth=0,
-                     antialiased=True, rcount=80, ccount=80)
+    # Superposition S as a top-down heatmap, matching the four family panels.
+    axS = fig.add_subplot(gs[0:2, 2])
+    imS = axS.imshow(S, origin="lower", extent=[0, maxX, 0, maxY],
+                     cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
+    axS.set_title(r"superposition $S$", pad=2)
+    axS.set_xlabel("x", labelpad=1)
+    axS.set_ylabel("y", labelpad=1)
+    axS.set_xticks(range(0, maxX + 1, 2))
+    axS.set_yticks(range(0, maxY + 1, 2))
+    axS.tick_params(labelsize=5, length=2)
+    for (mx, my) in magic:
+        axS.plot(mx, my, marker="*", color="white", ms=9, mew=0.8, mec="black")
+    for (mx, my) in partners:
+        axS.plot(mx, my, marker="o", color="white", ms=5, mew=0.7, mec="black")
+    for (mx, my) in placed:
+        axS.plot(mx, my, marker="s", color="white", ms=5, mew=0.7, mec="black")
     if best is not None:
-        ax3.scatter([best[0]], [best[1]], [best_v + 0.05 * (S.max() - S.min())],
-                    color="crimson", marker="v", s=18, depthshade=False)
-    ax3.set_title(r"superposition $S$", pad=0)
-    ax3.set_xlabel("x", labelpad=-6)
-    ax3.set_ylabel("y", labelpad=-6)
-    _style_3d(ax3)
+        axS.plot(best[0], best[1], marker="X", color="crimson", ms=10,
+                 mew=0.9, mec="white", zorder=5)
+    cbS = fig.colorbar(imS, ax=axS, location="right", shrink=0.9, aspect=22, pad=0.02)
+    cbS.set_label(r"score $S$", fontsize=6)
+    cbS.ax.tick_params(labelsize=7)
+
+    # Shared marker legend in the dedicated bottom row.
+    axL = fig.add_subplot(gs[2, :])
+    axL.axis("off")
+    legend_handles = [
+        Line2D([0], [0], linestyle="none", marker="*", markerfacecolor="white",
+               markeredgecolor="black", markersize=11, label="magic tile"),
+        Line2D([0], [0], linestyle="none", marker="o", markerfacecolor="white",
+               markeredgecolor="black", markersize=9, label="partner"),
+        Line2D([0], [0], linestyle="none", marker="s", markerfacecolor="white",
+               markeredgecolor="black", markersize=9, label="placed patch"),
+        Line2D([0], [0], linestyle="none", marker="X", markerfacecolor="crimson",
+               markeredgecolor="white", markersize=11, label="safe maximum"),
+    ]
+    axL.legend(handles=legend_handles, loc="center", ncol=4, fontsize=10,
+               handletextpad=0.4, columnspacing=1.4, framealpha=0.9,
+               facecolor="0.85", edgecolor="0.6")
 
     out = os.path.join(args.out_dir, "gaussian_fields.pdf")
     fig.savefig(out)
@@ -297,8 +338,11 @@ def render_frames(args):
         ax.set_zlim(zlo, zhi)
         ax.set_title(f"{len(placed)} qubits placed", pad=-2)
         _style_3d(ax)
-        ax.set_xticks([])
-        ax.set_yticks([])
+        ax.set_xticks(range(0, w, 2))
+        ax.set_yticks(range(0, h, 2))
+        ax.set_xlabel("x", labelpad=-3)
+        ax.set_ylabel("y", labelpad=-3)
+        ax.set_zlabel(r"score $S$", labelpad=-3, rotation=90)
 
     out = os.path.join(args.out_dir, "gaussian_frames.pdf")
     fig.savefig(out)
@@ -327,7 +371,7 @@ def main():
     ap.add_argument("--base-weight", type=float, default=1.0)
     ap.add_argument("--mesh", type=int, default=160)
     ap.add_argument("--fields-w", type=float, default=7.0)
-    ap.add_argument("--fields-h", type=float, default=3.0)
+    ap.add_argument("--fields-h", type=float, default=3.5)
 
     # formation strip
     ap.add_argument("--strip-frames", type=lambda s: [int(x) for x in s.split(",")],
