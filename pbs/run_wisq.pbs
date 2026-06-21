@@ -23,6 +23,12 @@ date
 
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
 
+# Optional --wisq-native flag, threaded through from the w alias via WISQ_NATIVE.
+WISQ_NATIVE_ARG=""
+case "${WISQ_NATIVE:-0}" in
+  1|true|True|TRUE|yes|Yes|on|On) WISQ_NATIVE_ARG="--wisq-native" ;;
+esac
+
 apptainer exec \
   --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
   --env OMP_DISPLAY_ENV=TRUE \
@@ -40,7 +46,8 @@ apptainer exec \
     --workers "$BENCH_JOBS" \
     --process-count "${BENCH_PROCESS_COUNT:-1}" \
     --processor "${PROCESSOR:-0}" \
-    --mr_timeout "${MR_TIMEOUT:-300}" >> "$LOG_FILE" 2>&1
+    --mr_timeout "${MR_TIMEOUT:-300}" \
+    $WISQ_NATIVE_ARG >> "$LOG_FILE" 2>&1
 
 {
 echo "END_JOB=$PBS_JOBID"

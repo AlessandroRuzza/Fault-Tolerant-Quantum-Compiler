@@ -47,6 +47,7 @@ import csv
 import fcntl
 import itertools
 import json
+import math
 import re
 import subprocess
 import sys
@@ -59,8 +60,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BINARY = REPO_ROOT / "build" / "FaultTolerantQuantumCompiler"
 DEFAULT_CONFIG = REPO_ROOT / "config" / "0_compiler_config.json"
+QASMS_DIR = REPO_ROOT / "qasms"
 QASM_GRAPHS_DIR = REPO_ROOT / "qasm_graphs"
 UNIVERSAL_QASMS_DIR = REPO_ROOT / "universal_set_qasms"
+
+# Config grid sentinel: x == y == WISQ_OPTIMAL_SENTINEL means "size BOTH our run
+# and WISQ to WISQ's native (square_sparse_layout) grid":
+#   side = 2*ceil(sqrt(n)) + (2 if the circuit has T gates else 1)
+# Our run is forced onto that grid; WISQ then inherits it via read_graph.
+WISQ_OPTIMAL_SENTINEL = -3
 
 _local_wisq = REPO_ROOT / ".env" / "bin" / "wisq"
 WISQ = _local_wisq if _local_wisq.exists() else Path("wisq")
@@ -90,6 +98,11 @@ _active_wisq_lock = threading.Lock()
 _wisq_cache: dict[tuple, object] = {}
 _wisq_cache_lock = threading.Lock()
 
+# When True (--wisq-native), WISQ uses its own native square_sparse_layout
+# (odd/odd qubits + all_sides magic, sized by WISQ itself) instead of our arch,
+# and our compiler is run on the SAME grid size (wisq_native_side).
+_wisq_native = False
+
 
 def _get_circuit_lock(circuit: str) -> threading.Lock:
     with _circuit_locks_mutex:
@@ -114,16 +127,99 @@ CONFIG_FIELDS = [
 
 # ── our compiler ────────────────────────────────────────────────────────────────
 
-def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
-    """Run our compiler once on `circuit` with x=-1/y=-1 and the given mapping config.
+def _input_qasm_qubits_and_t(circuit: str) -> tuple[int | None, bool]:
+    """From qasms/<circuit>.qasm: (#distinct qubits in cx/t/tdg, has_any_T).
 
-    Returns parsed routing_steps / qubits / grid dims / duration from stdout.
-    The compiler also writes qasm_graphs/<circuit>.graph as a side effect.
+    Read from the input QASM (available before any run), so the WISQ-optimal grid
+    can be computed up front. Returns (None, False) if the file is missing.
+    """
+    path = QASMS_DIR / f"{Path(circuit).stem}.qasm"
+    if not path.exists():
+        return None, False
+    text = path.read_text()
+    cx_re = re.compile(r"\bcx\s+q\[(\d+)\]\s*,\s*q\[(\d+)\]\s*;")
+    t_re = re.compile(r"\b(?:t|tdg)\s+q\[(\d+)\]\s*;")
+    qubits: set[int] = set()
+    has_t = False
+    for line in text.splitlines():
+        m = cx_re.search(line)
+        if m:
+            qubits.add(int(m.group(1)))
+            qubits.add(int(m.group(2)))
+        m = t_re.search(line)
+        if m:
+            has_t = True
+            qubits.add(int(m.group(1)))
+    if not qubits:
+        qm = re.search(r"qreg\s+\w+\[(\d+)\]", text)
+        return (int(qm.group(1)) if qm else None), has_t
+    return len(qubits), has_t
+
+
+def wisq_optimal_side(n: int, has_t: bool) -> int:
+    """WISQ-optimal grid side for the x=y=-3 sentinel: 2*ceil(sqrt(n)) + (2 if T else 1)."""
+    return 2 * math.ceil(math.sqrt(n)) + (2 if has_t else 1)
+
+
+def wisq_native_side(n: int) -> int:
+    """Side of WISQ's native square_sparse_layout WITH the all_sides magic border:
+    base 2*ceil(sqrt(n))+1 plus +1 column/row on each side -> 2*ceil(sqrt(n))+3.
+    Mirrors wisq.architecture.square_sparse_layout(n, 'all_sides')."""
+    return 2 * math.ceil(math.sqrt(n)) + 3
+
+
+def native_built(n: int) -> dict:
+    """Synthetic 'built' descriptor for --wisq-native, for the CSV columns.
+    WISQ sizes/places everything itself; here we just report the resulting grid
+    (side = wisq_native_side) and slot count (odd/odd cells = ceil(sqrt(n))^2)."""
+    side = wisq_native_side(n)
+    k = math.ceil(math.sqrt(n))
+    return {
+        "arch": {"width": side, "height": side},
+        "grown": False,
+        "enough_space": True,
+        "n_slots": k * k,
+    }
+
+
+def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
+    """Run our compiler once on `circuit` and return parsed routing_steps / qubits /
+    grid dims / duration from stdout. Writes qasm_graphs/<circuit>.graph as a side
+    effect.
+
+    Grid: by default our run auto-sizes (x=y=-1) and WISQ mirrors the resolved grid.
+    If the config sets x == y == WISQ_OPTIMAL_SENTINEL (-3), our run (and therefore
+    WISQ) is sized to WISQ's native grid instead — see WISQ_OPTIMAL_SENTINEL.
     """
     cfg = dict(base_config)
     cfg["circuit"] = circuit
-    cfg["x"] = -1
-    cfg["y"] = -1
+    if _wisq_native:
+        # WISQ runs on its native square_sparse grid; run OUR compiler at the SAME size.
+        n, _ = _input_qasm_qubits_and_t(circuit)
+        if n:
+            side = wisq_native_side(n)
+            cfg["x"] = side
+            cfg["y"] = side
+        else:
+            print(f"  WARNING [{circuit}]: cannot determine qubit count for "
+                  f"--wisq-native; falling back to auto-size.", file=sys.stderr)
+            cfg["x"] = -1
+            cfg["y"] = -1
+    elif base_config.get("x") == WISQ_OPTIMAL_SENTINEL and base_config.get("y") == WISQ_OPTIMAL_SENTINEL:
+        n, has_t = _input_qasm_qubits_and_t(circuit)
+        if n:
+            side = wisq_optimal_side(n, has_t)
+            cfg["x"] = side
+            cfg["y"] = side
+        else:
+            print(f"  WARNING [{circuit}]: cannot determine qubit count for the "
+                  f"x=y={WISQ_OPTIMAL_SENTINEL} (WISQ-optimal) sentinel; "
+                  f"falling back to auto-size.", file=sys.stderr)
+            cfg["x"] = -1
+            cfg["y"] = -1
+    else:
+        cfg["x"] = -1
+        cfg["y"] = -1
 
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
         json.dump(cfg, tmp, indent=2)
@@ -274,7 +370,9 @@ def run_wisq(circuit: str, arch_path: Path, mr_timeout: int) -> dict:
     cmd = [
         str(WISQ), str(qasm),
         "--mode", "scmr",
-        "-arch", str(arch_path),
+        # --wisq-native: let WISQ build its own square_sparse_layout (odd/odd +
+        # all_sides magic) instead of our custom arch file.
+        "-arch", ("square_sparse_layout" if _wisq_native else str(arch_path)),
         "--output_path", str(out_path),
         "--mr_timeout", str(mr_timeout),
     ]
@@ -462,7 +560,10 @@ def get_or_run_wisq(circuit: str, built: dict, arch_dir: Path,
 
     suffix = f"_{run_id}" if run_id is not None else ""
     arch_path = arch_dir / f"{circuit}{suffix}_wisq2.arch"
-    write_arch_file(built["arch"], arch_path)
+    # In --wisq-native mode run_wisq ignores arch_path (uses square_sparse_layout),
+    # so there is no arch file to write.
+    if not _wisq_native:
+        write_arch_file(built["arch"], arch_path)
     try:
         wisq = _run_wisq_with_limit(circuit, arch_path, mr_timeout)
     finally:
@@ -489,19 +590,22 @@ def run_one(circuit: str, cfg: dict, binary: Path, arch_dir: Path,
 
     n_qubits = count_qasm_qubits(circuit) or mine.get("num_qubits")
 
-    built = build_wisq_arch(
-        graph["width"], graph["height"], graph["magic_states"],
-        n_qubits, parity,
-    )
-
-    if not built["enough_space"]:
-        print(f"  WARNING: only {built['n_slots']} slots for {n_qubits} qubits "
-              f"after {MAX_GROW_STEPS} grow steps — WISQ will likely fail.",
-              file=sys.stderr)
-    elif built["grown"]:
-        print(f"  NOTE: grid grown for WISQ to "
-              f"{built['arch']['width']}x{built['arch']['height']} "
-              f"(dimension parity broken).", file=sys.stderr)
+    if _wisq_native:
+        # WISQ builds its own grid; report the resulting native dims for the CSV.
+        built = native_built(n_qubits)
+    else:
+        built = build_wisq_arch(
+            graph["width"], graph["height"], graph["magic_states"],
+            n_qubits, parity,
+        )
+        if not built["enough_space"]:
+            print(f"  WARNING: only {built['n_slots']} slots for {n_qubits} qubits "
+                  f"after {MAX_GROW_STEPS} grow steps — WISQ will likely fail.",
+                  file=sys.stderr)
+        elif built["grown"]:
+            print(f"  NOTE: grid grown for WISQ to "
+                  f"{built['arch']['width']}x{built['arch']['height']} "
+                  f"(dimension parity broken).", file=sys.stderr)
 
     wisq = get_or_run_wisq(circuit, built, arch_dir, mr_timeout, run_id)
 
@@ -597,9 +701,17 @@ def main() -> int:
                              "(default: 1). Process K handles items where index %% N == K.")
     parser.add_argument("--processor", type=int, default=0,
                         help="Index of this process (0-based, default: 0).")
+    parser.add_argument("--wisq-native", action="store_true",
+                        help="Run WISQ on its own native square_sparse_layout "
+                             "(odd/odd qubits + all_sides magic, sized by WISQ) instead "
+                             "of our arch; our compiler is run at the SAME grid size.")
     args = parser.parse_args()
 
-    global _wisq_semaphore
+    global _wisq_semaphore, _wisq_native
+    _wisq_native = args.wisq_native
+    if _wisq_native:
+        print("WISQ-native mode: WISQ uses square_sparse_layout; our compiler runs "
+              "at the same native grid size.", file=sys.stderr)
     wisq_limit = args.wisq_workers if args.wisq_workers is not None else args.workers
     if wisq_limit < args.workers:
         _wisq_semaphore = threading.Semaphore(wisq_limit)
