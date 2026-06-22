@@ -258,14 +258,14 @@ magic 0/0, cnot_low 0, base 1 — e **dimensiona la griglia con largo padding** 
 | parametro | Connectivity | Cube |
 |---|---|---|
 | `type` | gaussian | gaussian |
-| `external_weight` | −5 | −5 |
+| `external_weight` | −15 | −15 |
 | `base_gaussian_weight` | 1 | 1 |
 | `bfs_density_threshold` | 0.70 | 0.70 |
 | `cnot_low` | 0 | 0 |
 | `magic_low` | 0 | 0 |
 | `number_of_magic_states` | −1 | −1 |
 | magic placement | center_circle | center_circle |
-| `routing_strategy` | naive *(steps: packing)* | naive *(steps: naive_critical)* |
+| `routing_strategy` | packing | packing |
 | t-routing | smart_t_routing | smart_t_routing |
 | `gaussian_strategy` | fine | fine |
 | `safe_passage_strategy` | connectivity | cube |
@@ -273,6 +273,6 @@ magic 0/0, cnot_low 0, base 1 — e **dimensiona la griglia con largo padding** 
 | `sigma` | 0.7 | 0.7 |
 | `mapped` | 20 | 15 |
 | `cnot_high` | 8 *(steps: 1–2)* | 6 |
-| `magic_high` | 0 | 0 *(steps: ~0.5–1)* |
+| `magic_high` | 0 | 0.7 |
 | `use_layer_cache` | true | true |
 | `patience_threshold` | 3 | 3 |
