@@ -43,6 +43,31 @@ CONFIG_LABEL_FIELDS = [
     ("border_distance_percentage", {}),
 ]
 
+# Single-CSV column names (compare_wisq_2.py output).
+MINE_STEPS = "my_routing_steps"
+WISQ_STEPS = "wisq_routing_steps"
+MIN_STEPS = "min_routing_steps"
+PARALLELISM = "max_parallelism"
+DENSITY = "cnot_interaction_density"
+
+# CNOT interaction-graph characterization metrics. Each becomes an
+# optimality-vs-metric scatter / grouped-bar chart, the same way density did.
+# (CSV column, x-axis label, title phrase, filename slug). The density entry
+# keeps the legacy "circuit_density" slug so its filename does not change.
+CNOT_GRAPH_METRIC_SPECS = [
+    (DENSITY, "circuit density (unique CNOT pairs / max pairs)", "Circuit Density", "circuit_density"),
+    ("cnot_graph_modularity", "CNOT graph modularity (community structure)", "CNOT Graph Modularity", "cnot_graph_modularity"),
+    ("cnot_graph_diameter", "CNOT graph diameter (max hop distance)", "CNOT Graph Diameter", "cnot_graph_diameter"),
+    ("cnot_graph_avg_shortest_path", "CNOT graph avg shortest path (hops)", "CNOT Graph Avg Shortest Path", "cnot_graph_avg_shortest_path"),
+    ("max_cnot_degree", "max CNOT degree (busiest qubit)", "Max CNOT Degree", "max_cnot_degree"),
+    ("min_cnot_degree", "min CNOT degree (over qubits with a CNOT)", "Min CNOT Degree", "min_cnot_degree"),
+    ("avg_cnot_degree", "avg CNOT degree", "Avg CNOT Degree", "avg_cnot_degree"),
+    ("cnot_degree_gini", "CNOT degree Gini (degree inequality)", "CNOT Degree Gini", "cnot_degree_gini"),
+    ("cnot_pair_rep_gini", "CNOT pair-repetition Gini (interaction skew)", "CNOT Pair-Repetition Gini", "cnot_pair_rep_gini"),
+    ("cnot_edge_weight_stddev", "CNOT edge-weight stddev (adjacency std)", "CNOT Edge-Weight Stddev", "cnot_edge_weight_stddev"),
+    ("cnot_graph_clustering_coeff", "CNOT graph clustering coefficient", "CNOT Graph Clustering Coeff", "cnot_graph_clustering_coeff"),
+]
+
 
 def to_float(v: str) -> float | None:
     try:
@@ -320,6 +345,167 @@ def plot_summary(by_circuit: dict[str, list[dict]], out_dir: Path, metric: str,
     print(f"  saved: {out_path}")
 
 
+def plot_optimality(by_circuit: dict[str, list[dict]], out_dir: Path) -> None:
+    """Scatter figures of our routing optimality, coloured by circuit family.
+
+    optimality = min_routing_steps / my_routing_steps (layering-depth lower bound
+    over the steps actually taken): 1 is perfect, smaller is further from optimal.
+
+      * vs max_parallelism      -- the worst-case floor is the y = 1/x curve, so
+        every point sits between y = 1/x (worst) and y = 1 (perfect).
+      * vs each CNOT interaction-graph metric (density, modularity, diameter, avg
+        shortest path, degree statistics, Gini coefficients, edge-weight stddev,
+        clustering) -- whether more tangled interaction graphs route further from
+        optimal. See CNOT_GRAPH_METRIC_SPECS.
+
+    Needs the min_routing_steps / max_parallelism columns plus the relevant CNOT
+    interaction-graph column in the CSV; rows missing them are skipped.
+    """
+    specs = [
+        (PARALLELISM, "max parallelism (avg gates / layer)",
+         "Routing Optimality vs Max Parallelism", "optimality_vs_max_parallelism.png", True),
+    ]
+    specs += [
+        (col, xlabel, f"Routing Optimality vs {title}", f"optimality_vs_{slug}.png", False)
+        for col, xlabel, title, slug in CNOT_GRAPH_METRIC_SPECS
+    ]
+    for x_key, xlabel, title, fname, worst_case_curve in specs:
+        by_family: dict[str, list[tuple[float, float]]] = {}
+        for circuit, rows in by_circuit.items():
+            fam = circuit_family(circuit)
+            for r in rows:
+                steps = to_float(r.get(MINE_STEPS))
+                min_steps = to_float(r.get(MIN_STEPS))
+                x = to_float(r.get(x_key))
+                if steps is None or min_steps is None or x is None or steps <= 0:
+                    continue
+                by_family.setdefault(fam, []).append((x, min_steps / steps))
+
+        if not by_family:
+            print(f"  (no rows with {MIN_STEPS} + {x_key}; skipping {fname})")
+            continue
+
+        families = sorted(by_family)
+        cmap = plt.get_cmap("tab20", max(1, len(families)))
+        fig, ax = plt.subplots(figsize=(9, 6))
+        n_points = 0
+        for i, fam in enumerate(families):
+            pts = by_family[fam]
+            n_points += len(pts)
+            ax.scatter([p[0] for p in pts], [p[1] for p in pts],
+                       label=f"{fam} (n={len(pts)})", alpha=0.7, s=28, color=cmap(i))
+
+        # y = 1: perfect routing (ceiling).
+        ax.axhline(1.0, color="#2A9D8F", linestyle="--", linewidth=1.0,
+                   label="optimality = 1 (perfect)", zorder=1)
+        # y = 1/x: minimum achievable optimality (fully serial). Only the
+        # parallelism axis has this closed-form floor.
+        if worst_case_curve:
+            xs_all = [p[0] for pts in by_family.values() for p in pts]
+            x_min = max(1e-9, min(xs_all))
+            x_max = max(xs_all)
+            if x_max > x_min:
+                xs = np.linspace(x_min, x_max, 200)
+                ax.plot(xs, 1.0 / xs, color="#E76F51", linestyle=":", linewidth=1.2,
+                        label="optimality = 1/max_parallelism (worst)", zorder=1)
+
+        ax.set_ylim(0.0, 1.05)
+        ax.set_title(f"{title}  (n={n_points})", fontweight="bold")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("optimality (min_routing_steps / routing_steps)")
+        ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0))
+        ax.grid(True, linestyle=":", alpha=0.4)
+        plt.tight_layout()
+        out_path = out_dir / fname
+        plt.savefig(out_path, dpi=150)
+        plt.close(fig)
+        print(f"  saved: {out_path}")
+
+
+def plot_optimality_bars(by_circuit: dict[str, list[dict]], out_dir: Path) -> None:
+    """Grouped bar charts: routing optimality of ours (blue) vs WISQ (red), one
+    bar pair per circuit, with circuits ordered along the x-axis by a circuit
+    metric. One figure per metric in CNOT_GRAPH_METRIC_SPECS.
+
+    optimality = min_routing_steps / routing_steps (layering-depth lower bound
+    over the steps actually taken; 1 = perfect, smaller = further from optimal).
+    min_routing_steps is the circuit's dependency depth — a router-/mapping-
+    independent lower bound — so it is the same numerator for both sides:
+
+        ours optimality = min_routing_steps / our best my_routing_steps
+        WISQ optimality = min_routing_steps / wisq_routing_steps
+
+    Higher is better. No binning/aggregation: every circuit keeps its own bar
+    pair; circuits that share a metric value simply sit next to each other (the
+    x tick shows the metric value, so equal values read as one bin of bars).
+    """
+    for col, xlabel, title, slug in CNOT_GRAPH_METRIC_SPECS:
+        entries = []
+        for circuit, rows in by_circuit.items():
+            best, _ = pick_best_worst(rows)
+            min_steps = to_float(best.get(MIN_STEPS))
+            my_steps = to_float(best.get(MINE_STEPS))
+            wisq_steps = to_float(best.get(WISQ_STEPS))
+            x = to_float(best.get(col))
+            if None in (min_steps, my_steps, wisq_steps, x):
+                continue
+            if min_steps <= 0 or my_steps <= 0 or wisq_steps <= 0:
+                continue
+            entries.append((circuit, x, min_steps / my_steps, min_steps / wisq_steps))
+
+        fname = f"optimality_bars_vs_{slug}.png"
+        if not entries:
+            print(f"  (no rows with {MIN_STEPS}/{MINE_STEPS}/{WISQ_STEPS} + {col}; skipping {fname})")
+            continue
+
+        # Order left->right by the metric value (then circuit name); equal values
+        # end up adjacent, forming a visual bin.
+        entries.sort(key=lambda e: (e[1], e[0]))
+        circuits = [e[0] for e in entries]
+        xvals = [e[1] for e in entries]
+        mine_opt = [e[2] for e in entries]
+        wisq_opt = [e[3] for e in entries]
+
+        EPS = 1e-9
+        ours_wins = sum(1 for m, w in zip(mine_opt, wisq_opt) if m > w + EPS)
+        ties = sum(1 for m, w in zip(mine_opt, wisq_opt) if abs(m - w) <= EPS)
+        wisq_wins = sum(1 for m, w in zip(mine_opt, wisq_opt) if m < w - EPS)
+        total = len(circuits)
+
+        x = np.arange(len(circuits))
+        width = 0.4
+        fig, ax = plt.subplots(figsize=(max(8, len(circuits) * 0.5), 6))
+        ax.bar(x - width / 2, mine_opt, width, label="ours (best)", color="#2196F3")
+        ax.bar(x + width / 2, wisq_opt, width, label="WISQ", color="#E53935")
+
+        summary = (f"ours wins: {ours_wins}   ties: {ties}   WISQ wins: {wisq_wins}"
+                   f"   (of {total})")
+        ax.text(0.5, 0.97, summary, transform=ax.transAxes, ha="center", va="top",
+                fontsize=11, fontweight="bold",
+                bbox=dict(boxstyle="round", facecolor="#FFF9C4", edgecolor="#BDBDBD"))
+
+        # y = 1: perfect routing (one step per layer).
+        ax.axhline(1.0, color="#2A9D8F", linestyle="--", linewidth=1.0,
+                   label="optimality = 1 (perfect)", zorder=1)
+
+        # x tick = metric value (primary) with the circuit underneath for identity.
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"{xv:g}\n{c}" for xv, c in zip(xvals, circuits)],
+                           rotation=90, fontsize=7)
+        ax.set_ylim(0.0, max(1.05, max(mine_opt + wisq_opt) * 1.08))
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("optimality (min_routing_steps / routing_steps)")
+        ax.set_title(f"Routing Optimality: ours vs WISQ — ordered by {title}  ({total} circuits)",
+                     fontweight="bold")
+        ax.legend()
+        ax.grid(axis="y", linestyle=":", alpha=0.4)
+        plt.tight_layout()
+        out_path = out_dir / fname
+        plt.savefig(out_path, dpi=150)
+        plt.close(fig)
+        print(f"  saved: {out_path}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Plot best/worst config vs WISQ, one figure per circuit."
@@ -354,6 +540,13 @@ def main() -> int:
     # Two cross-circuit overview figures: routing steps and time.
     plot_summary(by_circuit, out_dir, "steps")
     plot_summary(by_circuit, out_dir, "time")
+
+    # Routing-optimality scatters (ours), coloured by circuit family.
+    plot_optimality(by_circuit, out_dir)
+
+    # Routing-optimality grouped bar charts: ours (blue) vs WISQ (red) per
+    # circuit, one figure per metric, x-ordered by that metric.
+    plot_optimality_bars(by_circuit, out_dir)
 
     # Per-family overview figures (same as the summaries, restricted to each
     # family: qft, qaoa, vqe_su2, ...). Families with a single circuit are skipped.
