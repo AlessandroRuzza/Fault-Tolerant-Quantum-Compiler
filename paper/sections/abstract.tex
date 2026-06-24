@@ -10,17 +10,18 @@ sub-problem: each candidate tile in the lattice is scored by superposing repulsi
 qubits toward their partners. We implement the
 method in an open-source C++20 OpenQASM compiler and evaluate it against a
 randomized-restart baseline and the state-of-the-art WISQ compiler. Across
-\todo{$N$} circuits the field placement reduces routing steps by \todo{$X\%$} on
-average over the randomized baseline and by \todo{$Y\%$} over WISQ, while
-compiling roughly \todo{$Z\times$} faster than WISQ's solver-based scheduler. 
-The method also offers a tighter-packing mode that certifies
-routability by connectivity instead of reserving the $3\times3$ patch spacing WISQ
-requires, fitting circuits onto strictly smaller grids: this trades a modest
-increase in routing steps for up to \todo{$G\%$} fewer physical qubits, at the
-same low compilation cost.
+\todo{$N$} circuits the field placement reduces routing steps on average by \todo{$X\%$} 
+over the randomized baseline, and by \todo{$Y\%$} over WISQ for \todo{$k$ of $N$} circuits,
+while compiling roughly \todo{$Z\times$} faster than WISQ's solver-based scheduler.
+The method also offers a tighter-packing mode that does not reserve the $3\times3$ 
+patch spacing WISQ requires, fitting all \todo{$N$} circuits of our benchmark onto 
+strictly smaller grids: 
+this trades a modest increase in routing steps for up to \todo{$G\%$} 
+fewer physical qubits, at the same reduced compilation time.
 \end{abstract}
 
 \begin{IEEEkeywords}
 qubit mapping, qubit routing, fault-tolerant compilation, surface code,
-lattice surgery, magic states, quantum circuit compilation, heuristic placement
+lattice surgery, magic states, quantum circuit compilation, heuristic placement,
+potential-field methods, OpenQASM
 \end{IEEEkeywords}
