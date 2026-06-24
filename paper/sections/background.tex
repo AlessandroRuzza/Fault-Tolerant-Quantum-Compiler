@@ -2,10 +2,8 @@
 \section{Background and Problem Formulation}
 \label{sec:background}
 
-This section recalls the fault-tolerant substrate our compiler targets,
-formalises it as a graph, and states the placement problem.
-Figure~\ref{fig:overview} previews the pipeline from a circuit to a
-lattice-surgery schedule.
+This section recalls the fault-tolerant architecure our compiler targets, formalises it as a graph, and states the placement problem.
+Figure~\ref{fig:overview} previews the pipeline from a circuit to a lattice-surgery schedule.
 
 \input{figures/fig_overview}
 
@@ -15,33 +13,28 @@ Physical qubits are too noisy to compute on directly, so fault-tolerant quantum
 computation (FTQC) encodes each \emph{logical} qubit into many physical qubits
 with a quantum error-correcting (QEC) code and operates on the encoded
 information while errors are continually detected and corrected. The most widely studied
-choice, and the substrate we target, is the \emph{surface code}, which stores one
+choice, and the one we target, is the \emph{surface code}, which stores one
 logical qubit in a two-dimensional \emph{patch} of physical qubits; enlarging the patch---its code
 distance---suppresses the logical error rate
-exponentially~\cite{fowler2012surface}. A computation is compiled into the
-Clifford$+T$ gate set, and each gate becomes a spatial operation on patches.
+exponentially~\cite{fowler2012surface}. A computation is compiled into the Clifford$+T$ gate set, and each gate becomes an operation on patches.
 
-A logical two-qubit gate is realised by \emph{lattice surgery}. Two patches are
-briefly \emph{merged} into one---by activating the free ancilla patches in the
-corridor between them---which jointly measures the two operands, and are then
-\emph{split} back apart. A gate such as CNOT is built from one or two of these
-merge--split measurements together with an ancilla
-patch~\cite{horsman2012lattice,litinski2019game}. The
-non-Clifford $T$ gate cannot be done this way; it is teleported by consuming a
-distilled \emph{magic state}, which must be delivered from a magic-state factory
-to the operand patch through a free lane of the lattice~\cite{bravyi2005magic}.
-Both kinds of operation therefore need a free \emph{corridor} of ancilla
-patches---joining the two operands, or an operand and a magic state---for the
-duration of the surgery, and these corridors are the resource the compiler must
-schedule.
+A logical two-qubit gate is realised by \emph{lattice surgery}. Using the
+free ancilla patches in the corridor between two operands, they are \emph{merged} 
+into a single patch, which jointly measures
+a two-qubit Pauli operator to execute the corresponding gate~\cite{horsman2012lattice,litinski2019game}; the patch is then \emph{split} back into the separate operands. 
+The non-Clifford $T$ gate instead consumes a distilled \emph{magic state}, supplied by a magic-state factory. 
+It is still executed by the same merge--split operation among 
+the operand and the magic state~\cite{bravyi2005magic}.
+Both kinds of operation therefore need a free \emph{corridor} of ancilla patches for the
+duration of the surgery, and these corridors are the resource the compiler must schedule.
 
 \subsection{Architecture Graph, Safe Passage and Routing}
 
 We model the processor as an \emph{architecture graph} $\A=(V,E)$ over a
 rectangular $W\times H$ grid of patches. Each vertex $v\in V$ is a tile with
-integer coordinates $(x,y)$; edges connect orthogonally adjacent tiles, the
+integer coordinates $(x,y)$; edges $(v,w)\in E \subset V^2$ connect orthogonally adjacent tiles, the
 corridors along which surgery can merge patches. A fixed subset
-$V_{\mathrm m}\subset V$ hosts magic states, whose number and positions are
+$V_{\mathrm m}\subset V$ hosts magic states, whose number and positions depend on
 configuration parameters.
 
 A circuit $\C$ over logical qubits $\Q_L$ is given in the Clifford$+T$ basis. From
@@ -49,9 +42,8 @@ it we extract, for each qubit $q$, its $T$-count $t(q)$ (its magic-state demand)
 and, for each pair $(q,q')$, the two-qubit interaction count $c(q,q')$; we write
 $\bar t,\sigma_t$ and $\bar c,\sigma_c$ for the mean and standard deviation of the
 per-qubit $T$- and CNOT-counts. These summary statistics are the only circuit
-information the placement uses (Section~\ref{sec:approach}), and the pair counts
-define the \emph{CNOT interaction graph} whose density separates sparse from
-dense circuits.
+information the placement uses \todo{optimal config may depend on circuit stats} (Section~\ref{sec:approach}), and the pair counts
+define the \emph{CNOT interaction graph} whose density separates sparse from dense circuits.
 
 \begin{definition}[Qubit Mapping]
 \label{def:mapping}
@@ -87,11 +79,10 @@ area-constrained lattices.
     $\Lay(\C)=(L_1,\dots,L_{|\Lay|})$ of its gates into \emph{layers}, where the gates
     of each layer $L_i$ act on pairwise-disjoint qubits and the ordering respects
     every gate dependency. Since dependent gates can never be routed together,
-    we can define $\Rmin=\min_{\Lay}|\Lay|$ the achievable lower-bound for the number of 
-    routing steps.
+    we can define $\Rmin=\min_{\Lay}|\Lay|$ as the lower-bound for the number of routing steps.
 \end{definition}
 
-\begin{definition}[Qubit Routing]
+\begin{definition}[Routing]
 \label{def:routing}
     Given an architecture $\A$, a circuit $\C$ and a mapping $\M$, a \emph{routing} 
     is a sequence $\Rout(\A,\C,\M)=(P_1,\dots,P_{|\Rout|})$ where each element
@@ -108,8 +99,6 @@ $\A$, which is $\NP$-hard in
 general~\cite{beverland2022surface,siraichi2018qubit}, so practical routers are
 heuristic. 
 
-\begin{problem}[Routable Placement]
-    Find a mapping $\M$ that (a) satisfies safe passage and (b) minimises the
-    expected number of lattice-surgery routing steps $|\Rout|$ required to execute $\C$
-    on $\A$.
+\begin{problem}[Optimally-routable Placement]
+    Find a mapping $\M$ that (a) satisfies safe passage and (b) minimises the number of lattice-surgery routing steps $|\Rout|$ required to execute $\C$ on $\A$.
 \end{problem}

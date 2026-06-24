@@ -2,20 +2,22 @@
 \begin{abstract}
 Running a quantum circuit fault-tolerantly on a surface-code processor reduces
 to two coupled tasks: placing logical qubits on a two-dimensional lattice and
-scheduling the lattice-surgery operations that execute its gates, each
-non-Clifford gate consuming a magic state. Unlike the near-term (NISQ) setting,
+routing the lattice-surgery operations that execute its gates. Unlike the near-term (NISQ) setting,
 the bottleneck is not $\SWAP{}$ insertion but the routing corridors---free lanes
-of lattice that must stay open so interacting patches can be joined on demand. We
+in the lattice through which the gates are routed. We
 present a \emph{Gaussian potential-field} heuristic for the placement
-sub-problem: each candidate tile is scored by superposing attractive Gaussian
-fields---pulling $T$-heavy qubits toward magic states and tightly interacting
-qubits toward their partners---with repulsive fields that preserve routing space,
-and a \emph{safe-passage} test keeps every mapping routable. We implement the
+sub-problem: each candidate tile in the lattice is scored by superposing repulsive fields that preserve routing space and attractive Gaussian fields that pull $T$-heavy qubits toward magic states and tightly interacting
+qubits toward their partners. We implement the
 method in an open-source C++20 OpenQASM compiler and evaluate it against a
-randomized-restart baseline and the WISQ compiler. On \todo{$N$} circuits the
-field placement reduces routing steps by \todo{$X$}\% on average over the
-randomized baseline and is competitive with WISQ---completing several instances
-on which WISQ times out---at a fraction of the compilation time.
+randomized-restart baseline and the state-of-the-art WISQ compiler. Across
+\todo{$N$} circuits the field placement reduces routing steps by \todo{$X\%$} on
+average over the randomized baseline and by \todo{$Y\%$} over WISQ, while
+compiling roughly \todo{$Z\times$} faster than WISQ's solver-based scheduler. 
+The method also offers a tighter-packing mode that certifies
+routability by connectivity instead of reserving the $3\times3$ patch spacing WISQ
+requires, fitting circuits onto strictly smaller grids: this trades a modest
+increase in routing steps for up to \todo{$G\%$} fewer physical qubits, at the
+same low compilation cost.
 \end{abstract}
 
 \begin{IEEEkeywords}

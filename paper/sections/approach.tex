@@ -5,7 +5,7 @@
 At the heart of the method is one idea: turn the informal placement goal---sit
 near magic states when $T$-heavy, cluster with frequent interaction partners, and
 leave room to route---into a scalar field over the lattice whose safe maximum is
-the tile we pick. The rest of this section makes that precise. We first define the
+the tile we pick. The rest of this section specifies our method. We first define the
 influence field cast by a single source and the score that superposes many of them
 (\S\ref{sec:fields}), then give the two recipes---\emph{coarse} and \emph{fine}---that
 read the field weights off the circuit statistics, and finally describe the greedy
@@ -29,8 +29,7 @@ size---sets the reach of every field: a larger $\sigma$ spreads a source's
 influence over more tiles, a smaller one keeps it local. We use one tuned value of
 $\sigma$ for all fields (Section~\ref{sec:eval}). To bound work, each field is
 evaluated only within a bounded window around its centre, where its contribution
-is non-negligible, and takes its limiting value beyond it---zero for an attractive
-field, $w$ for a repulsive valley.
+is non-negligible, and takes the field's limiting value beyond it---zero if attractive, $w$ if repulsive.
 
 When placing a qubit $q$, the score at a free tile $v$ superposes four families of
 fields,
@@ -53,14 +52,11 @@ clearing those neighbourhoods for the qubits that need them. The
 already-mapped partner $p\in P(q)$, pulling strongly coupled qubits together so
 their future surgeries traverse short corridors. The \emph{repulsion} term puts a
 repulsive Gaussian on every already-placed qubit $u\in\M$, discouraging
-overcrowding and preserving routing lanes. Finally $b(v)$ is a single attractive
+overcrowding. Finally $b(v)$ is a single attractive
 Gaussian at the grid centre that keeps the overall mapping compact; in the regime
-where magic states sit on the lattice boundary we also add a tuned constant to
-every border tile---in practice a penalty that pushes patches inward, away from the
-magic lane.
+where magic states sit on the lattice boundary we subtract a tuned constant from every border tile, penalising boundary placements that obstruct magic state tiles.
 Figure~\ref{fig:fields} shows the four families and their superposition. Crucially,
-only partners and patches \emph{already committed} contribute, so the field a
-qubit sees depends on the placement order---which we exploit in
+only partners and patches \emph{already committed} contribute, so the field seen by a qubit depends on the placement order---which we exploit in
 Section~\ref{sec:loop}.
 
 \input{figures/fig_fields}
@@ -128,31 +124,42 @@ neighbourhood breadth-first, heaviest partner first, so every qubit finds its
 strongest partner already in place; on dense graphs, which offer no such locality,
 we keep the plain importance order. For each qubit we evaluate the score $S$ of
 \eqref{eq:score} on every free tile, sort the tiles by decreasing $S$, and commit
-the first that keeps the mapping in safe passage
+the first that doesn't violate safe passage
 (Definition~\ref{def:safepassage}), adding a repulsion field there; if no tile
 passes, placement reports failure.
-Algorithm~\ref{alg:main} summarises the loop and Figure~\ref{fig:frames} shows a
-mapping forming, the repulsion valleys spacing patches apart while peaks stay near
-the magic tiles.
+Algorithm~\ref{alg:main} summarises the loop and Figure~\ref{fig:frames} shows the potential-field variation as
+the mapping grows.
 
 \input{algorithms/alg_placement}
 
-The resulting mapping is handed to the router, which turns it into a routing
-$\Rout$ (Definition~\ref{def:routing}). Our \emph{packing} router opens as many
+The resulting mapping is handed to the router, which produces a routing
+$\Rout$ (Definition~\ref{def:routing}). Our \emph{packing} router schedules as many
 vertex-disjoint corridors per step $P_i$ as it can, prioritising gates that are
 critical to the downstream schedule, and serves $T$ gates with a dedicated
-strategy that reserves a lane to the nearest free magic-state tile; a simpler
-\emph{naive} shortest-path router is also available. Because the mapping already
+strategy that reserves a corridor to the nearest free magic-state tile; a simpler
+\emph{naive-critical} shortest-path router is also available. Because the mapping already
 satisfies safe passage (Definition~\ref{def:safepassage}), every gate stays
 reachable and the router never deadlocks---its only job is to keep $|\Rout|$ small
-by packing each step densely. The full router is described in the
+by packing each step densely.
+
+The two routers differ in how they fill each step. The
+\emph{packing} router proposes a few
+candidate corridors for every waiting gate and then greedily commits a 
+maximal mutually disjoint subset, taking gates
+in order of \emph{downstream criticality} (how many of the next few layers depend
+on each gate's qubits) and deferring whatever does not fit to the following step.
+The \emph{naive-critical} router is the lightweight alternative: it lays down a
+single shortest path per gate, visits gates in the same criticality order, and
+simply defers any gate whose path would collide with one already placed.
+It is cheaper but packs each step less densely, so it generally
+uses more routing steps than packing. The full routers are described in the
 artifact~\cite{ftqc}.
 
 \input{figures/fig_frames}
 
 \begin{remark}
 Evaluating the field for one qubit costs
-$O(|V|\cdot(|V_{\mathrm m}|+|P(q)|+|\M|))$, and with the lattice sized as
+$O(|V|\cdot(|V_{\mathrm m}|+|P(q)|+|\Q_L|))$, and with the lattice sized as
 $\Theta(|\Q_L|+|V_{\mathrm m}|)$ tiles the whole placement is low-order
 polynomial in the qubit count.
 \end{remark}

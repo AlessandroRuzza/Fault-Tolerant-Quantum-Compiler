@@ -1,7 +1,7 @@
 % ---- FIGURE: circuit -> architecture graph -> lattice surgery ----
 \begin{figure*}[t]
     \centering
-    \resizebox{0.8\textwidth}{!}{%
+    \resizebox{0.95\textwidth}{!}{%
     \begin{tikzpicture}
       % ======================== (a) circuit ========================
       \begin{scope}
@@ -62,14 +62,37 @@
         \draw[pin,ftorange!70!black] (2,0)--(2,2);
         \node[ftgray,font=\footnotesize] at (1,-0.7){(c) first layer};
       \end{scope}
+
+      % next-step arrow
+      \draw[-{Stealth[length=2mm]},thick,ftgray]
+            (10.1,0.7)--(11.0,0.7) node[midway,above,font=\footnotesize,black]{};
+
+      % ==================== (d) second lattice-surgery step ====================
+      \begin{scope}[xshift=11.4cm]
+        \foreach \y in {0,1,2}\draw[ftgray!40] (0,\y)--(2,\y);
+        \foreach \x in {0,1,2}\draw[ftgray!40] (\x,0)--(\x,2);
+        \foreach \x in {0,1,2}\foreach \y in {0,1,2}\node[free] at (\x,\y){};
+        % corridor of the second layer: CNOT(q1,q2) along the bottom row
+        \node[corridor] at (1,0){};                        % CNOT(q1,q2)
+        % patches
+        \node[data] at (0,2){}; \node[qlabel] at (0,2){$q_0$};
+        \node[data] at (0,0){}; \node[qlabel] at (0,0){$q_1$};
+        \node[data] at (2,0){}; \node[qlabel] at (2,0){$q_2$};
+        \node[magic] at (2,2){}; \node[mstar] at (2,2){};
+        % merge (CNOT q1-q2) highlight along the bottom row
+        \draw[ftgreen!55!black,line width=1.1pt,shorten >=2.5mm,shorten <=2.5mm]
+              (0,0)--(2,0);
+        \node[ftgray,font=\footnotesize] at (1,-0.7){(d) second layer};
+      \end{scope}
     \end{tikzpicture}}
     \caption{From circuit to lattice surgery. A Clifford$+T$ circuit~(a) is
     \emph{mapped} onto the architecture graph $\A$~(b), assigning each logical
     qubit to a tile while magic states ($\star$) stay fixed. The \emph{router}
     then executes each layer by reserving vertex-disjoint corridors; panel~(c)
     shows the first layer, where a green merge corridor realises $\CNOT(q_0,q_1)$
-    and an orange lane routes the $T$ gate on $q_2$ to a magic state. Choosing the
-    most gates servable at once is a maximum vertex-disjoint paths problem on
-    $\A$.}
+    and an orange lane routes the $T$ gate on $q_2$ to a magic state. Panel~(d) is
+    the next step, where a green merge corridor along the bottom row realises
+    $\CNOT(q_1,q_2)$. Choosing the most gates servable at once is a maximum
+    vertex-disjoint paths problem on $\A$.}
     \label{fig:overview}
 \end{figure*}
