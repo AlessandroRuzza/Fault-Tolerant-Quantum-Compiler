@@ -13,6 +13,9 @@ cd "$PBS_O_WORKDIR"
 # 1) reproduce the old single-process behaviour exactly.
 PROCESSOR="${PROCESSOR:-0}"
 BENCH_PROCESS_COUNT="${BENCH_PROCESS_COUNT:-1}"
+# RERUN_TIMEOUTS=1 re-executes rows previously marked timeout_reached=true
+# (otherwise resume skips them). Empty = normal resume.
+RERUN_TIMEOUTS="${RERUN_TIMEOUTS:-}"
 
 mkdir -p benchmarks/results benchmarks/logs config qasms universal_set_qasms qasm_graphs logs
 
@@ -59,6 +62,7 @@ apptainer run \
   --env BENCH_JOBS="$BENCH_JOBS" \
   --env BENCH_PROCESS_COUNT="$BENCH_PROCESS_COUNT" \
   --env PROCESSOR="$PROCESSOR" \
+  --env RERUN_TIMEOUTS="$RERUN_TIMEOUTS" \
   --env OMP_DISPLAY_ENV=TRUE \
   --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
   --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \

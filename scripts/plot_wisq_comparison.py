@@ -102,6 +102,20 @@ def wisq_extra_qubit_pct(our_x, our_y, wisq_x, wisq_y) -> float | None:
     return 100.0 * (wisq_area - our_area) / our_area
 
 
+def dim_diff_per_side(row: dict) -> float | None:
+    """WISQ's grid side minus ours, per side (positive = OUR grid is smaller).
+
+    Uses the dim_diff_side column written by compare_wisq_conn.py when present;
+    otherwise falls back to wisq_x - my_x (square grids). None if unavailable."""
+    v = to_float(row.get("dim_diff_side"))
+    if v is not None:
+        return v
+    mx, wx = to_float(row.get("my_x")), to_float(row.get("wisq_x"))
+    if mx is None or wx is None:
+        return None
+    return wx - mx
+
+
 def config_label(row: dict) -> str:
     parts = []
     for field, abbrev in CONFIG_LABEL_FIELDS:
@@ -145,7 +159,10 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
 
     wisq_steps = to_float(best["wisq_routing_steps"])
     wisq_time = to_float(best.get("wisq_duration_s"))
-    grid = f"{best.get('wisq_x', '?')}x{best.get('wisq_y', '?')}"
+    my_grid = f"{best.get('my_x', '?')}x{best.get('my_y', '?')}"
+    wisq_grid = f"{best.get('wisq_x', '?')}x{best.get('wisq_y', '?')}"
+    dside = dim_diff_per_side(best)
+    diff_str = f"  (WISQ {dside:+.0f}/side)" if dside is not None else ""
 
     best_steps = to_float(best["my_routing_steps"])
     worst_steps = to_float(worst["my_routing_steps"])
@@ -174,7 +191,8 @@ def plot_circuit(circuit: str, rows: list[dict], out_dir: Path) -> None:
     ]
 
     fig, (ax_steps, ax_time) = plt.subplots(1, 2, figsize=(11, 5))
-    fig.suptitle(f"{circuit}  —  grid {grid}", fontsize=13, fontweight="bold")
+    fig.suptitle(f"{circuit}  —  ours {my_grid} vs WISQ {wisq_grid}{diff_str}",
+                 fontsize=13, fontweight="bold")
 
     def pct_label(val: float | None, ref: float | None) -> str:
         """Return '+X%' / '-X%' / '0%' relative to ref. Empty string if missing."""
@@ -506,6 +524,69 @@ def plot_optimality_bars(by_circuit: dict[str, list[dict]], out_dir: Path) -> No
         print(f"  saved: {out_path}")
 
 
+def plot_dim_diff(by_circuit: dict[str, list[dict]], out_dir: Path) -> None:
+    """Bar chart of the per-side grid footprint gap vs WISQ, one bar per circuit.
+
+    dim_diff_side = wisq_x - my_x (from compare_wisq_conn.py): how many fewer rows/
+    cols per side our best config used than WISQ. Positive (green) = we are smaller
+    than WISQ (the win); negative (red) = we needed a bigger grid. Circuits are
+    ordered left->right by qubit count. Skipped if no circuit has the datum.
+    """
+    entries = []
+    for circuit, rows in by_circuit.items():
+        best, _ = pick_best_worst(rows)
+        d = dim_diff_per_side(best)
+        if d is None:
+            continue
+        nq = to_float(best.get("n_qubits")) or 0.0
+        entries.append((circuit, nq, d))
+
+    if not entries:
+        print("  (no dim_diff_side / grid columns; skipping summary_dim_diff.png)")
+        return
+
+    entries.sort(key=lambda e: (e[1], e[0]))
+    circuits = [e[0] for e in entries]
+    diffs = [e[2] for e in entries]
+
+    EPS = 1e-9
+    smaller = sum(1 for d in diffs if d > EPS)     # we use a smaller grid than WISQ
+    equal = sum(1 for d in diffs if abs(d) <= EPS)
+    bigger = sum(1 for d in diffs if d < -EPS)
+    total = len(diffs)
+    mean_d = sum(diffs) / total
+
+    colors = ["#2A9D8F" if d > EPS else ("#E53935" if d < -EPS else "#9E9E9E")
+              for d in diffs]
+
+    x = np.arange(len(circuits))
+    fig, ax = plt.subplots(figsize=(max(8, len(circuits) * 0.5), 6))
+    ax.bar(x, diffs, color=colors, width=0.7, edgecolor="white")
+    ax.axhline(0.0, color="#333333", linewidth=0.8)
+    ax.axhline(mean_d, color="#1565C0", linestyle="--", linewidth=1.0,
+               label=f"mean = {mean_d:+.2f}/side")
+
+    summary = (f"ours smaller: {smaller}   equal: {equal}   ours bigger: {bigger}"
+               f"   (of {total})")
+    ax.text(0.5, 0.97, summary, transform=ax.transAxes, ha="center", va="top",
+            fontsize=11, fontweight="bold",
+            bbox=dict(boxstyle="round", facecolor="#FFF9C4", edgecolor="#BDBDBD"))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(circuits, rotation=90, fontsize=8)
+    ax.set_ylabel("WISQ side − our side  (cells per side)")
+    ax.set_title(f"Grid footprint gap vs WISQ: positive = ours is smaller  "
+                 f"({total} circuits)", fontweight="bold")
+    ax.legend(loc="upper left")
+    ax.grid(axis="y", linestyle=":", alpha=0.4)
+
+    plt.tight_layout()
+    out_path = out_dir / "summary_dim_diff.png"
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  saved: {out_path}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Plot best/worst config vs WISQ, one figure per circuit."
@@ -540,6 +621,10 @@ def main() -> int:
     # Two cross-circuit overview figures: routing steps and time.
     plot_summary(by_circuit, out_dir, "steps")
     plot_summary(by_circuit, out_dir, "time")
+
+    # Grid footprint gap vs WISQ (per side), one bar per circuit. Needs
+    # dim_diff_side (compare_wisq_conn.py) or my_x/wisq_x in the CSV.
+    plot_dim_diff(by_circuit, out_dir)
 
     # Routing-optimality scatters (ours), coloured by circuit family.
     plot_optimality(by_circuit, out_dir)

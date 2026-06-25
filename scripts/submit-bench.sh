@@ -36,6 +36,9 @@ NPROC="${3:-1}"
 PBS_SCRIPT="${PBS_SCRIPT:-run_ftqc.pbs}"
 WALLTIME="${WALLTIME:-48:00:00}"
 MEM="${MEM:-64gb}"
+# Set RERUN_TIMEOUTS=1 in the env to re-execute rows previously marked
+# timeout_reached=true (forwarded to run-bench.sh inside the container).
+RERUN_TIMEOUTS="${RERUN_TIMEOUTS:-}"
 
 case "$NPROC" in
     ''|*[!0-9]*) echo "NPROC must be a positive integer, got '$NPROC'" >&2; exit 1 ;;
@@ -47,7 +50,7 @@ echo "Submitting $NPROC job(s) for '$BENCH_PATH' (BENCH_JOBS=$BENCH_JOBS cores +
 i=0
 while [ "$i" -lt "$NPROC" ]; do
     qsub -l select=1:ncpus="$BENCH_JOBS":mem="$MEM" -l walltime="$WALLTIME" \
-         -v BENCH_PATH="$BENCH_PATH",BENCH_JOBS="$BENCH_JOBS",BENCH_PROCESS_COUNT="$NPROC",PROCESSOR="$i" \
+         -v BENCH_PATH="$BENCH_PATH",BENCH_JOBS="$BENCH_JOBS",BENCH_PROCESS_COUNT="$NPROC",PROCESSOR="$i",RERUN_TIMEOUTS="$RERUN_TIMEOUTS" \
          "$PBS_SCRIPT"
     i=$((i + 1))
 done

@@ -124,6 +124,50 @@ CONFIG_FIELDS = [
     "magic_aware_strategy",
 ]
 
+# Connectivity fallback for cube runs that fail to MAP on a narrow grid.
+#
+# On the WISQ-native (or otherwise tight) grid, a `safe_passage_strategy: cube` run
+# can fail deterministically in the mapping phase: cube's 3x3-isolation rule leaves
+# no free non-magic cell, so the compiler raises a SafePassageException and exits 2
+# (NOT a timeout — raising mr_timeout does nothing). When that happens we retry the
+# circuit ONCE with the connectivity-optimal configuration from the pesi_tunati
+# summary table ("Connectivity" column, border = 15); connectivity's safe-passage
+# check is more lenient and fits the same grid. The grid (x/y) is intentionally
+# preserved by run_compiler so the WISQ comparison stays at parity — only the mapping
+# strategy and weights change. The whole connectivity optimum is applied (not just the
+# few fields that differ from cube) so the fallback result is exactly the tuned
+# connectivity config regardless of which cube variant failed.
+CONNECTIVITY_FALLBACK_OVERRIDES = {
+    "type": "gaussian",
+    "gaussian_strategy": "fine",
+    "safe_passage_strategy": "connectivity",
+    "MagicStatePlacementStrategy": "center_circle",
+    "border_distance_percentage": 15.0,
+    "BFS_DENSITY_THRESHOLD": 0.7,
+    "MAGIC_HIGH": 0.0,
+    "MAGIC_LOW": 0.0,
+    "CNOT_HIGH": 8.0,
+    "CNOT_LOW": 0.0,
+    "MAPPED_GAUSSIAN_WEIGHT": 20.0,
+    "BASE_GAUSSIAN_WEIGHT": 1.0,
+    "EXTERNAL_WEIGHT": -15.0,
+    "GAUSSIAN_SIGMA": 0.7,
+    "number_of_magic_states": -1,
+    "routing_strategy": "packing",
+    "t-routing-mode": "smart_t_routing",
+    "patience_threshold": 3,
+    "use_layer_cache": True,
+}
+
+
+class CompilerError(RuntimeError):
+    """Raised when our compiler exits non-zero. `fallback_attempted` records whether a
+    connectivity fallback was tried (and also failed), so the CSV error row can say so."""
+
+    def __init__(self, message: str, fallback_attempted: bool = False):
+        super().__init__(message)
+        self.fallback_attempted = fallback_attempted
+
 
 # ── our compiler ────────────────────────────────────────────────────────────────
 
@@ -221,22 +265,46 @@ def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
         cfg["x"] = -1
         cfg["y"] = -1
 
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
-        json.dump(cfg, tmp, indent=2)
-        cfg_path = Path(tmp.name)
+    def _invoke(run_cfg: dict):
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+            json.dump(run_cfg, tmp, indent=2)
+            cfg_path = Path(tmp.name)
+        cmd = [str(binary), "--config", str(cfg_path)]
+        print(f"  [compiler] {' '.join(cmd)}", file=sys.stderr)
+        t0 = time.perf_counter()
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        duration = time.perf_counter() - t0
+        cfg_path.unlink(missing_ok=True)
+        return proc, duration
 
-    cmd = [str(binary), "--config", str(cfg_path)]
-    print(f"  [compiler] {' '.join(cmd)}", file=sys.stderr)
+    proc, duration = _invoke(cfg)
 
-    t0 = time.perf_counter()
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    duration = time.perf_counter() - t0
-    cfg_path.unlink(missing_ok=True)
+    # Connectivity fallback: a `safe_passage_strategy: cube` run can fail to MAP on
+    # this (narrow) grid because cube's 3x3-isolation rule leaves no free non-magic
+    # cell — a deterministic SafePassageException (exit 2), not a timeout. Retry once
+    # with the connectivity-optimal config (CONNECTIVITY_FALLBACK_OVERRIDES, border 15);
+    # the grid (x/y, already resolved into cfg) is preserved so WISQ parity holds.
+    safe_passage_fallback = ""
+    fallback_attempted = False
+    if proc.returncode != 0 and cfg.get("safe_passage_strategy") == "cube":
+        fallback_attempted = True
+        print(f"  NOTE [{circuit}]: cube mapping failed (exit {proc.returncode}); "
+              f"retrying with connectivity fallback (pesi_tunati optimum, border 15).",
+              file=sys.stderr)
+        fb_cfg = {**cfg, **CONNECTIVITY_FALLBACK_OVERRIDES}
+        proc, duration = _invoke(fb_cfg)
+        if proc.returncode == 0:
+            safe_passage_fallback = "connectivity"
+            print(f"  NOTE [{circuit}]: connectivity fallback succeeded.",
+                  file=sys.stderr)
 
     if proc.returncode != 0:
         print(proc.stdout[-2000:], file=sys.stderr)
         print(proc.stderr[-2000:], file=sys.stderr)
-        raise RuntimeError(f"compiler failed for '{circuit}' (exit {proc.returncode})")
+        raise CompilerError(
+            f"compiler failed for '{circuit}' (exit {proc.returncode})",
+            fallback_attempted=fallback_attempted,
+        )
 
     out = proc.stdout
 
@@ -251,6 +319,7 @@ def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
         "width": int(dims_m.group(1)) if dims_m else None,
         "height": int(dims_m.group(2)) if dims_m else None,
         "duration_seconds": float(exec_m.group(1)) if exec_m else duration,
+        "safe_passage_fallback": safe_passage_fallback,
     }
 
 
@@ -496,6 +565,10 @@ CSV_COLUMNS = [
     "wisq_x", "wisq_y", "wisq_routing_steps", "wisq_duration_s",
     "wisq_n_slots", "grid_grown_for_wisq", "wisq_status",
     "ratio_wisq_over_mine",
+    # "connectivity" when a cube run fell back to the connectivity config (see
+    # CONNECTIVITY_FALLBACK_OVERRIDES); "connectivity(failed)" if even the fallback
+    # failed; empty otherwise.
+    "safe_passage_fallback",
 ]
 
 BENCH_CSV_COLUMNS = (
@@ -507,8 +580,50 @@ BENCH_CSV_COLUMNS = (
         "wisq_x", "wisq_y", "wisq_routing_steps", "wisq_duration_s",
         "wisq_n_slots", "grid_grown_for_wisq", "wisq_status",
         "ratio_wisq_over_mine",
+        "safe_passage_fallback",
     ]
 )
+
+
+def _init_and_migrate_csv(path: Path, columns: list) -> None:
+    """Create `path` with `columns` as header, or migrate an older CSV whose header
+    is a prefix of `columns` (i.e. trailing columns were added, e.g.
+    safe_passage_fallback) by padding existing rows with empty cells.
+
+    Serialized across threads (caller holds _csv_write_lock) and across processes via
+    an exclusive flock on a sibling .lock file. Must be called BEFORE opening the
+    long-lived append handle, because migration rewrites the file via rename (which
+    would orphan an already-open append handle). Idempotent: once migrated, later
+    callers see a matching header and do nothing.
+    """
+    lock_path = path.with_name(path.name + ".lock")
+    with open(lock_path, "w") as lock_f:
+        fcntl.flock(lock_f, fcntl.LOCK_EX)
+        try:
+            if not path.exists() or path.stat().st_size == 0:
+                with path.open("w", newline="") as f:
+                    csv.writer(f).writerow(columns)
+                return
+            with path.open(newline="") as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+                if header is None or header == columns:
+                    return
+                if header != columns[:len(header)]:
+                    return  # foreign/incompatible header — leave it untouched
+                rows = list(reader)
+            pad = [""] * (len(columns) - len(header))
+            tmp = path.with_name(path.name + ".migrate.tmp")
+            with tmp.open("w", newline="") as f:
+                w = csv.writer(f)
+                w.writerow(columns)
+                for r in rows:
+                    w.writerow(r + pad)
+            tmp.replace(path)
+            print(f"Migrated {path.name}: added {pad and len(pad)} column(s) "
+                  f"({', '.join(columns[len(header):])}).", file=sys.stderr)
+        finally:
+            fcntl.flock(lock_f, fcntl.LOCK_UN)
 
 
 # ── shared per-circuit logic ─────────────────────────────────────────────────────
@@ -582,7 +697,9 @@ def run_one(circuit: str, cfg: dict, binary: Path, arch_dir: Path,
     run_id makes the arch file path unique so parallel workers on the same
     circuit don't clobber each other's arch files.
     The compiler always writes qasm_graphs/<circuit>.graph, so we hold a
-    per-circuit lock for the compiler + read_graph phase.
+    per-circuit lock for the compiler + read_graph phase. A cube run that fails to
+    map falls back to connectivity inside run_compiler (single retry, border 15),
+    tagged in mine["safe_passage_fallback"].
     """
     with _get_circuit_lock(circuit):
         mine = run_compiler(circuit, cfg, binary)
@@ -643,16 +760,18 @@ def make_row_base(circuit: str, result: dict, parity: int) -> dict:
         "grid_grown_for_wisq": "true" if built["grown"] else "false",
         "wisq_status": wisq["status"],
         "ratio_wisq_over_mine": f"{ratio:.4f}" if ratio is not None else "",
+        "safe_passage_fallback": mine.get("safe_passage_fallback", ""),
     }
 
 
-def make_error_row_base(circuit: str, parity: int) -> dict:
+def make_error_row_base(circuit: str, parity: int, safe_passage_fallback: str = "") -> dict:
     return {
         "circuit": circuit, "n_qubits": "", "parity": parity,
         "my_x": "", "my_y": "", "my_routing_steps": "", "my_duration_s": "",
         "wisq_x": "", "wisq_y": "", "wisq_routing_steps": "", "wisq_duration_s": "",
         "wisq_n_slots": "", "grid_grown_for_wisq": "", "wisq_status": "error",
         "ratio_wisq_over_mine": "",
+        "safe_passage_fallback": safe_passage_fallback,
     }
 
 
@@ -764,18 +883,14 @@ def main() -> int:
         writer = None
         if output_path:
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            # Create the CSV with the current header, or migrate an older one that
+            # predates the safe_passage_fallback column (pads existing rows). Done
+            # before opening the long-lived append handle and serialized across
+            # threads + PBS processes so concurrent jobs can't race or corrupt it.
+            with _csv_write_lock:
+                _init_and_migrate_csv(output_path, BENCH_CSV_COLUMNS)
             csv_file = output_path.open("a", newline="")
             writer = csv.DictWriter(csv_file, fieldnames=BENCH_CSV_COLUMNS)
-            # Write header only if the file is empty; flock prevents two processes
-            # from racing on the first write.
-            with _csv_write_lock:
-                fcntl.flock(csv_file, fcntl.LOCK_EX)
-                try:
-                    if output_path.stat().st_size == 0:
-                        writer.writeheader()
-                        csv_file.flush()
-                finally:
-                    fcntl.flock(csv_file, fcntl.LOCK_UN)
 
         # Build the list of (index, cfg) pairs that still need to run,
         # then shard by processor index so multiple PBS jobs can share one CSV.
@@ -802,7 +917,8 @@ def main() -> int:
                 row = {**make_row_base(circuit, result, args.parity), **cfg_fields(cfg)}
             except (RuntimeError, FileNotFoundError) as e:
                 print(f"  ERROR [{circuit}]: {e}", file=sys.stderr)
-                row = {**make_error_row_base(circuit, args.parity), **cfg_fields(cfg)}
+                fb = "connectivity(failed)" if getattr(e, "fallback_attempted", False) else ""
+                row = {**make_error_row_base(circuit, args.parity, fb), **cfg_fields(cfg)}
             return {k: row.get(k, "") for k in BENCH_CSV_COLUMNS}
 
         def _write_row(row: dict) -> None:
@@ -894,7 +1010,8 @@ def main() -> int:
             rows.append(make_row_base(circuit, result, args.parity))
         except (RuntimeError, FileNotFoundError) as e:
             print(f"  ERROR: {e}", file=sys.stderr)
-            rows.append(make_error_row_base(circuit, args.parity))
+            fb = "connectivity(failed)" if getattr(e, "fallback_attempted", False) else ""
+            rows.append(make_error_row_base(circuit, args.parity, fb))
 
     if args.output:
         out = Path(args.output)
