@@ -7,7 +7,7 @@
 cd "$PBS_O_WORKDIR"
 
 # This job runs ONE benchmark process. To split a benchmark across several
-# processes, submit one job per processor with scripts/submit-bench.sh: every
+# processes, submit one job per processor with scripts/benchmark_execution/submit-bench.sh: every
 # job shares the same config/ and benchmarks/results/ and runs only the cases
 # whose process index matches its PROCESSOR. The defaults below (processor 0 of
 # 1) reproduce the old single-process behaviour exactly.

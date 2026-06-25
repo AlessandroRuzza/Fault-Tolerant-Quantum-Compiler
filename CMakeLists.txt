@@ -100,21 +100,21 @@ add_custom_target(clearexpanded
 # make run-bench BENCH_PATH=<path_or_name> [RERUN_TIMEOUTS=1] [BENCH_JOBS=<n>] [BENCH_PROCESS_COUNT=<n>] [PROCESSOR=<n>]
 add_custom_target(run-bench
     DEPENDS FaultTolerantQuantumCompiler
-    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler>
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/benchmark_execution/run-bench.sh $<TARGET_FILE:FaultTolerantQuantumCompiler>
     COMMENT "Running FaultTolerantQuantumCompiler with --bench_path"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 # make run-wisq QASM=QASM="<file1> [file2 ...]" [OUTPUT=<csv>] [MR_TIMEOUT=<secs>]
 add_custom_target(run-wisq
-    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-wisq.sh
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/wisq_compare/run-wisq.sh
     COMMENT "Running wisq (usage: make run-wisq QASM=\"<name> [name2 ...]\")"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
 # make run-wisq-all [OUTPUT=<csv>] [MR_TIMEOUT=<secs>]
 add_custom_target(run-wisq-all
-    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/run-wisq-all.sh
+    COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/wisq_compare/run-wisq-all.sh
     COMMENT "Running wisq on all QASMs in universal_set_qasms/"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
@@ -155,7 +155,7 @@ add_custom_target(run-graph-viewer
 
 # Target to export PROJECT and generate gaussian animation at 2 fps.
 add_custom_target(make-video
-    COMMAND ${CMAKE_COMMAND} -E env PROJECT=${CMAKE_SOURCE_DIR} sh ${CMAKE_SOURCE_DIR}/scripts/make-video.sh
+    COMMAND ${CMAKE_COMMAND} -E env PROJECT=${CMAKE_SOURCE_DIR} sh ${CMAKE_SOURCE_DIR}/scripts/plots/make-video.sh
     COMMENT "Exporting gaussian frames MP4+GIF (2 fps)"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )

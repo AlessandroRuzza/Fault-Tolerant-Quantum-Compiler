@@ -1,14 +1,14 @@
 #!/bin/bash
 #PBS -q cpu
 #PBS -l walltime=48:00:00
-#PBS -N wisq
+#PBS -N wisq3
 #PBS -j oe
 
 cd "$PBS_O_WORKDIR"
 
 mkdir -p benchmarks/results benchmarks/logs config qasms universal_set_qasms qasm_graphs logs visualization
 
-LOG_FILE="logs/wisq_${PBS_JOBID}.log"
+LOG_FILE="logs/wisq3_${PBS_JOBID}.log"
 
 echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
 
@@ -23,12 +23,6 @@ date
 
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
 
-# Optional --wisq-native flag, threaded through from the w alias via WISQ_NATIVE.
-WISQ_NATIVE_ARG=""
-case "${WISQ_NATIVE:-0}" in
-  1|true|True|TRUE|yes|Yes|on|On) WISQ_NATIVE_ARG="--wisq-native" ;;
-esac
-
 apptainer exec \
   --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
   --env OMP_DISPLAY_ENV=TRUE \
@@ -40,14 +34,13 @@ apptainer exec \
   --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
   --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
   --bind "$PWD/visualization:/app/visualization" \
-  ftqc.sif python3 /app/scripts/wisq_compare/compare_wisq_2.py \
+  ftqc.sif python3 /app/scripts/wisq_compare/compare_wisq3.py \
     --bench "/app/config/${BENCH_PATH}.json" \
-    --output "/app/benchmarks/results/${BENCH_PATH}_wisq.csv" \
+    --output "/app/benchmarks/results/${BENCH_PATH}_wisq3.csv" \
     --workers "$BENCH_JOBS" \
     --process-count "${BENCH_PROCESS_COUNT:-1}" \
     --processor "${PROCESSOR:-0}" \
-    --mr_timeout "${MR_TIMEOUT:-300}" \
-    $WISQ_NATIVE_ARG >> "$LOG_FILE" 2>&1
+    --mr_timeout "${MR_TIMEOUT:-300}" >> "$LOG_FILE" 2>&1
 
 {
 echo "END_JOB=$PBS_JOBID"

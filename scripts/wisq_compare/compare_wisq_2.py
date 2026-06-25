@@ -1,0 +1,1048 @@
+#!/usr/bin/env python3
+"""Compare our compiler vs WISQ at parity of grid dimensions and magic-state placement.
+
+Pipeline, per circuit:
+  1. Run our compiler with x=-1, y=-1 (auto dimensions) using the mapping config the
+     user chose (type, gaussian_strategy, safe_passage_strategy, routing, ...). The
+     compiler does its normal mapping + routing and writes qasm_graphs/<circuit>.graph
+     (grid dimensions + magic-state positions) and the universal QASM.
+  2. Build a WISQ architecture with:
+       - the same grid dimensions,
+       - the magic states at the SAME positions our mapper chose,
+       - data-qubit slots = all cells of the same sub-lattice our compiler uses
+         (even col AND even row), minus the magic-state cells.
+     WISQ is then free to map the circuit's qubits onto any of these slots.
+  3. If that sub-lattice has fewer slots than the circuit's qubits, grow the grid
+     FOR WISQ ONLY (width +1, then height +1, alternating) until they fit. This
+     breaks dimension parity, so it is a last resort and is flagged per row.
+  4. Run WISQ (mapping + routing) on that architecture.
+  5. Emit a side-by-side CSV and print a summary.
+
+Why the even/even sub-lattice and not "all cells": in a surface code the empty cells
+between qubits ARE the lattice-surgery routing corridors. WISQ (square_sparse_layout)
+and our router both need them. A dense layout leaves no corridors and routing fails.
+The even/even sub-lattice matches the slots our compiler exposes, giving true parity.
+
+Bench mode (--bench):
+  Accepts a sweep config (e.g. data/config/params_bench.json) and runs the full
+  cartesian product of all parameter combinations, mirroring the C++ benchmark
+  expansion logic. Results are written incrementally so the run can be interrupted
+  and resumed without losing work.
+
+WISQ deduplication:
+  Our compiler runs once per (circuit, config) pair, but WISQ only depends on the
+  architecture (grid dims + magic-state positions + data slots) and the circuit
+  QASM — never on our mapping/routing config. So config fields that do not change
+  the grid (gaussian_strategy, routing_strategy, t_routing_mode, use_layer_cache,
+  ...) all yield the same arch, and WISQ is run only once per distinct arch and its
+  result reused for every config that maps to it. The per-config ratio_wisq_over_mine
+  is still computed against each config's own routing steps. Cache hits are logged as
+  "[wisq] (cached) ...".
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import fcntl
+import itertools
+import json
+import math
+import re
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent  # scripts/wisq_compare/ -> root
+DEFAULT_BINARY = REPO_ROOT / "build" / "FaultTolerantQuantumCompiler"
+DEFAULT_CONFIG = REPO_ROOT / "config" / "0_compiler_config.json"
+QASMS_DIR = REPO_ROOT / "qasms"
+QASM_GRAPHS_DIR = REPO_ROOT / "qasm_graphs"
+UNIVERSAL_QASMS_DIR = REPO_ROOT / "universal_set_qasms"
+
+# Config grid sentinel: x == y == WISQ_OPTIMAL_SENTINEL means "size BOTH our run
+# and WISQ to WISQ's native (square_sparse_layout) grid":
+#   side = 2*ceil(sqrt(n)) + (2 if the circuit has T gates else 1)
+# Our run is forced onto that grid; WISQ then inherits it via read_graph.
+WISQ_OPTIMAL_SENTINEL = -3
+
+_local_wisq = REPO_ROOT / ".env" / "bin" / "wisq"
+WISQ = _local_wisq if _local_wisq.exists() else Path("wisq")
+
+# Sub-lattice parity for data-qubit slots. Our compiler exports data qubits on
+# even/even cells (0,2,4,...), so we mirror that for a fair, same-density comparison.
+PARITY = 0  # 0 -> even coordinates, 1 -> odd coordinates
+
+MAX_GROW_STEPS = 64  # safety cap on the WISQ-only grid enlargement loop
+
+# Per-circuit locks: prevent two workers from writing qasm_graphs/<circuit>.graph
+# simultaneously (the compiler always writes to that fixed path).
+_circuit_locks: dict[str, threading.Lock] = {}
+_circuit_locks_mutex = threading.Lock()
+_csv_write_lock = threading.Lock()
+# Semaphore limiting concurrent WISQ instances (set in main() via --wisq-workers).
+_wisq_semaphore: threading.Semaphore | None = None
+_active_wisq = 0
+_active_wisq_lock = threading.Lock()
+
+# Cache of WISQ results keyed by (circuit, arch signature). WISQ's result depends
+# only on the architecture (grid dims + magic-state positions + data slots) and the
+# circuit QASM — never on our mapping/routing config (gaussian_strategy,
+# routing_strategy, t_routing_mode, ... do not change the grid). So every
+# (circuit, config) pair that yields the same arch reuses a single WISQ run.
+# Values are a threading.Event while a run is in progress, then the result dict.
+_wisq_cache: dict[tuple, object] = {}
+_wisq_cache_lock = threading.Lock()
+
+# When True (--wisq-native), WISQ uses its own native square_sparse_layout
+# (odd/odd qubits + all_sides magic, sized by WISQ itself) instead of our arch,
+# and our compiler is run on the SAME grid size (wisq_native_side).
+_wisq_native = False
+
+
+def _get_circuit_lock(circuit: str) -> threading.Lock:
+    with _circuit_locks_mutex:
+        if circuit not in _circuit_locks:
+            _circuit_locks[circuit] = threading.Lock()
+        return _circuit_locks[circuit]
+
+# Config fields that vary across a bench sweep and are written as CSV columns.
+CONFIG_FIELDS = [
+    "type",
+    "gaussian_strategy",
+    "safe_passage_strategy",
+    "routing_strategy",
+    "t_routing_mode",
+    "use_layer_cache",
+    "MagicStatePlacementStrategy",
+    "number_of_magic_states",
+    "border_distance_percentage",
+    "magic_aware_strategy",
+]
+
+# Connectivity fallback for cube runs that fail to MAP on a narrow grid.
+#
+# On the WISQ-native (or otherwise tight) grid, a `safe_passage_strategy: cube` run
+# can fail deterministically in the mapping phase: cube's 3x3-isolation rule leaves
+# no free non-magic cell, so the compiler raises a SafePassageException and exits 2
+# (NOT a timeout — raising mr_timeout does nothing). When that happens we retry the
+# circuit ONCE with the connectivity-optimal configuration from the pesi_tunati
+# summary table ("Connectivity" column, border = 15); connectivity's safe-passage
+# check is more lenient and fits the same grid. The grid (x/y) is intentionally
+# preserved by run_compiler so the WISQ comparison stays at parity — only the mapping
+# strategy and weights change. The whole connectivity optimum is applied (not just the
+# few fields that differ from cube) so the fallback result is exactly the tuned
+# connectivity config regardless of which cube variant failed.
+CONNECTIVITY_FALLBACK_OVERRIDES = {
+    "type": "gaussian",
+    "gaussian_strategy": "fine",
+    "safe_passage_strategy": "connectivity",
+    "MagicStatePlacementStrategy": "center_circle",
+    "border_distance_percentage": 15.0,
+    "BFS_DENSITY_THRESHOLD": 0.7,
+    "MAGIC_HIGH": 0.0,
+    "MAGIC_LOW": 0.0,
+    "CNOT_HIGH": 8.0,
+    "CNOT_LOW": 0.0,
+    "MAPPED_GAUSSIAN_WEIGHT": 20.0,
+    "BASE_GAUSSIAN_WEIGHT": 1.0,
+    "EXTERNAL_WEIGHT": -15.0,
+    "GAUSSIAN_SIGMA": 0.7,
+    "number_of_magic_states": -1,
+    "routing_strategy": "packing",
+    "t-routing-mode": "smart_t_routing",
+    "patience_threshold": 3,
+    "use_layer_cache": True,
+}
+
+
+class CompilerError(RuntimeError):
+    """Raised when our compiler exits non-zero. `fallback_attempted` records whether a
+    connectivity fallback was tried (and also failed), so the CSV error row can say so."""
+
+    def __init__(self, message: str, fallback_attempted: bool = False):
+        super().__init__(message)
+        self.fallback_attempted = fallback_attempted
+
+
+# ── our compiler ────────────────────────────────────────────────────────────────
+
+def _input_qasm_qubits_and_t(circuit: str) -> tuple[int | None, bool]:
+    """From qasms/<circuit>.qasm: (#distinct qubits in cx/t/tdg, has_any_T).
+
+    Read from the input QASM (available before any run), so the WISQ-optimal grid
+    can be computed up front. Returns (None, False) if the file is missing.
+    """
+    path = QASMS_DIR / f"{Path(circuit).stem}.qasm"
+    if not path.exists():
+        return None, False
+    text = path.read_text()
+    cx_re = re.compile(r"\bcx\s+q\[(\d+)\]\s*,\s*q\[(\d+)\]\s*;")
+    t_re = re.compile(r"\b(?:t|tdg)\s+q\[(\d+)\]\s*;")
+    qubits: set[int] = set()
+    has_t = False
+    for line in text.splitlines():
+        m = cx_re.search(line)
+        if m:
+            qubits.add(int(m.group(1)))
+            qubits.add(int(m.group(2)))
+        m = t_re.search(line)
+        if m:
+            has_t = True
+            qubits.add(int(m.group(1)))
+    if not qubits:
+        qm = re.search(r"qreg\s+\w+\[(\d+)\]", text)
+        return (int(qm.group(1)) if qm else None), has_t
+    return len(qubits), has_t
+
+
+def wisq_optimal_side(n: int, has_t: bool) -> int:
+    """WISQ-optimal grid side for the x=y=-3 sentinel: 2*ceil(sqrt(n)) + (2 if T else 1)."""
+    return 2 * math.ceil(math.sqrt(n)) + (2 if has_t else 1)
+
+
+def wisq_native_side(n: int) -> int:
+    """Side of WISQ's native square_sparse_layout WITH the all_sides magic border:
+    base 2*ceil(sqrt(n))+1 plus +1 column/row on each side -> 2*ceil(sqrt(n))+3.
+    Mirrors wisq.architecture.square_sparse_layout(n, 'all_sides')."""
+    return 2 * math.ceil(math.sqrt(n)) + 3
+
+
+def native_built(n: int) -> dict:
+    """Synthetic 'built' descriptor for --wisq-native, for the CSV columns.
+    WISQ sizes/places everything itself; here we just report the resulting grid
+    (side = wisq_native_side) and slot count (odd/odd cells = ceil(sqrt(n))^2)."""
+    side = wisq_native_side(n)
+    k = math.ceil(math.sqrt(n))
+    return {
+        "arch": {"width": side, "height": side},
+        "grown": False,
+        "enough_space": True,
+        "n_slots": k * k,
+    }
+
+
+def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
+    """Run our compiler once on `circuit` and return parsed routing_steps / qubits /
+    grid dims / duration from stdout. Writes qasm_graphs/<circuit>.graph as a side
+    effect.
+
+    Grid: by default our run auto-sizes (x=y=-1) and WISQ mirrors the resolved grid.
+    If the config sets x == y == WISQ_OPTIMAL_SENTINEL (-3), our run (and therefore
+    WISQ) is sized to WISQ's native grid instead — see WISQ_OPTIMAL_SENTINEL.
+    """
+    cfg = dict(base_config)
+    cfg["circuit"] = circuit
+    if _wisq_native:
+        # WISQ runs on its native square_sparse grid; run OUR compiler at the SAME size.
+        n, _ = _input_qasm_qubits_and_t(circuit)
+        if n:
+            side = wisq_native_side(n)
+            cfg["x"] = side
+            cfg["y"] = side
+        else:
+            print(f"  WARNING [{circuit}]: cannot determine qubit count for "
+                  f"--wisq-native; falling back to auto-size.", file=sys.stderr)
+            cfg["x"] = -1
+            cfg["y"] = -1
+    elif base_config.get("x") == WISQ_OPTIMAL_SENTINEL and base_config.get("y") == WISQ_OPTIMAL_SENTINEL:
+        n, has_t = _input_qasm_qubits_and_t(circuit)
+        if n:
+            side = wisq_optimal_side(n, has_t)
+            cfg["x"] = side
+            cfg["y"] = side
+        else:
+            print(f"  WARNING [{circuit}]: cannot determine qubit count for the "
+                  f"x=y={WISQ_OPTIMAL_SENTINEL} (WISQ-optimal) sentinel; "
+                  f"falling back to auto-size.", file=sys.stderr)
+            cfg["x"] = -1
+            cfg["y"] = -1
+    else:
+        cfg["x"] = -1
+        cfg["y"] = -1
+
+    def _invoke(run_cfg: dict):
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+            json.dump(run_cfg, tmp, indent=2)
+            cfg_path = Path(tmp.name)
+        cmd = [str(binary), "--config", str(cfg_path)]
+        print(f"  [compiler] {' '.join(cmd)}", file=sys.stderr)
+        t0 = time.perf_counter()
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        duration = time.perf_counter() - t0
+        cfg_path.unlink(missing_ok=True)
+        return proc, duration
+
+    proc, duration = _invoke(cfg)
+
+    # Connectivity fallback: a `safe_passage_strategy: cube` run can fail to MAP on
+    # this (narrow) grid because cube's 3x3-isolation rule leaves no free non-magic
+    # cell — a deterministic SafePassageException (exit 2), not a timeout. Retry once
+    # with the connectivity-optimal config (CONNECTIVITY_FALLBACK_OVERRIDES, border 15);
+    # the grid (x/y, already resolved into cfg) is preserved so WISQ parity holds.
+    safe_passage_fallback = ""
+    fallback_attempted = False
+    if proc.returncode != 0 and cfg.get("safe_passage_strategy") == "cube":
+        fallback_attempted = True
+        print(f"  NOTE [{circuit}]: cube mapping failed (exit {proc.returncode}); "
+              f"retrying with connectivity fallback (pesi_tunati optimum, border 15).",
+              file=sys.stderr)
+        fb_cfg = {**cfg, **CONNECTIVITY_FALLBACK_OVERRIDES}
+        proc, duration = _invoke(fb_cfg)
+        if proc.returncode == 0:
+            safe_passage_fallback = "connectivity"
+            print(f"  NOTE [{circuit}]: connectivity fallback succeeded.",
+                  file=sys.stderr)
+
+    if proc.returncode != 0:
+        print(proc.stdout[-2000:], file=sys.stderr)
+        print(proc.stderr[-2000:], file=sys.stderr)
+        raise CompilerError(
+            f"compiler failed for '{circuit}' (exit {proc.returncode})",
+            fallback_attempted=fallback_attempted,
+        )
+
+    out = proc.stdout
+
+    steps_m = re.search(r"Total routing steps \([^)]*\):\s*(\d+)", out)
+    qubits_m = re.search(r"(?m)^Qubits:\s*(\d+)", out)
+    dims_m = re.search(r"resolved graph dimensions:\s*(\d+)x(\d+)", out)
+    exec_m = re.search(r"Execution time:\s*([\d.]+)\s*seconds", out)
+
+    return {
+        "routing_steps": int(steps_m.group(1)) if steps_m else None,
+        "num_qubits": int(qubits_m.group(1)) if qubits_m else None,
+        "width": int(dims_m.group(1)) if dims_m else None,
+        "height": int(dims_m.group(2)) if dims_m else None,
+        "duration_seconds": float(exec_m.group(1)) if exec_m else duration,
+        "safe_passage_fallback": safe_passage_fallback,
+    }
+
+
+def read_graph(circuit: str) -> dict:
+    """Read qasm_graphs/<circuit>.graph -> width, height, magic_states (flat indices)."""
+    path = QASM_GRAPHS_DIR / f"{circuit}.graph"
+    if not path.exists():
+        raise FileNotFoundError(f"missing graph file: {path}")
+    data = json.loads(path.read_text())
+    return {
+        "width": int(data["width"]),
+        "height": int(data["height"]),
+        "magic_states": [int(m) for m in data.get("magic_states", [])],
+    }
+
+
+def count_qasm_qubits(circuit: str) -> int | None:
+    """Count distinct qubits appearing in cx/t/tdg gates of the universal QASM.
+
+    This mirrors WISQ's extract_qubits_from_gates: it is the number of logical
+    qubits WISQ must place, which drives the 'enough slots?' check.
+    """
+    path = UNIVERSAL_QASMS_DIR / f"{circuit}_universal.qasm"
+    if not path.exists():
+        return None
+    qubits: set[int] = set()
+    cx_re = re.compile(r"cx\s+q\[(\d+)\]\s*,\s*q\[(\d+)\]\s*;")
+    t_re = re.compile(r"(?:t|tdg)\s+q\[(\d+)\]\s*;")
+    for line in path.read_text().splitlines():
+        m = cx_re.search(line)
+        if m:
+            qubits.add(int(m.group(1)))
+            qubits.add(int(m.group(2)))
+            continue
+        m = t_re.search(line)
+        if m:
+            qubits.add(int(m.group(1)))
+    return len(qubits)
+
+
+# ── WISQ architecture builder ────────────────────────────────────────────────────
+
+def sublattice_slots(width: int, height: int, magic_set: set[int], parity: int) -> list[int]:
+    """All even/even (or odd/odd) cells, as flat indices, excluding magic cells."""
+    slots = []
+    for row in range(height):
+        if row % 2 != parity:
+            continue
+        for col in range(width):
+            if col % 2 != parity:
+                continue
+            idx = row * width + col
+            if idx not in magic_set:
+                slots.append(idx)
+    return slots
+
+
+def build_wisq_arch(width: int, height: int, magic_flat: list[int],
+                    n_qubits: int, parity: int) -> dict:
+    """Build a WISQ arch dict. Grow the grid (WISQ-only) if slots < n_qubits.
+
+    Magic states are kept as (col, row) coordinates and re-flattened whenever the
+    width changes, so their physical position is preserved across growth.
+    """
+    magic_coords = [(m % width, m // width) for m in magic_flat]
+
+    w, h = width, height
+    grown = False
+    grow_step = 0
+    while True:
+        magic_set = {row * w + col for col, row in magic_coords}
+        slots = sublattice_slots(w, h, magic_set, parity)
+        if n_qubits is None or len(slots) >= n_qubits:
+            break
+        if grow_step >= MAX_GROW_STEPS:
+            break
+        # Alternate: grow width first, then height.
+        if grow_step % 2 == 0:
+            w += 1
+        else:
+            h += 1
+        grown = True
+        grow_step += 1
+
+    magic_set = {row * w + col for col, row in magic_coords}
+    slots = sublattice_slots(w, h, magic_set, parity)
+
+    return {
+        "arch": {
+            "width": w,
+            "height": h,
+            "alg_qubits": slots,
+            "magic_states": sorted(magic_set),
+        },
+        "grown": grown,
+        "enough_space": n_qubits is None or len(slots) >= n_qubits,
+        "n_slots": len(slots),
+    }
+
+
+def write_arch_file(arch: dict, path: Path) -> None:
+    # WISQ loads arch with ast.literal_eval; a JSON dict of ints/lists is a valid
+    # Python literal, so json.dump is safe here.
+    path.write_text(json.dumps(arch, indent=2))
+
+
+# ── WISQ runner ──────────────────────────────────────────────────────────────────
+
+def run_wisq(circuit: str, arch_path: Path, mr_timeout: int) -> dict:
+    qasm = UNIVERSAL_QASMS_DIR / f"{circuit}_universal.qasm"
+    if not qasm.exists():
+        raise FileNotFoundError(f"missing universal QASM: {qasm}")
+
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+        out_path = Path(tmp.name)
+
+    cmd = [
+        str(WISQ), str(qasm),
+        "--mode", "scmr",
+        # --wisq-native: let WISQ build its own square_sparse_layout (odd/odd +
+        # all_sides magic) instead of our custom arch file.
+        "-arch", ("square_sparse_layout" if _wisq_native else str(arch_path)),
+        "--output_path", str(out_path),
+        "--mr_timeout", str(mr_timeout),
+    ]
+    print(f"  [wisq]     {' '.join(cmd)}", file=sys.stderr)
+
+    t0 = time.perf_counter()
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    duration = time.perf_counter() - t0
+
+    routing_steps = None
+    status = "success" if proc.returncode == 0 else "failed"
+    if proc.returncode == 124:
+        status = "timeout"
+
+    if proc.returncode == 0 and out_path.exists():
+        try:
+            data = json.loads(out_path.read_text())
+            steps = data.get("steps")
+            if steps == "timeout":
+                status = "timeout"
+            elif isinstance(steps, list):
+                routing_steps = len(steps)
+        except (json.JSONDecodeError, OSError):
+            status = "bad_output"
+
+    out_path.unlink(missing_ok=True)
+    return {
+        "routing_steps": routing_steps,
+        "duration_seconds": duration,
+        "status": status,
+        "exit_code": proc.returncode,
+    }
+
+
+# ── bench config expansion ───────────────────────────────────────────────────────
+
+def expand_config_variants(source: dict) -> list[dict]:
+    """Port of the C++ expand_config_variants.
+
+    Rules (applied recursively):
+    - A field whose value is a list of objects → for each object, merge its fields
+      into the current entry (removing the list field) and recurse. Only the first
+      such field found is expanded per recursion level, matching the C++ behaviour.
+    - After all object-lists are resolved, take the cartesian product of all
+      remaining array-valued fields (scalar arrays).
+    """
+    results: list[dict] = []
+
+    def expand_entry(entry: dict) -> None:
+        # Handle the first array-of-objects found (e.g., magic_configs).
+        for key in list(entry.keys()):
+            value = entry[key]
+            if isinstance(value, list) and value and all(isinstance(v, dict) for v in value):
+                base = {k: v for k, v in entry.items() if k != key}
+                for obj_override in value:
+                    expand_entry({**base, **obj_override})
+                return
+
+        # Cartesian product of all remaining (scalar) array-valued fields.
+        keys = list(entry.keys())
+        values_per_key = [
+            v if isinstance(v, list) else [v]
+            for v in entry.values()
+        ]
+        for combo in itertools.product(*values_per_key):
+            results.append(dict(zip(keys, combo)))
+
+    if isinstance(source, list):
+        for item in source:
+            expand_entry(item)
+    else:
+        expand_entry(source)
+    return results
+
+
+def cfg_fields(cfg: dict) -> dict:
+    """Extract CONFIG_FIELDS values from an expanded config dict."""
+    return {
+        "type": cfg.get("type", ""),
+        "gaussian_strategy": cfg.get("gaussian_strategy", ""),
+        "safe_passage_strategy": cfg.get("safe_passage_strategy", ""),
+        "routing_strategy": cfg.get("routing_strategy", ""),
+        "t_routing_mode": cfg.get("t-routing-mode", ""),
+        "use_layer_cache": cfg.get("use_layer_cache", ""),
+        "MagicStatePlacementStrategy": cfg.get("MagicStatePlacementStrategy", ""),
+        "number_of_magic_states": cfg.get("number_of_magic_states", ""),
+        "border_distance_percentage": cfg.get("border_distance_percentage", ""),
+        "magic_aware_strategy": cfg.get("magic_aware_strategy", ""),
+    }
+
+
+def cfg_key(circuit: str, cfg: dict) -> tuple:
+    """Unique key for a (circuit, config) pair — used for resume dedup."""
+    fields = cfg_fields(cfg)
+    return (circuit,) + tuple(str(fields[k]) for k in CONFIG_FIELDS)
+
+
+def load_done_keys_bench(path: Path) -> set[tuple]:
+    """Read an existing bench CSV and return already-processed (circuit, config...) keys."""
+    if not path.exists():
+        return set()
+    done: set[tuple] = set()
+    try:
+        with path.open(newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                key = (row.get("circuit", ""),) + tuple(
+                    row.get(k, "") for k in CONFIG_FIELDS
+                )
+                done.add(key)
+    except Exception:
+        pass
+    return done
+
+
+# ── CSV schemas ──────────────────────────────────────────────────────────────────
+
+CSV_COLUMNS = [
+    "circuit", "n_qubits", "parity",
+    "my_x", "my_y", "my_routing_steps", "my_duration_s",
+    "wisq_x", "wisq_y", "wisq_routing_steps", "wisq_duration_s",
+    "wisq_n_slots", "grid_grown_for_wisq", "wisq_status",
+    "ratio_wisq_over_mine",
+    # "connectivity" when a cube run fell back to the connectivity config (see
+    # CONNECTIVITY_FALLBACK_OVERRIDES); "connectivity(failed)" if even the fallback
+    # failed; empty otherwise.
+    "safe_passage_fallback",
+]
+
+BENCH_CSV_COLUMNS = (
+    ["circuit", "n_qubits"]
+    + CONFIG_FIELDS
+    + [
+        "parity",
+        "my_x", "my_y", "my_routing_steps", "my_duration_s",
+        "wisq_x", "wisq_y", "wisq_routing_steps", "wisq_duration_s",
+        "wisq_n_slots", "grid_grown_for_wisq", "wisq_status",
+        "ratio_wisq_over_mine",
+        "safe_passage_fallback",
+    ]
+)
+
+
+def _init_and_migrate_csv(path: Path, columns: list) -> None:
+    """Create `path` with `columns` as header, or migrate an older CSV whose header
+    is a prefix of `columns` (i.e. trailing columns were added, e.g.
+    safe_passage_fallback) by padding existing rows with empty cells.
+
+    Serialized across threads (caller holds _csv_write_lock) and across processes via
+    an exclusive flock on a sibling .lock file. Must be called BEFORE opening the
+    long-lived append handle, because migration rewrites the file via rename (which
+    would orphan an already-open append handle). Idempotent: once migrated, later
+    callers see a matching header and do nothing.
+    """
+    lock_path = path.with_name(path.name + ".lock")
+    with open(lock_path, "w") as lock_f:
+        fcntl.flock(lock_f, fcntl.LOCK_EX)
+        try:
+            if not path.exists() or path.stat().st_size == 0:
+                with path.open("w", newline="") as f:
+                    csv.writer(f).writerow(columns)
+                return
+            with path.open(newline="") as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+                if header is None or header == columns:
+                    return
+                if header != columns[:len(header)]:
+                    return  # foreign/incompatible header — leave it untouched
+                rows = list(reader)
+            pad = [""] * (len(columns) - len(header))
+            tmp = path.with_name(path.name + ".migrate.tmp")
+            with tmp.open("w", newline="") as f:
+                w = csv.writer(f)
+                w.writerow(columns)
+                for r in rows:
+                    w.writerow(r + pad)
+            tmp.replace(path)
+            print(f"Migrated {path.name}: added {pad and len(pad)} column(s) "
+                  f"({', '.join(columns[len(header):])}).", file=sys.stderr)
+        finally:
+            fcntl.flock(lock_f, fcntl.LOCK_UN)
+
+
+# ── shared per-circuit logic ─────────────────────────────────────────────────────
+
+def _run_wisq_with_limit(circuit: str, arch_path: Path, mr_timeout: int) -> dict:
+    """run_wisq, honoring the optional --wisq-workers concurrency cap."""
+    global _active_wisq
+    if _wisq_semaphore is None:
+        return run_wisq(circuit, arch_path, mr_timeout)
+    with _wisq_semaphore:
+        with _active_wisq_lock:
+            _active_wisq += 1
+        try:
+            return run_wisq(circuit, arch_path, mr_timeout)
+        finally:
+            with _active_wisq_lock:
+                _active_wisq -= 1
+
+
+def get_or_run_wisq(circuit: str, built: dict, arch_dir: Path,
+                    mr_timeout: int, run_id: int | None) -> dict:
+    """Run WISQ for `built["arch"]`, or reuse a cached result for an identical arch.
+
+    Because WISQ depends only on the architecture and the circuit QASM, two configs
+    that produce the same grid + magic-state layout share one WISQ run. Concurrent
+    workers needing the same arch wait on the first run instead of launching
+    duplicates. The returned dict is shared across callers and must not be mutated.
+    """
+    sig = (circuit, json.dumps(built["arch"], sort_keys=True))
+
+    with _wisq_cache_lock:
+        entry = _wisq_cache.get(sig)
+        if entry is None:
+            event = threading.Event()
+            _wisq_cache[sig] = event
+            owner = True
+        else:
+            owner = False
+
+    if not owner:
+        if isinstance(entry, threading.Event):
+            entry.wait()
+            with _wisq_cache_lock:
+                entry = _wisq_cache[sig]
+        arch = built["arch"]
+        print(f"  [wisq]     (cached) {circuit} "
+              f"{arch['width']}x{arch['height']}", file=sys.stderr)
+        return entry  # type: ignore[return-value]
+
+    suffix = f"_{run_id}" if run_id is not None else ""
+    arch_path = arch_dir / f"{circuit}{suffix}_wisq2.arch"
+    # In --wisq-native mode run_wisq ignores arch_path (uses square_sparse_layout),
+    # so there is no arch file to write.
+    if not _wisq_native:
+        write_arch_file(built["arch"], arch_path)
+    try:
+        wisq = _run_wisq_with_limit(circuit, arch_path, mr_timeout)
+    finally:
+        arch_path.unlink(missing_ok=True)
+
+    with _wisq_cache_lock:
+        _wisq_cache[sig] = wisq
+    event.set()
+    return wisq
+
+
+def run_one(circuit: str, cfg: dict, binary: Path, arch_dir: Path,
+            parity: int, mr_timeout: int, run_id: int | None = None) -> dict:
+    """Run compiler + WISQ for one (circuit, cfg) pair. Returns a result dict.
+
+    run_id makes the arch file path unique so parallel workers on the same
+    circuit don't clobber each other's arch files.
+    The compiler always writes qasm_graphs/<circuit>.graph, so we hold a
+    per-circuit lock for the compiler + read_graph phase. A cube run that fails to
+    map falls back to connectivity inside run_compiler (single retry, border 15),
+    tagged in mine["safe_passage_fallback"].
+    """
+    with _get_circuit_lock(circuit):
+        mine = run_compiler(circuit, cfg, binary)
+        graph = read_graph(circuit)
+
+    n_qubits = count_qasm_qubits(circuit) or mine.get("num_qubits")
+
+    if _wisq_native:
+        # WISQ builds its own grid; report the resulting native dims for the CSV.
+        built = native_built(n_qubits)
+    else:
+        built = build_wisq_arch(
+            graph["width"], graph["height"], graph["magic_states"],
+            n_qubits, parity,
+        )
+        if not built["enough_space"]:
+            print(f"  WARNING: only {built['n_slots']} slots for {n_qubits} qubits "
+                  f"after {MAX_GROW_STEPS} grow steps — WISQ will likely fail.",
+                  file=sys.stderr)
+        elif built["grown"]:
+            print(f"  NOTE: grid grown for WISQ to "
+                  f"{built['arch']['width']}x{built['arch']['height']} "
+                  f"(dimension parity broken).", file=sys.stderr)
+
+    wisq = get_or_run_wisq(circuit, built, arch_dir, mr_timeout, run_id)
+
+    ratio = None
+    if (wisq["routing_steps"] and mine["routing_steps"] and mine["routing_steps"] > 0):
+        ratio = wisq["routing_steps"] / mine["routing_steps"]
+
+    return {
+        "n_qubits": n_qubits,
+        "mine": mine,
+        "built": built,
+        "wisq": wisq,
+        "ratio": ratio,
+    }
+
+
+def make_row_base(circuit: str, result: dict, parity: int) -> dict:
+    mine = result["mine"]
+    built = result["built"]
+    wisq = result["wisq"]
+    ratio = result["ratio"]
+    return {
+        "circuit": circuit,
+        "n_qubits": result["n_qubits"],
+        "parity": parity,
+        "my_x": mine["width"],
+        "my_y": mine["height"],
+        "my_routing_steps": mine["routing_steps"],
+        "my_duration_s": f"{mine['duration_seconds']:.6f}" if mine["duration_seconds"] is not None else "",
+        "wisq_x": built["arch"]["width"],
+        "wisq_y": built["arch"]["height"],
+        "wisq_routing_steps": wisq["routing_steps"],
+        "wisq_duration_s": f"{wisq['duration_seconds']:.6f}",
+        "wisq_n_slots": built["n_slots"],
+        "grid_grown_for_wisq": "true" if built["grown"] else "false",
+        "wisq_status": wisq["status"],
+        "ratio_wisq_over_mine": f"{ratio:.4f}" if ratio is not None else "",
+        "safe_passage_fallback": mine.get("safe_passage_fallback", ""),
+    }
+
+
+def make_error_row_base(circuit: str, parity: int, safe_passage_fallback: str = "") -> dict:
+    return {
+        "circuit": circuit, "n_qubits": "", "parity": parity,
+        "my_x": "", "my_y": "", "my_routing_steps": "", "my_duration_s": "",
+        "wisq_x": "", "wisq_y": "", "wisq_routing_steps": "", "wisq_duration_s": "",
+        "wisq_n_slots": "", "grid_grown_for_wisq": "", "wisq_status": "error",
+        "ratio_wisq_over_mine": "",
+        "safe_passage_fallback": safe_passage_fallback,
+    }
+
+
+# ── main ──────────────────────────────────────────────────────────────────────────
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Compare our compiler vs WISQ at parity of grid + magic placement."
+    )
+
+    # ── single-run mode ──
+    parser.add_argument("--circuits", nargs="+", default=None,
+                        help="Circuit names for single-run mode (e.g. qft_20 adder_n4)")
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG),
+                        help=f"Single-run compiler config (default: {DEFAULT_CONFIG})")
+
+    # ── bench sweep mode ──
+    parser.add_argument("--bench", default=None,
+                        help="Sweep config path (e.g. data/config/params_bench.json). "
+                             "Expands all parameter combinations and runs each one.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="With --bench: print the number of combinations and exit.")
+
+    # ── shared options ──
+    parser.add_argument("--binary", default=str(DEFAULT_BINARY),
+                        help=f"Compiler binary (default: {DEFAULT_BINARY})")
+    parser.add_argument("--mr_timeout", type=int, default=300,
+                        help="WISQ mapping/routing timeout in seconds (default: 300)")
+    parser.add_argument("--parity", type=int, choices=(0, 1), default=PARITY,
+                        help="Data-qubit sub-lattice parity: 0=even, 1=odd (default: 0)")
+    parser.add_argument("--output", "-o", default=None,
+                        help="Write comparison CSV to this file (default: print summary only). "
+                             "In bench mode, rows are appended incrementally so the run can "
+                             "be interrupted and resumed.")
+    parser.add_argument("--keep-arch-dir", default=None,
+                        help="Directory to keep the generated WISQ arch files (default: temp, discarded)")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Number of parallel workers (default: 1). Each worker runs one "
+                             "(circuit, config) pair — compiler + WISQ — concurrently.")
+    parser.add_argument("--wisq-workers", type=int, default=None,
+                        help="Max concurrent WISQ instances (default: same as --workers). "
+                             "Set lower than --workers to cap RAM usage: extra workers run "
+                             "the compiler freely but queue before launching WISQ.")
+    parser.add_argument("--process-count", type=int, default=1,
+                        help="Total number of parallel processes sharing the same CSV "
+                             "(default: 1). Process K handles items where index %% N == K.")
+    parser.add_argument("--processor", type=int, default=0,
+                        help="Index of this process (0-based, default: 0).")
+    parser.add_argument("--wisq-native", action="store_true",
+                        help="Run WISQ on its own native square_sparse_layout "
+                             "(odd/odd qubits + all_sides magic, sized by WISQ) instead "
+                             "of our arch; our compiler is run at the SAME grid size.")
+    args = parser.parse_args()
+
+    global _wisq_semaphore, _wisq_native
+    _wisq_native = args.wisq_native
+    if _wisq_native:
+        print("WISQ-native mode: WISQ uses square_sparse_layout; our compiler runs "
+              "at the same native grid size.", file=sys.stderr)
+    wisq_limit = args.wisq_workers if args.wisq_workers is not None else args.workers
+    if wisq_limit < args.workers:
+        _wisq_semaphore = threading.Semaphore(wisq_limit)
+        print(f"WISQ concurrency limited to {wisq_limit} (workers={args.workers}).",
+              file=sys.stderr)
+
+    if args.bench is None and args.circuits is None:
+        parser.error("Provide either --circuits (single-run) or --bench (sweep).")
+
+    if args.bench is not None and args.circuits is not None:
+        parser.error("--bench and --circuits are mutually exclusive.")
+
+    binary = Path(args.binary)
+    if not binary.exists():
+        print(f"ERROR: compiler binary not found: {binary}\n"
+              f"Build it first (e.g. `cmake --build build`).", file=sys.stderr)
+        return 1
+
+    arch_dir = (
+        Path(args.keep_arch_dir)
+        if args.keep_arch_dir
+        else Path(tempfile.mkdtemp(prefix="wisq2_arch_"))
+    )
+    arch_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── bench sweep mode ─────────────────────────────────────────────────────────
+    if args.bench is not None:
+        bench_source = json.loads(Path(args.bench).read_text())
+        expanded = expand_config_variants(bench_source)
+        # Filter out entries without a circuit field.
+        expanded = [c for c in expanded if c.get("circuit")]
+
+        print(f"Expanded to {len(expanded)} configurations.", file=sys.stderr)
+
+        if args.dry_run:
+            print(f"Dry run: {len(expanded)} combinations would be processed.")
+            return 0
+
+        output_path = Path(args.output) if args.output else None
+        process_count = args.process_count
+        processor = args.processor
+
+        # Resume support: skip (circuit, config) pairs already in the CSV.
+        done_keys = load_done_keys_bench(output_path) if output_path else set()
+        if done_keys:
+            print(f"Resuming: {len(done_keys)} combinations already done, skipping.",
+                  file=sys.stderr)
+
+        csv_file = None
+        writer = None
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            # Create the CSV with the current header, or migrate an older one that
+            # predates the safe_passage_fallback column (pads existing rows). Done
+            # before opening the long-lived append handle and serialized across
+            # threads + PBS processes so concurrent jobs can't race or corrupt it.
+            with _csv_write_lock:
+                _init_and_migrate_csv(output_path, BENCH_CSV_COLUMNS)
+            csv_file = output_path.open("a", newline="")
+            writer = csv.DictWriter(csv_file, fieldnames=BENCH_CSV_COLUMNS)
+
+        # Build the list of (index, cfg) pairs that still need to run,
+        # then shard by processor index so multiple PBS jobs can share one CSV.
+        todo = [
+            (i, cfg) for i, cfg in enumerate(expanded)
+            if cfg_key(cfg["circuit"], cfg) not in done_keys
+            and (process_count <= 1 or i % process_count == processor)
+        ]
+        skipped = len(expanded) - len(todo)
+        if process_count > 1:
+            print(f"Process {processor}/{process_count}: {len(todo)} items to run "
+                  f"(skipped {skipped} already done).", file=sys.stderr)
+        else:
+            print(f"To run: {len(todo)}  (skipped {skipped} already done).", file=sys.stderr)
+
+        rows: list[dict] = []
+        completed = 0
+
+        def _process(i: int, cfg: dict) -> dict:
+            circuit = cfg["circuit"]
+            try:
+                result = run_one(circuit, cfg, binary, arch_dir,
+                                 args.parity, args.mr_timeout, run_id=i)
+                row = {**make_row_base(circuit, result, args.parity), **cfg_fields(cfg)}
+            except (RuntimeError, FileNotFoundError) as e:
+                print(f"  ERROR [{circuit}]: {e}", file=sys.stderr)
+                fb = "connectivity(failed)" if getattr(e, "fallback_attempted", False) else ""
+                row = {**make_error_row_base(circuit, args.parity, fb), **cfg_fields(cfg)}
+            return {k: row.get(k, "") for k in BENCH_CSV_COLUMNS}
+
+        def _write_row(row: dict) -> None:
+            nonlocal completed
+            rows.append(row)
+            completed += 1
+            if writer:
+                with _csv_write_lock:
+                    fcntl.flock(csv_file, fcntl.LOCK_EX)
+                    try:
+                        writer.writerow(row)
+                        csv_file.flush()
+                    finally:
+                        fcntl.flock(csv_file, fcntl.LOCK_UN)
+            my_grid = f"{row['my_x']}x{row['my_y']}" if row.get('my_x') else "?"
+            wisq_grid = f"{row['wisq_x']}x{row['wisq_y']}" if row.get('wisq_x') else "?"
+            print(f"  [{completed}/{len(todo)}] {row['circuit']} "
+                  f"my_grid={my_grid} wisq_grid={wisq_grid} "
+                  f"mine={row['my_routing_steps']} wisq={row['wisq_routing_steps']} "
+                  f"ratio={row['ratio_wisq_over_mine']} status={row['wisq_status']}",
+                  file=sys.stderr)
+
+        if args.workers > 1:
+            print(f"Running with {args.workers} parallel workers.", file=sys.stderr)
+            _heartbeat_stop = threading.Event()
+
+            def _heartbeat() -> None:
+                while not _heartbeat_stop.wait(timeout=30):
+                    with _active_wisq_lock:
+                        n = _active_wisq
+                    print(f"  [heartbeat] {completed}/{len(todo)} done, "
+                          f"{n} WISQ running.", file=sys.stderr)
+
+            threading.Thread(target=_heartbeat, daemon=True).start()
+
+            with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                futures = {
+                    executor.submit(_process, i, cfg): (i, cfg)
+                    for i, cfg in todo
+                }
+                for fut in as_completed(futures):
+                    _write_row(fut.result())
+
+            _heartbeat_stop.set()
+        else:
+            for seq, (i, cfg) in enumerate(todo):
+                print(f"\n──── [{seq+1}/{len(todo)}] {cfg['circuit']} ────",
+                      file=sys.stderr)
+                _write_row(_process(i, cfg))
+
+        if csv_file:
+            csv_file.close()
+
+        if output_path:
+            print(f"\nCSV written/appended to {output_path}")
+
+        # Brief summary (last 20 rows to avoid flooding the terminal).
+        print(f"\n=== Summary (last {min(20, len(rows))} of {len(rows)} new rows) ===")
+        print(f"{'circuit':<28} {'type':>10} {'routing':>10} "
+              f"{'my_grid':>9} {'wisq_grid':>9} "
+              f"{'mine':>6} {'wisq':>6} {'wisq/mine':>9} {'status':>9}")
+        for r in rows[-20:]:
+            my_grid = f"{r['my_x']}x{r['my_y']}" if r.get('my_x') else "?"
+            wisq_grid = f"{r['wisq_x']}x{r['wisq_y']}" if r.get('wisq_x') else "?"
+            print(f"{str(r['circuit']):<28} {str(r['type']):>10} "
+                  f"{str(r['routing_strategy']):>10} "
+                  f"{my_grid:>9} {wisq_grid:>9} "
+                  f"{str(r['my_routing_steps']):>6} {str(r['wisq_routing_steps']):>6} "
+                  f"{str(r['ratio_wisq_over_mine']):>9} {str(r['wisq_status']):>9}")
+
+        if not args.keep_arch_dir:
+            for p in arch_dir.glob("*_wisq2.arch"):
+                p.unlink(missing_ok=True)
+            try:
+                arch_dir.rmdir()
+            except OSError:
+                pass
+
+        return 0
+
+    # ── single-run mode ──────────────────────────────────────────────────────────
+    base_config = json.loads(Path(args.config).read_text())
+
+    rows = []
+    for circuit in args.circuits:
+        print(f"\n──── {circuit} ────", file=sys.stderr)
+        try:
+            result = run_one(circuit, base_config, binary, arch_dir, args.parity, args.mr_timeout)
+            rows.append(make_row_base(circuit, result, args.parity))
+        except (RuntimeError, FileNotFoundError) as e:
+            print(f"  ERROR: {e}", file=sys.stderr)
+            fb = "connectivity(failed)" if getattr(e, "fallback_attempted", False) else ""
+            rows.append(make_error_row_base(circuit, args.parity, fb))
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"\nCSV written to {out}")
+
+    print("\n=== Summary (routing steps) ===")
+    print(f"{'circuit':<28} {'qubits':>6} {'my_grid':>9} {'wisq_grid':>9} "
+          f"{'mine':>6} {'wisq':>6} {'wisq/mine':>9} {'grown':>6} {'status':>9}")
+    for r in rows:
+        my_grid = f"{r['my_x']}x{r['my_y']}" if r.get("my_x", "") != "" else "-"
+        wisq_grid = f"{r['wisq_x']}x{r['wisq_y']}" if r.get("wisq_x", "") != "" else "-"
+        print(f"{r['circuit']:<28} {str(r['n_qubits']):>6} {my_grid:>9} {wisq_grid:>9} "
+              f"{str(r['my_routing_steps']):>6} {str(r['wisq_routing_steps']):>6} "
+              f"{str(r['ratio_wisq_over_mine']):>9} {str(r['grid_grown_for_wisq']):>6} "
+              f"{str(r['wisq_status']):>9}")
+
+    if not args.keep_arch_dir:
+        for p in arch_dir.glob("*_wisq2.arch"):
+            p.unlink(missing_ok=True)
+        try:
+            arch_dir.rmdir()
+        except OSError:
+            pass
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,9 +1,17 @@
 # syntax=docker/dockerfile:1.7
+#
+# Dockerfile.PGO — same image as Dockerfile, but the compiler stage builds a
+# Profile-Guided-Optimized binary via scripts/docker_build/build_pgo_docker.sh:
+#   1. instrumented build (-fprofile-generate)
+#   2. training run: --bench profile with a single worker (OMP_NUM_THREADS=1)
+#   3. optimized rebuild (-fprofile-use + LTO)
+# No -march=native -> the shipped binary stays portable across CPUs.
+#
+# Build:   docker build -f docker/Dockerfile.PGO -t ftqc:pgo .
+# (The build runs the training benchmark, so it is slower than Dockerfile.)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1 — System build tools
-# Rarely changes → sits high in the cache chain.
-# BuildKit cache-mounts keep apt archives out of the image layers entirely.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim AS sys-deps
 
@@ -13,12 +21,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         build-essential \
         cmake \
         ninja-build \
+        bash \
         libeigen3-dev \
         libboost-dev
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2 — External / submodule deps
-# Invalidated only when external/ (nlohmann_json submodule) changes.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM sys-deps AS ext-deps
 
@@ -26,9 +34,10 @@ WORKDIR /app
 COPY external/ ./external/
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 3 — Compile
-# Invalidated when CMakeLists.txt, include/, or src/ change.
-# LTO (IPO) + symbol stripping minimize the binary shipped to the runtime.
+# Stage 3 — Compile (PGO)
+# Needs the training inputs in addition to the sources, because the instrumented
+# binary runs the `profile` benchmark during the build. PROJECT_ROOT is baked in
+# as the source dir (/app), so config/ and qasms/ must live here at run time.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM ext-deps AS builder
 
@@ -37,19 +46,21 @@ COPY include/        ./include/
 COPY src/            ./src/
 COPY visualization/  ./visualization/
 
-RUN cmake -S . -B build \
-        -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
-        -DEIGEN3_INCLUDE_DIR=/usr/include/eigen3 \
-        -DBOOST_INCLUDEDIR=/usr/include \
- && cmake --build build --target FaultTolerantQuantumCompiler --parallel "$(nproc)" \
+# Training inputs + the PGO build script.
+COPY scripts/        ./scripts/
+COPY config/         ./config/
+COPY qasms/          ./qasms/
+
+# Eigen/Boost include hints (mirrors Dockerfile). Forwarded by the script to
+# both cmake configure passes.
+ENV EXTRA_CMAKE_ARGS="-DEIGEN3_INCLUDE_DIR=/usr/include/eigen3 -DBOOST_INCLUDEDIR=/usr/include"
+
+# Two-phase PGO build (generic ISA -> portable), then strip the final binary.
+RUN bash scripts/docker_build/build_pgo_docker.sh profile \
  && strip --strip-all build/FaultTolerantQuantumCompiler
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 4 — Python venv with wisq (needs Java 21 to build)
-# Uses Eclipse Temurin image which has Java 21 pre-installed.
-# Only the venv is copied to the final image — Java stays out.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim AS python-deps
 
@@ -67,8 +78,6 @@ RUN python3 -m venv /opt/venv && \
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 5 — Minimal runtime image
-# Only the stripped binary + runtime data files land here.
-# cmake/ninja/gcc/headers are NOT copied — saves ~500 MB.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim AS runtime
 
@@ -88,7 +97,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
-# Stripped binary from builder
+# Stripped PGO binary from builder
 COPY --from=builder /app/build/FaultTolerantQuantumCompiler ./build/FaultTolerantQuantumCompiler
 
 # Runtime support files
@@ -102,27 +111,15 @@ COPY universal_set_qasms/    ./universal_set_qasms/
 RUN mkdir -p benchmarks/results benchmarks/logs
 
 # Thin Makefile so "make run-bench [BENCH_PATH=<name>]" works without cmake.
-# run-bench.sh reads BENCH_PATH from the environment when not set on the
-# command line, so both "docker run -e BENCH_PATH=..." and
-# "docker run ... make run-bench BENCH_PATH=..." work.
 RUN printf '.PHONY: run-bench\nrun-bench:\n\tsh /app/scripts/benchmark_execution/run-bench.sh /app/build/FaultTolerantQuantumCompiler\n' \
     > /app/Makefile
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 5 — Entry-point layer
-# Only ENV / CMD live here; editing them doesn't invalidate any layer above.
+# Stage 6 — Entry-point layer
 # ─────────────────────────────────────────────────────────────────────────────
 FROM runtime AS final
 
-# Default benchmark; override at run-time:
-#   docker run --init -e BENCH_PATH=gaussian_coarse_vs_fine <image>
-#   docker run --init <image> make run-bench BENCH_PATH=cache_vs_no_cache
 ENV BENCH_PATH=naive_congestion_boost_normal_t_smart_t
 
-# Default BENCH_JOBS = all cores
-
-# IMPORTANT: launch with `docker run --init ...` so tini becomes PID 1 and
-# forwards signals to the benchmark binary. run-bench.sh `exec`s the binary,
-# so SIGINT/SIGTERM/SIGHUP land directly on it and trigger a clean "interrupted"
-# write to the CSV before exiting.
+# IMPORTANT: launch with `docker run --init ...` so tini forwards signals.
 CMD ["sh", "/app/scripts/benchmark_execution/run-bench.sh", "/app/build/FaultTolerantQuantumCompiler"]

@@ -34,7 +34,7 @@ fi
 apptainer exec \
   --bind "$PWD:/app/host" \
   ftqc.sif \
-  python3 /app/scripts/generate_benchmark_plots.py \
+  python3 /app/scripts/plots/generate_benchmark_plots.py \
     ${INPUT_ARG} \
     ${PLOT_FLAGS} \
   >> "$LOG_FILE" 2>&1

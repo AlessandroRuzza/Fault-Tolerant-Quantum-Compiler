@@ -1,6 +1,6 @@
 # Fault-Tolerant Quantum Compiler - Gaussian Potential-Field mapping
 
-Fault-Tolerant-Quantum-Compiler is a C++20 project that parses OpenQASM circuits, maps them onto a target architecture with configurable strategies, and performs routing with several selectable strategies (congestion-aware, naive, naive-critical, packing, and an optional Boost-based router).
+Fault-Tolerant-Quantum-Compiler is a C++20 project that parses OpenQASM circuits, maps them onto a target architecture with configurable strategies, and performs routing with several selectable strategies (congestion-aware, naive, naive-critical, packing, critical-packing, and an optional Boost-based router).
 
 The repository also includes:
 - Benchmark execution from JSON configs.
@@ -117,7 +117,7 @@ You can add other strategy flags as needed, for example:
 
 Single-run config files are JSON objects (for example `config/0_compiler_config.json`).
 
-Use benchmark-style configs with arrays (for example `config/ex1.json`) only in benchmark mode.
+Use benchmark-style configs with arrays (for example `config/all_circuits.json`) only in benchmark mode.
 
 From `build/`:
 
@@ -136,42 +136,60 @@ You can still override config values from CLI:
 
 ## Tuned Gaussian mapping parameters
 
-Recommended parameter values for the Gaussian mapping, grouped by *regime* — the
-combination of `gaussian_strategy` (`coarse` / `fine`) and `safe_passage_strategy`
-(`cube` / `connectivity`). `cube` yields shorter routes but needs a larger
-lattice; `connectivity` packs onto smaller lattices.
+Recommended Gaussian-mapping parameters, by *safe-passage regime*: `cube` yields
+shorter routes but needs a larger lattice, `connectivity` packs onto smaller
+lattices. These are the consolidated optima from the weight sweeps; the full
+per-parameter reasoning, metric trade-offs, and correlation analysis live in
+[`metric_analysis_outcomes/pesi_tunati.md`](metric_analysis_outcomes/pesi_tunati.md)
+(final summary in
+[`pesi_finali.md`](metric_analysis_outcomes/pesi_finali.md)).
 
-Common to all configurations:
-
-| Parameter | Value | Note |
+| Parameter | `connectivity` | `cube` |
 |---|---|---|
-| `EXTERNAL_WEIGHT` | `0` | |
-| `BASE_GAUSSIAN_WEIGHT` | `1` | |
-| `CNOT_LOW` | `0` | |
-| `number_of_magic_states` | `-1` | auto |
-| `MagicStatePlacementStrategy` | `center_circle` | with `border_distance_percentage` |
-| `routing_strategy` / `t-routing-mode` | `naive_critical` / `smart_t_routing` | |
+| `type` | `gaussian` | `gaussian` |
+| `gaussian_strategy` | `fine` | `fine` |
+| `safe_passage_strategy` | `connectivity` | `cube` |
+| `EXTERNAL_WEIGHT` | −15 | −15 |
+| `BASE_GAUSSIAN_WEIGHT` | 1 | 1 |
+| `GAUSSIAN_SIGMA` | 0.7 | 0.7 |
+| `MAPPED_GAUSSIAN_WEIGHT` | 20 | 15 |
+| `CNOT_HIGH` | 8 | 6 |
+| `CNOT_LOW` | 0 | 0 |
+| `MAGIC_HIGH` | 0 | 0.7 |
+| `MAGIC_LOW` | 0 | 0 |
+| `border_distance_percentage` | 15 | 5 |
+| `MagicStatePlacementStrategy` | `center_circle` | `center_circle` |
+| `number_of_magic_states` | −1 (auto) | −1 (auto) |
+| `bfs_density_threshold` | 0.70 | 0.70 |
+| `routing_strategy` | `packing` † | `packing` † |
+| `t-routing-mode` | `smart_t_routing` | `smart_t_routing` |
+| `patience_threshold` | 3 | 3 |
+| `use_layer_cache` | `true` | `true` |
 
-Border-independent weights:
+Key points from the sweeps:
 
-| Regime (`gaussian_strategy` / `safe_passage_strategy`) | `GAUSSIAN_CONFIDENCE` | `CNOT_HIGH` | `MAPPED_GAUSSIAN_WEIGHT` | `MAGIC_LOW` |
-|---|---|---|---|---|
-| coarse / cube | 0.999999 | 1.5 | 0 | 0 |
-| coarse / connectivity | 0.99999 | 1.5 | 2.0 | 0 |
-| fine / cube | 0.999999 | 0.5 | 0 | 1 † |
-| fine / connectivity | 0.99999 | 0.5 | 1.5 | 0 |
+- **Grid size is the dominant lever** — `non_routed` moves ~8–9pp (connectivity) /
+  ~2–3pp (cube) from a tight to a padded lattice, versus ≤1.4pp for *all* weights
+  combined. Pad generously (`dimension_offset` 6–12) and don't re-tune the weights
+  per size.
+- **`MAPPED_GAUSSIAN_WEIGHT` and `CNOT_HIGH` ride a ridge** `cnot ≈ mapped / 2.5` —
+  tune them together, never `mapped` alone. `GAUSSIAN_SIGMA ≈ 0.7` stays roughly
+  constant along the ridge (widen it only on very tight lattices).
+- **`EXTERNAL_WEIGHT` saturates** — any negative value is near-optimal; `0` costs
+  ~1.5pp on connectivity.
+- **`MAGIC_HIGH` / `MAGIC_LOW` / `CNOT_LOW` are inert** for `non_routed`, so keep
+  them at 0 (cube's `MAGIC_HIGH = 0.7` only buys ~0.3–0.5% on `routing_steps`,
+  nothing on `non_routed`). The old "wider border → higher magic" rule was an
+  artifact, not a real effect.
 
-`MAGIC_HIGH` depends on `border_distance_percentage` (`b`, in %):
+† `routing_strategy`: the table lists `packing`, which minimises **routing steps**
+on large circuits. For **non_routed** (the primary metric) and compile time,
+`naive` / `naive_critical` is the more robust choice — it ties or beats packing on
+non_routed and runs 12–18× faster with no timeouts. See
+[Routing strategies](#routing-strategies) for the trade-off.
 
-| Regime | `b=0` | `b=5` | `b=10` | `b=20` | `b=30` |
-|---|---|---|---|---|---|
-| coarse / cube | 0 | 0.2 | 0.2 | 0.2 | 1.6 |
-| coarse / connectivity | 0 | 0.2 | 0.8 | 0.8 | 0.2 |
-| fine / cube | 20 ‡ | 3 | 1.6 | 0 | 0 |
-| fine / connectivity | 3 | 1.6 | 0.4 | 0.4 | 0.2 |
-
-† `MAGIC_LOW` = 1 for `border_distance_percentage` ≤ 10, else 0 (fine / cube only).
-‡ Robust argmin is 20, but the curve is flat above ~1.6.
+> `GAUSSIAN_CONFIDENCE` (a confidence value from which sigma was derived) was
+> removed; the mapping now takes the absolute `GAUSSIAN_SIGMA` directly.
 
 ### Example: `cube` vs `connectivity` on `ising_n420`
 
@@ -213,7 +231,8 @@ rather than assuming one wins everywhere.
 | `congestion` (`congestion_aware`) | Shortest-path corridors with a congestion penalty (scale `0.35`, static global) that steers paths away from already-busy nodes. Gates routed one-by-one, shortest operand-distance first. |
 | `naive` | Plain shortest-path corridors, no congestion penalty. Gates routed one-by-one, shortest operand-distance first. |
 | `naive_critical` (`critical`, `naivecritical`) | Same shortest-path routing as `naive`, but orders each layer's gates by **criticality** (dependency-chain tail length) first, operand distance second, so gates on the critical path claim corridors first. **Default.** |
-| `packing` (`pack`, `disjoint`, `disjoint_paths`) | Maximises the set of **vertex-disjoint** corridors opened per layer instead of routing greedily one-by-one. Per layer: (1) generate up to `k` candidate paths per gate (penalised re-search for 2-qubit gates, nearest free magic states for T gates); (2) greedily select a conflict-free subset, prioritising **downstream criticality** (how many of the next `L` layers touch the gate's qubits), ties broken by shorter path; (3) a fill pass routes any still-unrouted gate on a fresh disjoint path, so each step is always maximal. Routes more gates per step → usually fewer routing steps on contended circuits (not universal; see below). |
+| `packing` (`pack`, `disjoint`, `disjoint_paths`) | Maximises the set of **vertex-disjoint** corridors opened per layer instead of routing greedily one-by-one. Per layer: (1) generate up to `k` candidate paths per gate (penalised re-search for 2-qubit gates, nearest free magic states for T gates); (2) greedily select a conflict-free subset, prioritising **downstream pressure** (how many of the next `L` layers touch the gate's qubits), ties broken by shorter path; (3) a fill pass routes any still-unrouted gate on a fresh disjoint path, so each step is always maximal. Routes more gates per step → usually fewer routing steps on contended circuits (not universal; see below). |
+| `critical_packing` (`crit_packing`, `critpacking`) | Same per-layer disjoint-path packing as `packing`, but gates are prioritised by their true **critical-path length** (longest dependency-chain tail), keeping the downstream pressure only as the tiebreak. Recovers the step count on long serial cascades (e.g. QFT), where packing's short-lookahead pressure misses chain depth; on circuits with flat tails (e.g. QAOA) it reduces to plain `packing` behaviour. |
 | `boost` | Boost Graph Library-based router. Only available when the binary is built with Boost support; otherwise it errors out. |
 
 > **Operand distance** is the length of a *trial* shortest path between a gate's two
@@ -229,7 +248,11 @@ n50–n100 sweep); override via environment only when re-deriving them in a swee
 | Env var | Default | Meaning |
 |---|---|---|
 | `FTQC_PACKING_CANDIDATES` | `2` | `k`: candidate paths generated per gate |
-| `FTQC_PACKING_LOOKAHEAD` | `4` | `L`: layers of downstream lookahead for the criticality weight |
+| `FTQC_PACKING_LOOKAHEAD` | `4` | `L`: layers of downstream lookahead for the pressure weight |
+
+Both `packing` and `critical_packing` also accept `--packing-commute <true|false>`
+(off by default), which makes the per-layer frontier commutation-aware so
+commuting gates can be reordered when selecting disjoint paths.
 
 ### T-gate routing
 
@@ -267,41 +290,44 @@ Both safe-passage **and** router choice are circuit-specific.
 
 ## Run benchmarks through JSON in config/
 
-Benchmark mode expands and runs combinations defined in a benchmark JSON (for example `config/ex1.json`).
+Benchmark mode expands and runs combinations defined in a benchmark JSON. The
+bundled `config/all_circuits.json` sweeps the full circuit set, so it is a long
+run — the commands below use it only to show the syntax; point `--bench` at your
+own (smaller) benchmark JSON for quick runs.
 
 ### Direct binary usage
 
 From `build/`:
 
 ```bash
-./FaultTolerantQuantumCompiler --bench ex1
+./FaultTolerantQuantumCompiler --bench all_circuits
 ```
 
 To limit or increase benchmark parallelism, set `OMP_NUM_THREADS`:
 
 ```bash
-OMP_NUM_THREADS=8 ./FaultTolerantQuantumCompiler --bench ex1
+OMP_NUM_THREADS=8 ./FaultTolerantQuantumCompiler --bench all_circuits
 ```
 
 Equivalent aliases:
 
 ```bash
-./FaultTolerantQuantumCompiler --bench_path ex1
-./FaultTolerantQuantumCompiler --bench-path ex1
+./FaultTolerantQuantumCompiler --bench_path all_circuits
+./FaultTolerantQuantumCompiler --bench-path all_circuits
 ```
 
-You can also pass values like `config/ex1.json`; the runner extracts the benchmark name and resolves it in `config/`.
+You can also pass values like `config/all_circuits.json`; the runner extracts the benchmark name and resolves it in `config/`.
 
 ### Rerun only timed-out cases
 
 ```bash
-./FaultTolerantQuantumCompiler --bench ex1 --rerun-timeouts
+./FaultTolerantQuantumCompiler --bench all_circuits --rerun-timeouts
 ```
 
 Or:
 
 ```bash
-./FaultTolerantQuantumCompiler --bench ex1 --rerun-timeouts=true
+./FaultTolerantQuantumCompiler --bench all_circuits --rerun-timeouts=true
 ```
 
 ### Make target usage
@@ -309,32 +335,32 @@ Or:
 From `build/`:
 
 ```bash
-make run-bench BENCH_PATH=ex1
+make run-bench BENCH_PATH=all_circuits
 ```
 
 To control benchmark parallelism from the make target:
 
 ```bash
-make run-bench BENCH_PATH=ex1 BENCH_JOBS=8
+make run-bench BENCH_PATH=all_circuits BENCH_JOBS=8
 ```
 
 To control the round-robin `process` field written into the expanded JSON, use a separate process count:
 
 ```bash
-./FaultTolerantQuantumCompiler --bench ex1 --process-count 4
-make run-bench BENCH_PATH=ex1 BENCH_PROCESS_COUNT=4
+./FaultTolerantQuantumCompiler --bench all_circuits --process-count 4
+make run-bench BENCH_PATH=all_circuits BENCH_PROCESS_COUNT=4
 ```
 
 With timeout rerun enabled:
 
 ```bash
-make run-bench BENCH_PATH=ex1 RERUN_TIMEOUTS=1
+make run-bench BENCH_PATH=all_circuits RERUN_TIMEOUTS=1
 ```
 
 You can combine both:
 
 ```bash
-make run-bench BENCH_PATH=ex1 RERUN_TIMEOUTS=1 BENCH_JOBS=8
+make run-bench BENCH_PATH=all_circuits RERUN_TIMEOUTS=1 BENCH_JOBS=8
 ```
 
 ## Where execution results are written
@@ -381,11 +407,11 @@ Benchmark JSON files in `config/` can define parameter sweeps using arrays.
 
 Example benchmark file:
 
-- `config/ex1.json`
+- `config/all_circuits.json`
 
 Expansion output:
 
-- `config/executed/ex1_expanded.json`
+- `config/executed/all_circuits_expanded.json`
 
 Each expanded case is executed once unless already marked `executed=true`.
 
@@ -396,7 +422,7 @@ If `timeout` is set in a case, execution is wrapped with `timeout`; timed-out ru
 Merge every benchmark CSV in `benchmarks/results/` and generate the full plot set:
 
 ```bash
-python3 scripts/generate_benchmark_plots.py --glob
+python3 scripts/plots/generate_benchmark_plots.py --glob
 ```
 
 `--glob` concatenates all CSVs in the results directory (writing a merged CSV to
@@ -406,22 +432,12 @@ configuration, or `--output-dir <dir>` to change where plots are written.
 Generate plots from a single benchmark CSV:
 
 ```bash
-python3 scripts/generate_benchmark_plots.py --csv benchmarks/results/ex1_runs.csv
+python3 scripts/plots/generate_benchmark_plots.py --csv benchmarks/results/all_circuits_runs.csv
 ```
 
 Default output for single-CSV mode:
 
 - `benchmarks/results/<csv_name_without_extension>_plots/`
-
-Create a readable CSV view from one benchmark CSV:
-
-```bash
-python3 scripts/make_readable_csv.py benchmarks/results/ex1_runs.csv
-```
-
-Default output:
-
-- `tmp/<input_name>_readable.csv`
 
 ## Other useful CMake targets
 
@@ -478,12 +494,12 @@ Benchmark from config JSON:
 
 ```bash
 cd build
-./FaultTolerantQuantumCompiler --bench ex1
+./FaultTolerantQuantumCompiler --bench all_circuits
 ```
 
 Benchmark via make target:
 
 ```bash
 cd build
-make run-bench BENCH_PATH=ex1
+make run-bench BENCH_PATH=all_circuits
 ```
