@@ -363,6 +363,313 @@ def plot_summary(by_circuit: dict[str, list[dict]], out_dir: Path, metric: str,
     print(f"  saved: {out_path}")
 
 
+def plot_family_grid_size(by_circuit: dict[str, list[dict]], out_dir: Path,
+                          family: str) -> None:
+    """Per-family line chart of the grid size (area x*y = physical-qubit footprint)
+    used by ours (best config) vs WISQ, one point per circuit.
+
+    Two lines (ours / WISQ), circuits sorted left->right by qubit count, so the
+    grid footprints can be compared as the family scales up. Saved as
+    grid_size_<family>.png. Families with fewer than 2 circuits are skipped.
+    """
+    entries = []
+    for circuit, rows in by_circuit.items():
+        if circuit_family(circuit) != family:
+            continue
+        best, _ = pick_best_worst(rows)
+        our_area = grid_area(best.get("my_x"), best.get("my_y"))
+        wisq_area = grid_area(best.get("wisq_x"), best.get("wisq_y"))
+        if our_area is None or wisq_area is None:
+            continue
+        nq = to_float(best.get("n_qubits")) or 0.0
+        our_dim = f"{str(best.get('my_x', '')).strip()}×{str(best.get('my_y', '')).strip()}"
+        wisq_dim = f"{str(best.get('wisq_x', '')).strip()}×{str(best.get('wisq_y', '')).strip()}"
+        entries.append((circuit, nq, our_area, wisq_area, our_dim, wisq_dim))
+
+    # A per-family line needs at least 2 circuits to be a meaningful trend.
+    if len(entries) < 2:
+        return
+
+    entries.sort(key=lambda e: (e[1], e[0]))
+    circuits = [e[0] for e in entries]
+    our_areas = [e[2] for e in entries]
+    wisq_areas = [e[3] for e in entries]
+    our_dims = [e[4] for e in entries]
+    wisq_dims = [e[5] for e in entries]
+
+    # Win/tie/loss tally (smaller grid footprint is better).
+    EPS = 1e-9
+    ours_wins = sum(1 for o, w in zip(our_areas, wisq_areas) if o < w - EPS)
+    ties = sum(1 for o, w in zip(our_areas, wisq_areas) if abs(o - w) <= EPS)
+    wisq_wins = sum(1 for o, w in zip(our_areas, wisq_areas) if o > w + EPS)
+    total = len(circuits)
+
+    x = np.arange(len(circuits))
+    fig, ax = plt.subplots(figsize=(max(8, len(circuits) * 0.5), 6))
+    ax.plot(x, our_areas, marker="o", color="#2196F3", label="ours (best)")
+    ax.plot(x, wisq_areas, marker="s", color="#E53935", label="WISQ")
+
+    # Above each point: the actual grid written as "x×y".
+    for xi, area, dim in zip(x, our_areas, our_dims):
+        ax.annotate(dim, (xi, area), xytext=(0, 6), textcoords="offset points",
+                    ha="center", va="bottom", fontsize=7, color="#1565C0")
+    for xi, area, dim in zip(x, wisq_areas, wisq_dims):
+        ax.annotate(dim, (xi, area), xytext=(0, 6), textcoords="offset points",
+                    ha="center", va="bottom", fontsize=7, color="#B71C1C")
+
+    summary = (f"ours smaller: {ours_wins}   ties: {ties}   WISQ smaller: {wisq_wins}"
+               f"   (of {total})")
+    ax.text(0.5, 0.97, summary, transform=ax.transAxes, ha="center", va="top",
+            fontsize=11, fontweight="bold",
+            bbox=dict(boxstyle="round", facecolor="#FFF9C4", edgecolor="#BDBDBD"))
+
+    # Log scale when the values span a wide range and are all positive.
+    allv = our_areas + wisq_areas
+    if min(allv) > 0 and max(allv) / min(allv) > 50:
+        ax.set_yscale("log")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(circuits, rotation=90, fontsize=8)
+    ax.set_ylabel("grid size (physical qubits, area x·y)")
+    ax.set_title(f"[{family}] Grid size: ours (best) vs WISQ  ({total} circuits)",
+                 fontweight="bold")
+    ax.legend()
+    ax.grid(axis="y", linestyle=":", alpha=0.4)
+
+    plt.tight_layout()
+    out_path = out_dir / f"grid_size_{family}.png"
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  saved: {out_path}")
+
+
+def smallest_grid_entries(by_circuit: dict[str, list[dict]]) -> list[dict]:
+    """Per circuit, the row whose OUR grid area (x*y) is smallest, with the
+    grid-size comparison fields computed straight from that CSV row.
+
+    Only rows where all four grid dims (my_x, my_y, wisq_x, wisq_y) are present
+    are considered. Selection tiebreak when several rows share our minimal area:
+    smaller WISQ area, then fewer routing steps, then less time. Returns one dict
+    per circuit: {circuit, n_qubits, our_area, wisq_area, pct, ratio} where
+        pct   = (wisq_area - our_area) / our_area * 100   (WISQ extra qubits, %)
+        ratio = wisq_area / our_area                       (WISQ / ours, >0)
+    """
+    entries: list[dict] = []
+    for circuit, rows in by_circuit.items():
+        cand = []
+        for r in rows:
+            oa = grid_area(r.get("my_x"), r.get("my_y"))
+            wa = grid_area(r.get("wisq_x"), r.get("wisq_y"))
+            if oa is None or wa is None or oa <= 0:
+                continue
+            steps = to_float(r.get("my_routing_steps"))
+            steps = steps if steps is not None else float("inf")
+            dur = to_float(r.get("my_duration_s"))
+            dur = dur if dur is not None else float("inf")
+            cand.append((oa, wa, steps, dur, r))
+        if not cand:
+            continue
+        cand.sort(key=lambda t: (t[0], t[1], t[2], t[3]))
+        oa, wa, _, _, r = cand[0]
+        entries.append({
+            "circuit": circuit,
+            "n_qubits": to_float(r.get("n_qubits")),
+            "our_area": oa,
+            "wisq_area": wa,
+            "pct": (wa - oa) / oa * 100.0,
+            "ratio": wa / oa,
+        })
+    return entries
+
+
+def grid_size_stats(entries: list[dict]) -> dict:
+    """All aggregate grid-size numbers, computed only from `entries` (CSV-derived).
+    Returns {} if there is nothing to summarise."""
+    if not entries:
+        return {}
+    pct = np.array([e["pct"] for e in entries], dtype=float)
+    ratio = np.array([e["ratio"] for e in entries], dtype=float)
+    our_tot = float(sum(e["our_area"] for e in entries))
+    wisq_tot = float(sum(e["wisq_area"] for e in entries))
+    EPS = 1e-9
+    ours_smaller = sum(1 for e in entries if e["our_area"] < e["wisq_area"] - EPS)
+    ties = sum(1 for e in entries if abs(e["our_area"] - e["wisq_area"]) <= EPS)
+    wisq_smaller = sum(1 for e in entries if e["our_area"] > e["wisq_area"] + EPS)
+    n = len(entries)
+    return {
+        "n": n,
+        "mean_pct": float(np.mean(pct)),
+        "median_pct": float(np.median(pct)),
+        # geometric mean of the ratio (all areas > 0, so logs are finite).
+        "geomean_ratio": float(np.exp(np.mean(np.log(ratio)))),
+        "p25_pct": float(np.percentile(pct, 25)),
+        "p75_pct": float(np.percentile(pct, 75)),
+        "std_pct": float(np.std(pct, ddof=1)) if n > 1 else 0.0,
+        "min_pct": float(np.min(pct)),
+        "max_pct": float(np.max(pct)),
+        "ours_smaller": ours_smaller,
+        "ties": ties,
+        "wisq_smaller": wisq_smaller,
+        "our_total_qubits": our_tot,
+        "wisq_total_qubits": wisq_tot,
+        "total_qubits_saved": wisq_tot - our_tot,
+    }
+
+
+def plot_grid_overview(by_circuit: dict[str, list[dict]], out_dir: Path) -> None:
+    """Single figure summarising the grid-size gap over ALL circuits.
+
+    Boxplot + jittered points of the per-circuit % difference
+    (wisq_area - our_area)/our_area*100, with mean and median lines, plus a stats
+    box (mean, median, geomean ratio, IQR, min/max, win/tie/loss, total qubits).
+    Every number comes from smallest_grid_entries / grid_size_stats (CSV only).
+    """
+    entries = smallest_grid_entries(by_circuit)
+    s = grid_size_stats(entries)
+    if not s:
+        print("  (no rows with all grid dims; skipping grid overview)")
+        return
+
+    pcts = [e["pct"] for e in entries]
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+    bp = ax.boxplot(pcts, vert=True, widths=0.5, showfliers=False,
+                    patch_artist=True, medianprops=dict(color="#1565C0", linewidth=2))
+    for box in bp["boxes"]:
+        box.set(facecolor="#BBDEFB", edgecolor="#1565C0")
+
+    # All circuits as jittered points so the distribution is visible.
+    rng = np.random.default_rng(0)
+    xj = 1 + (rng.random(len(pcts)) - 0.5) * 0.25
+    ax.scatter(xj, pcts, s=18, color="#0D47A1", alpha=0.5, zorder=3)
+
+    ax.axhline(s["mean_pct"], color="#388E3C", linestyle="--", linewidth=1.3,
+               label=f"mean = {s['mean_pct']:+.1f}%")
+    ax.axhline(s["median_pct"], color="#E53935", linestyle="-", linewidth=1.3,
+               label=f"median = {s['median_pct']:+.1f}%")
+    ax.axhline(0.0, color="gray", linestyle=":", linewidth=1.0)
+
+    stats_txt = (
+        f"circuits: {s['n']}\n"
+        f"mean: {s['mean_pct']:+.1f}%   median: {s['median_pct']:+.1f}%\n"
+        f"geomean ratio (WISQ/ours): ×{s['geomean_ratio']:.2f}\n"
+        f"IQR: {s['p25_pct']:+.1f}% … {s['p75_pct']:+.1f}%   std: {s['std_pct']:.1f}%\n"
+        f"min/max: {s['min_pct']:+.1f}% / {s['max_pct']:+.1f}%\n"
+        f"ours smaller: {s['ours_smaller']}   ties: {s['ties']}   "
+        f"WISQ smaller: {s['wisq_smaller']}\n"
+        f"total qubits — ours: {s['our_total_qubits']:.0f}  "
+        f"WISQ: {s['wisq_total_qubits']:.0f}  "
+        f"saved: {s['total_qubits_saved']:.0f}"
+    )
+    ax.text(0.98, 0.02, stats_txt, transform=ax.transAxes, ha="right", va="bottom",
+            fontsize=9, family="monospace",
+            bbox=dict(boxstyle="round", facecolor="#FFF9C4", edgecolor="#BDBDBD"))
+
+    ax.set_xticks([1])
+    ax.set_xticklabels([f"all circuits (n={s['n']})"])
+    ax.set_ylabel("WISQ extra grid area vs ours  (%)")
+    ax.set_title("Grid-size gap over all circuits\n"
+                 "(% = (wisq_area − our_area) / our_area · 100; >0 ⇒ WISQ bigger)",
+                 fontweight="bold", fontsize=11)
+    ax.legend(loc="upper right")
+    ax.grid(axis="y", linestyle=":", alpha=0.4)
+
+    plt.tight_layout()
+    out_path = out_dir / "grid_overview.png"
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  saved: {out_path}")
+    print(f"    [grid overview] n={s['n']} mean={s['mean_pct']:+.2f}% "
+          f"median={s['median_pct']:+.2f}% geomean_ratio=x{s['geomean_ratio']:.3f} "
+          f"ours_smaller={s['ours_smaller']} ties={s['ties']} "
+          f"wisq_smaller={s['wisq_smaller']} qubits_saved={s['total_qubits_saved']:.0f}")
+
+
+def plot_grid_pct_vs_qubits(by_circuit: dict[str, list[dict]], out_dir: Path) -> None:
+    """Scatter of the per-circuit grid-size % difference vs qubit count, with a
+    least-squares trend line (slope + Pearson r computed from the CSV points).
+    Shows whether our footprint advantage grows or saturates with circuit size."""
+    entries = [e for e in smallest_grid_entries(by_circuit) if e["n_qubits"] is not None]
+    if len(entries) < 2:
+        print("  (need ≥2 circuits with n_qubits; skipping grid % vs qubits)")
+        return
+
+    xs = np.array([e["n_qubits"] for e in entries], dtype=float)
+    ys = np.array([e["pct"] for e in entries], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    ax.scatter(xs, ys, s=30, color="#1565C0", alpha=0.7, label=f"circuits (n={len(xs)})")
+    ax.axhline(0.0, color="gray", linestyle=":", linewidth=1.0)
+
+    # Linear trend (degree-1 least squares) + Pearson correlation.
+    slope, intercept = np.polyfit(xs, ys, 1)
+    order = np.argsort(xs)
+    ax.plot(xs[order], slope * xs[order] + intercept, color="#E53935", linewidth=1.6,
+            label=f"trend: {slope:+.3f}%/qubit")
+    r = float(np.corrcoef(xs, ys)[0, 1])
+
+    ax.text(0.02, 0.98, f"slope = {slope:+.3f} %/qubit\nPearson r = {r:+.3f}",
+            transform=ax.transAxes, ha="left", va="top", fontsize=9, family="monospace",
+            bbox=dict(boxstyle="round", facecolor="#FFF9C4", edgecolor="#BDBDBD"))
+
+    ax.set_xlabel("circuit size (qubits)")
+    ax.set_ylabel("WISQ extra grid area vs ours  (%)")
+    ax.set_title("Grid-size gap vs circuit size", fontweight="bold")
+    ax.legend(loc="upper right")
+    ax.grid(True, linestyle=":", alpha=0.4)
+
+    plt.tight_layout()
+    out_path = out_dir / "grid_pct_vs_qubits.png"
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  saved: {out_path}")
+    print(f"    [grid % vs qubits] slope={slope:+.4f}%/qubit pearson_r={r:+.4f}")
+
+
+def plot_grid_pct_ccdf(by_circuit: dict[str, list[dict]], out_dir: Path) -> None:
+    """Complementary CDF of the per-circuit grid-size % difference: for each
+    threshold Y on the x-axis, the y-value is the fraction of circuits where WISQ
+    uses ≥ Y% more grid area than ours. Reads e.g. "in 90% of circuits WISQ uses
+    ≥ Y% more". Built directly from the CSV-derived percentages."""
+    entries = smallest_grid_entries(by_circuit)
+    if not entries:
+        print("  (no rows with all grid dims; skipping grid % CCDF)")
+        return
+
+    pcts = np.sort(np.array([e["pct"] for e in entries], dtype=float))
+    n = len(pcts)
+    # survival[i] = fraction of circuits with pct >= pcts[i] = (n - i) / n
+    survival = (n - np.arange(n)) / n
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    ax.step(pcts, survival, where="post", color="#1565C0", linewidth=1.8)
+    ax.scatter(pcts, survival, s=14, color="#0D47A1", alpha=0.6, zorder=3)
+    ax.axvline(0.0, color="gray", linestyle=":", linewidth=1.0)
+
+    # Reference guide line at 90% of circuits (the example the user cares about).
+    frac_ref = 0.90
+    # largest threshold Y such that fraction(pct >= Y) >= 0.90 -> the 10th percentile.
+    y_at_90 = float(np.percentile(pcts, 100 * (1 - frac_ref)))
+    ax.axhline(frac_ref, color="#388E3C", linestyle="--", linewidth=1.0)
+    ax.annotate(f"in 90% of circuits\nWISQ uses ≥ {y_at_90:+.1f}% more",
+                xy=(y_at_90, frac_ref), xytext=(10, 20), textcoords="offset points",
+                fontsize=9, color="#2E7D32",
+                arrowprops=dict(arrowstyle="->", color="#2E7D32"))
+
+    ax.set_xlabel("threshold Y: WISQ extra grid area vs ours  (%)")
+    ax.set_ylabel("fraction of circuits with WISQ ≥ Y% bigger")
+    ax.set_ylim(0, 1.02)
+    ax.set_title(f"Grid-size gap — complementary CDF  (n={n})", fontweight="bold")
+    ax.grid(True, linestyle=":", alpha=0.4)
+
+    plt.tight_layout()
+    out_path = out_dir / "grid_pct_ccdf.png"
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
+    print(f"  saved: {out_path}")
+    print(f"    [grid % CCDF] n={n} 90%-of-circuits threshold={y_at_90:+.2f}%")
+
+
 def plot_optimality(by_circuit: dict[str, list[dict]], out_dir: Path) -> None:
     """Scatter figures of our routing optimality, coloured by circuit family.
 
@@ -625,6 +932,11 @@ def main() -> int:
     # Grid footprint gap vs WISQ (per side), one bar per circuit. Needs
     # dim_diff_side (compare_wisq_conn.py) or my_x/wisq_x in the CSV.
     plot_dim_diff(by_circuit, out_dir)
+    # Aggregate grid-size gap over all circuits (ours vs WISQ). Per circuit the
+    # smallest-grid config is used; all numbers come straight from the CSV.
+    plot_grid_overview(by_circuit, out_dir)
+    plot_grid_pct_vs_qubits(by_circuit, out_dir)
+    plot_grid_pct_ccdf(by_circuit, out_dir)
 
     # Routing-optimality scatters (ours), coloured by circuit family.
     plot_optimality(by_circuit, out_dir)
@@ -639,6 +951,8 @@ def main() -> int:
     for fam in families:
         plot_summary(by_circuit, out_dir, "steps", family=fam)
         plot_summary(by_circuit, out_dir, "time", family=fam)
+        # Per-family line chart of grid size (area x·y): ours vs WISQ.
+        plot_family_grid_size(by_circuit, out_dir, fam)
 
     return 0
 
