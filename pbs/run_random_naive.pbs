@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -q cpu
+#PBS -l walltime=48:00:00
+#PBS -N randnaive
+#PBS -j oe
+
+cd "$PBS_O_WORKDIR"
+
+# qasms/ is read-only input from the image (/app/qasms). The dirs below are bound
+# writable because the binary writes into them (PROJECT_ROOT=/app, image fs is RO).
+mkdir -p benchmarks/results benchmarks/logs config universal_set_qasms qasm_graphs logs visualization
+
+LOG_FILE="logs/randnaive_${PBS_JOBID}.log"
+echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
+
+# Which bench config (config/<BENCH_PATH>.json) and how many circuits' grids to read.
+BENCH_PATH="${BENCH_PATH:-random_cube_native_naive}"
+# WISQ's grid per circuit, read verbatim (WISQ is NOT run here).
+GRID_FROM="${GRID_FROM:-benchmarks/results/connectivity_summary_all_wisq.csv}"
+
+{
+echo "JOBID=$PBS_JOBID"
+echo "HOSTNAME=$(hostname)"
+echo "WORKDIR=$(pwd)"
+echo "BENCH_PATH=$BENCH_PATH"
+echo "BENCH_JOBS=$BENCH_JOBS"
+echo "BENCH_PROCESS_COUNT=$BENCH_PROCESS_COUNT"
+echo "PROCESSOR=$PROCESSOR"
+echo "GRID_FROM=$GRID_FROM"
+date
+} >> "$LOG_FILE" 2>&1
+
+apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/ 2>/dev/null || true' >> "$LOG_FILE" 2>&1
+
+# compare_random.py is NEW (not baked into the .sif) so it MUST be present locally.
+if [ ! -f "$PWD/scripts/wisq_compare/compare_random.py" ]; then
+  echo "FATAL: scripts/wisq_compare/compare_random.py missing on the cluster — scp it first." >> "$LOG_FILE" 2>&1
+  exit 1
+fi
+# cw2/cw3 are imported by compare_random.py. Bind the LOCAL copies ONLY if present;
+# otherwise fall back to the versions baked into ftqc.sif (like run_wisq_offset.pbs).
+EXTRA_BINDS=""
+for f in compare_wisq_2.py compare_wisq3.py; do
+  if [ -f "$PWD/scripts/wisq_compare/$f" ]; then
+    EXTRA_BINDS="$EXTRA_BINDS --bind $PWD/scripts/wisq_compare/$f:/app/scripts/wisq_compare/$f"
+  fi
+done
+
+# All shards append to ONE CSV (flock + resume).
+apptainer exec \
+  --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
+  --env OMP_DISPLAY_ENV=TRUE \
+  --bind "$PWD/scripts/wisq_compare/compare_random.py:/app/scripts/wisq_compare/compare_random.py" \
+  $EXTRA_BINDS \
+  --bind "$PWD/config:/app/config" \
+  --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
+  --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
+  --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
+  --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
+  --bind "$PWD/visualization:/app/visualization" \
+  ftqc.sif python3 /app/scripts/wisq_compare/compare_random.py run \
+    --bench "/app/config/${BENCH_PATH}.json" \
+    --grid-from "/app/${GRID_FROM}" \
+    --output "/app/benchmarks/results/${BENCH_PATH}_ours.csv" \
+    --workers "${BENCH_JOBS:-1}" \
+    --process-count "${BENCH_PROCESS_COUNT:-1}" \
+    --processor "${PROCESSOR:-0}" >> "$LOG_FILE" 2>&1
+
+{
+echo "END_JOB=$PBS_JOBID"
+date
+} >> "$LOG_FILE" 2>&1

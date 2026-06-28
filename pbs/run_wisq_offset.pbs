@@ -1,0 +1,63 @@
+#!/bin/bash
+#PBS -q cpu
+#PBS -l walltime=48:00:00
+#PBS -N wisqoffset
+#PBS -j oe
+
+cd "$PBS_O_WORKDIR"
+
+# qasms/ is read-only input from the image (/app/qasms). The dirs below are bound
+# writable because the binary writes into them (PROJECT_ROOT=/app, image fs is RO).
+mkdir -p benchmarks/results benchmarks/logs config universal_set_qasms qasm_graphs logs visualization
+
+LOG_FILE="logs/wisqoffset_${PBS_JOBID}.log"
+echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
+
+# Per-side grid offsets ADDED to WISQ's native side (both compilers forced onto
+# native+offset; WISQ on a parity arch at that side). Comma-separated.
+OFFSETS="${OFFSETS:-0,2,4,6,8}"
+# Cap on WISQ-side grid growth. 0 = hold WISQ at our native+offset grid (it fits
+# there, so 0 keeps strict dimension parity).
+WISQ_MAX_GROW="${WISQ_MAX_GROW:-0}"
+
+{
+echo "JOBID=$PBS_JOBID"
+echo "HOSTNAME=$(hostname)"
+echo "WORKDIR=$(pwd)"
+echo "BENCH_PATH=$BENCH_PATH"
+echo "BENCH_JOBS=$BENCH_JOBS"
+echo "OFFSETS=$OFFSETS"
+echo "WISQ_MAX_GROW=$WISQ_MAX_GROW"
+date
+} >> "$LOG_FILE" 2>&1
+
+apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
+
+# Bind the LOCAL compare_offset.py (and compare_wisq_conn.py, which it does NOT need
+# but keeps the parity-capable cw2 helpers consistent) over the image so the new
+# script runs against the stable cw2/cw3 baked into ftqc.sif. Put the updated
+# scripts/wisq_compare/compare_offset.py on the cluster before submitting.
+apptainer exec \
+  --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
+  --env OMP_DISPLAY_ENV=TRUE \
+  --bind "$PWD/scripts/wisq_compare/compare_offset.py:/app/scripts/wisq_compare/compare_offset.py" \
+  --bind "$PWD/config:/app/config" \
+  --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
+  --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
+  --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
+  --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
+  --bind "$PWD/visualization:/app/visualization" \
+  ftqc.sif python3 /app/scripts/wisq_compare/compare_offset.py run \
+    --bench "/app/config/${BENCH_PATH}.json" \
+    --offsets "$OFFSETS" \
+    --output "/app/benchmarks/results/${BENCH_PATH}_runs.csv" \
+    --workers "$BENCH_JOBS" \
+    --process-count "${BENCH_PROCESS_COUNT:-1}" \
+    --processor "${PROCESSOR:-0}" \
+    --wisq-max-grow "$WISQ_MAX_GROW" \
+    --mr_timeout "${MR_TIMEOUT:-300}" >> "$LOG_FILE" 2>&1
+
+{
+echo "END_JOB=$PBS_JOBID"
+date
+} >> "$LOG_FILE" 2>&1
