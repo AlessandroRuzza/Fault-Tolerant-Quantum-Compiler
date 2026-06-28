@@ -82,6 +82,7 @@ struct CircuitMetrics {
     int num_unique_layers = 0;
     double layer_reuse_ratio = 0.0;
     double depth_width_ratio = 0.0;  // num_layers / num_qubits — tall vs wide
+    double density = 0.0;            // total_gates / (num_qubits * num_layers) — circuit fill ratio
     double avg_layer_size = 0.0;
     int max_layer_size = 0;
     double avg_cnot_per_layer = 0.0;
@@ -521,6 +522,10 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
 
     const double t_layer_ratio     = num_layers > 0 ? static_cast<double>(t_depth)   / num_layers : 0.0;
     const double depth_width_ratio = num_qubits  > 0 ? static_cast<double>(num_layers) / num_qubits : 0.0;
+    // Circuit "fill" density: fraction of (qubit x layer) slots occupied by a gate.
+    const double density = (num_qubits > 0 && num_layers > 0)
+        ? static_cast<double>(total_gates) / (static_cast<double>(num_qubits) * num_layers)
+        : 0.0;
 
     // Layer size distribution
     std::map<int, int> size_dist;
@@ -605,6 +610,7 @@ inline CircuitMetrics compute_structural_metrics(const LayeredCircuit& layered) 
         .num_unique_layers            = num_unique_layers,
         .layer_reuse_ratio            = layer_reuse_ratio,
         .depth_width_ratio            = depth_width_ratio,
+        .density                      = density,
         .avg_layer_size               = avg_layer_size,
         .max_layer_size               = max_layer_size,
         .avg_cnot_per_layer           = avg_cnot_per_layer,
@@ -703,7 +709,7 @@ inline void write_metrics_csv(const CircuitMetrics& metrics,
         "avg_cnot_degree,cnot_degree_gini,cnot_graph_modularity,cnot_pair_rep_gini,"
         "cnot_graph_diameter,cnot_graph_avg_shortest_path,"
         "cnot_edge_weight_stddev,cnot_graph_clustering_coeff,"
-        "total_layers,num_unique_layers,layer_reuse_ratio,depth_width_ratio,"
+        "total_layers,num_unique_layers,layer_reuse_ratio,depth_width_ratio,density,"
         "avg_layer_size,max_layer_size,avg_cnot_per_layer,avg_t_per_layer,"
         "max_t_in_layer,max_cnot_in_layer,t_depth,cnot_depth,t_layer_ratio,"
         "layer_congestion_score,max_repeated_seq_len,"
@@ -753,7 +759,7 @@ inline void write_metrics_csv(const CircuitMetrics& metrics,
         << metrics.avg_cnot_degree << ',' << metrics.cnot_degree_gini << ',' << metrics.cnot_graph_modularity << ',' << metrics.cnot_pair_rep_gini << ','
         << metrics.cnot_graph_diameter << ',' << metrics.cnot_graph_avg_shortest_path << ','
         << metrics.cnot_edge_weight_stddev << ',' << metrics.cnot_graph_clustering_coeff << ','
-        << metrics.num_layers << ',' << metrics.num_unique_layers << ',' << metrics.layer_reuse_ratio << ',' << metrics.depth_width_ratio << ','
+        << metrics.num_layers << ',' << metrics.num_unique_layers << ',' << metrics.layer_reuse_ratio << ',' << metrics.depth_width_ratio << ',' << metrics.density << ','
         << metrics.avg_layer_size << ',' << metrics.max_layer_size << ',' << metrics.avg_cnot_per_layer << ',' << metrics.avg_t_per_layer << ','
         << metrics.max_t_in_layer << ',' << metrics.max_cnot_in_layer << ',' << metrics.t_depth << ',' << metrics.cnot_depth << ',' << metrics.t_layer_ratio << ','
         << metrics.layer_congestion_score << ',' << metrics.max_repeated_seq_len << ','
