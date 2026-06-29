@@ -54,8 +54,8 @@ that certifies routability before any routing is attempted. We give two
 weightings of the field---a discrete \emph{coarse} variant and a continuous
 \emph{fine} variant that interpolates field strength from per-qubit $T$-count and
 per-pair CNOT statistics---and implement everything in an open-source C++20
-OpenQASM-to-lattice-surgery compiler~\cite{ftqc}. On \todo{$N$} arithmetic,
+OpenQASM-to-lattice-surgery compiler~\cite{ftqc}. On 256 arithmetic,
 algorithmic and state-preparation circuits the field placement reduces routing
 steps by \todo{$X\%$} on average over a random baseline and matches
-or improves on WISQ (by \todo{$M_{low}-M_{high}\times$}) for \todo{$k$ of $N$} circuits, 
+or improves on WISQ (by \todo{$M_{low}-M_{high}\times$}) for \todo{$k$ of 256} circuits, 
 while compiling \todo{$Y\times$} faster (Section~\ref{sec:eval}).

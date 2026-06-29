@@ -1,27 +1,32 @@
 % ── Abstract and keywords ────────────────────────────────────
 \begin{abstract}
 Running a quantum circuit fault-tolerantly on a surface-code processor reduces
-to two coupled tasks: placing logical qubits on a two-dimensional lattice and
-routing the lattice-surgery operations that execute its gates. Unlike the near-term (NISQ) setting,
-the bottleneck is not $\SWAP{}$ insertion but the routing corridors---free lanes
-in the lattice through which the gates are routed. We
-present a \emph{Gaussian potential-field} heuristic for the placement
-sub-problem: each candidate tile in the lattice is scored by superposing repulsive fields that preserve routing space and attractive Gaussian fields that pull $T$-heavy qubits toward magic states and tightly interacting
-qubits toward their partners. We implement the
-method in an open-source C++20 OpenQASM compiler and evaluate it against a
-randomized-restart baseline and the state-of-the-art WISQ compiler. Across
-\todo{$N$} circuits the field placement reduces routing steps on average by \todo{$X\%$} 
-over the randomized baseline, and by \todo{$Y\%$} over WISQ for \todo{$k$ of $N$} circuits,
-while compiling roughly \todo{$Z\times$} faster than WISQ's solver-based scheduler.
-The method also offers a tighter-packing mode that does not reserve the $3\times3$ 
-patch spacing WISQ requires, fitting all \todo{$N$} circuits of our benchmark onto 
-strictly smaller grids: 
-this trades a modest increase in routing steps for up to \todo{$G\%$} 
-fewer physical qubits, at the same reduced compilation time.
-\end{abstract}
+to two tasks: placing logical qubits on a two-dimensional lattice and
+routing the lattice-surgery operations that implement the circuit's gates. Unlike in the
+near-term (NISQ) setting, the main bottleneck is not $\SWAP{}$ insertion, but
+the availability of routing corridors: free lanes in the lattice through which
+lattice-surgery operations can be routed.
+
+We present a \emph{Gaussian potential-field} heuristic for the placement
+subproblem. Each candidate tile in the lattice is scored by superposing
+repulsive fields, which preserve routing space, and attractive Gaussian fields,
+which pull $T$-heavy qubits toward magic-state locations and strongly
+interacting qubits toward their partners. We implement the method in an
+open-source C++20 OpenQASM compiler and evaluate it against a
+randomized-restart baseline and the state-of-the-art WISQ compiler.
+
+Across 258 circuits, our field-based placement outperforms WISQ on 60.5\% of
+instances with a 200-minute execution timeout, and on 80.2\% of instances under
+a 5-minute timeout. The method also supports a tighter-packing mode that does
+not reserve the $3 \times 3$ patch spacing required by WISQ, fitting 246 of the
+258 benchmark circuits on grids five \todo{change "lattice sites"} smaller per side than
+WISQ's native layout.
+
 
 \begin{IEEEkeywords}
 qubit mapping, qubit routing, fault-tolerant compilation, surface code,
 lattice surgery, magic states, quantum circuit compilation, heuristic placement,
 potential-field methods, OpenQASM
 \end{IEEEkeywords}
+
+\end{abstract}
