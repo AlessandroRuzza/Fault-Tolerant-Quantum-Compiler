@@ -4,3 +4,5 @@
 [submodule "data"]
 	path = data
 	url = https://github.com/FedericoQuartieri/Fault-Tolerant-Quantum-Compiler-Data.git
+[submodule "paper_overleaf"]
+	path = paper_overleaf
