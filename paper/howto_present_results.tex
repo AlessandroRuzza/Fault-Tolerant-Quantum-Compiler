@@ -1,0 +1,51 @@
+What we have:
+- Full results of our tool
+    - Routing + compilation time
+    - Grid size (+ min size)
+    - Circuit metrics (interaction graph density, etc.)
+
+- Comparison to WISQ
+    - Vittorie assolute
+    - Vittorie consentendo 5\% loss in routing step, con 100-1500x time speedup
+    - Vittorie consentendo 33\% loss in routing step, con -45\% qubit fisici usati (-5 grid size)
+    - Vittorie limitando il timeout WISQ a 1h / 30min / 5min
+    
+    - Minima grid possibile nostra vs WISQ standard
+    
+    - Speedup vs WISQ (tutti)       mediana 300x, media 656x,  max 40'282x
+    - Speedup vs WISQ (vittorie)    mediana 140x, media 184x,  max 542x
+    - Speedup vs WISQ (pareggi)     mediana 367x, media 1054x, max 40'282x
+    - Speedup vs WISQ (sconfitte)   mediana 417x, media 505x,  max 1999x
+    - Speedup vs WISQ (timeout 12k) mediana >19x, media >181x, max >1160x
+
+    - Sconfitte per tempo vs WISQ principalmente in circuiti *piccoli*, dove overhead
+      gaussian pesa più della ricerca WISQ. Random risolve con abbastanza repetition.
+
+
+Nel paper:
+    - Density CNOT graph vs ratio routing step noi/WISQ
+        - Due curve, una packing una naive-critical
+    - Tutti i grafici su optimality
+    - Bar graph comparison con WISQ (optimality)
+    - Tabella con best-routing
+    - Siccome siamo molto veloci a eseguire, è possibile provare più config
+      del nostro tool per trovare il migliore (abbiamo X config candidate a ottime)
+      (es. cube + connectivity + packing + naive-critical)
+
+
+Aggiungere/Cambiare:
+    - Comparison qualitativa con altri state-of-the-art
+    - Background max 1 pagina
+    - Rimpicciolire Fig. 1
+    - Delete Coarse, rename fine a "gaussian" e basta
+    - Tabella circuiti grandi (migliori risultati)
+    - Grafici con i diversi regimi
+        - 5 min timeout vs 1h o 3h
+        - 5\% loss routing win 1000x speedup, win-rate (scritto a testo)
+    - Tagliare pseudocodice?
+
+    - Fig.3 in pagina 1
+    - Taglia pseudocodice
+    - Riduci Fig.1 (singola colonna)
+    - Aggiungi grafici results density vs performance Gaussian
+    
