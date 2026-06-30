@@ -2,8 +2,8 @@
 """
 Show which circuit characteristics drive gaussian's routing performance.
 
-Performance = routing overhead = routing_steps / total_layers
-(1.0 = ideal, no inflation; higher = more routing steps per ideal layer).
+Performance = routing optimality = total_layers / routing_steps
+(1.0 = ideal; lower = more routing steps per ideal layer, i.e. worse).
 
 The runs CSV may contain several configurations per circuit (e.g. different
 safe-passage / routing / weight bundles). A "configuration" is the unique
@@ -11,13 +11,13 @@ combination of the tuning-parameter columns that vary across the CSV.
 
 Output layout (in --out-dir):
 
-  <metric>/<metric>_vs_overhead_deg<N>.png   one subfolder per characteristic;
+  <metric>/<metric>_vs_optimality_deg<N>.png   one subfolder per characteristic;
                                    inside, for each polynomial degree N in 1..5,
                                    a trend curve PER configuration (no scatter
                                    points, one legend entry per config).
-  overhead_correlations_<config>.png   (root) for EACH configuration, a ranked
-                                   bar chart of Spearman(overhead, characteristic).
-  overhead_correlations_combined.png   (root) a single ranking pooling all
+  optimality_correlations_<config>.png   (root) for EACH configuration, a ranked
+                                   bar chart of Spearman(optimality, characteristic).
+  optimality_correlations_combined.png   (root) a single ranking pooling all
                                    configurations together.
 
 Usage:
@@ -138,24 +138,24 @@ def load(runs_csv, metrics_csv):
     header = next(iter(metrics.values())).keys() if metrics else []
     metric_keys = [k for k in header if k not in SKIP_METRICS]
 
-    overhead = defaultdict(dict)
+    optimality = defaultdict(dict)
     metvals = {}
     for cfg, per_circ in steps.items():
         for c, s in per_circ.items():
             tl = g(c, "total_layers")
-            if not tl or tl <= 0:
+            if not tl or tl <= 0 or s <= 0:
                 continue
-            overhead[cfg][c] = s / tl
+            optimality[cfg][c] = tl / s   # total_layers / routing_steps  (<=1, 1=ideal)
             if c not in metvals:
                 metvals[c] = {k: g(c, k) for k in metric_keys}
 
-    configs = sorted(overhead.keys())
+    configs = sorted(optimality.keys())
     usable = []
     for k in metric_keys:
         vals = [metvals[c][k] for c in metvals if metvals[c][k] is not None]
         if len(vals) >= 5 and len(set(vals)) > 1:
             usable.append(k)
-    return {"cfg_cols": cfg_cols, "configs": configs, "overhead": overhead,
+    return {"cfg_cols": cfg_cols, "configs": configs, "optimality": optimality,
             "metvals": metvals, "metrics": usable}
 
 
@@ -170,11 +170,11 @@ def plot_trend(d, key, degree, out_path):
     xr = np.linspace(min(all_x), max(all_x), 200)
 
     fig, ax = plt.subplots(figsize=(10, 6.5), facecolor="white")
-    ax.axhline(1.0, color="#888", ls="--", lw=1.2, zorder=1, label="overhead = 1 (ideal)")
+    ax.axhline(1.0, color="#888", ls="--", lw=1.2, zorder=1, label="optimality = 1 (ideal)")
 
     plotted = False
     for i, cfg in enumerate(configs):
-        pts = [(d["metvals"][c][key], ov) for c, ov in d["overhead"][cfg].items()
+        pts = [(d["metvals"][c][key], ov) for c, ov in d["optimality"][cfg].items()
                if d["metvals"].get(c, {}).get(key) is not None]
         xs = np.array([p[0] for p in pts], float)
         ys = np.array([p[1] for p in pts], float)
@@ -192,15 +192,15 @@ def plot_trend(d, key, degree, out_path):
         plt.close(fig)
         return
 
-    # keep y on a sensible range (high-degree fits can shoot off-screen)
-    ys_all = [ov for cfg in configs for ov in d["overhead"][cfg].values()]
+    # optimality is in (0, 1]; clamp the view (high-degree fits can shoot off-screen)
+    ys_all = [ov for cfg in configs for ov in d["optimality"][cfg].values()]
     if ys_all:
-        ax.set_ylim(min(0.9, min(ys_all)), max(ys_all) * 1.15)
+        ax.set_ylim(max(0.0, min(ys_all) - 0.05), 1.05)
 
     deg_name = {1: "linear", 2: "quadratic", 3: "cubic", 4: "quartic", 5: "quintic"}.get(degree, f"degree {degree}")
     ax.set_xlabel(lab(key), fontsize=11)
-    ax.set_ylabel("Routing overhead = routing_steps / total_layers", fontsize=11)
-    ax.set_title(f"Gaussian routing overhead vs {lab(key)}\n"
+    ax.set_ylabel("Routing optimality = total_layers / routing_steps", fontsize=11)
+    ax.set_title(f"Gaussian routing optimality vs {lab(key)}\n"
                  f"{deg_name} trend (degree {degree}), one curve per configuration",
                  fontsize=12, fontweight="bold")
     ax.grid(alpha=0.25, zorder=0)
@@ -211,7 +211,7 @@ def plot_trend(d, key, degree, out_path):
 
 
 def plot_correlation_ranking(d, pairs, subtitle, out_path):
-    """pairs: list of (circuit, overhead) — may pool several configurations."""
+    """pairs: list of (circuit, optimality) — may pool several configurations."""
     rows = []
     for k in d["metrics"]:
         pts = [(d["metvals"][c][k], ov) for (c, ov) in pairs
@@ -242,13 +242,13 @@ def plot_correlation_ranking(d, pairs, subtitle, out_path):
         ax.text(v + (0.02 if v >= 0 else -0.02), i, f"{v:+.2f}",
                 va="center", ha="left" if v >= 0 else "right", fontsize=8)
     ax.set_xlim(-1, 1)
-    ax.set_xlabel("Spearman( overhead , characteristic )", fontsize=11)
-    ax.set_title("Correlation of each circuit characteristic with gaussian routing overhead\n"
+    ax.set_xlabel("Spearman( optimality , characteristic )", fontsize=11)
+    ax.set_title("Correlation of each circuit characteristic with gaussian routing optimality\n"
                  f"{subtitle}", fontsize=11, fontweight="bold")
     # legend explaining the colours
     from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color="#e15759", label="more overhead (positive)"),
-                       Patch(color="#4e79a7", label="less overhead (negative)")],
+    ax.legend(handles=[Patch(color="#e15759", label="higher optimality (positive)"),
+                       Patch(color="#4e79a7", label="lower optimality (negative)")],
               loc="lower right", fontsize=8.5)
     ax.grid(axis="x", alpha=0.25, zorder=0)
     fig.tight_layout()
@@ -273,17 +273,17 @@ def main():
 
     print(f"Configurations: {len(d['configs'])} | characteristics: {len(d['metrics'])}")
     for cfg in d["configs"]:
-        print(f"  - {config_label(cfg, d['cfg_cols'])}  ({len(d['overhead'][cfg])} circuits)")
+        print(f"  - {config_label(cfg, d['cfg_cols'])}  ({len(d['optimality'][cfg])} circuits)")
 
     # correlation rankings stay in the root out-dir
     for cfg in d["configs"]:
-        pairs = list(d["overhead"][cfg].items())
+        pairs = list(d["optimality"][cfg].items())
         plot_correlation_ranking(d, pairs, f"config: {config_label(cfg, d['cfg_cols'])}",
-                                 out_dir / f"overhead_correlations_{config_slug(cfg, d['cfg_cols'])}.png")
+                                 out_dir / f"optimality_correlations_{config_slug(cfg, d['cfg_cols'])}.png")
     # one combined ranking pooling all configurations
-    combined = [(c, ov) for cfg in d["configs"] for c, ov in d["overhead"][cfg].items()]
+    combined = [(c, ov) for cfg in d["configs"] for c, ov in d["optimality"][cfg].items()]
     plot_correlation_ranking(d, combined, "combined (all configurations pooled)",
-                             out_dir / "overhead_correlations_combined.png")
+                             out_dir / "optimality_correlations_combined.png")
 
     # trend curves: one subfolder per characteristic, the 5 degrees inside
     degrees = [1, 2, 3, 4, 5]
@@ -291,7 +291,7 @@ def main():
         sub = out_dir / k
         sub.mkdir(parents=True, exist_ok=True)
         for deg in degrees:
-            plot_trend(d, k, deg, sub / f"{k}_vs_overhead_deg{deg}.png")
+            plot_trend(d, k, deg, sub / f"{k}_vs_optimality_deg{deg}.png")
     print(f"Wrote {len(d['configs'])} per-config + 1 combined ranking (root), "
           f"and {len(d['metrics'])} characteristic folders x {len(degrees)} degrees to {out_dir}/")
 
