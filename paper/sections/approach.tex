@@ -2,10 +2,20 @@
 \section{Gaussian Field Placement}
 \label{sec:approach}
 
-At the heart of the method is one idea: turn the informal placement goal---sit
-near magic states when $T$-heavy, cluster with frequent interaction partners, and
-leave room to route---into a scalar field over the lattice whose safe maximum is
-the tile we pick. The rest of this section specifies our method. We first define the
+In contrast to compiler flows that jointly optimize placement, routing and
+scheduling through global search or solver-based
+procedures~\cite{wisq,zhu2024ecmas}, we treat initial placement as a fast
+geometric approximation problem. The dominant fault-tolerant pressures can be
+estimated \emph{before} routing begins: a qubit with high non-Clifford demand
+should sit near magic-state supply, strongly interacting qubits should sit near
+one another, and already-placed patches should repel later placements to preserve
+routing capacity. We encode these pressures as a single scalar field over the
+lattice and commit each qubit to the highest-scoring tile that is still provably
+safe for downstream routing. The field acts as an interpretable proxy for routing
+difficulty: attractive terms estimate future communication demand, while repulsive
+terms reserve free space for that demand to materialize without deadlock.
+
+The rest of this section specifies the method. We first define the
 influence field cast by a single source and the score that superposes many of them
 (\S\ref{sec:fields}), then give the two recipes---\emph{coarse} and \emph{fine}---that
 read the field weights off the circuit statistics, and finally describe the greedy
@@ -14,7 +24,7 @@ placement-and-routing loop that consumes the score (\S\ref{sec:loop}).
 \subsection{Influence Fields and the Placement Score}
 \label{sec:fields}
 
-A single \emph{influence field} is an isotropic 2D Gaussian centred at a tile
+A single \emph{influence field} is an isotropic 2D Gaussian centered at a tile
 $(\mu_x,\mu_y)$,
 \begin{equation}
 g(x,y) \;=\; w\,\exp\!\Big(\!-\frac{(x-\mu_x)^2+(y-\mu_y)^2}{2\sigma^2}\Big),
@@ -22,13 +32,13 @@ g(x,y) \;=\; w\,\exp\!\Big(\!-\frac{(x-\mu_x)^2+(y-\mu_y)^2}{2\sigma^2}\Big),
 \end{equation}
 with a non-negative weight $w$. A field is either \emph{attractive}, contributing
 $g(x,y)$, or \emph{repulsive}, contributing the valley
-$\max\!\big(w-g(x,y),\,0\big)$, which is near zero at the centre and rises to $w$
+$\max\!\big(w-g(x,y),\,0\big)$, which is near zero at the center and rises to $w$
 far away; attractive sources thus pull a qubit in, repulsive sources push it out.
 A single width $\sigma$---the same on both axes and independent of the grid
 size---sets the reach of every field: a larger $\sigma$ spreads a source's
 influence over more tiles, a smaller one keeps it local. We use one tuned value of
 $\sigma$ for all fields (Section~\ref{sec:eval}). To bound work, each field is
-evaluated only within a bounded window around its centre, where its contribution
+evaluated only within a bounded window around its center, where its contribution
 is non-negligible, and takes the field's limiting value beyond it---zero if attractive, $w$ if repulsive.
 
 When placing a qubit $q$, the score at a free tile $v$ superposes four families of
@@ -47,14 +57,14 @@ partial mapping $\M$ (Definition~\ref{def:mapping}). The \emph{magic-state}
 term puts one Gaussian on every magic tile $m\in V_{\mathrm m}$, whose sign and
 weight encode $q$'s $T$ demand: a $T$-heavy qubit makes them attractive and is
 drawn toward magic states, whereas a $T$-light qubit makes them repulsive,
-clearing those neighbourhoods for the qubits that need them. The
+clearing those neighborhoods for the qubits that need them. The
 \emph{partner} term puts an attractive Gaussian on the tile of each
 already-mapped partner $p\in P(q)$, pulling strongly coupled qubits together so
 their future surgeries traverse short corridors. The \emph{repulsion} term puts a
 repulsive Gaussian on every already-placed qubit $u\in\M$, discouraging
 overcrowding. Finally $b(v)$ is a single attractive
-Gaussian at the grid centre that keeps the overall mapping compact; in the regime
-where magic states sit on the lattice boundary we subtract a tuned constant from every border tile, penalising boundary placements that obstruct magic state tiles.
+Gaussian at the grid center that keeps the overall mapping compact; in the regime
+where magic states sit on the lattice boundary we subtract a tuned constant from every border tile, penalizing boundary placements that obstruct magic state tiles.
 Figure~\ref{fig:fields} shows the four families and their superposition. Crucially,
 only partners and patches \emph{already committed} contribute, so the field seen by a qubit depends on the placement order---which we exploit in
 Section~\ref{sec:loop}.
@@ -122,21 +132,27 @@ partner fields act only on partners that are already placed, the visiting order
 matters on sparse circuits: when the CNOT interaction graph has density below a
 threshold $\tau$ ($0.7$ by default) we expand placement in \emph{CNOT-BFS} order,
 starting from the highest-importance qubits and visiting each interaction
-neighbourhood breadth-first, heaviest partner first, so every qubit finds its
+neighborhood breadth-first, heaviest partner first, so every qubit finds its
 strongest partner already in place; on dense graphs, which offer no such locality,
 we keep the plain importance order. For each qubit we evaluate the score $S$ of
 \eqref{eq:score} on every free tile, sort the tiles by decreasing $S$, and commit
 the first that doesn't violate safe passage
 (Definition~\ref{def:safepassage}), adding a repulsion field there; if no tile
 passes, placement reports failure.
-Algorithm~\ref{alg:main} summarises the loop and Figure~\ref{fig:frames} shows the potential-field variation as
-the mapping grows.
+Algorithm~\ref{alg:main} summarizes the loop and Figure~\ref{fig:frames} shows the potential-field variation as
+the mapping grows. The loop is intentionally a deterministic, low-overhead
+front-end mapper rather than a globally optimal scheduler: in a regime where exact
+optimization is $\NP$-hard~\cite{herr2017nphard} and the best compilation strategy
+depends on workload properties such as circuit density, logical-qubit count and
+$T$ fraction~\cite{leblond2025comparison}, we deliberately prioritize
+interpretability, compile-time efficiency and routability-preserving geometry over
+global optimality.
 
 \input{algorithms/alg_placement}
 
 The resulting mapping is handed to the router, which produces a routing
 $\Rout$ (Definition~\ref{def:routing}). Our \emph{packing} router schedules as many
-vertex-disjoint corridors per step $P_i$ as it can, prioritising gates that are
+vertex-disjoint corridors per step $P_i$ as it can, prioritizing gates that are
 critical to the downstream schedule, and serves $T$ gates with a dedicated
 strategy that reserves a corridor to the nearest free magic-state tile; a simpler
 \emph{naive-critical} shortest-path router is also available. Because the mapping already

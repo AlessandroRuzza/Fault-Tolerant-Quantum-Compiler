@@ -30,6 +30,11 @@ are the routing-step count $|\Rout|$ (Definition~\ref{def:routing}), bounded bel
 by the circuit depth $\Rmin$, and the compilation time; our implementation
 additionally reports the average gate parallelism and the average non-routed-gate
 percentage per layer (Definition~\ref{def:layering}).
+We emphasize routing-step count and compile time because this work targets the
+initial-placement layer; more global metrics such as space-time volume, logical
+error rate, and factory utilization~\cite{kan2025sparo,hamada2026routing3d} remain
+important downstream consequences, but are not the primary optimization target of
+the present heuristic.
 
 \subsection{Results}
 
@@ -37,7 +42,7 @@ Table~\ref{tab:results} reports the routing-step count $|\Rout|$ and compilation
 time across the suite for the Gaussian method and the two baselines, and
 Figure~\ref{fig:scatter} plots per-circuit $|\Rout|$ of the Gaussian method against
 WISQ: points below
-the diagonal favour our method, while the WISQ column of the table flags circuits
+the diagonal favor our method, while the WISQ column of the table flags circuits
 where WISQ fails or times out though the Gaussian method completes. The field
 weights of Section~\ref{sec:fields} were tuned per gaussian variant (coarse or fine) 
 and safe-passage strategy (cube or connectivity) 

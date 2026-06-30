@@ -4,7 +4,7 @@
 
 \input{figures/fig_overview}
 
-This section recalls the fault-tolerant architecure our compiler targets, formalises it as a graph, and states the placement problem.
+This section recalls the fault-tolerant architecure our compiler targets, formalizes it as a graph, and states the placement problem.
 Figure~\ref{fig:overview} previews the pipeline from a circuit to a lattice-surgery schedule.
 
 \subsection{Surface Codes and Lattice Surgery}
@@ -18,7 +18,7 @@ logical qubit in a two-dimensional \emph{patch} of physical qubits; enlarging th
 distance---suppresses the logical error rate
 exponentially~\cite{fowler2012surface}. A computation is compiled into the Clifford$+T$ gate set, and each gate becomes an operation on patches.
 
-A logical two-qubit gate is realised by \emph{lattice surgery}. Using the
+A logical two-qubit gate is realized by \emph{lattice surgery}. Using the
 free ancilla patches in the corridor between two operands, they are \emph{merged} 
 into a single patch, which jointly measures
 a two-qubit Pauli operator to execute the corresponding gate~\cite{horsman2012lattice,litinski2019game}; the patch is then \emph{split} back into the separate operands. 
@@ -59,7 +59,7 @@ define the \emph{CNOT interaction graph} whose density separates sparse from den
     (i) every mapped pair of CNOT partners is joined by a path of free tiles;
     (ii) every mapped qubit $q$ with $t(q)>0$ has a free path from $\M(q)$ to some
     magic tile $m\in V_{\mathrm m}$; and
-    (iii) at least one magic tile retains a free neighbour, reserved as an entry
+    (iii) at least one magic tile retains a free neighbor, reserved as an entry
     for the qubits with $T$ demand not yet mapped.
 \end{definition}
 
@@ -68,7 +68,7 @@ The \emph{connectivity} test checks
 (i)--(iii) directly on the free lattice and admits any mapping that preserves
 them; it packs patches tightly and fits on smaller grids. The \emph{cube} test is
 a stricter, cheaper sufficient condition: it forbids any new patch within the
-$3\times3$ neighbourhood of an occupied patch, which needs more area but leaves
+$3\times3$ neighborhood of an occupied patch, which needs more area but leaves
 more routing options and yields consistently shorter routes in our experiments. We
 therefore take \emph{cube} as the default and reserve \emph{connectivity} for
 area-constrained lattices.
@@ -87,7 +87,7 @@ area-constrained lattices.
     Given an architecture $\A$, a circuit $\C$ and a mapping $\M$, a \emph{routing} 
     is a sequence $\Rout(\A,\C,\M)=(P_1,\dots,P_{|\Rout|})$ where each element
     ---a \emph{routing step}---is a set of vertex-disjoint paths of $\A$. Each gate is 
-    realised by a unique path $p\in P_i$ between two tiles. 
+    realized by a unique path $p\in P_i$ between two tiles. 
     The steps respect the layering $\Lay(\C)$, 
     and the number of \emph{routing steps} is the length $|\Rout|$.
 \end{definition}
@@ -100,5 +100,5 @@ general~\cite{beverland2022surface,siraichi2018qubit}, so practical routers are
 heuristic. 
 
 \begin{problem}[Optimally-routable Placement]
-    Find a mapping $\M$ that (a) satisfies safe passage and (b) minimises the number of lattice-surgery routing steps $|\Rout|$ required to execute $\C$ on $\A$.
+    Find a mapping $\M$ that (a) satisfies safe passage and (b) minimizes the number of lattice-surgery routing steps $|\Rout|$ required to execute $\C$ on $\A$.
 \end{problem}
