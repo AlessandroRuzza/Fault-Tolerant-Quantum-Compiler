@@ -3,52 +3,83 @@
 \label{sec:intro}
 
 Fault-tolerant quantum computation protects each logical qubit inside a patch of
-a quantum error-correcting code, most commonly the surface code laid out on a
-two-dimensional grid of physical qubits~\cite{fowler2012surface}. On such
-hardware a logical two-qubit gate is performed via \emph{lattice surgery}, which 
-temporarily merges and then splits a strip of
-ancilla patches between the two operands~\cite{horsman2012lattice,litinski2019game}. 
-The non-Clifford $T$
-gate that completes a universal Clifford$+T$ set cannot be applied transversally;
-it is teleported by consuming a distilled \emph{magic state}, which must travel
-from a magic-state factory to the operand through a free corridor of the
-lattice~\cite{bravyi2005magic}.
+a quantum error-correcting code, most commonly the surface code~\cite{fowler2012surface}.
+Patches are then laid out on a two-dimensional grid~\cite{litinski2019game}. On such
+hardware, a logical two-qubit gate is performed via \emph{lattice surgery}, which 
+temporarily merges and then splits a strip of ancilla patches between the 
+two operands~\cite{horsman2012lattice,litinski2019game}. 
+Single-qubit Clifford gates carry no such cost, but the non-Clifford $T$ gate 
+that completes a universal gate set does; 
+it must be teleported by consuming a \emph{magic state}~\cite{bravyi2005magic} 
+from a magic-state-factory patch~\cite{litinski2019game}, which must be connected to 
+the operand, also through lattice surgery.
 
-Compiling a logical circuit onto this fabric splits into two coupled sub-problems. \emph{Mapping} assigns each logical qubit to a patch; \emph{routing}
-then schedules the lattice-surgery operations in time, reserving disjoint ancilla corridors at every step. 
-The initial placement is decisive: $T$-heavy qubits stranded far from a magic state, or frequent partners scattered across the grid, force lattice surgeries to serialise and inflate routing depth.
+Compiling a logical circuit onto this fabric splits into two sub-problems. 
+Placement (\emph{mapping}) assigns each logical qubit to a patch; \emph{routing}
+then schedules the lattice-surgery operations, reserving disjoint
+ancilla corridors at every time-step.
+The initial placement is decisive: $T$-heavy qubits stranded far from a
+magic-state factory, or frequently-interacting partners scattered across the grid,
+often cause lattice surgeries to serialize and inflate routing depth.
 
-We address the placement sub-problem with a \emph{potential-field} heuristic. Each candidate tile is scored by a scalar
-field obtained by superposing two-dimensional Gaussians: attractive hills that
-pull $T$-heavy qubits toward magic states and often-interacting qubits toward
-their partners, and repulsive valleys around already-placed patches that keep
-routing lanes open. Every qubit is committed to the highest-scoring tile that
-passes a \emph{safe-passage} test---a fast reachability check guaranteeing that no
-placement traps a patch from reaching its partners or magic states---so the
-resulting mapping is always routable. The whole pass is deterministic and runs in
-low-order polynomial time, in contrast to the search- and solver-based schedulers
-that dominate current fault-tolerant toolchains.
+We address the placement sub-problem with a \emph{potential-field} heuristic. 
+Each candidate tile is scored by superposing two-dimensional Gaussians---attractive
+toward magic-state factories and frequently-interacting partners, repulsive around
+already-placed patches to keep ancilla corridors open. Every qubit is committed to
+the highest-scoring tile that passes a \emph{safe-passage} test---a fast reachability
+check guaranteeing that no placement traps a patch from reaching its partners or
+magic-state factories---so the resulting mapping is always routable. 
+The whole pass is deterministic and runs in
+low-order polynomial time, in contrast to the heavier fault-tolerant compilation
+strategies such as dependency-aware optimization, topology-centric
+representations, or architecture-level co-optimization.
 
-Qubit mapping and routing are well studied in the NISQ regime, where heuristics
-such as SABRE~\cite{li2019sabre} and the Qiskit transpiler~\cite{qiskit} insert
-$\SWAP{}$ gates to satisfy a fixed coupling graph and the underlying allocation
-problem is known to be $\NP$-hard~\cite{siraichi2018qubit}; these methods
-minimise $\SWAP{}$ count or depth, objectives that do not transfer to a setting with no $\SWAP{}$s. 
-On the fault-tolerant side, Litinski's \emph{game of surface codes}~\cite{litinski2019game} fixes the
-lattice-surgery cost model and tile budgets we optimise against, while Beverland
-et al.~\cite{beverland2022surface} formalise surface-code routing as an
-edge-disjoint-paths problem. WISQ~\cite{wisq}
-is a recent end-to-end fault-tolerant compiler that treats placement and
-scheduling jointly with a dependency-aware solver; it produces high-quality
-schedules but is far slower to compile. Relative to all
-of these, our contribution is deliberately lightweight: instead of solving
-placement and routing together by search, we compute a cheap, interpretable
-placement up front and hand it to a simple downstream router.
+\smallskip
+\noindent\textbf{Related work.}
+Qubit mapping and routing are well studied in the NISQ regime~\cite{siraichi2018qubit}, 
+where heuristics such as SABRE~\cite{li2019sabre} and the Qiskit transpiler~\cite{qiskit} 
+insert $\SWAP{}$ gates to satisfy a fixed coupling graph; these methods
+minimize $\SWAP{}$ count or depth, objectives that do not transfer to
+our setting. Fault-tolerant compilation has since diversified into several
+complementary lines. Its foundations are the surface-code and lattice-surgery
+frameworks~\cite{fowler2012surface,horsman2012lattice} and Litinski's
+\emph{game of surface codes}~\cite{litinski2019game}, whose tile-based space-time
+model fixes the lattice-surgery cost model and tile budgets we optimize against;
+optimizing lattice surgery exactly is itself $\NP$-hard~\cite{herr2017nphard}.
+Routing-oriented methods recast long-range logical communication as graph
+problems---edge-disjoint paths~\cite{beverland2022surface} and three-dimensional
+path scheduling~\cite{hamada2026routing3d}---while end-to-end compilers and joint
+optimizers attack mapping and routing together through scalable intermediate
+representations~\cite{watkins2024compiler}, dependency-aware
+search~\cite{wisq}, or resource-adaptive scheduling~\cite{zhu2024ecmas}. A
+further line broadens the design space beyond conventional place-and-route: SAT
+synthesis of volume-optimal subroutines such as $T$ 
+factories~\cite{tan2024satscalpel}, multi-qubit lattice-surgery
+scheduling~\cite{silva2024multiqubit}, topology-centric intermediate
+representations based on ZX diagrams with search-based layout
+synthesis~\cite{zhou2026topols}, and architecture-level co-optimization of compute
+regions, routing space and magic-state
+resources~\cite{kan2025sparo,bharadwaj2026qomet}. A recurring message of this
+recent work is that no single compilation family is universally optimal: the
+preferred strategy depends on workload properties such as circuit density,
+logical-qubit count and $T$ fraction~\cite{leblond2025comparison}.
+
+Our closest point of comparison is WISQ~\cite{wisq}, a recent end-to-end compiler
+that treats placement and scheduling jointly with a dependency-aware solver; it
+produces high-quality schedules but is far slower to compile. Relative to all of
+these, our contribution is deliberately positioned in a different part of the
+design space. Rather than solving a global mapping-and-routing problem online, we
+compute a cheap, interpretable placement up front---encoding the dominant
+geometric pressures of lattice-surgery execution---and hand it to a simple
+downstream router. The method is thus complementary to global, topology-aware and
+architecture-aware optimizers~\cite{wisq,kan2025sparo,zhou2026topols}: it is a
+fast initial-placement strategy, not a replacement for end-to-end fault-tolerant
+compilation flows.
 
 \smallskip
 \noindent\textbf{Contributions.}
-We formulate fault-tolerant initial placement as the maximisation of a Gaussian
-potential field over the lattice, sourced by magic states, mapped interaction
+We formulate fault-tolerant initial placement as the maximization of a Gaussian
+potential field over the lattice, sourced by magic-state factories, mapped interaction
 partners and already-placed qubits, and we pair it with a safe-passage filter
 that certifies routability before any routing is attempted. We give two
 weightings of the field---a discrete \emph{coarse} variant and a continuous
