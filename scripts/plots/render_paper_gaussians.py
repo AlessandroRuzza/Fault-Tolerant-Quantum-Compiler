@@ -329,12 +329,6 @@ def render_frames(args):
         ax.plot_surface(XI, YI, Zu, cmap=SURF_CMAP, linewidth=0,
                         antialiased=True, vmin=zlo, vmax=zhi, rcount=80, ccount=80)
         placed = [component_center(p) for p in component_paths(frames_dir, "mapped", f)]
-        for (mx, my) in placed:
-            ax.scatter([mx], [my], [Z[my, mx]], color="white", edgecolors="black",
-                       linewidths=0.3, marker="s", s=10, depthshade=False)
-        for (mx, my) in magic:
-            ax.scatter([mx], [my], [Z[my, mx]], color="crimson", edgecolors="black",
-                       linewidths=0.3, marker="*", s=26, depthshade=False)
         ax.set_zlim(zlo, zhi)
         ax.set_title(f"{len(placed)} qubits placed", pad=-2)
         _style_3d(ax)
