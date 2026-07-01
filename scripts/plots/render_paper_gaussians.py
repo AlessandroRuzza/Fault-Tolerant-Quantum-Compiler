@@ -206,17 +206,6 @@ def render_fields(args):
     f_base = gaussian_field(XX, YY, maxX // 2, maxY // 2, sigma, args.base_weight, False)
     S = f_magic + f_cnot + f_mapped + f_base
 
-    # chosen tile = safe maximum of S over free, non-magic tiles
-    occ = set(placed) | set(magic)
-    best, best_v = None, -np.inf
-    for yy in range(h):
-        for xx in range(w):
-            if (xx, yy) in occ:
-                continue
-            v = float(S[int(round(yy * (n - 1) / maxY)), int(round(xx * (n - 1) / maxX))])
-            if v > best_v:
-                best_v, best = v, (xx, yy)
-
     from matplotlib.lines import Line2D
 
     set_style()
@@ -238,7 +227,7 @@ def render_fields(args):
         ax = fig.add_subplot(cell)
         im = ax.imshow(F, origin="lower", extent=[0, maxX, 0, maxY],
                        cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
-        ax.set_title(title, pad=2)
+        ax.set_title(title, pad=2, fontsize=11)
         ax.set_xticks([])
         ax.set_yticks([])
         if title == "magic-state":
@@ -260,9 +249,9 @@ def render_fields(args):
     axS = fig.add_subplot(gs[0:2, 2])
     imS = axS.imshow(S, origin="lower", extent=[0, maxX, 0, maxY],
                      cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
-    axS.set_title(r"superposition $S$", pad=2)
-    axS.set_xlabel("x", labelpad=1)
-    axS.set_ylabel("y", labelpad=1)
+    axS.set_title(r"superposition $S$", pad=2, fontsize=11)
+    axS.set_xlabel("x", labelpad=1, fontsize=10)
+    axS.set_ylabel("y", labelpad=1, fontsize=10)
     axS.set_xticks(range(0, maxX + 1, 2))
     axS.set_yticks(range(0, maxY + 1, 2))
     axS.tick_params(labelsize=5, length=2)
@@ -272,11 +261,8 @@ def render_fields(args):
         axS.plot(mx, my, marker="o", color="white", ms=5, mew=0.7, mec="black")
     for (mx, my) in placed:
         axS.plot(mx, my, marker="s", color="white", ms=5, mew=0.7, mec="black")
-    if best is not None:
-        axS.plot(best[0], best[1], marker="X", color="crimson", ms=10,
-                 mew=0.9, mec="white", zorder=5)
     cbS = fig.colorbar(imS, ax=axS, location="right", shrink=0.9, aspect=22, pad=0.02)
-    cbS.set_label(r"score $S$", fontsize=6)
+    cbS.set_label(r"score $S$", fontsize=10)
     cbS.ax.tick_params(labelsize=7)
 
     # Shared marker legend in the dedicated bottom row.
@@ -289,10 +275,8 @@ def render_fields(args):
                markeredgecolor="black", markersize=9, label="partner"),
         Line2D([0], [0], linestyle="none", marker="s", markerfacecolor="white",
                markeredgecolor="black", markersize=9, label="placed patch"),
-        Line2D([0], [0], linestyle="none", marker="X", markerfacecolor="crimson",
-               markeredgecolor="white", markersize=11, label="safe maximum"),
     ]
-    axL.legend(handles=legend_handles, loc="center", ncol=4, fontsize=10,
+    axL.legend(handles=legend_handles, loc="center", ncol=3, fontsize=10,
                handletextpad=0.4, columnspacing=1.4, framealpha=0.9,
                facecolor="0.85", edgecolor="0.6")
 
@@ -301,7 +285,7 @@ def render_fields(args):
     fig.savefig(out[:-4] + ".png", dpi=200)
     plt.close(fig)
     print(f"[fields] frame={frame} magic={len(magic)} placed={len(placed)} "
-          f"partners={len(partners)} chosen={best} -> {out}")
+          f"partners={len(partners)} -> {out}")
 
 
 # ---------------------------------------------------------------------------
