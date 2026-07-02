@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""compare_wisq_minsearch.py — binary-search WISQ's MINIMUM grid, then run our
-compiler on that exact grid under every bench combination.
+"""compare_wisq_minsearch.py — find WISQ's MINIMUM grid by a bounded upward scan,
+then run our compiler on that exact grid under every bench combination.
 
 Per circuit:
-  1. BINARY-SEARCH the smallest square side s on which WISQ compiles.
-     At each candidate side s:
+  1. SCAN candidate square sides s = 2*ceil(sqrt(n))-1, 2*ceil(sqrt(n)), ...,
+     2*ceil(sqrt(n))+2, in order. At each candidate side s:
        a. our compiler runs at exactly (s, s) with the fixed ARCH-SEARCH config
           (connectivity + packing, border_distance_percentage = 5) and writes
           qasm_graphs/<circuit>.graph — the magic-state positions WISQ will use;
@@ -14,12 +14,13 @@ Per circuit:
        c. WISQ runs on that arch. The candidate SUCCEEDS iff WISQ produces a
           routing result (a WISQ timeout or failure = candidate fails, so a low
           --mr_timeout inflates the "minimum" side).
-     Bounds: lo = 2*ceil(sqrt(n)) - 1 (first side whose even/even sub-lattice can
-     hold n qubits at all), hi = WISQ's native side 2*ceil(sqrt(n)) + 3. If hi
-     itself fails it is raised by doubling steps (+1, +2, +4, ...) until WISQ
-     succeeds or --max-grow raises are spent; each failed raise moves lo past it.
-     The search assumes monotonicity (if WISQ compiles at s it compiles at s+1);
-     the arch is re-generated at every probed side.
+     The scan starts at 2*ceil(sqrt(n))-1, the first side whose even/even
+     sub-lattice can hold n qubits at all; the first succeeding side is WISQ's
+     minimum. If EVERY side up to 2*ceil(sqrt(n))+2 fails, the minimum is taken
+     to be WISQ's native side 2*ceil(sqrt(n))+3 — WISQ compiles there by
+     construction on its own default square_sparse_layout — and WISQ is run on
+     that native layout to obtain the routing steps (flagged
+     wisq_native_fallback=True in the CSV).
   2. Run OUR compiler at the found minimum (s*, s*) — exact grid, never grown —
      once per bench parameter combination (e.g. connectivity|cube x
      packing|naive_critical from data/config/all_circuits_4_variants.json; the
@@ -28,8 +29,9 @@ Per circuit:
 
 Output: one CSV row per (circuit, combination). The wisq_* columns repeat the s*
 search result on every row of the circuit (wisq_x = wisq_y = s*). Columns =
-compare_wisq_2's bench schema + my_status + search_probes, so extract/plot
-tooling keyed on the shared columns keeps working.
+compare_wisq_2's bench schema + my_status + search_probes +
+wisq_native_fallback, so extract/plot tooling keyed on the shared columns keeps
+working.
 
 Resume: rows are appended per combo; on restart, a circuit whose CSV rows already
 carry a successful WISQ result reuses that s* (no re-search, no WISQ re-run) and
@@ -48,9 +50,11 @@ import csv
 import fcntl
 import json
 import math
+import subprocess
 import sys
 import tempfile
 import threading
+import time
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -64,7 +68,8 @@ import compare_wisq_mingrid as cwm  # noqa: E402
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 
-MINSEARCH_CSV_COLUMNS = cw2.BENCH_CSV_COLUMNS + ["my_status", "search_probes"]
+MINSEARCH_CSV_COLUMNS = cw2.BENCH_CSV_COLUMNS + ["my_status", "search_probes",
+                                                 "wisq_native_fallback"]
 
 # Config used ONLY to generate the arch (magic positions + data slots) fed to WISQ
 # during the minimum-side search: the pesi_tunati CONNECTIVITY optimum with
@@ -150,56 +155,95 @@ def probe_side(circuit: str, search_cfg: dict, binary: Path, side: int, parity: 
     return {"ok": False, "why": f"wisq {wisq['status']}"}
 
 
-def search_wisq_min_side(circuit: str, search_cfg: dict, binary: Path, parity: int,
-                         arch_dir: Path, mr_timeout: int, max_grow: int,
-                         attempt_timeout: float | None, run_id: int):
-    """Binary-search the smallest side on which WISQ compiles.
+def run_wisq_native_layout(circuit: str, mr_timeout: int) -> dict:
+    """cw2.run_wisq, but on WISQ's OWN default square_sparse_layout (the native
+    arch WISQ sizes itself). Used only by the native-side fallback. Honors the
+    --wisq-workers concurrency cap."""
+    qasm = cw2.UNIVERSAL_QASMS_DIR / f"{circuit}_universal.qasm"
+    if not qasm.exists():
+        raise FileNotFoundError(f"missing universal QASM: {qasm}")
 
-    Returns ({"side", "wisq", "n_slots", "n_qubits", "search_probes"}, None) or
-    (None, reason).
+    def _run() -> dict:
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            out_path = Path(tmp.name)
+        cmd = [
+            str(cw2.WISQ), str(qasm),
+            "--mode", "scmr",
+            "-arch", "square_sparse_layout",
+            "--output_path", str(out_path),
+            "--mr_timeout", str(mr_timeout),
+        ]
+        print(f"  [wisq]     {' '.join(cmd)}", file=sys.stderr)
+        t0 = time.perf_counter()
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        duration = time.perf_counter() - t0
+
+        routing_steps = None
+        status = "success" if proc.returncode == 0 else "failed"
+        if proc.returncode == 124:
+            status = "timeout"
+        if proc.returncode == 0 and out_path.exists():
+            try:
+                data = json.loads(out_path.read_text())
+                steps = data.get("steps")
+                if steps == "timeout":
+                    status = "timeout"
+                elif isinstance(steps, list):
+                    routing_steps = len(steps)
+            except (json.JSONDecodeError, OSError):
+                status = "bad_output"
+        out_path.unlink(missing_ok=True)
+        return {"routing_steps": routing_steps, "duration_seconds": duration,
+                "status": status, "exit_code": proc.returncode}
+
+    if cw2._wisq_semaphore is not None:
+        with cw2._wisq_semaphore:
+            return _run()
+    return _run()
+
+
+def search_wisq_min_side(circuit: str, search_cfg: dict, binary: Path, parity: int,
+                         arch_dir: Path, mr_timeout: int,
+                         attempt_timeout: float | None, run_id: int):
+    """Scan sides 2*ceil(sqrt(n))-1 .. 2*ceil(sqrt(n))+2 upward; first success is
+    the minimum. All fail -> native side 2*ceil(sqrt(n))+3 (WISQ compiles there
+    by construction on square_sparse_layout), run on the native layout.
+
+    Returns ({"side", "wisq", "n_slots", "n_qubits", "search_probes",
+    "native_fallback"}, None) or (None, reason).
     """
     n_in, _has_t = cw2._input_qasm_qubits_and_t(circuit)
     if not n_in:
         return None, f"cannot determine qubit count for {circuit} (missing/empty qasm)"
 
-    lo = search_lower_bound(n_in)
-    hi = cw2.wisq_native_side(n_in)
+    lo = search_lower_bound(n_in)               # 2*ceil(sqrt(n)) - 1
+    native = cw2.wisq_native_side(n_in)         # 2*ceil(sqrt(n)) + 3
     probes = 0
-    results: dict[int, dict] = {}
-
-    def test(s: int) -> bool:
-        nonlocal probes
+    for side in range(lo, native):              # lo .. native-1 (= 2*ceil(sqrt(n))+2)
         probes += 1
-        r = probe_side(circuit, search_cfg, binary, s, parity, arch_dir,
+        r = probe_side(circuit, search_cfg, binary, side, parity, arch_dir,
                        mr_timeout, attempt_timeout, run_id)
-        results[s] = r
-        print(f"    [{circuit}] probe {s}x{s}: "
+        print(f"    [{circuit}] probe {side}x{side}: "
               f"{'OK' if r['ok'] else 'fail (' + r['why'] + ')'}", file=sys.stderr)
-        return r["ok"]
+        if r["ok"]:
+            return {"side": side, "wisq": r["wisq"], "n_slots": r["n_slots"],
+                    "n_qubits": r["n_qubits"], "search_probes": probes,
+                    "native_fallback": False}, None
 
-    # Establish a succeeding upper bound (native side usually works; raise if not).
-    step = 1
-    raises = 0
-    while not test(hi):
-        if raises >= max_grow:
-            return None, (f"WISQ never compiled up to side {hi} "
-                          f"({raises} raises past native)")
-        lo = hi + 1
-        hi += step
-        step *= 2
-        raises += 1
-
-    # Smallest success in [lo, hi]; hi is a verified success.
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if test(mid):
-            hi = mid
-        else:
-            lo = mid + 1
-
-    win = results[hi]
-    return {"side": hi, "wisq": win["wisq"], "n_slots": win["n_slots"],
-            "n_qubits": win["n_qubits"], "search_probes": probes}, None
+    # Every side below native failed: the minimum is the native side by
+    # construction. Run WISQ on its own square_sparse_layout to get the steps.
+    print(f"    [{circuit}] all sides < {native} failed; native fallback "
+          f"{native}x{native} (square_sparse_layout).", file=sys.stderr)
+    if not (cw2.UNIVERSAL_QASMS_DIR / f"{circuit}_universal.qasm").exists():
+        # No probe ever got past our compiler: generate the universal QASM once.
+        cwm.run_compiler_at(circuit, search_cfg, binary, native, native,
+                            attempt_timeout)
+    wisq = run_wisq_native_layout(circuit, mr_timeout)
+    n_q = cw2.count_qasm_qubits(circuit) or n_in
+    built = cw2.native_built(n_q)
+    return {"side": built["arch"]["width"], "wisq": wisq,
+            "n_slots": built["n_slots"], "n_qubits": n_q,
+            "search_probes": probes, "native_fallback": True}, None
 
 
 def make_combo_row(circuit: str, cfg: dict, found: dict, parity: int,
@@ -220,6 +264,7 @@ def make_combo_row(circuit: str, cfg: dict, found: dict, parity: int,
         "wisq_status": wisq["status"],
         "safe_passage_fallback": "",
         "search_probes": found["search_probes"],
+        "wisq_native_fallback": found.get("native_fallback", ""),
         **cw2.cfg_fields(cfg),
     }
     if mine is None:
@@ -246,11 +291,12 @@ def make_search_error_row(circuit: str, cfg: dict, parity: int) -> dict:
     row["wisq_status"] = "search_failed"
     row["my_status"] = ""
     row["search_probes"] = ""
+    row["wisq_native_fallback"] = ""
     return {k: row.get(k, "") for k in MINSEARCH_CSV_COLUMNS}
 
 
 def process_circuit(circuit: str, combos: list[dict], binary: Path, arch_dir: Path,
-                    parity: int, mr_timeout: int, max_grow: int,
+                    parity: int, mr_timeout: int,
                     attempt_timeout: float | None, run_id: int,
                     search_cfg: dict, prior: dict | None) -> list[dict]:
     """Search (or reuse) WISQ's minimum side, then run every combo at exactly it."""
@@ -261,12 +307,13 @@ def process_circuit(circuit: str, combos: list[dict], binary: Path, arch_dir: Pa
     else:
         found, reason = search_wisq_min_side(
             circuit, search_cfg, binary, parity, arch_dir,
-            mr_timeout, max_grow, attempt_timeout, run_id)
+            mr_timeout, attempt_timeout, run_id)
         if found is None:
             print(f"  ERROR [{circuit}]: {reason}", file=sys.stderr)
             return [make_search_error_row(circuit, cfg, parity) for cfg in combos]
         print(f"  [{circuit}] WISQ minimum side s*={found['side']} "
-              f"({found['search_probes']} probes, "
+              f"({found['search_probes']} probes"
+              f"{', native fallback' if found['native_fallback'] else ''}, "
               f"wisq={found['wisq']['routing_steps']} steps).", file=sys.stderr)
 
     side = found["side"]
@@ -319,6 +366,7 @@ def load_prior(path: Path):
                         "n_qubits": (int(row["n_qubits"])
                                      if str(row.get("n_qubits", "")).strip() else None),
                         "search_probes": row.get("search_probes", ""),
+                        "native_fallback": row.get("wisq_native_fallback", ""),
                     }
                 except (KeyError, ValueError, TypeError):
                     pass
@@ -348,9 +396,6 @@ def main() -> int:
                         help="WISQ mapping/routing timeout in seconds (default: 300). "
                              "A WISQ timeout fails the candidate side, so too low a "
                              "value inflates the found minimum.")
-    parser.add_argument("--max-grow", type=int, default=8,
-                        help="Cap on doubling raises of the upper bound past WISQ's "
-                             "native side before giving up (default: 8).")
     parser.add_argument("--attempt-timeout", type=float, default=None,
                         help="Per-attempt timeout (s) for OUR compiler runs; a timed-out "
                              "run counts as a failure (default: none).")
@@ -403,7 +448,9 @@ def main() -> int:
         for c in circuits:
             n_in, _ = cw2._input_qasm_qubits_and_t(c)
             if n_in:
-                bounds = f"search [{search_lower_bound(n_in)}, {cw2.wisq_native_side(n_in)}]"
+                native = cw2.wisq_native_side(n_in)
+                bounds = (f"scan [{search_lower_bound(n_in)}, {native - 1}], "
+                          f"fallback {native}")
             else:
                 bounds = "NO INPUT QASM"
             print(f"  {c}: {len(by_circuit[c])} combinations, {bounds}")
@@ -451,7 +498,7 @@ def main() -> int:
         try:
             return process_circuit(
                 circuit, combos, binary, arch_dir, args.parity,
-                args.mr_timeout, args.max_grow, args.attempt_timeout,
+                args.mr_timeout, args.attempt_timeout,
                 run_id=i, search_cfg=search_cfg,
                 prior=prior_wisq.get(circuit),
             )
