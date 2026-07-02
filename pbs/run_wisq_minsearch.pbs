@@ -1,0 +1,77 @@
+#!/bin/bash
+#PBS -q cpu
+#PBS -l walltime=48:00:00
+#PBS -N wisqmin
+#PBS -j oe
+
+# WISQ minimum-grid search + our compiler at that exact grid, per bench combo.
+# Submit:
+#   qsub -v BENCH_PATH=all_circuits_4_variants,BENCH_JOBS=8 pbs/run_wisq_minsearch.pbs
+# Env vars:
+#   BENCH_PATH           bench JSON in config/ (without .json)     [required]
+#   BENCH_JOBS           parallel workers, ONE circuit each        [required]
+#   WISQ_WORKERS         max concurrent WISQ instances             [default: BENCH_JOBS]
+#   MR_TIMEOUT           WISQ mapping/routing timeout (s); a WISQ timeout fails
+#                        the candidate side, so too low a value inflates the
+#                        found minimum                             [default: 600]
+#   ATTEMPT_TIMEOUT      per-attempt timeout (s) for OUR compiler  [default: none]
+#   BENCH_PROCESS_COUNT  processes sharing one CSV (shard/circuit) [default: 1]
+#   PROCESSOR            this process index (0-based)              [default: 0]
+
+cd "$PBS_O_WORKDIR"
+
+# qasms/ is NOT created/bound: read-only input baked into the image (/app/qasms).
+# The dirs below are bound writable because the binary writes into them
+# (PROJECT_ROOT=/app, image fs is read-only).
+mkdir -p benchmarks/results benchmarks/logs config universal_set_qasms qasm_graphs logs visualization
+
+LOG_FILE="logs/wisqmin_${PBS_JOBID}.log"
+
+echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
+
+{
+echo "JOBID=$PBS_JOBID"
+echo "HOSTNAME=$(hostname)"
+echo "WORKDIR=$(pwd)"
+echo "BENCH_PATH=$BENCH_PATH"
+echo "BENCH_JOBS=$BENCH_JOBS"
+echo "WISQ_WORKERS=${WISQ_WORKERS:-$BENCH_JOBS}"
+echo "MR_TIMEOUT=${MR_TIMEOUT:-600}"
+echo "ATTEMPT_TIMEOUT=${ATTEMPT_TIMEOUT:-none}"
+date
+} >> "$LOG_FILE" 2>&1
+
+apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
+
+# Whole scripts/ dir is bound (like run_wisq3.pbs): compare_wisq_minsearch.py is
+# newer than the published image and imports the LOCAL compare_wisq_2.py and
+# compare_wisq_mingrid.py, so all three must come from the cluster checkout.
+EXTRA_ARGS=""
+if [ -n "$ATTEMPT_TIMEOUT" ]; then
+  EXTRA_ARGS="--attempt-timeout $ATTEMPT_TIMEOUT"
+fi
+
+apptainer exec \
+  --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
+  --env OMP_DISPLAY_ENV=TRUE \
+  --bind "$PWD/scripts:/app/scripts" \
+  --bind "$PWD/config:/app/config" \
+  --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
+  --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
+  --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
+  --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
+  --bind "$PWD/visualization:/app/visualization" \
+  ftqc.sif python3 /app/scripts/wisq_compare/compare_wisq_minsearch.py \
+    --bench "/app/config/${BENCH_PATH}.json" \
+    --output "/app/benchmarks/results/${BENCH_PATH}_wisqmin.csv" \
+    --workers "$BENCH_JOBS" \
+    --wisq-workers "${WISQ_WORKERS:-$BENCH_JOBS}" \
+    --process-count "${BENCH_PROCESS_COUNT:-1}" \
+    --processor "${PROCESSOR:-0}" \
+    --mr_timeout "${MR_TIMEOUT:-600}" \
+    $EXTRA_ARGS >> "$LOG_FILE" 2>&1
+
+{
+echo "END_JOB=$PBS_JOBID"
+date
+} >> "$LOG_FILE" 2>&1
