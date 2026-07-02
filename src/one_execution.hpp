@@ -554,6 +554,34 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
             routerPtr = std::make_unique<CriticalPackingQubitRouter>(
                 *mapping, *layeredCircuit, *graph, packing_candidates, packing_lookahead,
                 /*diversity_penalty=*/1.0f, packing_commute);
+        } else if (routing_strategy == "greedy_lookahead") {
+            // Deterministic dependency-aware router with one-step lookahead
+            // (see GreedyLookaheadRouter). Score weights overridable via env
+            // for parameter sweeps, same pattern as FTQC_PACKING_*.
+            float greedy_alpha = 3.0f;   // gate's own criticality
+            float greedy_beta = 1.0f;    // path length penalty
+            float greedy_eta = 2.0f;     // residual-routability lookahead term
+            if (const char* env = std::getenv("FTQC_GREEDY_ALPHA")) {
+                try { greedy_alpha = std::stof(env); } catch (...) {}
+            }
+            if (const char* env = std::getenv("FTQC_GREEDY_BETA")) {
+                try { greedy_beta = std::stof(env); } catch (...) {}
+            }
+            if (const char* env = std::getenv("FTQC_GREEDY_ETA")) {
+                try { greedy_eta = std::stof(env); } catch (...) {}
+            }
+            routerPtr = std::make_unique<GreedyLookaheadRouter>(
+                *mapping, *layeredCircuit, *graph, greedy_alpha, greedy_beta, greedy_eta);
+        } else if (routing_strategy == "dascot_sa") {
+            // DASCOT-style routing-order optimizer: simulated annealing over the
+            // front layer's routing order (see AnnealingOrderRouter). The budget
+            // is only spent on congested steps (fully-routed layers exit early).
+            int sa_iterations = 100;
+            if (const char* env = std::getenv("FTQC_SA_ITERS")) {
+                try { sa_iterations = std::stoi(env); } catch (...) {}
+            }
+            routerPtr = std::make_unique<AnnealingOrderRouter>(
+                *mapping, *layeredCircuit, *graph, sa_iterations);
         } else {
             constexpr float CONGESTION_PENALTY_SCALE = 0.35f;
             constexpr CongestionUpdatePolicy CONGESTION_UPDATE_POLICY = CongestionUpdatePolicy::STATIC_GLOBAL;

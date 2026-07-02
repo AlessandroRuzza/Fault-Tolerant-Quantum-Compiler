@@ -379,30 +379,9 @@ Routing QubitRouter::route_layer(const Layer& layer_gates) const {
 }
 
 void QubitRouter::compute_gate_criticality() {
-    // Reverse pass over the circuit's gate sequence. Gates touching the same qubit
-    // form a linear dependency chain (textual order), so a gate's direct successors
-    // are, per qubit, the next gate that touches that qubit. tail = 1 + max tail of
-    // those successors (1 for a gate with none). Computed once; the values stay
-    // valid as already-routed gates are removed, so there is no per-step recompute.
-    const std::vector<Gate>& gates = circuit.getGates();
-    gate_tail_by_id.clear();
-    gate_tail_by_id.reserve(gates.size());
-
-    std::unordered_map<uint32_t, int> next_tail_on_qubit; // qubit -> tail of next gate on it
-    for (auto it = gates.rbegin(); it != gates.rend(); ++it) {
-        const Gate& g = *it;
-        int tail = 1;
-        for (const uint32_t q : g.qubits) {
-            const auto found = next_tail_on_qubit.find(q);
-            if (found != next_tail_on_qubit.end()) {
-                tail = std::max(tail, 1 + found->second);
-            }
-        }
-        gate_tail_by_id[g.id] = tail;
-        for (const uint32_t q : g.qubits) {
-            next_tail_on_qubit[q] = tail;
-        }
-    }
+    // Shared tail definition (see compute_gate_tails). Computed once; the values
+    // stay valid as already-routed gates are removed, so no per-step recompute.
+    gate_tail_by_id = compute_gate_tails(circuit.getGates());
 }
 
 void QubitRouter::route_circuit() {

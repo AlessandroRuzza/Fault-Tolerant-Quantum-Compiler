@@ -16,6 +16,13 @@
 using Path = std::vector<int>;
 using Routing = std::unordered_map<Gate, Path>;
 
+// Longest dependency-chain tail per gate id ("criticality"). Gates touching the
+// same qubit form a linear dependency chain (textual order): a gate's tail is
+// 1 + max tail of the next gate on each of its qubits. Shared definition used
+// by naive_critical, critical_packing, greedy_lookahead and dascot_sa, so all
+// criticality-based strategies rank gates identically.
+std::unordered_map<int, int> compute_gate_tails(const std::vector<Gate>& gates);
+
 // How QubitRouter orders the gates of a layer when deciding which to route first
 // in a step. PATH_LENGTH is the historical behaviour ("naive"); CRITICALITY is
 // the "naive_critical" strategy, which routes critical-path gates first.
@@ -365,6 +372,167 @@ public:
     ) : PackingQubitRouter(m, c, g, num_candidates, criticality_lookahead, diversity_penalty, enable_commute) {
         compute_gate_criticality(c);
     }
+};
+
+/*
+ * DependencyAwareRouterBase
+ *
+ * Shared machinery for the two dependency-aware routers below (greedy_lookahead
+ * and dascot_sa). Both work on the same primitives: the per-gate criticality
+ * (dependency-chain tail, see compute_gate_tails), a shortest-available-path
+ * search identical to NaiveShortestPath's A*, and a per-step commit loop with
+ * the same first-exposure accounting as the other routers. Subclasses only
+ * decide *which* gates of the front layer to route and in what order, by
+ * implementing route_layer_dependency().
+ */
+class DependencyAwareRouterBase : public IQubitRouter {
+protected:
+    const Mapping& mapping;
+    LayeredCircuit& circuit;
+    const Graph& graph;
+
+    // gate.id -> dependency-chain tail. Computed once at construction; stays
+    // valid as routed gates are removed, so it is never recomputed per step.
+    std::unordered_map<int, int> gate_tail_by_id;
+
+    std::vector<Routing> routing_steps;
+    std::unordered_map<std::size_t, std::size_t> non_routed_histogram;
+    std::size_t first_exposure_total = 0;
+    std::size_t first_exposure_routed = 0;
+
+    DependencyAwareRouterBase(const Mapping& m, LayeredCircuit& c, const Graph& g);
+
+    inline int gate_criticality(const Gate& g) const {
+        const auto it = gate_tail_by_id.find(g.id);
+        return it != gate_tail_by_id.end() ? it->second : 0;
+    }
+
+    // Mapped qubit nodes (plus magic states under MAGIC_STOPS_ROUTE): the
+    // permanent obstacles every path of this step must avoid.
+    std::unordered_set<int> base_blocked_nodes() const;
+
+    // A* shortest path with unit costs. Nodes in `blocked` are not traversable
+    // except as the destination (the other gate endpoint / magic state).
+    Path shortest_available_path(int start_node, int end_node, const std::unordered_set<int>& blocked) const;
+
+    // Path for a non-trivial gate given the nodes already consumed this step:
+    // 2q -> path between the two mapped endpoints; T -> shortest path to the
+    // nearest magic state not in used_magic_states. Empty when unroutable now.
+    Path find_gate_path(
+        const Gate& gate,
+        const std::unordered_set<int>& blocked,
+        const std::unordered_set<int>& used_magic_states
+    ) const;
+
+    // Deterministic base order for a layer's gates (independent of Gate::id),
+    // same trick as QubitRouter/PackingQubitRouter use.
+    static std::vector<Gate> deterministic_gate_order(const Layer& layer_gates);
+
+    virtual Routing route_layer_dependency(const Layer& layer_gates) const = 0;
+
+public:
+    void route_circuit() override;
+    inline int get_routing_length() const override { return static_cast<int>(routing_steps.size()); }
+
+    inline double get_non_routed_layer_percentage() const override {
+        if (first_exposure_total == 0) return 0.0;
+        return 100.0 * static_cast<double>(first_exposure_total - first_exposure_routed)
+                     / static_cast<double>(first_exposure_total);
+    }
+
+    void print_routing_steps() const override;
+    inline void reset() override {
+        circuit.reset();
+        routing_steps.clear();
+        first_exposure_total = 0;
+        first_exposure_routed = 0;
+    }
+
+    inline const std::vector<Routing>& get_routing() const { return routing_steps; }
+    inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
+    void print_routing(int i) const;
+    void print_non_routed_histogram() const;
+};
+
+/*
+ * GreedyLookaheadRouter ("greedy_lookahead")
+ *
+ * Deterministic dependency-aware router with one-step lookahead. Instead of
+ * routing the front layer in a fixed precomputed order, each commit re-scores
+ * every still-routable gate g (with current shortest available path p_g):
+ *
+ *   score(g) = alpha * crit(g) - beta * |p_g| + eta * future(g)
+ *
+ * where crit(g) is the dependency-chain tail and future(g) is the criticality
+ * mass of the other candidates whose current paths stay node-disjoint from p_g
+ * (i.e. how much of the front layer remains routable this step after taking
+ * p_g). The best-scoring gate is committed, its nodes are reserved, and only
+ * the candidates whose paths got invalidated are re-searched. This keeps the
+ * DASCOT idea (criticality-weighted progress) without any stochastic search.
+ */
+class GreedyLookaheadRouter : public DependencyAwareRouterBase {
+private:
+    float alpha;  // weight of the gate's own criticality
+    float beta;   // penalty per path node (prefer short corridors)
+    float eta;    // weight of the residual-routability (lookahead) term
+
+    Routing route_layer_dependency(const Layer& layer_gates) const override;
+
+public:
+    GreedyLookaheadRouter(
+        const Mapping& m,
+        LayeredCircuit& c,
+        const Graph& g,
+        float alpha = 3.0f,
+        float beta = 1.0f,
+        float eta = 2.0f
+    ) : DependencyAwareRouterBase(m, c, g), alpha(alpha), beta(beta), eta(eta) {}
+};
+
+/*
+ * AnnealingOrderRouter ("dascot_sa")
+ *
+ * DASCOT-style dependency-aware routing-order optimizer (Molavi et al.),
+ * adapted to this corridor model. Per step, the routing *order* of the front
+ * layer is searched with simulated annealing: an order is evaluated by
+ * route-seq (route each gate on the shortest currently-available path,
+ * skipping gates that no longer fit) and scored by the criticality-weighted
+ * progress sum(crit(g)) over the routed gates, with total path nodes as the
+ * tie-break. Starts from the criticality-descending order, proposes random
+ * position swaps, and commits the best order found. Exits early when an order
+ * routes the whole layer (the score is then provably optimal), so the SA cost
+ * is only paid on congested steps. Deterministically seeded per step.
+ */
+class AnnealingOrderRouter : public DependencyAwareRouterBase {
+private:
+    int sa_iterations;      // proposal budget per congested step
+    unsigned int sa_seed;   // base seed; per-step seed = sa_seed + step index
+
+    struct SeqResult {
+        Routing routing;
+        long long gain = 0;        // sum of crit(g) over routed gates (maximize)
+        std::size_t total_nodes = 0;  // tie-break: fewer consumed nodes is better
+    };
+
+    // route-seq: route `order` greedily in sequence against the step's blocked
+    // set; unroutable gates are skipped (they stay for the next step).
+    SeqResult evaluate_order(
+        const std::vector<Gate>& order,
+        const std::unordered_set<int>& blocked
+    ) const;
+
+    Routing route_layer_dependency(const Layer& layer_gates) const override;
+
+public:
+    AnnealingOrderRouter(
+        const Mapping& m,
+        LayeredCircuit& c,
+        const Graph& g,
+        int sa_iterations = 100,
+        unsigned int sa_seed = 0x5EEDu
+    ) : DependencyAwareRouterBase(m, c, g),
+        sa_iterations(std::max(0, sa_iterations)),
+        sa_seed(sa_seed) {}
 };
 
 #endif // ROUTING_HPP

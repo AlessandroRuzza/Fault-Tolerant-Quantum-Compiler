@@ -1,0 +1,267 @@
+# random vs WISQ (WISQ grid)
+
+Both sides evaluated on WISQ's own grid (wisq_x/wisq_y), reused verbatim from `connectivity_summary_all_wisq.csv` — our compiler was forced onto exactly that grid, WISQ was NOT re-run (its native grid is strategy-independent). Lower routing_steps is better.
+
+- Circuits: **257**  (decided: 242, n/a: 15)
+- `random` WIN (fewer routing steps): **0**  LOSS: **182**  TIE: **60**
+- Geomean `wisq/random` routing-step ratio (>1 ⇒ random better): **0.733**
+
+| circuit | n_qubits | grid | random steps | wisq steps | wisq/random | verdict |
+|---|---|---|---|---|---|---|
+| continuous_3_17_13 | 3 | 7x7 | 17 | 17 | 1.000 | TIE |
+| fredkin_n3 | 3 | 7x7 | 10 | 10 | 1.000 | TIE |
+| simon_n6 | 3 | 7x7 | 2 | 2 | 1.000 | TIE |
+| toffoli_n3 | 3 | 7x7 | 11 | 11 | 1.000 | TIE |
+| adder_n4 | 4 | 7x7 | 8 | 8 | 1.000 | TIE |
+| vqe_uccsd_n4 | 4 | 7x7 | 87 | 87 | 1.000 | TIE |
+| ghz_n5 | 5 | 9x9 | 4 | 4 | 1.000 | TIE |
+| graphstate_n5 | 5 | 9x9 | 4 | 4 | 1.000 | TIE |
+| grover_n5 | 5 | 9x9 | 209 | 209 | 1.000 | TIE |
+| ising_n5 | 5 | 9x9 | 4 | 4 | 1.000 | TIE |
+| qaoa_n5 | 5 | 9x9 | 22 | 14 | 0.636 | LOSS |
+| qec_en_n5 | 5 | 9x9 | 11 | 11 | 1.000 | TIE |
+| qft_n5 | 5 | 9x9 | 14 | 14 | 1.000 | TIE |
+| vqe_real_amp_n5 | 5 | 9x9 | 8 | 8 | 1.000 | TIE |
+| vqe_su2_n5 | 5 | 9x9 | 10 | 8 | 0.800 | LOSS |
+| vqe_two_local_n5 | 5 | 9x9 | 17 | 17 | 1.000 | TIE |
+| wstate_n5 | 5 | 9x9 | 6 | 6 | 1.000 | TIE |
+| multiply_n13 | 6 | 9x9 | 2 | 2 | 1.000 | TIE |
+| qaoa_n6 | 6 | 9x9 | 37 | 33 | 0.892 | LOSS |
+| qaoa_n6_transpiled | 6 | 9x9 | 33 | 33 | 1.000 | TIE |
+| parallel | 8 | 9x9 | 10 | 10 | 1.000 | TIE |
+| t_test | 8 | 9x9 | 110 | 110 | 1.000 | TIE |
+| vqe_uccsd_n8 | 8 | 9x9 | 5446 | 5446 | 1.000 | TIE |
+| multiplier_n15 | 9 | 9x9 | 12 | 12 | 1.000 | TIE |
+| qpe_n9_transpiled | 9 | 9x9 | 42 | 42 | 1.000 | TIE |
+| qram_n20 | 9 | 9x9 | 10 | 8 | 0.800 | LOSS |
+| ghz_n10 | 10 | 11x11 | 9 | 9 | 1.000 | TIE |
+| graphstate_n10 | 10 | 11x11 | 4 | 4 | 1.000 | TIE |
+| grover_n10 | 10 | 11x11 | 11008 | 11008 | 1.000 | TIE |
+| hhl_n10 | 10 | 11x11 | 72044 | 72039 | 1.000 | LOSS |
+| ising_n10 | 10 | 11x11 | 4 | 4 | 1.000 | TIE |
+| qaoa_n10 | 10 | 11x11 | 46 | 46 | 1.000 | TIE |
+| qft_n10 | 10 | 11x11 | 44 | 34 | 0.773 | LOSS |
+| vqe_real_amp_n10 | 10 | 11x11 | 13 | 13 | 1.000 | TIE |
+| vqe_su2_n10 | 10 | 11x11 | 15 | 13 | 0.867 | LOSS |
+| vqe_two_local_n10 | 10 | 11x11 | 43 | 39 | 0.907 | LOSS |
+| wstate_n10 | 10 | 11x11 | 11 | 11 | 1.000 | TIE |
+| seca_n11 | 11 | 11x11 | 19 | 19 | 1.000 | TIE |
+| square_root_n18 | 14 | 11x11 | 52 | 27 | 0.519 | LOSS |
+| factor247_n15 | 15 | 11x11 | 349708 |  |  | n/a |
+| dnn_n16 | 16 | 11x11 | 126 | 52 | 0.413 | LOSS |
+| bigadder_n18_transpiled | 18 | 13x13 | 89 | 88 | 0.989 | LOSS |
+| qft_n18 | 18 | 13x13 | 90 | 71 | 0.789 | LOSS |
+| 19qubits_511gate_153layers | 19 | 13x13 | 104 | 99 | 0.952 | LOSS |
+| 19qubits_521gate_352layers | 19 | 13x13 | 289 | 286 | 0.990 | LOSS |
+| ghz_n20 | 20 | 13x13 | 19 | 19 | 1.000 | TIE |
+| graphstate_n20 | 20 | 13x13 | 8 | 4 | 0.500 | LOSS |
+| grover_n20 | 20 | 13x13 | 2146489 |  |  | n/a |
+| ising_n20 | 20 | 13x13 | 8 | 5 | 0.625 | LOSS |
+| multiplier_n20 | 20 | 13x13 | 3996 | 3990 | 0.998 | LOSS |
+| parallel_big | 20 | 13x13 | 23 | 10 | 0.435 | LOSS |
+| qaoa_n20 | 20 | 13x13 | 115 | 90 | 0.783 | LOSS |
+| qft_20 | 20 | 13x13 | 108 | 82 | 0.759 | LOSS |
+| qft_n20 | 20 | 13x13 | 121 | 82 | 0.678 | LOSS |
+| vqe_real_amp_n20 | 20 | 13x13 | 33 | 23 | 0.697 | LOSS |
+| vqe_su2_n20 | 20 | 13x13 | 26 | 23 | 0.885 | LOSS |
+| vqe_two_local_n20 | 20 | 13x13 | 148 | 101 | 0.682 | LOSS |
+| wstate_n20 | 20 | 13x13 | 22 | 21 | 0.955 | LOSS |
+| bwt_n21 | 21 | 13x13 | 130000 |  |  | n/a |
+| ghz_state_n23 | 23 | 13x13 | 22 | 22 | 1.000 | TIE |
+| ising_n26 | 26 | 15x15 | 12 | 5 | 0.417 | LOSS |
+| 53qubits_155gate_57layers | 27 | 15x15 | 23 | 23 | 1.000 | TIE |
+| multiplier_n45 | 27 | 15x15 | 60 | 36 | 0.600 | LOSS |
+| wstate_n27 | 27 | 15x15 | 29 | 28 | 0.966 | LOSS |
+| adder_n28 | 28 | 15x15 | 25 | 24 | 0.960 | LOSS |
+| bwt_n37 | 28 | 15x15 | 33890 | 33600 | 0.991 | LOSS |
+| ghz_n30 | 30 | 15x15 | 29 | 29 | 1.000 | TIE |
+| graphstate_n30 | 30 | 15x15 | 7 | 6 | 0.857 | LOSS |
+| ising_n30 | 30 | 15x15 | 12 | 6 | 0.500 | LOSS |
+| qaoa_n30 | 30 | 15x15 | 235 | 139 | 0.591 | LOSS |
+| qft_n30 | 30 | 15x15 | 210 | 135 | 0.643 | LOSS |
+| vqe_real_amp_n30 | 30 | 15x15 | 38 | 33 | 0.868 | LOSS |
+| vqe_su2_n30 | 30 | 15x15 | 34 | 33 | 0.971 | LOSS |
+| vqe_two_local_n30 | 30 | 15x15 | 302 | 189 | 0.626 | LOSS |
+| wstate_n30 | 30 | 15x15 | 31 | 31 | 1.000 | TIE |
+| square_root_n45 | 32 | 15x15 | 1391 | 570 | 0.410 | LOSS |
+| 53qubits_332gate_152layers | 39 | 17x17 | 41 | 41 | 1.000 | TIE |
+| ghz_n40 | 40 | 17x17 | 39 | 39 | 1.000 | TIE |
+| graphstate_n40 | 40 | 17x17 | 10 | 5 | 0.500 | LOSS |
+| ising_n40 | 40 | 17x17 | 14 | 7 | 0.500 | LOSS |
+| multiplier_n40 | 40 | 17x17 | 17335 | 17329 | 1.000 | LOSS |
+| qaoa_n40 | 40 | 17x17 | 354 | 208 | 0.588 | LOSS |
+| qft_n40 | 40 | 17x17 | 266 | 179 | 0.673 | LOSS |
+| vqe_real_amp_n40 | 40 | 17x17 | 47 | 43 | 0.915 | LOSS |
+| vqe_su2_n40 | 40 | 17x17 | 45 | 43 | 0.956 | LOSS |
+| vqe_two_local_n40 | 40 | 17x17 | 466 | 285 | 0.612 | LOSS |
+| wstate_n40 | 40 | 17x17 | 41 | 41 | 1.000 | TIE |
+| bwt_n57 | 43 | 17x17 | 68963 |  |  | n/a |
+| multiplier_n75 | 45 | 17x17 | 225 | 60 | 0.267 | LOSS |
+| ghz_n50 | 50 | 19x19 | 49 | 49 | 1.000 | TIE |
+| graphstate_n50 | 50 | 19x19 | 9 | 5 | 0.556 | LOSS |
+| ising_n50 | 50 | 19x19 | 16 | 8 | 0.500 | LOSS |
+| qaoa_n50 | 50 | 19x19 | 491 | 283 | 0.576 | LOSS |
+| qft_n50 | 50 | 19x19 | 380 | 221 | 0.582 | LOSS |
+| randomcircuit_n50 | 50 | 19x19 | 2035 | 1426 | 0.701 | LOSS |
+| synth_n50_d020_mix000_t030_hf000_hm001_r2_s0 | 50 | 19x19 | 107 | 60 | 0.561 | LOSS |
+| synth_n50_d020_mix000_t030_hf000_hm001_r2_s1 | 50 | 19x19 | 108 | 58 | 0.537 | LOSS |
+| synth_n50_d020_mix050_t030_hf000_hm001_r2_s0 | 50 | 19x19 | 98 | 70 | 0.714 | LOSS |
+| synth_n50_d020_mix050_t030_hf000_hm001_r2_s1 | 50 | 19x19 | 96 | 75 | 0.781 | LOSS |
+| synth_n50_d020_mix100_t030_hf000_hm001_r2_s0 | 50 | 19x19 | 87 | 69 | 0.793 | LOSS |
+| synth_n50_d020_mix100_t030_hf000_hm001_r2_s1 | 50 | 19x19 | 89 | 70 | 0.787 | LOSS |
+| synth_n50_d030_mix050_t030_hf000_hm001_r2_s0 | 50 | 19x19 | 137 | 106 | 0.774 | LOSS |
+| synth_n50_d040_mix000_t030_hf000_hm001_r2_s0 | 50 | 19x19 | 193 | 136 | 0.705 | LOSS |
+| synth_n50_d040_mix000_t030_hf000_hm001_r2_s1 | 50 | 19x19 | 170 | 137 | 0.806 | LOSS |
+| synth_n50_d040_mix050_t030_hf000_hm001_r2_s0 | 50 | 19x19 | 217 | 145 | 0.668 | LOSS |
+| synth_n50_d040_mix050_t030_hf000_hm001_r2_s1 | 50 | 19x19 | 197 | 151 | 0.766 | LOSS |
+| synth_n50_d040_mix100_t030_hf000_hm001_r2_s0 | 50 | 19x19 | 172 | 146 | 0.849 | LOSS |
+| synth_n50_d040_mix100_t030_hf000_hm001_r2_s1 | 50 | 19x19 | 176 | 146 | 0.830 | LOSS |
+| vqe_real_amp_n50 | 50 | 19x19 | 56 | 53 | 0.946 | LOSS |
+| vqe_su2_n50 | 50 | 19x19 | 58 | 53 | 0.914 | LOSS |
+| vqe_two_local_n50 | 50 | 19x19 | 677 | 403 | 0.595 | LOSS |
+| wstate_n50 | 50 | 19x19 | 53 | 51 | 0.962 | LOSS |
+| ghz_n60 | 60 | 19x19 | 59 | 59 | 1.000 | TIE |
+| graphstate_n60 | 60 | 19x19 | 11 | 5 | 0.455 | LOSS |
+| ising_n60 | 60 | 19x19 | 22 | 9 | 0.409 | LOSS |
+| multiplier_n60 | 60 | 19x19 | 39736 | 39731 | 1.000 | LOSS |
+| qaoa_n60 | 60 | 19x19 | 702 | 383 | 0.546 | LOSS |
+| qft_n60 | 60 | 19x19 | 449 | 269 | 0.599 | LOSS |
+| vqe_real_amp_n60 | 60 | 19x19 | 69 | 63 | 0.913 | LOSS |
+| vqe_su2_n60 | 60 | 19x19 | 66 | 63 | 0.955 | LOSS |
+| vqe_two_local_n60 | 60 | 19x19 | 1034 | 580 | 0.561 | LOSS |
+| wstate_n60 | 60 | 19x19 | 61 | 61 | 1.000 | TIE |
+| adder_n64_transpiled | 64 | 19x19 | 189 | 181 | 0.958 | LOSS |
+| qaoa_n64 | 64 | 19x19 | 787 | 428 | 0.544 | LOSS |
+| qft_n64 | 64 | 19x19 | 468 | 289 | 0.618 | LOSS |
+| ghz_n70 | 70 | 21x21 | 69 | 69 | 1.000 | TIE |
+| graphstate_n70 | 70 | 21x21 | 13 | 6 | 0.462 | LOSS |
+| ising_n70 | 70 | 21x21 | 20 | 10 | 0.500 | LOSS |
+| qaoa_n70 | 70 | 21x21 | 970 | 477 | 0.492 | LOSS |
+| qft_n70 | 70 | 21x21 | 519 | 317 | 0.611 | LOSS |
+| vqe_real_amp_n70 | 70 | 21x21 | 77 | 73 | 0.948 | LOSS |
+| vqe_su2_n70 | 70 | 21x21 | 77 | 73 | 0.948 | LOSS |
+| vqe_two_local_n70 | 70 | 21x21 | 1275 | 757 | 0.594 | LOSS |
+| wstate_n70 | 70 | 21x21 | 72 | 71 | 0.986 | LOSS |
+| bwt_n97 | 73 | 21x21 | 136596 |  |  | n/a |
+| ghz_n80 | 80 | 21x21 | 79 | 79 | 1.000 | TIE |
+| graphstate_n80 | 80 | 21x21 | 14 | 7 | 0.500 | LOSS |
+| ising_n80 | 80 | 21x21 | 28 | 11 | 0.393 | LOSS |
+| multiplier_n80 | 80 | 21x21 | 71359 | 71289 | 0.999 | LOSS |
+| qaoa_n80 | 80 | 21x21 | 1063 | 591 | 0.556 | LOSS |
+| qft_n80 | 80 | 21x21 | 585 | 352 | 0.602 | LOSS |
+| vqe_real_amp_n80 | 80 | 21x21 | 88 | 83 | 0.943 | LOSS |
+| vqe_su2_n80 | 80 | 21x21 | 84 | 83 | 0.988 | LOSS |
+| vqe_two_local_n80 | 80 | 21x21 | 1660 | 970 | 0.584 | LOSS |
+| wstate_n80 | 80 | 21x21 | 84 | 81 | 0.964 | LOSS |
+| ghz_n90 | 90 | 23x23 | 89 | 89 | 1.000 | TIE |
+| graphstate_n90 | 90 | 23x23 | 15 | 7 | 0.467 | LOSS |
+| ising_n90 | 90 | 23x23 | 28 | 13 | 0.464 | LOSS |
+| qaoa_n90 | 90 | 23x23 | 1410 | 721 | 0.511 | LOSS |
+| qft_n90 | 90 | 23x23 | 655 | 394 | 0.602 | LOSS |
+| vqe_real_amp_n90 | 90 | 23x23 | 96 | 93 | 0.969 | LOSS |
+| vqe_su2_n90 | 90 | 23x23 | 95 | 93 | 0.979 | LOSS |
+| vqe_two_local_n90 | 90 | 23x23 | 1857 | 1134 | 0.611 | LOSS |
+| wstate_n90 | 90 | 23x23 | 91 | 91 | 1.000 | TIE |
+| ghz_n100 | 100 | 23x23 | 99 | 99 | 1.000 | TIE |
+| graphstate_n100 | 100 | 23x23 | 15 | 8 | 0.533 | LOSS |
+| ising_n100 | 100 | 23x23 | 28 | 14 | 0.500 | LOSS |
+| multiplier_n100 | 100 | 23x23 | 111960 |  |  | n/a |
+| qaoa_n100 | 100 | 23x23 | 1607 | 876 | 0.545 | LOSS |
+| qft_n100 | 100 | 23x23 | 724 | 439 | 0.606 | LOSS |
+| randomcircuit_n100 | 100 | 23x23 | 6994 | 4397 | 0.629 | LOSS |
+| synth_n100_d020_mix000_t030_hf000_hm001_r2_s0 | 100 | 23x23 | 345 | 141 | 0.409 | LOSS |
+| synth_n100_d020_mix000_t030_hf000_hm001_r2_s1 | 100 | 23x23 | 354 | 144 | 0.407 | LOSS |
+| synth_n100_d020_mix050_t030_hf000_hm001_r2_s0 | 100 | 23x23 | 366 | 196 | 0.536 | LOSS |
+| synth_n100_d020_mix050_t030_hf000_hm001_r2_s1 | 100 | 23x23 | 362 | 187 | 0.517 | LOSS |
+| synth_n100_d020_mix100_t030_hf000_hm001_r2_s0 | 100 | 23x23 | 363 | 208 | 0.573 | LOSS |
+| synth_n100_d020_mix100_t030_hf000_hm001_r2_s1 | 100 | 23x23 | 375 | 209 | 0.557 | LOSS |
+| synth_n100_d040_mix000_t030_hf000_hm001_r2_s0 | 100 | 23x23 | 735 | 384 | 0.522 | LOSS |
+| synth_n100_d040_mix000_t030_hf000_hm001_r2_s1 | 100 | 23x23 | 725 | 391 | 0.539 | LOSS |
+| synth_n100_d040_mix050_t030_hf000_hm001_r2_s0 | 100 | 23x23 | 778 | 393 | 0.505 | LOSS |
+| synth_n100_d040_mix050_t030_hf000_hm001_r2_s1 | 100 | 23x23 | 736 | 392 | 0.533 | LOSS |
+| synth_n100_d040_mix100_t030_hf000_hm001_r2_s0 | 100 | 23x23 | 709 | 426 | 0.601 | LOSS |
+| synth_n100_d040_mix100_t030_hf000_hm001_r2_s1 | 100 | 23x23 | 719 | 431 | 0.599 | LOSS |
+| vqe_real_amp_n100 | 100 | 23x23 | 107 | 103 | 0.963 | LOSS |
+| vqe_su2_n100 | 100 | 23x23 | 108 | 103 | 0.954 | LOSS |
+| vqe_two_local_n100 | 100 | 23x23 | 2250 | 1391 | 0.618 | LOSS |
+| wstate_n100 | 100 | 23x23 | 102 | 101 | 0.990 | LOSS |
+| ghz_n125 | 125 | 27x27 | 124 | 124 | 1.000 | TIE |
+| graphstate_n125 | 125 | 27x27 | 18 | 8 | 0.444 | LOSS |
+| ising_n125 | 125 | 27x27 | 34 | 15 | 0.441 | LOSS |
+| qaoa_n125 | 125 | 27x27 | 2394 | 1265 | 0.528 | LOSS |
+| qft_n125 | 125 | 27x27 | 830 | 527 | 0.635 | LOSS |
+| vqe_real_amp_n125 | 125 | 27x27 | 131 | 128 | 0.977 | LOSS |
+| vqe_su2_n125 | 125 | 27x27 | 133 | 128 | 0.962 | LOSS |
+| vqe_two_local_n125 | 125 | 27x27 | 3208 | 1993 | 0.621 | LOSS |
+| wstate_n125 | 125 | 27x27 | 126 | 126 | 1.000 | TIE |
+| qft_n128 | 128 | 27x27 | 881 | 543 | 0.616 | LOSS |
+| cat_n130 | 130 | 27x27 | 129 | 129 | 1.000 | TIE |
+| bwt_n177 | 133 | 27x27 | 271642 |  |  | n/a |
+| ghz_n150 | 150 | 29x29 | 149 | 149 | 1.000 | TIE |
+| graphstate_n150 | 150 | 29x29 | 23 | 12 | 0.522 | LOSS |
+| ising_n150 | 150 | 29x29 | 38 | 19 | 0.500 | LOSS |
+| qaoa_n150 | 150 | 29x29 | 3208 | 1722 | 0.537 | LOSS |
+| qft_n150 | 150 | 29x29 | 969 | 631 | 0.651 | LOSS |
+| vqe_real_amp_n150 | 150 | 29x29 | 159 | 153 | 0.962 | LOSS |
+| vqe_su2_n150 | 150 | 29x29 | 156 | 153 | 0.981 | LOSS |
+| vqe_two_local_n150 | 150 | 29x29 | 4550 | 2732 | 0.600 | LOSS |
+| wstate_n150 | 150 | 29x29 | 156 | 151 | 0.968 | LOSS |
+| bv_n280 | 153 | 29x29 | 152 | 152 | 1.000 | TIE |
+| ghz_n175 | 175 | 31x31 | 174 | 174 | 1.000 | TIE |
+| graphstate_n175 | 175 | 31x31 | 22 | 10 | 0.455 | LOSS |
+| ising_n175 | 175 | 31x31 | 44 | 20 | 0.455 | LOSS |
+| qaoa_n175 | 175 | 31x31 | 4086 | 2259 | 0.553 | LOSS |
+| qft_n175 | 175 | 31x31 | 1179 | 723 | 0.613 | LOSS |
+| vqe_real_amp_n175 | 175 | 31x31 | 184 | 178 | 0.967 | LOSS |
+| vqe_su2_n175 | 175 | 31x31 | 182 | 178 | 0.978 | LOSS |
+| vqe_two_local_n175 | 175 | 31x31 | 5839 | 3552 | 0.608 | LOSS |
+| wstate_n175 | 175 | 31x31 | 180 | 176 | 0.978 | LOSS |
+| ghz_n200 | 200 | 33x33 | 199 | 199 | 1.000 | TIE |
+| graphstate_n200 | 200 | 33x33 | 24 | 12 | 0.500 | LOSS |
+| ising_n200 | 200 | 33x33 | 48 | 22 | 0.458 | LOSS |
+| multiplier_n200 | 200 | 33x33 | 450169 |  |  | n/a |
+| qaoa_n200 | 200 | 33x33 | 5136 | 2844 | 0.554 | LOSS |
+| qft_n200 | 200 | 33x33 | 1285 | 822 | 0.640 | LOSS |
+| randomcircuit_n200 | 200 | 33x33 | 21323 |  |  | n/a |
+| synth_n200_d020_mix000_t030_hf000_hm001_r2_s0 | 200 | 33x33 | 1079 | 419 | 0.388 | LOSS |
+| synth_n200_d020_mix000_t030_hf000_hm001_r2_s1 | 200 | 33x33 | 1075 | 384 | 0.357 | LOSS |
+| synth_n200_d020_mix050_t030_hf000_hm001_r2_s0 | 200 | 33x33 | 1114 | 605 | 0.543 | LOSS |
+| synth_n200_d020_mix050_t030_hf000_hm001_r2_s1 | 200 | 33x33 | 1092 | 605 | 0.554 | LOSS |
+| synth_n200_d020_mix100_t030_hf000_hm001_r2_s0 | 200 | 33x33 | 1097 | 647 | 0.590 | LOSS |
+| synth_n200_d020_mix100_t030_hf000_hm001_r2_s1 | 200 | 33x33 | 1103 | 647 | 0.587 | LOSS |
+| synth_n200_d040_mix000_t030_hf000_hm001_r2_s0 | 200 | 33x33 | 2185 | 1153 | 0.528 | LOSS |
+| synth_n200_d040_mix000_t030_hf000_hm001_r2_s1 | 200 | 33x33 | 2172 | 1161 | 0.535 | LOSS |
+| synth_n200_d040_mix050_t030_hf000_hm001_r2_s0 | 200 | 33x33 | 2106 | 1248 | 0.593 | LOSS |
+| synth_n200_d040_mix050_t030_hf000_hm001_r2_s1 | 200 | 33x33 | 2250 | 1251 | 0.556 | LOSS |
+| synth_n200_d040_mix100_t030_hf000_hm001_r2_s0 | 200 | 33x33 | 2202 | 1402 | 0.637 | LOSS |
+| synth_n200_d040_mix100_t030_hf000_hm001_r2_s1 | 200 | 33x33 | 2178 | 1405 | 0.645 | LOSS |
+| vqe_real_amp_n200 | 200 | 33x33 | 205 | 203 | 0.990 | LOSS |
+| vqe_su2_n200 | 200 | 33x33 | 210 | 203 | 0.967 | LOSS |
+| vqe_two_local_n200 | 200 | 33x33 | 7120 | 4464 | 0.627 | LOSS |
+| wstate_n200 | 200 | 33x33 | 202 | 201 | 0.995 | LOSS |
+| ghz_n255 | 255 | 35x35 | 254 | 254 | 1.000 | TIE |
+| ghz_state_n255 | 255 | 35x35 | 254 | 254 | 1.000 | TIE |
+| cat_n260 | 260 | 37x37 | 259 | 259 | 1.000 | TIE |
+| ghz_n300 | 300 | 39x39 | 299 | 299 | 1.000 | TIE |
+| graphstate_n300 | 300 | 39x39 | 36 | 17 | 0.472 | LOSS |
+| ising_n300 | 300 | 39x39 | 70 | 33 | 0.471 | LOSS |
+| multiplier_n300 | 300 | 39x39 | 1014118 |  |  | n/a |
+| qaoa_n300 | 300 | 39x39 | 10140 | 5908 | 0.583 | LOSS |
+| qft_n300 | 300 | 39x39 | 1842 | 1224 | 0.664 | LOSS |
+| vqe_real_amp_n300 | 300 | 39x39 | 305 | 303 | 0.993 | LOSS |
+| vqe_su2_n300 | 300 | 39x39 | 306 | 303 | 0.990 | LOSS |
+| vqe_two_local_n300 | 300 | 39x39 | 14306 |  |  | n/a |
+| wstate_n300 | 300 | 39x39 | 301 | 301 | 1.000 | TIE |
+| qft_n320 | 320 | 39x39 | 11629 |  |  | n/a |
+| ghz_n400 | 400 | 43x43 | 399 | 399 | 1.000 | TIE |
+| graphstate_n400 | 400 | 43x43 | 40 | 20 | 0.500 | LOSS |
+| ising_n400 | 400 | 43x43 | 76 | 42 | 0.553 | LOSS |
+| qaoa_n400 | 400 | 43x43 | 16683 |  |  | n/a |
+| qft_n400 | 400 | 43x43 | 2485 | 1654 | 0.666 | LOSS |
+| randomcircuit_n400 | 400 | 43x43 | 120946 |  |  | n/a |
+| vqe_real_amp_n400 | 400 | 43x43 | 407 | 403 | 0.990 | LOSS |
+| vqe_su2_n400 | 400 | 43x43 | 410 | 403 | 0.983 | LOSS |
+| vqe_two_local_n400 | 400 | 43x43 | 23777 |  |  | n/a |
+| wstate_n400 | 400 | 43x43 | 401 | 401 | 1.000 | TIE |
+| ising_n420 | 420 | 45x45 | 80 | 44 | 0.550 | LOSS |
+| adder_n433 | 433 | 45x45 | 264 | 249 | 0.943 | LOSS |

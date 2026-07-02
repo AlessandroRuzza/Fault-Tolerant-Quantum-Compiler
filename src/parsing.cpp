@@ -198,6 +198,8 @@ std::string normalize_routing_method(std::string value) {
     if (value == "naivecritical" || value == "critical" ) return "naive_critical";
     if (value == "pack" || value == "disjoint" || value == "disjoint_paths" ) return "packing";
     if (value == "criticalpacking" || value == "critpacking" || value == "crit_packing" ) return "critical_packing";
+    if (value == "dascot" || value == "sa" || value == "annealing" || value == "sa_order" || value == "dascotsa" ) return "dascot_sa";
+    if (value == "greedy" || value == "lookahead" || value == "lookahead_greedy" || value == "dependency_greedy" || value == "greedylookahead" ) return "greedy_lookahead";
     return value;
 }
 
@@ -211,7 +213,7 @@ std::string normalize_t_routing_mode(std::string value) {
 
 void validate_routing_method(const std::string& value, const char* executable) {
     const std::string normalized = normalize_routing_method(value);
-    const std::vector<std::string> valid_methods = {"congestion", "naive", "naive_critical", "packing", "critical_packing", "boost"};
+    const std::vector<std::string> valid_methods = {"congestion", "naive", "naive_critical", "packing", "critical_packing", "greedy_lookahead", "dascot_sa", "boost"};
     if (std::find(valid_methods.begin(), valid_methods.end(), normalized) == valid_methods.end()) {
         std::cerr << "Invalid routing method: " << value << "\n";
         print_usage(executable);
@@ -332,9 +334,9 @@ void print_usage(const char* executable) {
               << "[--bfs-density-threshold <float>, default=0.70 | CNOT-graph density below which CNOT-BFS order is used; <0 always heap; env FTQC_BFS_DENSITY_THRESHOLD overrides]\n"
               << "[--gaussian-sigma <float> > 0, default=0.4 | absolute gaussian stddev, same on both axes, graph-independent]\n"
 #if FTOQC_HAS_BOOST_ROUTER
-              << "[--routing-strategy [congestion|naive|naive_critical|packing|critical_packing|boost]]\n"
+              << "[--routing-strategy [congestion|naive|naive_critical|packing|critical_packing|greedy_lookahead|dascot_sa|boost]]\n"
 #else
-              << "[--routing-strategy [congestion|naive|naive_critical|packing|critical_packing]] (boost unavailable in this build)\n"
+              << "[--routing-strategy [congestion|naive|naive_critical|packing|critical_packing|greedy_lookahead|dascot_sa]] (boost unavailable in this build)\n"
 #endif
               << "[--t-routing-mode [normal_t_routing|smart_t_routing]]\n"
               << "[--patience-threshold <integer>=0]\n"

@@ -103,30 +103,9 @@ std::pair<int, int> PackingQubitRouter::gate_priority(const Gate& /*g*/, int qub
 }
 
 void CriticalPackingQubitRouter::compute_gate_criticality(const Circuit& circuit) {
-    // Reverse pass over the circuit's gate sequence. Gates touching the same qubit
-    // form a linear dependency chain (textual order), so a gate's tail is
-    // 1 + max tail of the next gate on each of its qubits. Mirrors
-    // QubitRouter::compute_gate_criticality so "critical_packing" and
-    // "naive_critical" share the exact same criticality definition.
-    const std::vector<Gate>& gates = circuit.getGates();
-    gate_tail_by_id.clear();
-    gate_tail_by_id.reserve(gates.size());
-
-    std::unordered_map<uint32_t, int> next_tail_on_qubit;  // qubit -> tail of next gate on it
-    for (auto it = gates.rbegin(); it != gates.rend(); ++it) {
-        const Gate& g = *it;
-        int tail = 1;
-        for (const uint32_t q : g.qubits) {
-            const auto found = next_tail_on_qubit.find(q);
-            if (found != next_tail_on_qubit.end()) {
-                tail = std::max(tail, 1 + found->second);
-            }
-        }
-        gate_tail_by_id[g.id] = tail;
-        for (const uint32_t q : g.qubits) {
-            next_tail_on_qubit[q] = tail;
-        }
-    }
+    // Shared tail definition (see compute_gate_tails), so "critical_packing" and
+    // "naive_critical" rank gates by the exact same criticality.
+    gate_tail_by_id = compute_gate_tails(circuit.getGates());
 }
 
 Routing PackingQubitRouter::route_layer_packing(const Layer& layer_gates) const {

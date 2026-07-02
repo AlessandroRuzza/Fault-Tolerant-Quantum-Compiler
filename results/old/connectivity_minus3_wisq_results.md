@@ -1,68 +1,63 @@
 # Risultati WISQ-native MENO 3 — connectivity
 
-
-**connectivity con i pesi finali** (gaussian/fine, safe_passage=connectivity, border=15, sigma=0.7, mapped=20, cnot_high=8, magic=0, ext=−15, bfs=0.70, center_circle, packing, smart_t_routing, patience=3). Griglia fissa a `wisq_native_side −3` per lato; WISQ resta sulla sua griglia nativa come riferimento.
-
-
-Dati da: `connectivity_vs_wisq_minus3.csv` — **261 circuiti**.
-
+**connectivity con i pesi finali** (gaussian/fine, safe_passage=connectivity, border=15, sigma=0.7, mapped=20, cnot_high=8, magic=0, ext=−15, bfs=0.70, center_circle, packing, smart_t_routing, patience=3).
+Griglia fissa a `wisq_native_side −3` per lato; WISQ resta sulla sua griglia nativa come riferimento.
+Dati: `conn_wisq_minus3_wisqconn.csv` — CSV corrente con **263 righe**. Esclusi da questa analisi: `knn_n25`, `test` → **261 circuiti**.
 
 ---
-
 
 ## Tabella riassuntiva delle performance
 
 | Categoria | Circuiti | Di cui noi +veloci |
 |-----------|----------|--------------------|
 | **Totale circuiti analizzati** | 261 | — |
-| **Nostro mapping FALLISCE** | 5 | — |
-| **Mappiamo con successo** | 256 | — |
-| ↳ WISQ va in timeout (noi vinciamo) | 20 | — |
+| **Nostro mapping FALLISCE a −3** | 5 | — |
+| **Mappiamo a −3 con successo** | 256 | — |
+| ↳ WISQ va in timeout sulla sua nativa (noi vinciamo) | 20 | — |
 | ↳ Entrambi completano | 236 | — |
-|   ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89.3%) |
-|   ↳ Pareggio su steps | 117 | 112 (95.7%) |
-|   ↳ WISQ vince su steps | 91 (ratio mediana 0.75×) | 91 (100.0%) |
+|   ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89%) |
+|   ↳ Pareggio su steps | 117 | 112 (96%) |
+|   ↳ WISQ vince su steps | 91 (ratio mediana 0.75×) | 91 (100%) |
 | | | |
 | **TOTALE VITTORIE NOSTRE** | **160 / 261 (61.3%)** | — |
-| ↳ Noi completiamo, WISQ va in timeout | 20 / 261 (7.7%) | — |
-| ↳ Noi vinciamo su steps (WISQ completa) | 28 / 261 (10.7%) | — |
+| ↳ Mappiamo a −3, WISQ va in timeout | 20 / 261 (7.7%) | — |
+| ↳ Vinciamo su steps (WISQ completa) | 28 / 261 (10.7%) | — |
 | ↳ Pareggio su steps, noi più veloci | 112 / 261 (42.9%) | — |
 | | | |
-| **SCONFITTE (mapping fallito)** | **5 / 261 (1.9%)** | — |
+| **SCONFITTE NOSTRE (mapping fallito a −3)** | **5 / 261 (1.9%)** | — |
 
-Circuiti dove non mappiamo: `grover_n5`, `adder_n4`, `bigadder_n18_transpiled`, `hhl_n10`, `qram_n20`.
+Circuiti dove non mappiamo a −3: `adder_n4`, `bigadder_n18_transpiled`, `grover_n5`, `hhl_n10`, `qram_n20`.
 
 ---
 
-
 ## Footprint: quanto scendiamo sotto WISQ
 
-| Δ lati vs WISQ (`dim_diff_side`) | Circuiti |
+| Δ lati sotto WISQ (`dim_diff_side`) | Circuiti |
 |---|---|
-| +5 | 1 |
-| +3 | 252 |
-| +1 | 1 |
-| -1 | 1 |
-| -5 | 1 |
+| +3 | 252 (target) |
+| −5 | 1 (`bv_n280`) |
+| −1 | 1 (`multiplier_n75`) |
+| +1 | 1 (`multiplier_n45`) |
+| +5 | 1 (`grover_n10`) |
 
 **Risparmio di qubit fisici** vs WISQ sui 256 successi: mediano **26.5%**, aggregato **20.7%** (area `my_x·my_y` vs `wisq_x·wisq_y`).
 
 ---
 
-## Trade-off: routing steps persi vs qubit fisici risparmiati
+## Trade-off −3: routing steps persi vs qubit fisici risparmiati
 
 Step su 236 circuiti dove entrambi completano; qubit fisici su tutti i 256 che mappiamo.
 
-**A) Contro WISQ** (noi shrink vs WISQ nativa):
+**A) Contro WISQ** (noi −3 vs WISQ nativa):
 
 | | noi | WISQ nativa | differenza |
 |---|--------|-------------|------------|
 | Routing steps (aggregato) | 278.922 | 225.953 | **+23.4%** |
-| Qubit fisici (aggregato) | 119.588 | 150.864 | **-20.7%** (31.276 in meno) |
+| Qubit fisici (aggregato) | 119.588 | 150.864 | **−20.7%** (31.276 in meno) |
 
 Step per-circuito: WIN 28 / TIE 117 / LOSS 91, mediana +0%.
 
-**B) Costo puro dello shrink** (noi nativa vs noi shrink, stessa config — `connectivity_vs_wisq.csv`, 253 circuiti):
+**B) Costo puro dello shrink** (noi −3 vs noi stessi a nativa, stessa config — `connectivity_summary_all`, 253 circuiti):
 
 | | noi nativa | noi shrink | differenza |
 |---|-----------|------------|------------|
@@ -72,276 +67,240 @@ Mediana **+0%**, **145/253 circuiti identici**.
 
 ---
 
+## Cliff QFT — il vero collo di bottiglia (indipendente dalla dimensione)
 
-## Routing steps in aggregato (nostro vs WISQ)
+Confronto nostri step / WISQ per dimensione, a −3, a −5 e a griglia piena (nativa).
 
-Sui 236 circuiti dove **entrambi completano**:
-
-| Metrica | Valore |
-|---------|--------|
-| Somma `my_routing_steps` | 278.922 |
-| Somma `wisq_routing_steps` | 225.953 |
-| **Rapporto dei totali (wisq / nostro)** | **0.81 → WISQ usa 19.0% di steps in meno** |
-| Mediana di `ratio_wisq_over_mine` | 1.00 |
-| Media di `ratio_wisq_over_mine` | 1.128 |
-
----
-
-
-## Densità dei circuiti: dove vinciamo vs dove perdiamo
-
-`cnot_interaction_density` = coppie-qubit CNOT distinte / coppie possibili `Q·(Q−1)/2` (0 = sparso/locale, 1 = ogni coppia interagisce). Calcolata dal QASM universale su 235/236 circuiti both-complete con QASM disponibile.
-
-**Per esito sugli steps:**
-
-| Esito (steps) | N | densità media | mediana | min | max |
-|---|---|---|---|---|---|
-| **Vinciamo** (WIN) | 28 | 0.029 | 0.021 | 0.005 | 0.100 |
-| Pareggio (TIE) | 116 | 0.182 | 0.040 | 0.005 | 1.000 |
-| **Perdiamo** (LOSS) | 91 | 0.505 | 0.418 | 0.098 | 1.000 |
-
-**Win/Loss per fascia di densità** (sugli steps, both-complete):
-
-| Densità `cid` | N | Win | Tie | Loss | Loss-rate (decisi) |
-|---|---|---|---|---|---|
-| < 0.15 | 112 | 28 | 82 | 2 | 6.7% |
-| 0.15 – 0.40 | 36 | 0 | 10 | 26 | 100.0% |
-| ≥ 0.40 | 87 | 0 | 24 | 63 | 100.0% |
+| qft | griglia −3 | noi −3 | WISQ | **−3/W** | −5/W | nativa/W |
+|---|---|---|---|---|---|---|
+| qft_n5 | 6 | 14 | 14 | **1.0×** | 1.1× | 1.0× |
+| qft_n10 | 8 | 34 | 34 | **1.0×** | 1.4× | 1.1× |
+| qft_n18 | 10 | 75 | 71 | **1.1×** | 1.4× | 1.0× |
+| qft_20 | 10 | 90 | 84 | **1.1×** | 1.8× | 1.0× |
+| qft_n20 | 10 | 90 | 82 | **1.1×** | 1.7× | 1.0× |
+| qft_n30 | 12 | 154 | 134 | **1.1×** | 2.0× | 1.1× |
+| qft_n40 | 14 | 214 | 181 | **1.2×** | 1.8× | 1.1× |
+| qft_n50 | 16 | 263 | 221 | **1.2×** | 1.6× | 1.2× |
+| qft_n60 | 16 | 371 | 270 | **1.4×** | 2.5× | 1.2× |
+| qft_n64 | 16 | 426 | 292 | **1.5×** | 3.2× | 1.2× |
+| qft_n70 | 18 | 393 | 307 | **1.3×** | 1.6× | 1.2× |
+| qft_n80 | 18 | 488 | 357 | **1.4×** | 2.6× | 1.3× |
+| qft_n90 | 20 | 521 | 396 | **1.3×** | 1.5× | 1.2× |
+| qft_n100 | 20 | 675 | 440 | **1.5×** | 1.8× | 1.2× |
+| qft_n125 | 24 | 2608 | 532 | **4.9×** | 4.7× | 5.0× |
+| qft_n128 | 24 | 2679 | 539 | **5.0×** | 4.8× | 5.0× |
+| qft_n150 | 26 | 3083 | 631 | **4.9×** | 5.1× | 4.9× |
+| qft_n175 | 28 | 3808 | 728 | **5.2×** | 5.0× | 5.2× |
+| qft_n200 | 30 | 4270 | 826 | **5.2×** | 5.1× | 5.2× |
+| qft_n300 | 36 | 6978 | 1247 | **5.6×** | 5.3× | 5.4× |
+| qft_n320 | 36 | 9134 | — | **(WISQ timeout)** | — | — |
+| qft_n400 | 40 | 9331 | 1672 | **5.6×** | 5.3× | 5.3× |
 
 ---
 
+## −3 vs −5 — cosa cambia stringendo di 2 lati in meno
+
+| metrica | **−3** | −5 |
+|---|---|---|
+| Mappano | **256** | 246 |
+| MapFail | **5** | 12 |
+| WISQ timeout (nostre vittorie) | **20** | 16 |
+| Entrambi completano | 236 | 230 |
+| Steps **WIN / TIE / LOSS** | **28 / 117 / 91** | 28 / 97 / 105 |
+| Aggregato steps vs WISQ | **+23.4%** | +33.3% |
+| Footprint (qubit risparmiati) | **−20.7%** | −33.2% |
+
+**Diretto, stessi 226 circuiti both-complete in entrambi:** a −3 usiamo **-15.0%** di step rispetto a −5 (gap vs WISQ: −3 **+25.5%** contro −5 **+47.5%** su quel set).
+
+---
 
 ## Tabella riassuntiva — budget wall-clock 1 ora (3600 s)
 
-Timeout imposto simmetricamente: conta solo chi finisce entro il budget.
+Timeout imposto simmetricamente a entrambi.
 
 | Categoria | Circuiti | Di cui noi +veloci |
 |-----------|----------|--------------------|
 | **Totale circuiti analizzati** | 261 | — |
-| Nostro mapping fallisce | 5 | — |
-| **WISQ non finisce in 1 ora** | 60 | — |
-| ↳ …ma anche noi sforiamo → nessun vincitore | 5 | — |
-| ↳ …noi finiamo → **vittoria** | 55 | — |
-| **Entrambi finiscono in 1 ora** | 196 | — |
-| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89.3%) |
-| ↳ Pareggio su steps | 116 | 111 (95.7%) |
-| ↳ WISQ vince su steps | 52 (ratio mediana 0.79×) | 52 (100.0%) |
+| Nostro mapping fallisce a −3 | 5 | — |
+| **WISQ non finisce in 1h** | 65 | — |
+| ↳ …ma anche noi sforiamo 1h → nessun vincitore | 10 | — |
+| ↳ …noi finiamo entro 1h → **vittoria** | 55 | — |
+| **Entrambi finiscono in 1h** | 196 | — |
+| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89%) |
+| ↳ Pareggio su steps | 116 | 111 (96%) |
+| ↳ WISQ vince su steps | 52 (ratio mediana 0.79×) | 52 (100%) |
 | | | |
 | **TOTALE VITTORIE NOSTRE** | **194 / 261 (74.3%)** | — |
 
 ---
 
-
 ## Tabella riassuntiva — budget wall-clock 30 minuti (1800 s)
 
-Timeout imposto simmetricamente: conta solo chi finisce entro il budget.
+Timeout imposto simmetricamente a entrambi.
 
 | Categoria | Circuiti | Di cui noi +veloci |
 |-----------|----------|--------------------|
 | **Totale circuiti analizzati** | 261 | — |
-| Nostro mapping fallisce | 5 | — |
-| **WISQ non finisce in 30 minuti** | 74 | — |
-| ↳ …ma anche noi sforiamo → nessun vincitore | 6 | — |
-| ↳ …noi finiamo → **vittoria** | 68 | — |
-| **Entrambi finiscono in 30 minuti** | 182 | — |
-| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89.3%) |
-| ↳ Pareggio su steps | 114 | 109 (95.6%) |
-| ↳ WISQ vince su steps | 40 (ratio mediana 0.80×) | 40 (100.0%) |
+| Nostro mapping fallisce a −3 | 5 | — |
+| **WISQ non finisce in 30min** | 79 | — |
+| ↳ …ma anche noi sforiamo 30min → nessun vincitore | 11 | — |
+| ↳ …noi finiamo entro 30min → **vittoria** | 68 | — |
+| **Entrambi finiscono in 30min** | 182 | — |
+| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89%) |
+| ↳ Pareggio su steps | 114 | 109 (96%) |
+| ↳ WISQ vince su steps | 40 (ratio mediana 0.80×) | 40 (100%) |
 | | | |
 | **TOTALE VITTORIE NOSTRE** | **205 / 261 (78.5%)** | — |
 
 ---
 
-
 ## Tabella riassuntiva — budget wall-clock 15 minuti (900 s)
 
-Timeout imposto simmetricamente: conta solo chi finisce entro il budget.
+Timeout imposto simmetricamente a entrambi.
 
 | Categoria | Circuiti | Di cui noi +veloci |
 |-----------|----------|--------------------|
 | **Totale circuiti analizzati** | 261 | — |
-| Nostro mapping fallisce | 5 | — |
-| **WISQ non finisce in 15 minuti** | 88 | — |
-| ↳ …ma anche noi sforiamo → nessun vincitore | 8 | — |
-| ↳ …noi finiamo → **vittoria** | 80 | — |
-| **Entrambi finiscono in 15 minuti** | 168 | — |
-| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89.3%) |
-| ↳ Pareggio su steps | 109 | 104 (95.4%) |
-| ↳ WISQ vince su steps | 31 (ratio mediana 0.81×) | 31 (100.0%) |
+| Nostro mapping fallisce a −3 | 5 | — |
+| **WISQ non finisce in 15min** | 93 | — |
+| ↳ …ma anche noi sforiamo 15min → nessun vincitore | 13 | — |
+| ↳ …noi finiamo entro 15min → **vittoria** | 80 | — |
+| **Entrambi finiscono in 15min** | 168 | — |
+| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89%) |
+| ↳ Pareggio su steps | 109 | 104 (95%) |
+| ↳ WISQ vince su steps | 31 (ratio mediana 0.81×) | 31 (100%) |
 | | | |
 | **TOTALE VITTORIE NOSTRE** | **212 / 261 (81.2%)** | — |
 
 ---
 
-
 ## Tabella riassuntiva — budget wall-clock 10 minuti (600 s)
 
-Timeout imposto simmetricamente: conta solo chi finisce entro il budget.
+Timeout imposto simmetricamente a entrambi.
 
 | Categoria | Circuiti | Di cui noi +veloci |
 |-----------|----------|--------------------|
 | **Totale circuiti analizzati** | 261 | — |
-| Nostro mapping fallisce | 5 | — |
-| **WISQ non finisce in 10 minuti** | 93 | — |
-| ↳ …ma anche noi sforiamo → nessun vincitore | 11 | — |
-| ↳ …noi finiamo → **vittoria** | 82 | — |
-| **Entrambi finiscono in 10 minuti** | 163 | — |
-| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89.3%) |
-| ↳ Pareggio su steps | 109 | 104 (95.4%) |
-| ↳ WISQ vince su steps | 26 (ratio mediana 0.83×) | 26 (100.0%) |
+| Nostro mapping fallisce a −3 | 5 | — |
+| **WISQ non finisce in 10min** | 98 | — |
+| ↳ …ma anche noi sforiamo 10min → nessun vincitore | 16 | — |
+| ↳ …noi finiamo entro 10min → **vittoria** | 82 | — |
+| **Entrambi finiscono in 10min** | 163 | — |
+| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89%) |
+| ↳ Pareggio su steps | 109 | 104 (95%) |
+| ↳ WISQ vince su steps | 26 (ratio mediana 0.83×) | 26 (100%) |
 | | | |
 | **TOTALE VITTORIE NOSTRE** | **214 / 261 (82.0%)** | — |
 
 ---
 
-
 ## Tabella riassuntiva — budget wall-clock 5 minuti (300 s)
 
-Timeout imposto simmetricamente: conta solo chi finisce entro il budget.
+Timeout imposto simmetricamente a entrambi.
 
 | Categoria | Circuiti | Di cui noi +veloci |
 |-----------|----------|--------------------|
 | **Totale circuiti analizzati** | 261 | — |
-| Nostro mapping fallisce | 5 | — |
-| **WISQ non finisce in 5 minuti** | 104 | — |
-| ↳ …ma anche noi sforiamo → nessun vincitore | 12 | — |
-| ↳ …noi finiamo → **vittoria** | 92 | — |
-| **Entrambi finiscono in 5 minuti** | 152 | — |
-| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89.3%) |
-| ↳ Pareggio su steps | 106 | 101 (95.3%) |
-| ↳ WISQ vince su steps | 18 (ratio mediana 0.87×) | 18 (100.0%) |
+| Nostro mapping fallisce a −3 | 5 | — |
+| **WISQ non finisce in 5min** | 109 | — |
+| ↳ …ma anche noi sforiamo 5min → nessun vincitore | 17 | — |
+| ↳ …noi finiamo entro 5min → **vittoria** | 92 | — |
+| **Entrambi finiscono in 5min** | 152 | — |
+| ↳ Noi vinciamo su steps | 28 (ratio mediana 1.92×) | 25 (89%) |
+| ↳ Pareggio su steps | 106 | 101 (95%) |
+| ↳ WISQ vince su steps | 18 (ratio mediana 0.87×) | 18 (100%) |
 | | | |
 | **TOTALE VITTORIE NOSTRE** | **221 / 261 (84.7%)** | — |
 
 ---
 
-
 ## Tabella riassuntiva — budget wall-clock 1 minuto (60 s)
 
-Timeout imposto simmetricamente: conta solo chi finisce entro il budget.
+Timeout imposto simmetricamente a entrambi.
 
 | Categoria | Circuiti | Di cui noi +veloci |
 |-----------|----------|--------------------|
 | **Totale circuiti analizzati** | 261 | — |
-| Nostro mapping fallisce | 5 | — |
-| **WISQ non finisce in 1 minuto** | 131 | — |
-| ↳ …ma anche noi sforiamo → nessun vincitore | 33 | — |
-| ↳ …noi finiamo → **vittoria** | 98 | — |
+| Nostro mapping fallisce a −3 | 5 | — |
+| **WISQ non finisce in 1min** | 136 | — |
+| ↳ …ma anche noi sforiamo 1min → nessun vincitore | 38 | — |
+| ↳ …noi finiamo entro 1min → **vittoria** | 98 | — |
 | **Noi non finiamo, WISQ sì → sconfitta** | 3 | — |
-| **Entrambi finiscono in 1 minuto** | 122 | — |
-| ↳ Noi vinciamo su steps | 24 (ratio mediana 1.81×) | 23 (95.8%) |
-| ↳ Pareggio su steps | 91 | 87 (95.6%) |
-| ↳ WISQ vince su steps | 7 (ratio mediana 0.93×) | 7 (100.0%) |
+| **Entrambi finiscono in 1min** | 122 | — |
+| ↳ Noi vinciamo su steps | 24 (ratio mediana 1.81×) | 23 (96%) |
+| ↳ Pareggio su steps | 91 | 87 (96%) |
+| ↳ WISQ vince su steps | 7 (ratio mediana 0.93×) | 7 (100%) |
 | | | |
 | **TOTALE VITTORIE NOSTRE** | **209 / 261 (80.1%)** | — |
 
 ---
 
-
 ## Andamento del win-rate al variare del budget wall-clock
 
 | Budget | Entrambi finiscono | WISQ timeout → ns vittoria | Noi timeout → sconfitta | Nessun vincitore | **Vittorie totali** |
 |--------|--------------------|----------------------------|-------------------------|------------------|---------------------|
-| 12000 s (orig., asimm.) | 236 | 20 | 0 | 0 | **160 (61.3%)** |
-| 1 ora | 196 | 55 | 0 | 5 | **194 (74.3%)** |
-| 30 minuti | 182 | 68 | 0 | 6 | **205 (78.5%)** |
-| 15 minuti | 168 | 80 | 0 | 8 | **212 (81.2%)** |
-| 10 minuti | 163 | 82 | 0 | 11 | **214 (82.0%)** |
-| 5 minuti | 152 | 92 | 0 | 12 | **221 (84.7%)** ⟵ picco |
-| 1 minuto | 122 | 98 | 3 | 33 | **209 (80.1%)** |
+| 12000 s (asimm.) | 236 | 20 | 0 | 0 | **160 (61.3%)** |
+| 1 ora | 196 | 55 | 0 | 10 | **194 (74.3%)** |
+| 30 minuti | 182 | 68 | 0 | 11 | **205 (78.5%)** |
+| 15 minuti | 168 | 80 | 0 | 13 | **212 (81.2%)** |
+| 10 minuti | 163 | 82 | 0 | 16 | **214 (82.0%)** |
+| 5 minuti | 152 | 92 | 0 | 17 | **221 (84.7%)** ⟵ picco |
+| 1 minuto | 122 | 98 | 3 | 38 | **209 (80.1%)** |
 
 ---
-
 
 ## Tempo di compilazione (wall-clock)
 
-Confronto `my_duration_s` vs `wisq_duration_s`. Speedup = `wisq_duration / my_duration` (>1 = siamo più veloci). I timeout WISQ sono inclusi con la durata registrata.
+Confronto `my_duration_s` vs `wisq_duration_s` sui 256 circuiti che mappiamo a −3.
 
 | Categoria | N | Noi più veloci | Speedup mediano | Speedup medio | Min | Max |
 |-----------|---|----------------|-----------------|---------------|-----|-----|
-| **Tutti (inclusi timeout WISQ)** | 256 | 245 (95.7%) | 430× | 720× | 0.10× | 26700× |
-| ↳ Dove vinciamo su steps | 28 | 25 (89.3%) | 150× | 176× | 0.10× | 440× |
-| ↳ In pareggio su steps | 117 | 112 (95.7%) | 575× | 701× | 0.23× | 7062× |
-| ↳ Dove WISQ vince su steps | 91 | 91 (100.0%) | 542× | 1005× | 13.87× | 26700× |
-| ↳ WISQ in timeout | 20 | 17 (85.0%) | 21× | 298× | 0.39× | 2408× |
+| **Tutti (inclusi timeout WISQ)** | 256 | 245 (96%) | 430× | 720× | 0.10× | 26700× |
+| ↳ Dove vinciamo su steps | 28 | 25 (89%) | 150× | 176× | 0.10× | 440× |
+| ↳ In pareggio su steps | 117 | 112 (96%) | 575× | 701× | 0.23× | 7062× |
+| ↳ Dove WISQ vince su steps | 91 | 91 (100%) | 542× | 1005× | 13.87× | 26700× |
+| ↳ WISQ in timeout | 20 | 17 (85%) | 21× | 298× | 0.39× | 2408× |
 
 ---
-
-
-## Buffer di steps dipendente dalla velocità — win-rate vs WISQ
-
-Analisi su `connectivity_vs_wisq_minus3.csv`. La metrica primaria sono i **routing steps**, il tempo è secondario: concediamo un buffer ε sugli steps che cresce con l'ordine di grandezza del vantaggio di tempo.
-
-```
-vinco  se   my_steps <= wisq_steps · (1 + ε)
-ε(speedup) = α · log10(speedup)      speedup = wisq_time / my_time
-α = 0.05 / log10(N)      (ancora: 5% di sforo steps ⇄ N× di velocità)
-```
-
-Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
-
-| ancora | α | loss recuperati | vittorie | % |
-|---|---:|---:|---:|---:|
-| 5% ⇄ 20× | 0.0384 | 11 | 171 | 65.5% |
-| 5% ⇄ 50× | 0.0294 | 10 | 170 | 65.1% |
-| 5% ⇄ 100× | 0.0250 | 8 | 168 | 64.4% |
-| 5% ⇄ 150× | 0.0230 | 7 | 167 | 64.0% |
-| 5% ⇄ 200× | 0.0217 | 7 | 167 | 64.0% |
-| 5% ⇄ 300× | 0.0202 | 7 | 167 | 64.0% |
-| 5% ⇄ 400× | 0.0192 | 6 | 166 | 63.6% |
-| 5% ⇄ 500× | 0.0185 | 6 | 166 | 63.6% |
-| 5% ⇄ 750× | 0.0174 | 6 | 166 | 63.6% |
-| 5% ⇄ 1000× | 0.0167 | 6 | 166 | 63.6% |
-| 5% ⇄ 1500× | 0.0157 | 6 | 166 | 63.6% |
-| 5% ⇄ 2000× | 0.0151 | 6 | 166 | 63.6% |
-| 5% ⇄ 2500× | 0.0147 | 6 | 166 | 63.6% |
-| 5% ⇄ 3000× | 0.0144 | 6 | 166 | 63.6% |
-| 5% ⇄ 4000× | 0.0139 | 6 | 166 | 63.6% |
-| 5% ⇄ 5000× | 0.0135 | 6 | 166 | 63.6% |
-
----
-
 
 ## Per famiglia di circuiti
 
-**WISQ timeout** = WISQ non ha completato. **MapFail** = il nostro mapping non riesce. Win/=/Loss sono sugli steps dove entrambi completano.
+**WISQ timeout** = `mr_timeout=12000s`. **MapFail** = il nostro mapping non riesce alla griglia shrinkata.
 
-| Family | N | Win | = (noi+veloci) | Loss | WISQ timeout | MapFail | Note |
-|--------|---|-----|----------------|------|--------------|---------|------|
+| Family | N | Win | = (noi+veloci) | Loss | WISQ timeout | MapFail −3 | Note |
+|--------|---|-----|----------------|------|--------------|-----------|------|
 | 19qubits | 2 | 0 | 1 (1 noi+veloci) | 1 | 0 | 0 | n=19 |
 | 53qubits | 2 | 0 | 2 (2 noi+veloci) | 0 | 0 | 0 | n=27–39 |
-| adder | 4 | 0 | 3 (2 noi+veloci) | 0 | 0 | 1 | n=28–433 |
-| bigadder | 1 | 0 | 0 (0 noi+veloci) | 0 | 0 | 1 |  |
+| adder | 5 | 0 | 3 (2 noi+veloci) | 0 | 0 | 2 | n=28–433 |
 | bv | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=153 |
-| bwt | 5 | 0 | 0 (0 noi+veloci) | 0 | 5 | 0 | n=21–133 |
+| bwt | 5 | 0 | 0 | 0 | 5 | 0 | n=21–133 |
 | cat | 2 | 0 | 2 (2 noi+veloci) | 0 | 0 | 0 | n=130–260 |
 | continuous_3_17 | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=3 |
 | dnn | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=16 |
 | example | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=4 |
-| factor247 | 1 | 0 | 0 (0 noi+veloci) | 0 | 1 | 0 | n=15 |
+| factor247 | 1 | 0 | 0 | 0 | 1 | 0 | n=15 |
 | fredkin | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=3 |
 | ghz | 18 | 0 | 18 (15 noi+veloci) | 0 | 0 | 0 | n=5–400 |
 | ghz_state | 2 | 0 | 2 (2 noi+veloci) | 0 | 0 | 0 | n=23–255 |
 | graphstate | 17 | 10 | 7 (7 noi+veloci) | 0 | 0 | 0 | n=5–400 |
-| grover | 3 | 0 | 0 (0 noi+veloci) | 1 | 1 | 1 | n=10–20 |
-| hhl | 1 | 0 | 0 (0 noi+veloci) | 0 | 0 | 1 |  |
+| grover | 3 | 0 | 0 | 1 | 1 | 1 | n=10–20 |
+| hhl | 1 | 0 | 0 | 0 | 0 | 1 |  |
 | ising | 19 | 17 | 2 (2 noi+veloci) | 0 | 0 | 0 | n=5–420 |
 | multiplier | 11 | 0 | 4 (3 noi+veloci) | 3 | 4 | 0 | n=9–400 |
 | multiply | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=6 |
 | parallel | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=8 |
-| parallel_big | 1 | 1 | 0 (0 noi+veloci) | 0 | 0 | 0 | n=20 |
+| parallel_big | 1 | 1 | 0 | 0 | 0 | 0 | n=20 |
 | qaoa | 20 | 0 | 4 (4 noi+veloci) | 15 | 1 | 0 | n=5–400 |
 | qec_en | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=5 |
 | qft | 22 | 0 | 2 (2 noi+veloci) | 19 | 1 | 0 | n=5–400 |
-| qpe | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=9 |
-| qram | 1 | 0 | 0 (0 noi+veloci) | 0 | 0 | 1 |  |
-| randomcircuit | 5 | 0 | 0 (0 noi+veloci) | 2 | 3 | 0 | n=50–500 |
+| qpe_n9 | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=9 |
+| qram | 1 | 0 | 0 | 0 | 0 | 1 |  |
+| randomcircuit | 5 | 0 | 0 | 2 | 3 | 0 | n=50–500 |
 | seca | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=11 |
 | simon | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=3 |
 | square_root | 2 | 0 | 2 (2 noi+veloci) | 0 | 0 | 0 | n=14–32 |
-| synth | 37 | 0 | 0 (0 noi+veloci) | 36 | 1 | 0 | n=50–200 |
-| t_test | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=8 |
-| t_test2 | 1 | 0 | 0 (0 noi+veloci) | 1 | 0 | 0 | n=8 |
+| synth | 37 | 0 | 0 | 36 | 1 | 0 | n=50–200 |
+| t_test | 2 | 0 | 1 (1 noi+veloci) | 1 | 0 | 0 | n=8 |
 | toffoli | 1 | 0 | 1 (1 noi+veloci) | 0 | 0 | 0 | n=3 |
 | vqe_real_amp | 17 | 0 | 17 (17 noi+veloci) | 0 | 0 | 0 | n=5–400 |
 | vqe_su2 | 17 | 0 | 17 (17 noi+veloci) | 0 | 0 | 0 | n=5–400 |
@@ -351,10 +310,9 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 
 ---
 
-
 ## Per circuito (dettaglio)
 
-**Steps**: WIN = noi meno routing steps, LOSS = WISQ meno, = pareggio. **Tempo** confronta le durate quando disponibili.
+**Δlati** = quanti lati sotto WISQ (`dim_diff_side`). **Steps**: WIN/=/LOSS. **MapFail** = mapping non riuscito.
 
 | # | Circuit | Qubits | Grid (nostra) | Δlati | My steps | WISQ steps | Ratio | WISQ status | Steps | Tempo |
 |---|---------|--------|---------------|-------|----------|------------|-------|-------------|-------|-------|
@@ -363,22 +321,22 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 3 | 53qubits_155gate_57layers | 27 | 12×12 | +3 | 23 | 23 | 1.0000 | success | = | noi +veloci |
 | 4 | 53qubits_332gate_152layers | 39 | 14×14 | +3 | 41 | 41 | 1.0000 | success | = | noi +veloci |
 | 5 | adder_n28 | 28 | 12×12 | +3 | 24 | 24 | 1.0000 | success | = | noi +veloci |
-| 6 | adder_n4 | — | — | — | — | — | — | error | **MapFail** | — |
+| 6 | adder_n4 | — | — | — | — | — | — | error | **MapFail −3** | — |
 | 7 | adder_n433 | 433 | 42×42 | +3 | 250 | 250 | 1.0000 | success | = | noi +veloci |
 | 8 | adder_n64_transpiled | 64 | 16×16 | +3 | 181 | 181 | 1.0000 | success | = | WISQ +veloce |
-| 9 | bigadder_n18_transpiled | — | — | — | — | — | — | error | **MapFail** | — |
-| 10 | bv_n280 | 153 | 34×34 | -5 | 152 | 152 | 1.0000 | success | = | noi +veloci |
-| 11 | bwt_n177 | 133 | 24×24 | +3 | 257605 | — | — | failed | timeout | noi +veloci |
-| 12 | bwt_n21 | 21 | 10×10 | +3 | 116400 | — | — | failed | timeout | noi +veloci |
-| 13 | bwt_n37 | 28 | 12×12 | +3 | 33603 | — | — | failed | timeout | noi +veloci |
-| 14 | bwt_n57 | 43 | 14×14 | +3 | 65644 | — | — | failed | timeout | noi +veloci |
-| 15 | bwt_n97 | 73 | 18×18 | +3 | 129673 | — | — | failed | timeout | noi +veloci |
+| 9 | bigadder_n18_transpiled | — | — | — | — | — | — | error | **MapFail −3** | — |
+| 10 | bv_n280 | 153 | 34×34 | −5 | 152 | 152 | 1.0000 | success | = | noi +veloci |
+| 11 | bwt_n177 | 133 | 24×24 | +3 | 257605 | — | — | failed | timeout | — |
+| 12 | bwt_n21 | 21 | 10×10 | +3 | 116400 | — | — | failed | timeout | — |
+| 13 | bwt_n37 | 28 | 12×12 | +3 | 33603 | — | — | failed | timeout | — |
+| 14 | bwt_n57 | 43 | 14×14 | +3 | 65644 | — | — | failed | timeout | — |
+| 15 | bwt_n97 | 73 | 18×18 | +3 | 129673 | — | — | failed | timeout | — |
 | 16 | cat_n130 | 130 | 24×24 | +3 | 129 | 129 | 1.0000 | success | = | noi +veloci |
 | 17 | cat_n260 | 260 | 34×34 | +3 | 259 | 259 | 1.0000 | success | = | noi +veloci |
 | 18 | continuous_3_17_13 | 3 | 4×4 | +3 | 17 | 17 | 1.0000 | success | = | noi +veloci |
 | 19 | dnn_n16 | 16 | 8×8 | +3 | 48 | 48 | 1.0000 | success | = | noi +veloci |
 | 20 | example | 4 | 4×4 | +3 | 21 | 21 | 1.0000 | success | = | noi +veloci |
-| 21 | factor247_n15 | 15 | 8×8 | +3 | 352856 | — | — | failed | timeout | noi +veloci |
+| 21 | factor247_n15 | 15 | 8×8 | +3 | 352856 | — | — | failed | timeout | — |
 | 22 | fredkin_n3 | 3 | 4×4 | +3 | 10 | 10 | 1.0000 | success | = | noi +veloci |
 | 23 | ghz_n10 | 10 | 8×8 | +3 | 9 | 9 | 1.0000 | success | = | noi +veloci |
 | 24 | ghz_n100 | 100 | 20×20 | +3 | 99 | 99 | 1.0000 | success | = | noi +veloci |
@@ -418,9 +376,9 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 58 | graphstate_n80 | 80 | 18×18 | +3 | 6 | 7 | 1.1667 | success | **WIN** | noi +veloci |
 | 59 | graphstate_n90 | 90 | 20×20 | +3 | 5 | 7 | 1.4000 | success | **WIN** | noi +veloci |
 | 60 | grover_n10 | 10 | 6×6 | +5 | 11127 | 11008 | 0.9893 | success | LOSS | noi +veloci |
-| 61 | grover_n20 | 20 | 10×10 | +3 | 2146489 | — | — | failed | timeout | noi +veloci |
-| 62 | grover_n5 | — | — | — | — | — | — | error | **MapFail** | — |
-| 63 | hhl_n10 | — | — | — | — | — | — | error | **MapFail** | — |
+| 61 | grover_n20 | 20 | 10×10 | +3 | 2146489 | — | — | failed | timeout | — |
+| 62 | grover_n5 | — | — | — | — | — | — | error | **MapFail −3** | — |
+| 63 | hhl_n10 | — | — | — | — | — | — | error | **MapFail −3** | — |
 | 64 | ising_n10 | 10 | 8×8 | +3 | 4 | 4 | 1.0000 | success | = | noi +veloci |
 | 65 | ising_n100 | 100 | 20×20 | +3 | 4 | 13 | 3.2500 | success | **WIN** | noi +veloci |
 | 66 | ising_n125 | 125 | 24×24 | +3 | 4 | 16 | 4.0000 | success | **WIN** | noi +veloci |
@@ -440,16 +398,16 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 80 | ising_n70 | 70 | 18×18 | +3 | 4 | 9 | 2.2500 | success | **WIN** | noi +veloci |
 | 81 | ising_n80 | 80 | 18×18 | +3 | 4 | 11 | 2.7500 | success | **WIN** | noi +veloci |
 | 82 | ising_n90 | 90 | 20×20 | +3 | 4 | 12 | 3.0000 | success | **WIN** | noi +veloci |
-| 83 | multiplier_n100 | 100 | 20×20 | +3 | 111981 | — | — | failed | timeout | noi +veloci |
+| 83 | multiplier_n100 | 100 | 20×20 | +3 | 111981 | — | — | failed | timeout | — |
 | 84 | multiplier_n15 | 9 | 6×6 | +3 | 12 | 12 | 1.0000 | success | = | noi +veloci |
 | 85 | multiplier_n20 | 20 | 10×10 | +3 | 3990 | 3990 | 1.0000 | success | = | noi +veloci |
-| 86 | multiplier_n200 | 200 | 30×30 | +3 | 450798 | — | — | failed | timeout | noi +veloci |
-| 87 | multiplier_n300 | 300 | 36×36 | +3 | 1018785 | — | — | failed | timeout | noi +veloci |
+| 86 | multiplier_n200 | 200 | 30×30 | +3 | 450798 | — | — | failed | timeout | — |
+| 87 | multiplier_n300 | 300 | 36×36 | +3 | 1018785 | — | — | failed | timeout | — |
 | 88 | multiplier_n40 | 40 | 14×14 | +3 | 17335 | 17329 | 0.9997 | success | LOSS | noi +veloci |
-| 89 | multiplier_n400 | 400 | 40×40 | +3 | 1818879 | — | — | failed | timeout | WISQ +veloce |
+| 89 | multiplier_n400 | 400 | 40×40 | +3 | 1818879 | — | — | failed | timeout | — |
 | 90 | multiplier_n45 | 27 | 14×14 | +1 | 36 | 36 | 1.0000 | success | = | WISQ +veloce |
 | 91 | multiplier_n60 | 60 | 16×16 | +3 | 39737 | 39730 | 0.9998 | success | LOSS | noi +veloci |
-| 92 | multiplier_n75 | 45 | 18×18 | -1 | 60 | 60 | 1.0000 | success | = | noi +veloci |
+| 92 | multiplier_n75 | 45 | 18×18 | −1 | 60 | 60 | 1.0000 | success | = | noi +veloci |
 | 93 | multiplier_n80 | 80 | 18×18 | +3 | 71399 | 71287 | 0.9984 | success | LOSS | noi +veloci |
 | 94 | multiply_n13 | 6 | 6×6 | +3 | 2 | 2 | 1.0000 | success | = | noi +veloci |
 | 95 | parallel | 8 | 6×6 | +3 | 10 | 10 | 1.0000 | success | = | noi +veloci |
@@ -464,7 +422,7 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 104 | qaoa_n30 | 30 | 12×12 | +3 | 166 | 138 | 0.8313 | success | LOSS | noi +veloci |
 | 105 | qaoa_n300 | 300 | 36×36 | +3 | 7361 | 5968 | 0.8108 | success | LOSS | noi +veloci |
 | 106 | qaoa_n40 | 40 | 14×14 | +3 | 262 | 205 | 0.7824 | success | LOSS | noi +veloci |
-| 107 | qaoa_n400 | 400 | 40×40 | +3 | 13016 | — | — | failed | timeout | noi +veloci |
+| 107 | qaoa_n400 | 400 | 40×40 | +3 | 13016 | — | — | failed | timeout | — |
 | 108 | qaoa_n5 | 5 | 6×6 | +3 | 14 | 14 | 1.0000 | success | = | noi +veloci |
 | 109 | qaoa_n50 | 50 | 16×16 | +3 | 356 | 285 | 0.8006 | success | LOSS | noi +veloci |
 | 110 | qaoa_n6 | 6 | 6×6 | +3 | 33 | 33 | 1.0000 | success | = | noi +veloci |
@@ -487,7 +445,7 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 127 | qft_n200 | 200 | 30×30 | +3 | 4270 | 826 | 0.1934 | success | LOSS | noi +veloci |
 | 128 | qft_n30 | 30 | 12×12 | +3 | 154 | 134 | 0.8701 | success | LOSS | noi +veloci |
 | 129 | qft_n300 | 300 | 36×36 | +3 | 6978 | 1247 | 0.1787 | success | LOSS | noi +veloci |
-| 130 | qft_n320 | 320 | 36×36 | +3 | 9134 | — | — | failed | timeout | noi +veloci |
+| 130 | qft_n320 | 320 | 36×36 | +3 | 9134 | — | — | failed | timeout | — |
 | 131 | qft_n40 | 40 | 14×14 | +3 | 214 | 181 | 0.8458 | success | LOSS | noi +veloci |
 | 132 | qft_n400 | 400 | 40×40 | +3 | 9331 | 1672 | 0.1792 | success | LOSS | noi +veloci |
 | 133 | qft_n5 | 5 | 6×6 | +3 | 14 | 14 | 1.0000 | success | = | noi +veloci |
@@ -498,12 +456,12 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 138 | qft_n80 | 80 | 18×18 | +3 | 488 | 357 | 0.7316 | success | LOSS | noi +veloci |
 | 139 | qft_n90 | 90 | 20×20 | +3 | 521 | 396 | 0.7601 | success | LOSS | noi +veloci |
 | 140 | qpe_n9_transpiled | 9 | 6×6 | +3 | 42 | 42 | 1.0000 | success | = | noi +veloci |
-| 141 | qram_n20 | — | — | — | — | — | — | error | **MapFail** | — |
+| 141 | qram_n20 | — | — | — | — | — | — | error | **MapFail −3** | — |
 | 142 | randomcircuit_n100 | 100 | 20×20 | +3 | 8799 | 4423 | 0.5027 | success | LOSS | noi +veloci |
-| 143 | randomcircuit_n200 | 200 | 30×30 | +3 | 29983 | — | — | failed | timeout | noi +veloci |
-| 144 | randomcircuit_n400 | 400 | 40×40 | +3 | 241958 | — | — | failed | timeout | WISQ +veloce |
+| 143 | randomcircuit_n200 | 200 | 30×30 | +3 | 29983 | — | — | failed | timeout | — |
+| 144 | randomcircuit_n400 | 400 | 40×40 | +3 | 241958 | — | — | failed | timeout | — |
 | 145 | randomcircuit_n50 | 50 | 16×16 | +3 | 1831 | 1453 | 0.7936 | success | LOSS | noi +veloci |
-| 146 | randomcircuit_n500 | 500 | 46×46 | +3 | 195087 | — | — | failed | timeout | WISQ +veloce |
+| 146 | randomcircuit_n500 | 500 | 46×46 | +3 | 195087 | — | — | failed | timeout | — |
 | 147 | seca_n11 | 11 | 8×8 | +3 | 19 | 19 | 1.0000 | success | = | noi +veloci |
 | 148 | simon_n6 | 3 | 4×4 | +3 | 2 | 2 | 1.0000 | success | = | noi +veloci |
 | 149 | square_root_n18 | 14 | 8×8 | +3 | 27 | 27 | 1.0000 | success | = | noi +veloci |
@@ -529,7 +487,7 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 169 | synth_n200_d040_mix000_t030_hf000_hm001_r2_s0 | 200 | 30×30 | +3 | 1763 | 1185 | 0.6721 | success | LOSS | noi +veloci |
 | 170 | synth_n200_d040_mix000_t030_hf000_hm001_r2_s1 | 200 | 30×30 | +3 | 1776 | 1185 | 0.6672 | success | LOSS | noi +veloci |
 | 171 | synth_n200_d040_mix050_t030_hf000_hm001_r2_s0 | 200 | 30×30 | +3 | 1770 | 1246 | 0.7040 | success | LOSS | noi +veloci |
-| 172 | synth_n200_d040_mix050_t030_hf000_hm001_r2_s1 | 200 | 30×30 | +3 | 1932 | — | — | failed | timeout | noi +veloci |
+| 172 | synth_n200_d040_mix050_t030_hf000_hm001_r2_s1 | 200 | 30×30 | +3 | 1932 | — | — | failed | timeout | — |
 | 173 | synth_n200_d040_mix100_t030_hf000_hm001_r2_s0 | 200 | 30×30 | +3 | 2207 | 1412 | 0.6398 | success | LOSS | noi +veloci |
 | 174 | synth_n200_d040_mix100_t030_hf000_hm001_r2_s1 | 200 | 30×30 | +3 | 1893 | 1415 | 0.7475 | success | LOSS | noi +veloci |
 | 175 | synth_n50_d020_mix000_t030_hf000_hm001_r2_s0 | 50 | 16×16 | +3 | 92 | 60 | 0.6522 | success | LOSS | noi +veloci |
@@ -588,11 +546,11 @@ Baseline (steps primario, tempo solo spareggio) = **160/261 = 61.3%**.
 | 228 | vqe_two_local_n150 | 150 | 26×26 | +3 | 3214 | 2725 | 0.8479 | success | LOSS | noi +veloci |
 | 229 | vqe_two_local_n175 | 175 | 28×28 | +3 | 4307 | 3526 | 0.8187 | success | LOSS | noi +veloci |
 | 230 | vqe_two_local_n20 | 20 | 10×10 | +3 | 111 | 97 | 0.8739 | success | LOSS | noi +veloci |
-| 231 | vqe_two_local_n200 | 200 | 30×30 | +3 | 5338 | — | — | failed | timeout | noi +veloci |
+| 231 | vqe_two_local_n200 | 200 | 30×30 | +3 | 5338 | — | — | failed | timeout | — |
 | 232 | vqe_two_local_n30 | 30 | 12×12 | +3 | 211 | 185 | 0.8768 | success | LOSS | noi +veloci |
-| 233 | vqe_two_local_n300 | 300 | 36×36 | +3 | 10983 | — | — | failed | timeout | noi +veloci |
+| 233 | vqe_two_local_n300 | 300 | 36×36 | +3 | 10983 | — | — | failed | timeout | — |
 | 234 | vqe_two_local_n40 | 40 | 14×14 | +3 | 342 | 295 | 0.8626 | success | LOSS | noi +veloci |
-| 235 | vqe_two_local_n400 | 400 | 40×40 | +3 | 18986 | — | — | failed | timeout | noi +veloci |
+| 235 | vqe_two_local_n400 | 400 | 40×40 | +3 | 18986 | — | — | failed | timeout | — |
 | 236 | vqe_two_local_n5 | 5 | 6×6 | +3 | 17 | 17 | 1.0000 | success | = | noi +veloci |
 | 237 | vqe_two_local_n50 | 50 | 16×16 | +3 | 476 | 409 | 0.8592 | success | LOSS | noi +veloci |
 | 238 | vqe_two_local_n60 | 60 | 16×16 | +3 | 727 | 580 | 0.7978 | success | LOSS | noi +veloci |
