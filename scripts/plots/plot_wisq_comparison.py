@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plot per-circuit comparison between best config, worst config, and WISQ.
 
-Reads a CSV produced by compare_wisq_2.py (--bench or single-run mode) and
+Reads a CSV produced by compare_wisq_parity.py (--bench or single-run mode) and
 generates one figure per circuit. Each figure has two subplots:
   - Left:  routing steps  (mine best / mine worst / wisq)
   - Right: wall-clock time (my_duration_s / my_duration_s / wisq_duration_s)
@@ -43,7 +43,7 @@ CONFIG_LABEL_FIELDS = [
     ("border_distance_percentage", {}),
 ]
 
-# Single-CSV column names (compare_wisq_2.py output).
+# Single-CSV column names (compare_wisq_parity.py output).
 MINE_STEPS = "my_routing_steps"
 WISQ_STEPS = "wisq_routing_steps"
 MIN_STEPS = "min_routing_steps"
@@ -900,7 +900,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--input", "-i", required=True,
-        help="CSV produced by compare_wisq_2.py",
+        help="CSV produced by compare_wisq_parity.py",
     )
     parser.add_argument(
         "--output", "-o", default=str(DEFAULT_OUTPUT_DIR),

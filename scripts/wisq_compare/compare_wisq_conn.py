@@ -6,7 +6,7 @@ compiler is forced onto a grid that is SMALLER than the one WISQ uses for itself
 
 Per circuit, per parameter combination (the bench cartesian expansion):
   1. WISQ keeps its OWN native square_sparse_layout grid (side = 2*ceil(sqrt(n))+3,
-     the same grid compare_wisq_2 --wisq-native gives it). That side is the reference.
+     the same grid compare_wisq_parity --wisq-native gives it). That side is the reference.
   2. Our compiler starts on a SQUARE grid of side  (wisq_native_side - SHRINK)  per
      side (default SHRINK=4). If it FAILS (any non-zero exit / no routing result —
      typically safe_passage cannot be established on so small a grid) the side is
@@ -18,7 +18,7 @@ Then, per circuit, across all its combinations, the winner is the combination th
 succeeded on the SMALLEST grid (area x*y; ties -> fewer routing steps; further ties
 -> less time). WISQ is run once on its native grid and compared against the winner.
 
-The extra columns vs compare_wisq_2's bench CSV are:
+The extra columns vs compare_wisq_parity's bench CSV are:
   * dim_diff_side  = wisq_x - my_x  (how many fewer rows/cols per side connectivity
                      used than WISQ; SHRINK if no grow was needed, less if it grew,
                      negative if connectivity needed MORE than WISQ).
@@ -45,14 +45,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 # Reuse the WISQ runner, native-arch builder, graph/qasm readers, CSV schema and row
-# formatters from compare_wisq_2, plus the grid-grow compiler helper from compare_wisq_mingrid.
+# formatters from compare_wisq_parity, plus the grid-grow compiler helper from gridrun_minimum_our_dimension.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import compare_wisq_2 as cw2  # noqa: E402
-import compare_wisq_mingrid as cw3   # noqa: E402
+import compare_wisq_parity as cw2  # noqa: E402
+import scripts.wisq_compare.gridrun_minimum_our_dimension as cw3   # noqa: E402
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 
-# compare_wisq_2's bench columns + the two footprint-gap columns this script adds.
+# compare_wisq_parity's bench columns + the two footprint-gap columns this script adds.
 CONN_CSV_COLUMNS = cw2.BENCH_CSV_COLUMNS + ["dim_diff_side", "grow_steps"]
 
 _csv_write_lock = threading.Lock()
@@ -89,7 +89,7 @@ def process_circuit(circuit: str, combos: list[dict], binary: Path, arch_dir: Pa
     count is unknown or no combo of this circuit ever succeeded.
     """
     # Qubit count from the INPUT qasm (available before any run); same value
-    # compare_wisq_2 --wisq-native uses to size both sides.
+    # compare_wisq_parity --wisq-native uses to size both sides.
     n_in, _has_t = cw2._input_qasm_qubits_and_t(circuit)
     if not n_in:
         return None, f"cannot determine qubit count for {circuit} (missing/empty qasm)"
@@ -171,7 +171,7 @@ def process_circuit(circuit: str, combos: list[dict], binary: Path, arch_dir: Pa
 
 
 def make_conn_row(circuit: str, cfg: dict, result: dict, parity: int) -> dict:
-    """compare_wisq_2 base row + the two footprint-gap columns."""
+    """compare_wisq_parity base row + the two footprint-gap columns."""
     row = {**cw2.make_row_base(circuit, result, parity), **cw2.cfg_fields(cfg)}
     row["dim_diff_side"] = result["dim_diff_side"]
     row["grow_steps"] = result["grow_steps"]
@@ -253,7 +253,7 @@ def main() -> int:
 
     # WISQ grid mode.
     #  native: WISQ keeps its own square_sparse_layout grid (our grid forced smaller).
-    #          Mirrors compare_wisq_2 --wisq-native. This is the original comparison.
+    #          Mirrors compare_wisq_parity --wisq-native. This is the original comparison.
     #  parity: WISQ is forced onto OUR (shrunk) grid via build_wisq_arch, with WISQ-side
     #          growth capped (--wisq-max-grow, default 0) so we can MEASURE whether WISQ
     #          can place/route on native-K at all instead of letting it grow back.

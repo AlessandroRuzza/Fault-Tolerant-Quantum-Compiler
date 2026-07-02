@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""compare_wisq_minsearch.py — find WISQ's MINIMUM grid by a bounded upward scan,
-then run our compiler on that exact grid under every bench combination.
+"""gridrun_gaussian__wisq_dimension.py — find WISQ's MINIMUM grid by a bounded upward scan,
+then run our (gaussian) compiler on that exact grid under every bench combination.
+(Formerly compare_wisq_minsearch.py.)
 
 Per circuit:
   1. SCAN candidate square sides s = 2*ceil(sqrt(n))-1, 2*ceil(sqrt(n)), ...,
@@ -29,7 +30,7 @@ Per circuit:
 
 Output: one CSV row per (circuit, combination). The wisq_* columns repeat the s*
 search result on every row of the circuit (wisq_x = wisq_y = s*). Columns =
-compare_wisq_2's bench schema + my_status + search_probes +
+compare_wisq_parity's bench schema + my_status + search_probes +
 wisq_native_fallback, so extract/plot tooling keyed on the shared columns keeps
 working.
 
@@ -38,7 +39,7 @@ carry a successful WISQ result reuses that s* (no re-search, no WISQ re-run) and
 only the missing combos are executed.
 
 Usage:
-    python scripts/wisq_compare/compare_wisq_minsearch.py \
+    python scripts/wisq_compare/gridrun_gaussian__wisq_dimension.py \
         --bench data/config/all_circuits_4_variants.json \
         --output data/results/<name>_wisqmin.csv --workers 8 --mr_timeout 600
 """
@@ -60,11 +61,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 # Reuse the WISQ runner, arch helpers, graph/qasm readers, CSV schema and row
-# formatters from compare_wisq_2, plus the exact-grid compiler helper from
-# compare_wisq_mingrid.
+# formatters from compare_wisq_parity, plus the exact-grid compiler helper from
+# gridrun_minimum_our_dimension.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import compare_wisq_2 as cw2  # noqa: E402
-import compare_wisq_mingrid as cwm  # noqa: E402
+import compare_wisq_parity as cw2  # noqa: E402
+import scripts.wisq_compare.gridrun_minimum_our_dimension as cwm  # noqa: E402
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 

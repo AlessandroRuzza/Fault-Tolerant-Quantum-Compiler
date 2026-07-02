@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Consolidate one or more WISQ-comparison CSVs into a best-WISQ-per-circuit CSV.
 
-Each input is a CSV produced by compare_wisq_2.py (columns: circuit, ...,
+Each input is a CSV produced by compare_wisq_parity.py (columns: circuit, ...,
 my_routing_steps, wisq_routing_steps, wisq_status, ratio_wisq_over_mine, ...).
 For every circuit, this picks the single best WISQ result across ALL inputs —
 "best" meaning the lowest wisq_routing_steps (tiebreak: lowest wisq_duration_s) —

@@ -7,7 +7,7 @@ The WISQ-native baseline (WISQ on its own square_sparse_layout grid,
 side = 2*ceil(sqrt(n))+3) depends ONLY on the circuit, not on which of OUR
 strategies it is paired with. It is therefore already computed and stored in
 benchmarks/results/connectivity_summary_all_wisq.csv (that file was produced with
-compare_wisq_2 --wisq-native, so my_x == wisq_x == native side per row). We reuse
+compare_wisq_parity --wisq-native, so my_x == wisq_x == native side per row). We reuse
 that WISQ column verbatim — WISQ does NOT need to be re-run.
 
 So to add a `random` baseline and a same-grid `random vs cube` comparison we only
@@ -58,8 +58,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import compare_wisq_2 as cw2  # noqa: E402
-import compare_wisq_mingrid as cw3   # noqa: E402  (run_compiler_at: explicit-grid runner)
+import compare_wisq_parity as cw2  # noqa: E402
+import scripts.wisq_compare.gridrun_minimum_our_dimension as cw3   # noqa: E402  (run_compiler_at: explicit-grid runner)
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 DEFAULT_BASELINE = cw2.REPO_ROOT / "benchmarks" / "results" / "connectivity_summary_all_wisq.csv"
@@ -99,7 +99,7 @@ def load_grid_map(path: Path) -> dict[str, tuple[int, int]]:
 def run_combo(circuit: str, cfg: dict, binary: Path, grid: tuple[int, int]) -> dict:
     """Run OUR compiler for one (circuit, cfg) forced onto WISQ's recorded grid `grid`.
 
-    Mirrors compare_wisq_2.run_compiler's cube→connectivity fallback: a cube run can
+    Mirrors compare_wisq_parity.run_compiler's cube→connectivity fallback: a cube run can
     fail to MAP on the (tight) WISQ grid; we retry once at the SAME grid with the
     connectivity config so the dimension is preserved. WISQ is never invoked here.
     """

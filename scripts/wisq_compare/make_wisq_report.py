@@ -6,7 +6,7 @@ One code path builds every section that until now was hand-written per report
 share identical definitions of win/loss, wall-clock budgets, compile-time
 speedup and the ε speed-buffer win-rate.
 
-Input: a side-by-side CSV from compare_wisq_2.py / compare_wisq_conn.py with the
+Input: a side-by-side CSV from compare_wisq_parity.py / compare_wisq_conn.py with the
 columns circuit, n_qubits, my_routing_steps, my_duration_s, wisq_routing_steps,
 wisq_duration_s, wisq_status, my_x/my_y, wisq_x/wisq_y (footprint/trade-off need
 the grid columns; dim_diff_side enables the "−k" footprint section).

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""compare_wisq_mingrid.py — like compare_wisq_2.py, but our compiler's grid is found by
-a minimum-grid SEARCH instead of auto-sizing.
+"""gridrun_minimum_our_dimension.py — like compare_wisq_parity.py, but our compiler's grid is found
+by a minimum-grid SEARCH instead of auto-sizing; WISQ then follows onto OUR grid.
+(Formerly compare_wisq_mingrid.py.)
 
 For every circuit and every parameter combination (the bench cartesian expansion):
   1. Start from the per-case MINIMUM grid given by the `x` and `y` fields of the
@@ -13,14 +14,14 @@ This yields, per (circuit, combination), the smallest grid on which we succeed.
 Then, per circuit, across all its combinations, the winner is the combination that
 succeeded on the SMALLEST grid (area x*y; ties -> fewer routing steps; further
 ties -> less time). WISQ is finally run "as usual" (same build_wisq_arch as
-compare_wisq_2: our magic positions + even/even slots, growing only if needed)
+compare_wisq_parity: our magic positions + even/even slots, growing only if needed)
 STARTING from that winning minimum grid.
 
 Output: one CSV row per circuit (the winning combination), same columns as
-compare_wisq_2's bench CSV, so extract_wisq.py / plot_wisq_comparison*.py work on it.
+compare_wisq_parity's bench CSV, so extract_wisq.py / plot_wisq_comparison*.py work on it.
 
 Usage:
-    python scripts/wisq_compare/compare_wisq_mingrid.py --bench data/config/<sweep>.json \
+    python scripts/wisq_compare/gridrun_minimum_our_dimension.py --bench data/config/<sweep>.json \
         --output data/results/<name>_wisq.csv --workers 8 --mr_timeout 600 --max-grow 100
 """
 
@@ -40,14 +41,14 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-# Reuse all the heavy machinery from compare_wisq_2 (WISQ runner, arch builder,
+# Reuse all the heavy machinery from compare_wisq_parity (WISQ runner, arch builder,
 # graph reader, CSV schema, row formatters). It is import-safe (guarded main).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import compare_wisq_2 as cw2  # noqa: E402
+import compare_wisq_parity as cw2  # noqa: E402
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 
-# Parse the compiler's stdout (same fields compare_wisq_2.run_compiler extracts).
+# Parse the compiler's stdout (same fields compare_wisq_parity.run_compiler extracts).
 _STEPS_RE = re.compile(r"Total routing steps \([^)]*\):\s*(\d+)")
 _QUBITS_RE = re.compile(r"(?m)^Qubits:\s*(\d+)")
 _DIMS_RE = re.compile(r"resolved graph dimensions:\s*(\d+)x(\d+)")
@@ -61,7 +62,7 @@ def run_compiler_at(circuit: str, base_config: dict, binary: Path,
     """Run our compiler on `circuit` forcing grid (x, y). Returns (ok, result).
 
     ok is False on any non-zero exit, a timeout, or missing routing_steps (so the
-    caller can grow the grid). On success, result mirrors compare_wisq_2.run_compiler.
+    caller can grow the grid). On success, result mirrors compare_wisq_parity.run_compiler.
     """
     cfg = dict(base_config)
     cfg["circuit"] = circuit

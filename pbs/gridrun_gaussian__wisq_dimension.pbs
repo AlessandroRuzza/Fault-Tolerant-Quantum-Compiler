@@ -6,7 +6,7 @@
 
 # WISQ minimum-grid search + our compiler at that exact grid, per bench combo.
 # Submit:
-#   qsub -v BENCH_PATH=all_circuits_4_variants,BENCH_JOBS=8 pbs/run_wisq_minsearch.pbs
+#   qsub -v BENCH_PATH=all_circuits_4_variants,BENCH_JOBS=8 pbs/gridrun_gaussian__wisq_dimension.pbs
 # Env vars:
 #   BENCH_PATH           bench JSON in config/ (without .json)     [required]
 #   BENCH_JOBS           parallel workers, ONE circuit each        [required]
@@ -43,9 +43,9 @@ date
 
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
 
-# Whole scripts/ dir is bound (like run_wisq3.pbs): compare_wisq_minsearch.py is
-# newer than the published image and imports the LOCAL compare_wisq_2.py and
-# compare_wisq_mingrid.py, so all three must come from the cluster checkout.
+# Whole scripts/ dir is bound (like gridrun_minimum_our_dimension.pbs): gridrun_gaussian__wisq_dimension.py
+# is newer than the published image and imports the LOCAL compare_wisq_parity.py and
+# gridrun_minimum_our_dimension.py, so all three must come from the cluster checkout.
 EXTRA_ARGS=""
 if [ -n "$ATTEMPT_TIMEOUT" ]; then
   EXTRA_ARGS="--attempt-timeout $ATTEMPT_TIMEOUT"
@@ -61,7 +61,7 @@ apptainer exec \
   --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
   --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
   --bind "$PWD/visualization:/app/visualization" \
-  ftqc.sif python3 /app/scripts/wisq_compare/compare_wisq_minsearch.py \
+  ftqc.sif python3 /app/scripts/wisq_compare/gridrun_gaussian__wisq_dimension.py \
     --bench "/app/config/${BENCH_PATH}.json" \
     --output "/app/benchmarks/results/${BENCH_PATH}_wisqmin.csv" \
     --workers "$BENCH_JOBS" \

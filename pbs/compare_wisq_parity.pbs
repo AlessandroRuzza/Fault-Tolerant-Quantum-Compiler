@@ -1,0 +1,84 @@
+#!/bin/bash
+#PBS -q cpu
+#PBS -l walltime=48:00:00
+#PBS -N cwparity
+#PBS -j oe
+#
+# Runs scripts/wisq_compare/compare_wisq_parity.py. Unifies the old run_wisq.pbs and
+# run_wisq_offset.pbs: MODE selects what the engine does. Pass MODE explicitly via
+# `qsub -v MODE=...` (a PBS job does not inherit your interactive shell, so nothing is
+# read from an ambient environment here).
+
+cd "$PBS_O_WORKDIR"
+
+mkdir -p benchmarks/results benchmarks/logs config qasms universal_set_qasms qasm_graphs logs visualization
+
+LOG_FILE="logs/cwparity_${PBS_JOBID}.log"
+echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
+
+# MODE = the grid DIMENSION (default parity):
+#   parity  - our compiler auto-sizes; WISQ mirrors our resolved grid
+#   native  - --wisq-native: WISQ builds its own square_sparse_layout, we match its side
+# OFFSETS = OPTIONAL add-on (default empty). When non-empty, run the offset sweep:
+#   both compilers forced onto (WISQ native side + offset) on a parity arch. The offset
+#   is measured from WISQ's native side, so it composes naturally with --wisq-native.
+#   A comma list works when set as a default HERE (PBS `-v` cannot carry commas, so the
+#   compare-wisq.sh --offset flag passes a single value).
+MODE="${MODE:-parity}"
+OFFSETS="${OFFSETS:-}"
+WISQ_MAX_GROW="${WISQ_MAX_GROW:-0}"
+
+if [ -n "$OFFSETS" ]; then
+  # Offset sweep. MODE still selects the BASE the offset is added to: native (square)
+  # with --wisq-native, else our auto-sized grid. So MODE composes with OFFSETS.
+  MODE_ARGS=(--offsets "$OFFSETS" --wisq-max-grow "$WISQ_MAX_GROW")
+  [ "$MODE" = native ] && MODE_ARGS+=(--wisq-native)
+  OUT_SUFFIX="_runs.csv"
+elif [ "$MODE" = native ]; then
+  MODE_ARGS=(--wisq-native); OUT_SUFFIX="_wisq.csv"
+else
+  MODE_ARGS=(); OUT_SUFFIX="_wisq.csv"
+fi
+
+{
+echo "JOBID=$PBS_JOBID"
+echo "HOSTNAME=$(hostname)"
+echo "WORKDIR=$(pwd)"
+echo "BENCH_PATH=$BENCH_PATH"
+echo "BENCH_JOBS=$BENCH_JOBS"
+echo "MODE=$MODE"
+[ -n "$OFFSETS" ] && { echo "OFFSETS=$OFFSETS"; echo "WISQ_MAX_GROW=$WISQ_MAX_GROW"; }
+date
+} >> "$LOG_FILE" 2>&1
+
+apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
+
+# qasms/ is bind-mounted below like config/, but has no prior writer to fill it on a
+# fresh host directory: the mkdir above creates it empty, which then shadows the real
+# circuits baked into the image. Seed it (like config/) before the bind takes over.
+apptainer exec --bind "$PWD/qasms:/host_qasms" ftqc.sif bash -lc 'cp -an /app/qasms/. /host_qasms/' >> "$LOG_FILE" 2>&1
+
+apptainer exec \
+  --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
+  --env OMP_DISPLAY_ENV=TRUE \
+  --bind "$PWD/scripts:/app/scripts" \
+  --bind "$PWD/config:/app/config" \
+  --bind "$PWD/qasms:/app/qasms" \
+  --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
+  --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
+  --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
+  --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
+  --bind "$PWD/visualization:/app/visualization" \
+  ftqc.sif python3 /app/scripts/wisq_compare/compare_wisq_parity.py \
+    --bench "/app/config/${BENCH_PATH}.json" \
+    --output "/app/benchmarks/results/${BENCH_PATH}${OUT_SUFFIX}" \
+    --workers "$BENCH_JOBS" \
+    --process-count "${BENCH_PROCESS_COUNT:-1}" \
+    --processor "${PROCESSOR:-0}" \
+    --mr_timeout "${MR_TIMEOUT:-300}" \
+    "${MODE_ARGS[@]}" >> "$LOG_FILE" 2>&1
+
+{
+echo "END_JOB=$PBS_JOBID"
+date
+} >> "$LOG_FILE" 2>&1

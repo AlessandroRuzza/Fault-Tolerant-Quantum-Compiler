@@ -49,11 +49,13 @@ import itertools
 import json
 import math
 import re
+import statistics
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -63,12 +65,6 @@ DEFAULT_CONFIG = REPO_ROOT / "config" / "0_compiler_config.json"
 QASMS_DIR = REPO_ROOT / "qasms"
 QASM_GRAPHS_DIR = REPO_ROOT / "qasm_graphs"
 UNIVERSAL_QASMS_DIR = REPO_ROOT / "universal_set_qasms"
-
-# Config grid sentinel: x == y == WISQ_OPTIMAL_SENTINEL means "size BOTH our run
-# and WISQ to WISQ's native (square_sparse_layout) grid":
-#   side = 2*ceil(sqrt(n)) + (2 if the circuit has T gates else 1)
-# Our run is forced onto that grid; WISQ then inherits it via read_graph.
-WISQ_OPTIMAL_SENTINEL = -3
 
 _local_wisq = REPO_ROOT / ".env" / "bin" / "wisq"
 WISQ = _local_wisq if _local_wisq.exists() else Path("wisq")
@@ -200,11 +196,6 @@ def _input_qasm_qubits_and_t(circuit: str) -> tuple[int | None, bool]:
     return len(qubits), has_t
 
 
-def wisq_optimal_side(n: int, has_t: bool) -> int:
-    """WISQ-optimal grid side for the x=y=-3 sentinel: 2*ceil(sqrt(n)) + (2 if T else 1)."""
-    return 2 * math.ceil(math.sqrt(n)) + (2 if has_t else 1)
-
-
 def wisq_native_side(n: int) -> int:
     """Side of WISQ's native square_sparse_layout WITH the all_sides magic border:
     base 2*ceil(sqrt(n))+1 plus +1 column/row on each side -> 2*ceil(sqrt(n))+3.
@@ -232,8 +223,8 @@ def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
     effect.
 
     Grid: by default our run auto-sizes (x=y=-1) and WISQ mirrors the resolved grid.
-    If the config sets x == y == WISQ_OPTIMAL_SENTINEL (-3), our run (and therefore
-    WISQ) is sized to WISQ's native grid instead — see WISQ_OPTIMAL_SENTINEL.
+    In --wisq-native mode our run is forced onto WISQ's native square_sparse grid
+    instead, so WISQ (which builds that grid itself) and our run stay at parity.
     """
     cfg = dict(base_config)
     cfg["circuit"] = circuit
@@ -247,18 +238,6 @@ def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
         else:
             print(f"  WARNING [{circuit}]: cannot determine qubit count for "
                   f"--wisq-native; falling back to auto-size.", file=sys.stderr)
-            cfg["x"] = -1
-            cfg["y"] = -1
-    elif base_config.get("x") == WISQ_OPTIMAL_SENTINEL and base_config.get("y") == WISQ_OPTIMAL_SENTINEL:
-        n, has_t = _input_qasm_qubits_and_t(circuit)
-        if n:
-            side = wisq_optimal_side(n, has_t)
-            cfg["x"] = side
-            cfg["y"] = side
-        else:
-            print(f"  WARNING [{circuit}]: cannot determine qubit count for the "
-                  f"x=y={WISQ_OPTIMAL_SENTINEL} (WISQ-optimal) sentinel; "
-                  f"falling back to auto-size.", file=sys.stderr)
             cfg["x"] = -1
             cfg["y"] = -1
     else:
@@ -320,6 +299,53 @@ def run_compiler(circuit: str, base_config: dict, binary: Path) -> dict:
         "height": int(dims_m.group(2)) if dims_m else None,
         "duration_seconds": float(exec_m.group(1)) if exec_m else duration,
         "safe_passage_fallback": safe_passage_fallback,
+    }
+
+
+def run_compiler_at(circuit: str, base_config: dict, binary: Path,
+                    x: int, y: int, attempt_timeout: float | None = None):
+    """Run our compiler on `circuit` forcing an EXPLICIT grid (x, y). Returns (ok, result).
+
+    Unlike run_compiler (which auto-sizes or uses the native side), this pins the grid
+    to (x, y). ok is False on any non-zero exit, a timeout, or a missing routing result,
+    so callers that sweep a fixed grid can record the failure. On success, result mirrors
+    run_compiler's dict. Used by the offset sweep (run_offsets)."""
+    cfg = dict(base_config)
+    cfg["circuit"] = circuit
+    cfg["x"] = x
+    cfg["y"] = y
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+        json.dump(cfg, tmp, indent=2)
+        cfg_path = Path(tmp.name)
+
+    cmd = [str(binary), "--config", str(cfg_path)]
+    t0 = time.perf_counter()
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=attempt_timeout)
+    except subprocess.TimeoutExpired:
+        cfg_path.unlink(missing_ok=True)
+        return False, None
+    duration = time.perf_counter() - t0
+    cfg_path.unlink(missing_ok=True)
+
+    if proc.returncode != 0:
+        return False, None
+
+    out = proc.stdout
+    steps_m = re.search(r"Total routing steps \([^)]*\):\s*(\d+)", out)
+    if not steps_m:
+        return False, None  # ran but produced no routing result -> treat as failure
+
+    qubits_m = re.search(r"(?m)^Qubits:\s*(\d+)", out)
+    dims_m = re.search(r"resolved graph dimensions:\s*(\d+)x(\d+)", out)
+    exec_m = re.search(r"Execution time:\s*([\d.]+)\s*seconds", out)
+    return True, {
+        "routing_steps": int(steps_m.group(1)),
+        "num_qubits": int(qubits_m.group(1)) if qubits_m else None,
+        "width": int(dims_m.group(1)) if dims_m else x,
+        "height": int(dims_m.group(2)) if dims_m else y,
+        "duration_seconds": float(exec_m.group(1)) if exec_m else duration,
     }
 
 
@@ -775,6 +801,401 @@ def make_error_row_base(circuit: str, parity: int, safe_passage_fallback: str = 
     }
 
 
+# ══════════════════════════════════════════════════════════════════════════════════
+# Offset sweep (folded-in compare_offset.py). Our compiler vs WISQ at PARITY of grid,
+# both forced onto (base grid + offset) per side, swept over a set of offsets. The base
+# is OUR auto-sized grid (--our-dimension, default, shape preserved) or WISQ's native
+# square (--wisq-native). WISQ runs on a custom parity arch at that grid (square_sparse
+# cannot be resized). Triggered by --offsets; aggregate a runs CSV with --offset-report.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+# One row per (circuit, offset): circuit identity + the offset/grid + both results.
+OFFSET_RUN_COLUMNS = [
+    "circuit", "n_qubits", "offset", "side",
+    "type", "safe_passage_strategy",
+    "my_routing_steps", "my_duration_s",
+    "wisq_x", "wisq_y", "wisq_routing_steps", "wisq_duration_s",
+    "wisq_n_slots", "grid_grown_for_wisq", "wisq_status",
+    "ratio_wisq_over_mine", "verdict",
+    "safe_passage_fallback",
+]
+
+
+def _parse_offsets(spec: str) -> list[int]:
+    """'0,2,4,6,8' -> [0, 2, 4, 6, 8]; sorted, de-duplicated, non-negative."""
+    vals = sorted({int(p) for p in spec.split(",") if p.strip() != ""})
+    if any(v < 0 for v in vals):
+        raise ValueError(f"offsets must be >= 0 (grid grows from native), got {spec}")
+    return vals
+
+
+def _offset_verdict(mine: int | None, wisq: int | None) -> str:
+    if mine is None or wisq is None:
+        return "n/a"
+    if mine < wisq:
+        return "WIN"      # we use FEWER routing steps
+    if mine > wisq:
+        return "LOSS"
+    return "TIE"
+
+
+def _offset_run_one(circuit: str, cfg: dict, binary: Path, n_qubits_in: int,
+                    width: int, height: int, offset: int, arch_dir: Path, parity: int,
+                    mr_timeout: int, attempt_timeout: float | None,
+                    run_id: int) -> dict:
+    """Run our compiler at (width, height) = base grid + offset, then WISQ on the same
+    parity arch. `width`/`height` are already base+offset (the base is our auto-sized
+    grid for --our-dimension, or WISQ's native square for --wisq-native).
+
+    A cube run can fail to MAP even on a roomy grid; retry once at the SAME size with
+    the connectivity config so the dimension is preserved (parity holds)."""
+    side_label = width if width == height else f"{width}x{height}"
+    row = {
+        "circuit": circuit, "n_qubits": "", "offset": offset, "side": side_label,
+        "type": cfg.get("type", ""),
+        "safe_passage_strategy": cfg.get("safe_passage_strategy", ""),
+        "my_routing_steps": "", "my_duration_s": "",
+        "wisq_x": "", "wisq_y": "", "wisq_routing_steps": "", "wisq_duration_s": "",
+        "wisq_n_slots": "", "grid_grown_for_wisq": "", "wisq_status": "skipped",
+        "ratio_wisq_over_mine": "", "verdict": "n/a", "safe_passage_fallback": "",
+    }
+
+    ok, mine = run_compiler_at(circuit, cfg, binary, width, height, attempt_timeout)
+    fb = ""
+    if not ok and cfg.get("safe_passage_strategy") == "cube":
+        ok, mine = run_compiler_at(
+            circuit, {**cfg, **CONNECTIVITY_FALLBACK_OVERRIDES}, binary,
+            width, height, attempt_timeout)
+        fb = "connectivity" if ok else "connectivity(failed)"
+    row["safe_passage_fallback"] = fb
+
+    if not ok:
+        row["wisq_status"] = "our_compiler_failed"
+        print(f"  ERROR [{circuit} off+{offset}]: our compiler produced no routing "
+              f"result at {width}x{height}", file=sys.stderr)
+        return {k: row.get(k, "") for k in OFFSET_RUN_COLUMNS}
+
+    n_qubits = count_qasm_qubits(circuit) or mine.get("num_qubits") or n_qubits_in
+    row["n_qubits"] = n_qubits
+    row["my_routing_steps"] = mine["routing_steps"]
+    row["my_duration_s"] = (f'{mine["duration_seconds"]:.6f}'
+                            if mine["duration_seconds"] is not None else "")
+
+    # WISQ on the SAME (width, height) grid: our magic positions + even/even slots. A
+    # WISQ launch/parse failure must not abort the sweep — keep OUR result, mark WISQ.
+    graph = read_graph(circuit)
+    built = build_wisq_arch(graph["width"], graph["height"],
+                            graph["magic_states"], n_qubits, parity)
+    try:
+        wisq = get_or_run_wisq(circuit, built, arch_dir, mr_timeout, run_id)
+    except Exception as e:  # noqa: BLE001 — never let one WISQ run kill the sweep
+        print(f"  ERROR [{circuit} off+{offset}]: WISQ run failed: {e}",
+              file=sys.stderr)
+        row.update({"wisq_x": built["arch"]["width"], "wisq_y": built["arch"]["height"],
+                    "wisq_n_slots": built["n_slots"],
+                    "grid_grown_for_wisq": "true" if built["grown"] else "false",
+                    "wisq_status": "error"})
+        return {k: row.get(k, "") for k in OFFSET_RUN_COLUMNS}
+
+    w_steps = wisq["routing_steps"]
+    row.update({
+        "wisq_x": built["arch"]["width"], "wisq_y": built["arch"]["height"],
+        "wisq_routing_steps": w_steps if w_steps is not None else "",
+        "wisq_duration_s": f'{wisq["duration_seconds"]:.6f}',
+        "wisq_n_slots": built["n_slots"],
+        "grid_grown_for_wisq": "true" if built["grown"] else "false",
+        "wisq_status": wisq["status"],
+    })
+    if w_steps and mine["routing_steps"]:
+        row["ratio_wisq_over_mine"] = f'{w_steps / mine["routing_steps"]:.4f}'
+    row["verdict"] = _offset_verdict(mine["routing_steps"], w_steps)
+    return {k: row.get(k, "") for k in OFFSET_RUN_COLUMNS}
+
+
+def _offset_load_done_keys(path: Path) -> set:
+    """(circuit, offset) pairs already present with OUR routing result."""
+    if not path.exists():
+        return set()
+    done: set = set()
+    try:
+        with path.open(newline="") as f:
+            for r in csv.DictReader(f):
+                if str(r.get("my_routing_steps", "")).strip():
+                    done.add((r["circuit"], str(r.get("offset", ""))))
+    except Exception:
+        pass
+    return done
+
+
+def _offset_base_dims(circuit: str, cfg: dict, binary: Path, use_wisq_native: bool,
+                      n_in: int, attempt_timeout: float | None):
+    """The base grid (width, height) the per-side offset is added to.
+
+    --wisq-native   -> WISQ's native square side (wisq_native_side(n), square).
+    --our-dimension -> OUR compiler's auto-sized grid (x=y=-1), preserving its shape.
+    Returns ((width, height), None) or (None, reason)."""
+    if use_wisq_native:
+        s = wisq_native_side(n_in)
+        return (s, s), None
+    # our-dimension: run our compiler auto-sized once to learn the grid it picks.
+    ok, mine = run_compiler_at(circuit, cfg, binary, -1, -1, attempt_timeout)
+    if not ok and cfg.get("safe_passage_strategy") == "cube":
+        ok, mine = run_compiler_at(
+            circuit, {**cfg, **CONNECTIVITY_FALLBACK_OVERRIDES}, binary,
+            -1, -1, attempt_timeout)
+    if not ok or not mine:
+        return None, "our compiler failed to auto-size"
+    w, h = mine.get("width"), mine.get("height")
+    if not w or not h or w <= 0 or h <= 0:
+        return None, "could not parse our auto-resolved grid dimensions"
+    return (w, h), None
+
+
+def run_offsets(args: argparse.Namespace) -> int:
+    """Offset sweep entrypoint (triggered by --offsets): both compilers forced onto
+    (base grid + offset) per side, one row per (circuit, offset). The base is our
+    auto-sized grid (--our-dimension, default) or WISQ's native square (--wisq-native).
+    WISQ always runs on a parity arch at the resulting grid. Resume-safe."""
+    global _wisq_native, MAX_GROW_STEPS, _wisq_semaphore
+
+    binary = Path(args.binary)
+    if not binary.exists():
+        print(f"ERROR: compiler binary not found: {binary}", file=sys.stderr)
+        return 1
+    if not args.output:
+        print("ERROR: --output/-o is required for the offset sweep.", file=sys.stderr)
+        return 1
+    if not args.bench:
+        print("ERROR: --bench (base config) is required for the offset sweep.",
+              file=sys.stderr)
+        return 1
+
+    offsets = _parse_offsets(args.offsets)
+
+    # WISQ is forced onto OUR parity grid (NOT square_sparse). Hold it at our side:
+    # --wisq-max-grow 0 (default) means the grid never grows past the base+offset side.
+    _wisq_native = False
+    MAX_GROW_STEPS = args.wisq_max_grow
+
+    if args.wisq_workers is not None and args.wisq_workers < args.workers:
+        _wisq_semaphore = threading.Semaphore(args.wisq_workers)
+        print(f"WISQ concurrency limited to {args.wisq_workers}.", file=sys.stderr)
+
+    arch_dir = (Path(args.keep_arch_dir) if args.keep_arch_dir
+                else Path(tempfile.mkdtemp(prefix="offset_arch_")))
+    arch_dir.mkdir(parents=True, exist_ok=True)
+
+    source = json.loads(Path(args.bench).read_text())
+    combos = [c for c in expand_config_variants(source) if c.get("circuit")]
+    # One combo per circuit (first wins); group so a worker owns a circuit.
+    by_circuit: "OrderedDict[str, dict]" = OrderedDict()
+    for cfg in combos:
+        by_circuit.setdefault(cfg["circuit"], cfg)
+    circuits = list(by_circuit.keys())
+    base_desc = "WISQ native square" if args.wisq_native else "our auto-sized"
+    print(f"{len(circuits)} circuits x {len(offsets)} offsets {offsets} "
+          f"(base = {base_desc} grid + offset per side; WISQ parity arch, grow cap "
+          f"{args.wisq_max_grow}).", file=sys.stderr)
+
+    if args.dry_run:
+        for c in circuits:
+            n, _ = _input_qasm_qubits_and_t(c)
+            if args.wisq_native:
+                base = wisq_native_side(n) if n else None
+                sides = [base + o for o in offsets] if base else "?"
+                print(f"  {c}  n={n} wisq_native={base} sides={sides}")
+            else:
+                print(f"  {c}  n={n} base=our-auto (resolved at runtime) offsets={offsets}")
+        return 0
+
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    done = _offset_load_done_keys(out_path)
+    if done:
+        print(f"Resuming: {len(done)} (circuit, offset) results already present.",
+              file=sys.stderr)
+
+    todo = [
+        (i, c) for i, c in enumerate(circuits)
+        if args.process_count <= 1 or i % args.process_count == args.processor
+    ]
+    print(f"Circuits for this process: {len(todo)}.", file=sys.stderr)
+
+    csv_file = out_path.open("a", newline="")
+    writer = csv.DictWriter(csv_file, fieldnames=OFFSET_RUN_COLUMNS)
+    with _csv_write_lock:
+        fcntl.flock(csv_file, fcntl.LOCK_EX)
+        try:
+            if out_path.stat().st_size == 0:
+                writer.writeheader()
+                csv_file.flush()
+        finally:
+            fcntl.flock(csv_file, fcntl.LOCK_UN)
+
+    completed = 0
+
+    def _emit(row: dict) -> None:
+        nonlocal completed
+        completed += 1
+        with _csv_write_lock:
+            fcntl.flock(csv_file, fcntl.LOCK_EX)
+            try:
+                writer.writerow(row)
+                csv_file.flush()
+            finally:
+                fcntl.flock(csv_file, fcntl.LOCK_UN)
+        print(f"[{completed}] {row['circuit']:30s} off+{row['offset']:<2} "
+              f"side={row['side']} mine={row['my_routing_steps']} "
+              f"wisq={row['wisq_routing_steps']} -> {row['verdict']} "
+              f"({row['wisq_status']})", file=sys.stderr)
+
+    def _process(idx: int, circuit: str) -> list:
+        cfg = by_circuit[circuit]
+        n_in, _ = _input_qasm_qubits_and_t(circuit)
+        out: list = []
+        if not n_in:
+            for o in offsets:
+                out.append({**{k: "" for k in OFFSET_RUN_COLUMNS}, "circuit": circuit,
+                            "offset": o, "wisq_status": "no_qubit_count",
+                            "verdict": "n/a"})
+            return out
+        base, reason = _offset_base_dims(circuit, cfg, binary, args.wisq_native,
+                                         n_in, args.attempt_timeout)
+        if base is None:
+            print(f"    [{circuit}] base grid unavailable: {reason}", file=sys.stderr)
+            for o in offsets:
+                if (circuit, str(o)) in done:
+                    continue
+                out.append({**{k: "" for k in OFFSET_RUN_COLUMNS}, "circuit": circuit,
+                            "n_qubits": n_in, "offset": o,
+                            "wisq_status": "base_dim_failed", "verdict": "n/a"})
+            return out
+        bw, bh = base
+        for o in offsets:
+            if (circuit, str(o)) in done:
+                continue
+            side_label = (bw + o) if bw == bh else f"{bw + o}x{bh + o}"
+            try:
+                out.append(_offset_run_one(
+                    circuit, cfg, binary, n_in, bw + o, bh + o, o, arch_dir, args.parity,
+                    args.mr_timeout, args.attempt_timeout, run_id=idx))
+            except Exception as e:  # noqa: BLE001 — isolate per-(circuit,offset) failures
+                print(f"  ERROR [{circuit} off+{o}]: {e}", file=sys.stderr)
+                out.append({**{k: "" for k in OFFSET_RUN_COLUMNS}, "circuit": circuit,
+                            "n_qubits": n_in, "offset": o, "side": side_label,
+                            "wisq_status": "error", "verdict": "n/a"})
+        return out
+
+    if args.workers > 1:
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futures = {ex.submit(_process, i, c): c for i, c in todo}
+            for fut in as_completed(futures):
+                for row in fut.result():
+                    _emit(row)
+    else:
+        for i, c in todo:
+            for row in _process(i, c):
+                _emit(row)
+
+    csv_file.close()
+    print(f"\nRuns CSV written/appended to {out_path}")
+
+    if not args.keep_arch_dir:
+        for p in arch_dir.glob("*_wisq2.arch"):
+            p.unlink(missing_ok=True)
+        try:
+            arch_dir.rmdir()
+        except OSError:
+            pass
+    return 0
+
+
+def _offset_int(x):
+    try:
+        return int(float(x))
+    except (TypeError, ValueError):
+        return None
+
+
+def report_offsets(args: argparse.Namespace) -> int:
+    """Aggregate an offset runs CSV per offset (triggered by --offset-report)."""
+    rows = list(csv.DictReader(Path(args.offset_report).open(newline="")))
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    by_off: dict = defaultdict(list)
+    for r in rows:
+        o = _offset_int(r.get("offset"))
+        if o is not None:
+            by_off[o].append(r)
+
+    lines = [
+        "# Our compiler vs WISQ at PARITY of grid, swept over grid offsets",
+        "",
+        "Both compilers forced onto a square grid of side = `wisq_native_side(n) + "
+        "offset` (per side). WISQ runs on a custom PARITY arch at that side (our "
+        "magic positions + even/even data slots) — square_sparse cannot be resized, "
+        "so this is the only way to put WISQ at the same dimension. `WIN` = we use "
+        "FEWER routing steps. `geomean wisq/mine` > 1 ⇒ we are better on average.",
+        "",
+        "| offset (+/side) | circuits | WIN | LOSS | TIE | n/a | WISQ fail | "
+        "geomean wisq/mine | median wisq/mine |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+
+    summary_rows = []
+    for o in sorted(by_off):
+        rs = by_off[o]
+        counts = {"WIN": 0, "LOSS": 0, "TIE": 0, "n/a": 0}
+        ratios: list = []
+        wisq_fail = 0
+        for r in rs:
+            counts[r.get("verdict", "n/a") if r.get("verdict") in counts else "n/a"] += 1
+            st = r.get("wisq_status", "")
+            if st not in ("success", "", "skipped"):
+                wisq_fail += 1
+            try:
+                ratios.append(float(r["ratio_wisq_over_mine"]))
+            except (KeyError, ValueError):
+                pass
+        geomean = (math.exp(sum(math.log(x) for x in ratios) / len(ratios))
+                   if ratios else None)
+        median = statistics.median(ratios) if ratios else None
+        lines.append(
+            f"| +{o} | {len(rs)} | {counts['WIN']} | {counts['LOSS']} | "
+            f"{counts['TIE']} | {counts['n/a']} | {wisq_fail} | "
+            f"{geomean:.3f} | {median:.3f} |"
+            if geomean is not None else
+            f"| +{o} | {len(rs)} | {counts['WIN']} | {counts['LOSS']} | "
+            f"{counts['TIE']} | {counts['n/a']} | {wisq_fail} |  |  |")
+        summary_rows.append({
+            "offset": o, "circuits": len(rs), **counts, "wisq_fail": wisq_fail,
+            "geomean_wisq_over_mine": f"{geomean:.4f}" if geomean else "",
+            "median_wisq_over_mine": f"{median:.4f}" if median else "",
+        })
+
+    lines += [
+        "",
+        "Read the WIN column down the offsets: a falling WIN count (and a geomean "
+        "drifting toward / below 1.0) means WISQ catches up as the grid grows; a "
+        "rising WIN count means extra dimension favours us.",
+        "",
+    ]
+    md_path = out_dir / "offset_parity_vs_wisq_results.md"
+    md_path.write_text("\n".join(lines) + "\n")
+
+    csv_path = out_dir / "offset_parity_vs_wisq_summary.csv"
+    with csv_path.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(summary_rows[0].keys()) if summary_rows
+                           else ["offset"])
+        w.writeheader()
+        w.writerows(summary_rows)
+
+    print(f"Wrote:\n  {md_path}\n  {csv_path}")
+    print("\n".join(lines))  # echo so the answer is visible without opening the file
+    return 0
+
+
 # ── main ──────────────────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -824,7 +1245,34 @@ def main() -> int:
                         help="Run WISQ on its own native square_sparse_layout "
                              "(odd/odd qubits + all_sides magic, sized by WISQ) instead "
                              "of our arch; our compiler is run at the SAME grid size.")
+
+    # ── offset sweep mode (folded-in compare_offset.py) ──
+    parser.add_argument("--offsets", default=None,
+                        help="Comma-separated per-side grid offsets (e.g. 0,2,4,6,8). "
+                             "Providing this runs the OFFSET sweep: both our compiler and "
+                             "WISQ are forced onto (base + offset) per side, one row per "
+                             "(circuit, offset). The base is our auto-sized grid by default, "
+                             "or WISQ's native square with --wisq-native. Uses --bench as "
+                             "the base config.")
+    parser.add_argument("--wisq-max-grow", type=int, default=0,
+                        help="Offset sweep: cap on WISQ-side grid growth (default 0 = "
+                             "hold WISQ at native+offset; it fits, so 0 keeps parity).")
+    parser.add_argument("--attempt-timeout", type=float, default=None,
+                        help="Offset sweep: per-attempt timeout (s) for our compiler "
+                             "(default: none).")
+    parser.add_argument("--offset-report", default=None,
+                        help="Aggregate an offset runs CSV (from --offsets) per offset "
+                             "and exit. Writes offset_parity_vs_wisq_{results.md,summary.csv}.")
+    parser.add_argument("--out-dir", default="results",
+                        help="Output dir for --offset-report (default: results).")
     args = parser.parse_args()
+
+    # Folded-in offset sweep (was compare_offset.py): dispatch and exit before the
+    # normal parity/circuits paths so --bench keeps meaning the standard sweep.
+    if args.offset_report is not None:
+        return report_offsets(args)
+    if args.offsets is not None:
+        return run_offsets(args)
 
     global _wisq_semaphore, _wisq_native
     _wisq_native = args.wisq_native
