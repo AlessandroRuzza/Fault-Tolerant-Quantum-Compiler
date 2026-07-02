@@ -28,7 +28,7 @@ scripts/wisq_compare/compare-wisq.sh --our-dimension gridrun_minimum_our_dimensi
 dimensione intrinseca e li ignorano (passa la flag "giusta" solo per chiarezza).
 
 Parametri specifici degli altri pbs (`compare_wisq_conn.pbs`→`SHRINK`,
-`compare_random.pbs`→`GRID_FROM`, `gridrun_gaussian__wisq_dimension.pbs`→`WISQ_WORKERS`) **non**
+`compare_random.pbs`→`GRID_FROM`, `gridrun_minimum_wisq_dimension.pbs`→`WISQ_WORKERS`) **non**
 sono esposti qui: per variarli usa `qsub -v` diretto (i default nel pbs bastano se non li cambi).
 
 ### Deploy: gli script python stanno nell'immagine
@@ -58,7 +58,7 @@ ogni file in "quale domanda risponde".
 |---|---|---|---|---|---|
 | `compare_wisq_parity.py` | baseline a **parità** (+ `--wisq-native`, + **`--offsets`**) | nostra auto / WISQ native / `native+offset` | formula | `compare_wisq_parity.pbs` (`MODE=parity\|native\|offset`) | `_wisq.csv` / `_runs.csv` |
 | `gridrun_minimum_our_dimension.py` | qual è la **nostra** griglia minima, WISQ ci segue | nostra | **ricerca** (parti dal min, cresci +1 fino a successo) | `gridrun_minimum_our_dimension.pbs` | `_wisq3.csv` |
-| `gridrun_gaussian__wisq_dimension.py` | griglia minima **di WISQ**, noi ci adattiamo | WISQ | **ricerca** (scan `s` in su fino a successo WISQ) | `gridrun_gaussian__wisq_dimension.pbs` | `_wisqmin.csv` |
+| `gridrun_minimum_wisq_dimension.py` | griglia minima **di WISQ**, noi ci adattiamo | WISQ | **ricerca** (scan `s` in su fino a successo WISQ) | `gridrun_minimum_wisq_dimension.pbs` | `_wisqmin.csv` |
 | `compare_wisq_conn.py` | vinciamo su una griglia **più stretta** di WISQ? | `WISQ_native − SHRINK` | **ricerca** (footprint; colonne `dim_diff_side`, `grow_steps`) | `compare_wisq_conn.pbs` | `_wisqconn.csv` |
 | `compare_random.py` | baseline **random/cube** vs WISQ (sub-comandi `run`/`report`) | WISQ native | — (legge la griglia dal baseline WISQ) | `compare_random.pbs` | `_ours.csv` |
 
@@ -81,7 +81,7 @@ compare_wisq_parity.py --offset-report <out>_runs.csv --out-dir results/
 ### Rinominati / fusi (per non ricascarci)
 - `compare_wisq_2.py`        → `compare_wisq_parity.py`  (il motore/baseline a parità)
 - `compare_wisq_mingrid.py`  → `gridrun_minimum_our_dimension.py`
-- `compare_wisq_minsearch.py` → `gridrun_gaussian__wisq_dimension.py`
+- `compare_wisq_minsearch.py` → `gridrun_minimum_wisq_dimension.py`
 - `compare_offset.py`        → **assorbito** in `compare_wisq_parity.py` (`--offsets` / `--offset-report`)
 
 ## Post-processing

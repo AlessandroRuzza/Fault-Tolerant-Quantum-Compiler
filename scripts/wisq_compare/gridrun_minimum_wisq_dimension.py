@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""gridrun_gaussian__wisq_dimension.py — find WISQ's MINIMUM grid by a bounded upward scan,
+"""gridrun_minimum_wisq_dimension.py — find WISQ's MINIMUM grid by a bounded upward scan,
 then run our (gaussian) compiler on that exact grid under every bench combination.
 (Formerly compare_wisq_minsearch.py.)
 
@@ -39,7 +39,7 @@ carry a successful WISQ result reuses that s* (no re-search, no WISQ re-run) and
 only the missing combos are executed.
 
 Usage:
-    python scripts/wisq_compare/gridrun_gaussian__wisq_dimension.py \
+    python scripts/wisq_compare/gridrun_minimum_wisq_dimension.py \
         --bench data/config/all_circuits_4_variants.json \
         --output data/results/<name>_wisqmin.csv --workers 8 --mr_timeout 600
 """

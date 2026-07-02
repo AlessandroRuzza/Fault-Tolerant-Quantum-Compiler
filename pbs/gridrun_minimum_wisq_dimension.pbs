@@ -6,7 +6,7 @@
 
 # WISQ minimum-grid search + our compiler at that exact grid, per bench combo.
 # Submit:
-#   qsub -v BENCH_PATH=all_circuits_4_variants,BENCH_JOBS=8 pbs/gridrun_gaussian__wisq_dimension.pbs
+#   qsub -v BENCH_PATH=all_circuits_4_variants,BENCH_JOBS=8 pbs/gridrun_minimum_wisq_dimension.pbs
 # Env vars:
 #   BENCH_PATH           bench JSON in config/ (without .json)     [required]
 #   BENCH_JOBS           parallel workers, ONE circuit each        [required]
@@ -58,7 +58,7 @@ apptainer exec \
   --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
   --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
   --bind "$PWD/visualization:/app/visualization" \
-  ftqc.sif python3 /app/scripts/wisq_compare/gridrun_gaussian__wisq_dimension.py \
+  ftqc.sif python3 /app/scripts/wisq_compare/gridrun_minimum_wisq_dimension.py \
     --bench "/app/config/${BENCH_PATH}.json" \
     --output "/app/benchmarks/results/${BENCH_PATH}_wisqmin.csv" \
     --workers "$BENCH_JOBS" \
