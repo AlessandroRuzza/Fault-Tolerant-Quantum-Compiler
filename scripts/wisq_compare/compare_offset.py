@@ -67,7 +67,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import compare_wisq_2 as cw2  # noqa: E402
-import compare_wisq3 as cw3   # noqa: E402  (run_compiler_at: explicit-grid runner)
+import compare_wisq_mingrid as cw3   # noqa: E402  (run_compiler_at: explicit-grid runner)
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 

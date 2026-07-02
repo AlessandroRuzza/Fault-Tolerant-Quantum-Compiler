@@ -44,7 +44,7 @@ date
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
 
 # NOTE: we bind ONLY compare_wisq_conn.py (not the whole scripts/ dir) so the LOCAL,
-# parity-capable version runs while compare_wisq_2.py / compare_wisq3.py stay the ones
+# parity-capable version runs while compare_wisq_2.py / compare_wisq_mingrid.py stay the ones
 # baked into ftqc.sif (stable; the parity path only calls existing cw2 helpers like
 # build_wisq_arch/read_graph). Needed for --wisq-grid parity, which the published image
 # predates. Put the updated scripts/wisq_compare/compare_wisq_conn.py on the cluster before running.

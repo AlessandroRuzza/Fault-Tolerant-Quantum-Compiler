@@ -34,7 +34,7 @@ apptainer exec \
   --bind "$PWD/universal_set_qasms:/app/universal_set_qasms" \
   --bind "$PWD/qasm_graphs:/app/qasm_graphs" \
   --bind "$PWD/visualization:/app/visualization" \
-  ftqc.sif python3 /app/scripts/wisq_compare/compare_wisq3.py \
+  ftqc.sif python3 /app/scripts/wisq_compare/compare_wisq_mingrid.py \
     --bench "/app/config/${BENCH_PATH}.json" \
     --output "/app/benchmarks/results/${BENCH_PATH}_wisq3.csv" \
     --workers "$BENCH_JOBS" \

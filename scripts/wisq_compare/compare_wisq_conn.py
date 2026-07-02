@@ -45,10 +45,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 # Reuse the WISQ runner, native-arch builder, graph/qasm readers, CSV schema and row
-# formatters from compare_wisq_2, plus the grid-grow compiler helper from compare_wisq3.
+# formatters from compare_wisq_2, plus the grid-grow compiler helper from compare_wisq_mingrid.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import compare_wisq_2 as cw2  # noqa: E402
-import compare_wisq3 as cw3   # noqa: E402
+import compare_wisq_mingrid as cw3   # noqa: E402
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 

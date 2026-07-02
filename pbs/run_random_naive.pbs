@@ -40,7 +40,7 @@ fi
 # cw2/cw3 are imported by compare_random.py. Bind the LOCAL copies ONLY if present;
 # otherwise fall back to the versions baked into ftqc.sif (like run_wisq_offset.pbs).
 EXTRA_BINDS=""
-for f in compare_wisq_2.py compare_wisq3.py; do
+for f in compare_wisq_2.py compare_wisq_mingrid.py; do
   if [ -f "$PWD/scripts/wisq_compare/$f" ]; then
     EXTRA_BINDS="$EXTRA_BINDS --bind $PWD/scripts/wisq_compare/$f:/app/scripts/wisq_compare/$f"
   fi

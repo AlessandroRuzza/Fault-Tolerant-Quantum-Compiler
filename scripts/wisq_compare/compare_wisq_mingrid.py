@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""compare_wisq3.py — like compare_wisq_2.py, but our compiler's grid is found by
+"""compare_wisq_mingrid.py — like compare_wisq_2.py, but our compiler's grid is found by
 a minimum-grid SEARCH instead of auto-sizing.
 
 For every circuit and every parameter combination (the bench cartesian expansion):
@@ -20,7 +20,7 @@ Output: one CSV row per circuit (the winning combination), same columns as
 compare_wisq_2's bench CSV, so extract_wisq.py / plot_wisq_comparison*.py work on it.
 
 Usage:
-    python scripts/wisq_compare/compare_wisq3.py --bench data/config/<sweep>.json \
+    python scripts/wisq_compare/compare_wisq_mingrid.py --bench data/config/<sweep>.json \
         --output data/results/<name>_wisq.csv --workers 8 --mr_timeout 600 --max-grow 100
 """
 
