@@ -43,19 +43,11 @@ date
 
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
 
-# NOTE: we bind ONLY the scripts this job needs (not the whole scripts/ dir) so the LOCAL,
-# parity-capable versions run while compare_wisq_parity.py stays the one baked into ftqc.sif
-# (stable; the parity path only calls existing cw2 helpers like build_wisq_arch/read_graph).
-# compare_wisq_conn.py imports gridrun_minimum_our_dimension.py (cw3, run_compiler_at); that
-# file was renamed after the image was published, so it is NOT in ftqc.sif and MUST be bound
-# locally too, else the import fails. Needed for --wisq-grid parity, which the published image
-# predates. Put both updated scripts on the cluster before running.
+# Python scripts come from ftqc.sif (rebuild the image to update them) — NOT bound from $PWD.
 # (Config is still seeded from the image via the cp -an above, then bound writable below.)
 apptainer exec \
   --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
   --env OMP_DISPLAY_ENV=TRUE \
-  --bind "$PWD/scripts/wisq_compare/compare_wisq_conn.py:/app/scripts/wisq_compare/compare_wisq_conn.py" \
-  --bind "$PWD/scripts/wisq_compare/gridrun_minimum_our_dimension.py:/app/scripts/wisq_compare/gridrun_minimum_our_dimension.py" \
   --bind "$PWD/config:/app/config" \
   --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
   --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \

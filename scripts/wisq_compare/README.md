@@ -31,6 +31,13 @@ Parametri specifici degli altri pbs (`compare_wisq_conn.pbs`→`SHRINK`,
 `compare_random.pbs`→`GRID_FROM`, `gridrun_gaussian__wisq_dimension.pbs`→`WISQ_WORKERS`) **non**
 sono esposti qui: per variarli usa `qsub -v` diretto (i default nel pbs bastano se non li cambi).
 
+### Deploy: gli script python stanno nell'immagine
+I pbs **non montano più** gli script locali (`--bind $PWD/scripts` rimossi). Sul cluster
+bastano quindi `compare-wisq.sh` + `pbs/`; i `.py` vengono da **`ftqc.sif`**, e `config/`/`qasms/`
+sono seminati dall'immagine (`cp -an`). **⚠ Devi RICOSTRUIRE l'immagine ogni volta che modifichi
+uno script python**, altrimenti i job girano la versione vecchia baked. (Non re-aggiungere i bind
+`$PWD/scripts` se non vuoi tornare alla modalità "script locali").
+
 ---
 
 

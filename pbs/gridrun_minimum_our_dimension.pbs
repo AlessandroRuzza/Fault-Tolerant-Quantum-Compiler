@@ -23,10 +23,10 @@ date
 
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
 
+# Python scripts come from ftqc.sif (rebuild the image to update them) — NOT bound from $PWD.
 apptainer exec \
   --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
   --env OMP_DISPLAY_ENV=TRUE \
-  --bind "$PWD/scripts:/app/scripts" \
   --bind "$PWD/config:/app/config" \
   --bind "$PWD/qasms:/app/qasms" \
   --bind "$PWD/benchmarks/results:/app/benchmarks/results" \

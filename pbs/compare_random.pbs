@@ -32,26 +32,11 @@ date
 
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/ 2>/dev/null || true' >> "$LOG_FILE" 2>&1
 
-# compare_random.py is NEW (not baked into the .sif) so it MUST be present locally.
-if [ ! -f "$PWD/scripts/wisq_compare/compare_random.py" ]; then
-  echo "FATAL: scripts/wisq_compare/compare_random.py missing on the cluster — scp it first." >> "$LOG_FILE" 2>&1
-  exit 1
-fi
-# cw2/cw3 are imported by compare_random.py. Bind the LOCAL copies ONLY if present;
-# otherwise fall back to the versions baked into ftqc.sif (like compare_wisq_parity.pbs).
-EXTRA_BINDS=""
-for f in compare_wisq_parity.py gridrun_minimum_our_dimension.py; do
-  if [ -f "$PWD/scripts/wisq_compare/$f" ]; then
-    EXTRA_BINDS="$EXTRA_BINDS --bind $PWD/scripts/wisq_compare/$f:/app/scripts/wisq_compare/$f"
-  fi
-done
-
+# Python scripts come from ftqc.sif (rebuild the image to update them) — NOT bound from $PWD.
 # All shards append to ONE CSV (flock + resume).
 apptainer exec \
   --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
   --env OMP_DISPLAY_ENV=TRUE \
-  --bind "$PWD/scripts/wisq_compare/compare_random.py:/app/scripts/wisq_compare/compare_random.py" \
-  $EXTRA_BINDS \
   --bind "$PWD/config:/app/config" \
   --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
   --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \

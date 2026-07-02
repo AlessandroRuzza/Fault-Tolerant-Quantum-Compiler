@@ -43,18 +43,15 @@ date
 
 apptainer exec --bind "$PWD/config:/host_config" ftqc.sif bash -lc 'cp -an /app/config/. /host_config/' >> "$LOG_FILE" 2>&1
 
-# Whole scripts/ dir is bound (like gridrun_minimum_our_dimension.pbs): gridrun_gaussian__wisq_dimension.py
-# is newer than the published image and imports the LOCAL compare_wisq_parity.py and
-# gridrun_minimum_our_dimension.py, so all three must come from the cluster checkout.
 EXTRA_ARGS=""
 if [ -n "$ATTEMPT_TIMEOUT" ]; then
   EXTRA_ARGS="--attempt-timeout $ATTEMPT_TIMEOUT"
 fi
 
+# Python scripts come from ftqc.sif (rebuild the image to update them) — NOT bound from $PWD.
 apptainer exec \
   --env PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin \
   --env OMP_DISPLAY_ENV=TRUE \
-  --bind "$PWD/scripts:/app/scripts" \
   --bind "$PWD/config:/app/config" \
   --bind "$PWD/benchmarks/results:/app/benchmarks/results" \
   --bind "$PWD/benchmarks/logs:/app/benchmarks/logs" \
