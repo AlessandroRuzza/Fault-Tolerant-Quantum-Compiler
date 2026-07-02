@@ -48,7 +48,7 @@ from pathlib import Path
 # formatters from compare_wisq_parity, plus the grid-grow compiler helper from gridrun_minimum_our_dimension.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import compare_wisq_parity as cw2  # noqa: E402
-import scripts.wisq_compare.gridrun_minimum_our_dimension as cw3   # noqa: E402
+import gridrun_minimum_our_dimension as cw3   # noqa: E402
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 

@@ -59,7 +59,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import compare_wisq_parity as cw2  # noqa: E402
-import scripts.wisq_compare.gridrun_minimum_our_dimension as cw3   # noqa: E402  (run_compiler_at: explicit-grid runner)
+import gridrun_minimum_our_dimension as cw3   # noqa: E402  (run_compiler_at: explicit-grid runner)
 
 DEFAULT_BINARY = cw2.DEFAULT_BINARY
 DEFAULT_BASELINE = cw2.REPO_ROOT / "benchmarks" / "results" / "connectivity_summary_all_wisq.csv"
