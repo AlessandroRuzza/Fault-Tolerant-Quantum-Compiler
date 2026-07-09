@@ -13,16 +13,22 @@ Output layout (in --out-dir):
 
   <metric>/<metric>_vs_optimality_deg<N>.png   one subfolder per characteristic;
                                    inside, for each polynomial degree N in 1..5,
-                                   a trend curve PER configuration (no scatter
-                                   points, one legend entry per config).
+                                   a trend curve PER configuration (with faint
+                                   per-circuit scatter behind it, one legend
+                                   entry per config).
   optimality_correlations_<config>.png   (root) for EACH configuration, a ranked
                                    bar chart of Spearman(optimality, characteristic).
   optimality_correlations_combined.png   (root) a single ranking pooling all
                                    configurations together.
 
+A WISQ baseline curve (dashed black) is added to every trend plot by joining
+data/best_wisq_per_circuit.csv (circuit, wisq_routing_steps) against the same
+total_layers metric; pass --wisq-csv to point elsewhere or a nonexistent path
+to omit it.
+
 Usage:
   python3 scripts/circuit_analysis/gaussian_overhead_plot.py <runs_csv> \
-      [--metrics <csv>] [--out-dir <dir>]
+      [--metrics <csv>] [--wisq-csv <csv>] [--out-dir <dir>]
 """
 
 import argparse
@@ -39,6 +45,8 @@ from scipy import stats
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_METRICS = PROJECT_ROOT / "benchmarks" / "results" / "cache_metrics" / "all_circuits_cache_metrics.csv"
+DEFAULT_WISQ_CSV = PROJECT_ROOT / "data" / "best_wisq_per_circuit.csv"
+WISQ_CFG = "WISQ"  # pseudo-config key for the WISQ baseline curve (not a PARAM_COLS tuple)
 
 # Columns of the metrics CSV that are not circuit characteristics to plot.
 # total_layers is excluded because it is the denominator of the overhead.
@@ -51,6 +59,17 @@ PARAM_COLS = [
     "gaussian_confidence", "safe_passage_strategy", "magic_state_placement_strategy",
     "border_distance_percentage", "number_of_magic_states", "routing_strategy",
     "t_routing_mode", "use_layer_cache",
+]
+# Circuit-structural columns that a runs CSV may already carry per-row (written
+# by the benchmark itself). These are preferred over the external metrics CSV,
+# which is a lazily-populated cache and can be missing many circuits (notably
+# large ones) — falling back to it silently would join away most of the data.
+ROW_METRIC_COLS = [
+    "max_parallelism", "avg_parallelism", "min_routing_steps",
+    "cnot_interaction_density", "cnot_graph_modularity", "cnot_graph_diameter",
+    "cnot_graph_avg_shortest_path", "max_cnot_degree", "min_cnot_degree",
+    "avg_cnot_degree", "cnot_degree_gini", "cnot_pair_rep_gini",
+    "cnot_edge_weight_stddev", "cnot_graph_clustering_coeff",
 ]
 SHORT = {
     "mapping_type": "type", "magic_aware_strategy": "ma", "gaussian_strategy": "gstrat",
@@ -91,6 +110,8 @@ def lab(k):
 
 def config_label(cfg, cfg_cols):
     """Readable legend label: bare value for strategy columns, short=value for the rest."""
+    if cfg == WISQ_CFG:
+        return "WISQ"
     parts = []
     for c, v in zip(cfg_cols, cfg):
         if c in ("safe_passage_strategy", "routing_strategy", "gaussian_strategy",
@@ -102,6 +123,8 @@ def config_label(cfg, cfg_cols):
 
 
 def config_slug(cfg, cfg_cols):
+    if cfg == WISQ_CFG:
+        return WISQ_CFG
     d = dict(zip(cfg_cols, cfg))
     base = "_".join(str(d.get(c, "")) for c in ("safe_passage_strategy", "routing_strategy") if c in d)
     if not base:
@@ -109,7 +132,7 @@ def config_slug(cfg, cfg_cols):
     return re.sub(r"[^0-9A-Za-z._-]+", "_", base).strip("_")
 
 
-def load(runs_csv, metrics_csv):
+def load(runs_csv, metrics_csv, wisq_csv=None):
     rows = list(csv.DictReader(open(runs_csv)))
     if not rows:
         return None
@@ -118,38 +141,88 @@ def load(runs_csv, metrics_csv):
     present = [c for c in PARAM_COLS if c in rows[0]]
     cfg_cols = [c for c in present if len({r[c] for r in rows}) > 1]
 
-    # best (min) routing_steps per (config, circuit)
+    # best (min) routing_steps per (config, circuit); also harvest any row-level
+    # circuit-structural columns (see ROW_METRIC_COLS) as we go, since the runs
+    # CSV usually covers every circuit while the metrics cache may not.
     steps = defaultdict(lambda: defaultdict(lambda: 10**18))
+    row_metvals = {}
+    row_min_routing_steps = {}
     for r in rows:
         if r.get("status") != "success" or not r.get("routing_steps", "").strip():
             continue
+        circuit = r["circuit"]
         cfg = tuple(r[c] for c in cfg_cols)
-        steps[cfg][r["circuit"]] = min(steps[cfg][r["circuit"]], int(float(r["routing_steps"])))
+        steps[cfg][circuit] = min(steps[cfg][circuit], int(float(r["routing_steps"])))
+
+        vals = row_metvals.setdefault(circuit, {})
+        for k in ROW_METRIC_COLS:
+            if k in vals:
+                continue
+            try:
+                vals[k] = float(r[k])
+            except (KeyError, ValueError, TypeError):
+                pass
+        try:
+            rms = float(r["min_routing_steps"])
+            cur = row_min_routing_steps.get(circuit)
+            row_min_routing_steps[circuit] = rms if cur is None else min(cur, rms)
+        except (KeyError, ValueError, TypeError):
+            pass
 
     metrics = {r["circuit"]: r for r in csv.DictReader(open(metrics_csv))}
 
     def g(c, k):
+        if k in ROW_METRIC_COLS and c in row_metvals and k in row_metvals[c]:
+            return row_metvals[c][k]
         try:
             return float(metrics[c][k])
         except (KeyError, ValueError, TypeError):
             return None
 
-    # overhead[config][circuit] and metric columns
+    # overhead[config][circuit] and metric columns: cache-CSV characteristics
+    # plus any row-level ones the runs CSV itself supplies.
     header = next(iter(metrics.values())).keys() if metrics else []
     metric_keys = [k for k in header if k not in SKIP_METRICS]
+    metric_keys += [k for k in ROW_METRIC_COLS if k not in metric_keys]
 
     optimality = defaultdict(dict)
     metvals = {}
     for cfg, per_circ in steps.items():
         for c, s in per_circ.items():
-            tl = g(c, "total_layers")
+            # total_layers (external cache) is the exact ideal-layers count;
+            # min_routing_steps (embedded in the runs CSV, so far more complete)
+            # is the same dependency-depth lower bound used elsewhere as a
+            # fallback when the cache doesn't have this circuit.
+            tl = g(c, "total_layers") or row_min_routing_steps.get(c)
             if not tl or tl <= 0 or s <= 0:
                 continue
             optimality[cfg][c] = tl / s   # total_layers / routing_steps  (<=1, 1=ideal)
             if c not in metvals:
                 metvals[c] = {k: g(c, k) for k in metric_keys}
 
-    configs = sorted(optimality.keys())
+    # WISQ baseline: same total_layers/routing_steps optimality, but routing_steps
+    # comes from a separate per-circuit CSV (WISQ has no PARAM_COLS of its own,
+    # so it is folded in as one extra pseudo-configuration rather than a tuple).
+    if wisq_csv is not None and Path(wisq_csv).exists():
+        wisq_rows = list(csv.DictReader(open(wisq_csv)))
+        for r in wisq_rows:
+            c = (r.get("circuit") or "").strip()
+            if not c:
+                continue
+            try:
+                wisq_steps = float(r["wisq_routing_steps"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            tl = g(c, "total_layers") or row_min_routing_steps.get(c)
+            if not tl or tl <= 0 or wisq_steps <= 0:
+                continue
+            optimality[WISQ_CFG][c] = tl / wisq_steps
+            if c not in metvals:
+                metvals[c] = {k: g(c, k) for k in metric_keys}
+
+    configs = sorted(k for k in optimality if k != WISQ_CFG)
+    if WISQ_CFG in optimality:
+        configs.append(WISQ_CFG)
     usable = []
     for k in metric_keys:
         vals = [metvals[c][k] for c in metvals if metvals[c][k] is not None]
@@ -178,13 +251,20 @@ def plot_trend(d, key, degree, out_path):
                if d["metvals"].get(c, {}).get(key) is not None]
         xs = np.array([p[0] for p in pts], float)
         ys = np.array([p[1] for p in pts], float)
+        is_wisq = cfg == WISQ_CFG
+        color = "black" if is_wisq else cmap(i % 10)
+        if len(xs):
+            ax.scatter(xs, ys, s=22, alpha=0.35, color=color, zorder=2,
+                       marker="^" if is_wisq else "o", linewidths=0)
         # need strictly more points than the polynomial order and ≥2 distinct x
         if len(xs) <= degree or len(set(xs)) < 2:
             continue
         with np.errstate(all="ignore"):
             coeffs = np.polyfit(xs, ys, degree)
         sp, _ = stats.spearmanr(xs, ys)
-        ax.plot(xr, np.polyval(coeffs, xr), color=cmap(i % 10), lw=2.4, zorder=3,
+        ls = "--" if is_wisq else "-"
+        ax.plot(xr, np.polyval(coeffs, xr), color=color, lw=2.8 if is_wisq else 2.4,
+                ls=ls, zorder=4 if is_wisq else 3,
                 label=f"{config_label(cfg, cfg_cols)}   (ρ={sp:+.2f})")
         plotted = True
 
@@ -260,13 +340,17 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("runs_csv")
     p.add_argument("--metrics", type=Path, default=DEFAULT_METRICS)
+    p.add_argument("--wisq-csv", type=Path, default=DEFAULT_WISQ_CSV,
+                    help="Per-circuit WISQ routing_steps CSV (circuit, wisq_routing_steps) "
+                         f"added as an extra baseline curve (default: {DEFAULT_WISQ_CSV}). "
+                         "Pass a nonexistent path to omit it.")
     p.add_argument("--out-dir", type=Path, default=None)
     args = p.parse_args()
 
     out_dir = args.out_dir or (Path(args.runs_csv).resolve().parent / "gaussian_overhead_plots")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    d = load(args.runs_csv, args.metrics)
+    d = load(args.runs_csv, args.metrics, args.wisq_csv)
     if not d or not d["configs"]:
         print("ERROR: no data (check runs CSV and metrics).")
         return
