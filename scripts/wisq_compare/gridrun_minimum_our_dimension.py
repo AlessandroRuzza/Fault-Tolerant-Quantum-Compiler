@@ -10,15 +10,21 @@ For every circuit and every parameter combination (the bench cartesian expansion
      the grid by +1 — alternating x, then y, then x, ... — and retry, until it
      SUCCEEDS or a safety cap (--max-grow) is hit.
 This yields, per (circuit, combination), the smallest grid on which we succeed.
+  3. Each combination is then re-run at ITS OWN minimum grid and WISQ is run there
+     (same build_wisq_arch as compare_wisq_parity: our magic positions + even/even
+     slots, growing only if WISQ does not fit).
 
-Then, per circuit, across all its combinations, the winner is the combination that
-succeeded on the SMALLEST grid (area x*y; ties -> fewer routing steps; further
-ties -> less time). WISQ is finally run "as usual" (same build_wisq_arch as
-compare_wisq_parity: our magic positions + even/even slots, growing only if needed)
-STARTING from that winning minimum grid.
+NO winner is picked. Every combination gets its own row: selecting the best combo per
+circuit after seeing the results is an ORACLE, not a reportable result. To report a
+result, choose a config a priori and read only that config's rows.
 
-Output: one CSV row per circuit (the winning combination), same columns as
-compare_wisq_parity's bench CSV, so extract_wisq.py / plot_wisq_comparison*.py work on it.
+WISQ is deduplicated by architecture, so combos resolving to the same grid + magic
+placement (e.g. the routing strategies of one safe_passage — routing does not change
+the mapping) share a single WISQ run.
+
+Output: one CSV row per (circuit, combination), same columns as compare_wisq_parity's
+bench CSV, so extract_wisq.py / plot_wisq_comparison*.py work on it. Resume is per
+(circuit, combo).
 
 Usage:
     python scripts/wisq_compare/gridrun_minimum_our_dimension.py --bench data/config/<sweep>.json \
@@ -140,79 +146,76 @@ def search_min_grid(circuit: str, cfg: dict, binary: Path,
 def process_circuit(circuit: str, combos: list[dict], binary: Path, arch_dir: Path,
                     parity: int, mr_timeout: int, max_grow: int,
                     attempt_timeout: float | None, run_id: int):
-    """Search every combo's minimum grid, pick the best, then run WISQ from it.
+    """Find EVERY combo's own minimum grid and run WISQ on each — one row per combo.
 
-    Returns (winning_cfg, result_dict) for a CSV row, or (None, reason) if no combo
-    of this circuit ever succeeded.
+    No winner is picked: choosing the best combination per circuit AFTER seeing the
+    results is an oracle, not a result you can report. Every combination gets its own
+    row so each fixed config can be evaluated on its own (pick the config a priori,
+    then read that config's rows).
+
+    WISQ is deduplicated by architecture (cw2.get_or_run_wisq), so combos that resolve
+    to the same grid + magic placement — e.g. the routing strategies of one
+    safe_passage, which do not change the mapping — share a single WISQ run.
+
+    Returns [(cfg, result_or_None, reason_or_None), ...] in `combos` order.
     """
-    best_cfg = None
-    best_res = None
-    best_key = None
-    n_success = 0
+    out: list[tuple[dict, dict | None, str | None]] = []
 
     for cfg in combos:
+        fields = cw2.cfg_fields(cfg)
+        label = f"{fields['safe_passage_strategy']}/{fields['routing_strategy']}"
+
         res, reason = search_min_grid(circuit, cfg, binary, max_grow, attempt_timeout)
         if res is None:
-            print(f"    [{circuit}] combo failed: {reason}", file=sys.stderr)
+            print(f"    [{circuit}] {label}: FAILED ({reason})", file=sys.stderr)
+            out.append((cfg, None, reason))
             continue
-        n_success += 1
-        mine = res["mine"]
-        area = mine["width"] * mine["height"]
-        dur = mine["duration_seconds"] if mine["duration_seconds"] is not None else float("inf")
-        # smallest grid (area) -> fewest routing steps -> least time
-        key = (area, mine["routing_steps"], dur)
-        if best_key is None or key < best_key:
-            best_key = key
-            best_cfg = cfg
-            best_res = res
-        print(f"    [{circuit}] combo ok: {mine['width']}x{mine['height']} "
-              f"(area {area}, steps {mine['routing_steps']}, +{res['grow_steps']} grow)",
-              file=sys.stderr)
 
-    if best_cfg is None:
-        return None, f"no combination succeeded within {max_grow} grow steps"
+        # Re-run this combo at its OWN minimum grid so qasm_graphs/<circuit>.graph and
+        # the universal QASM on disk correspond to THIS combo's mapping (the search
+        # overwrote them while probing). The mapper is deterministic, so this reproduces.
+        x, y = res["x"], res["y"]
+        ok, mine = run_compiler_at(circuit, cfg, binary, x, y, attempt_timeout)
+        if not ok:
+            print(f"    [{circuit}] {label}: did not reproduce at {x}x{y}", file=sys.stderr)
+            out.append((cfg, None, f"combo did not reproduce at {x}x{y}"))
+            continue
 
-    # Re-run the winner at its winning grid so qasm_graphs/<circuit>.graph and the
-    # universal QASM on disk correspond to the winning mapping (other combos ran
-    # afterwards and overwrote them). The mapper is deterministic, so this reproduces.
-    win_x, win_y = best_res["x"], best_res["y"]
-    ok, mine = run_compiler_at(circuit, best_cfg, binary, win_x, win_y, attempt_timeout)
-    if not ok:
-        return None, f"winning combo did not reproduce at {win_x}x{win_y}"
+        graph = cw2.read_graph(circuit)
+        n_qubits = cw2.count_qasm_qubits(circuit) or mine.get("num_qubits")
+        built = cw2.build_wisq_arch(
+            graph["width"], graph["height"], graph["magic_states"], n_qubits, parity
+        )
+        wisq = cw2.get_or_run_wisq(circuit, built, arch_dir, mr_timeout, run_id)
 
-    graph = cw2.read_graph(circuit)
-    n_qubits = cw2.count_qasm_qubits(circuit) or mine.get("num_qubits")
-    built = cw2.build_wisq_arch(
-        graph["width"], graph["height"], graph["magic_states"], n_qubits, parity
-    )
-    wisq = cw2.get_or_run_wisq(circuit, built, arch_dir, mr_timeout, run_id)
+        ratio = None
+        if wisq["routing_steps"] and mine["routing_steps"] and mine["routing_steps"] > 0:
+            ratio = wisq["routing_steps"] / mine["routing_steps"]
 
-    ratio = None
-    if wisq["routing_steps"] and mine["routing_steps"] and mine["routing_steps"] > 0:
-        ratio = wisq["routing_steps"] / mine["routing_steps"]
+        print(f"    [{circuit}] {label}: {mine['width']}x{mine['height']} "
+              f"(+{res['grow_steps']} grow) mine={mine['routing_steps']} "
+              f"wisq={wisq['routing_steps']} status={wisq['status']}", file=sys.stderr)
+        out.append((cfg, {"n_qubits": n_qubits, "mine": mine, "built": built,
+                          "wisq": wisq, "ratio": ratio}, None))
 
-    result = {
-        "n_qubits": n_qubits,
-        "mine": mine,
-        "built": built,
-        "wisq": wisq,
-        "ratio": ratio,
-    }
-    print(f"  [{circuit}] WINNER {mine['width']}x{mine['height']} (of {n_success} ok combos) "
-          f"mine={mine['routing_steps']} wisq={wisq['routing_steps']} "
-          f"status={wisq['status']}", file=sys.stderr)
-    return best_cfg, result
+    return out
 
 
-def load_done_circuits(path: Path) -> set[str]:
+def load_done_keys(path: Path) -> set[tuple]:
+    """(circuit, config...) keys already in the CSV.
+
+    Resume is per (circuit, combo), not per circuit: every combination has its own row,
+    so a circuit is only fully done when all of its combos are present.
+    """
     if not path.exists():
         return set()
-    done = set()
+    done: set[tuple] = set()
     try:
         with path.open(newline="") as f:
             for row in csv.DictReader(f):
-                if row.get("circuit"):
-                    done.add(row["circuit"])
+                circ = (row.get("circuit") or "").strip()
+                if circ:
+                    done.add((circ,) + tuple(row.get(k, "") for k in cw2.CONFIG_FIELDS))
     except Exception:
         pass
     return done
@@ -282,16 +285,23 @@ def main() -> int:
         return 0
 
     output_path = Path(args.output) if args.output else None
-    done = load_done_circuits(output_path) if output_path else set()
+    done = load_done_keys(output_path) if output_path else set()
     if done:
-        print(f"Resuming: {len(done)} circuits already in CSV, skipping.", file=sys.stderr)
+        print(f"Resuming: {len(done)} (circuit, combo) rows already in CSV.",
+              file=sys.stderr)
 
-    # Shard by circuit index (so multiple processes can share one CSV), skip done.
+    # Drop already-done combos; keep circuits that still have work; shard by index.
+    pending: "OrderedDict[str, list[dict]]" = OrderedDict()
+    for c in circuits:
+        todo_combos = [cfg for cfg in by_circuit[c] if cw2.cfg_key(c, cfg) not in done]
+        if todo_combos:
+            pending[c] = todo_combos
     todo = [
-        (i, c) for i, c in enumerate(circuits)
-        if c not in done and (args.process_count <= 1 or i % args.process_count == args.processor)
+        (i, c) for i, c in enumerate(pending.keys())
+        if args.process_count <= 1 or i % args.process_count == args.processor
     ]
-    print(f"Circuits to run: {len(todo)}.", file=sys.stderr)
+    n_combos = sum(len(pending[c]) for _, c in todo)
+    print(f"Circuits to run: {len(todo)} ({n_combos} combos).", file=sys.stderr)
 
     csv_file = None
     writer = None
@@ -311,55 +321,59 @@ def main() -> int:
     completed = 0
     rows: list[dict] = []
 
-    def _process(i: int, circuit: str) -> dict:
-        combos = by_circuit[circuit]
+    def _process(i: int, circuit: str) -> list[dict]:
+        combos = pending[circuit]
         try:
-            cfg, result = process_circuit(
+            results = process_circuit(
                 circuit, combos, binary, arch_dir, args.parity,
                 args.mr_timeout, args.max_grow, args.attempt_timeout, run_id=i,
             )
-            if cfg is None:
-                print(f"  ERROR [{circuit}]: {result}", file=sys.stderr)
+        except (RuntimeError, FileNotFoundError) as e:
+            print(f"  ERROR [{circuit}]: {e}", file=sys.stderr)
+            results = [(cfg, None, str(e)) for cfg in combos]
+
+        out: list[dict] = []
+        for cfg, result, reason in results:
+            if result is None:
                 row = {**cw2.make_error_row_base(circuit, args.parity),
-                       **cw2.cfg_fields(combos[0])}
+                       **cw2.cfg_fields(cfg)}
             else:
                 row = {**cw2.make_row_base(circuit, result, args.parity),
                        **cw2.cfg_fields(cfg)}
-        except (RuntimeError, FileNotFoundError) as e:
-            print(f"  ERROR [{circuit}]: {e}", file=sys.stderr)
-            row = {**cw2.make_error_row_base(circuit, args.parity),
-                   **cw2.cfg_fields(combos[0])}
-        return {k: row.get(k, "") for k in cw2.BENCH_CSV_COLUMNS}
+            out.append({k: row.get(k, "") for k in cw2.BENCH_CSV_COLUMNS})
+        return out
 
-    def _write_row(row: dict) -> None:
+    def _write_rows(new_rows: list[dict]) -> None:
         nonlocal completed
-        rows.append(row)
-        completed += 1
-        if writer:
-            with _csv_write_lock:
-                fcntl.flock(csv_file, fcntl.LOCK_EX)
-                try:
-                    writer.writerow(row)
-                    csv_file.flush()
-                finally:
-                    fcntl.flock(csv_file, fcntl.LOCK_UN)
-        my_grid = f"{row['my_x']}x{row['my_y']}" if row.get("my_x") else "?"
-        wisq_grid = f"{row['wisq_x']}x{row['wisq_y']}" if row.get("wisq_x") else "?"
-        print(f"[{completed}/{len(todo)}] {row['circuit']} "
-              f"my_grid={my_grid} wisq_grid={wisq_grid} "
-              f"mine={row['my_routing_steps']} wisq={row['wisq_routing_steps']} "
-              f"ratio={row['ratio_wisq_over_mine']} status={row['wisq_status']}",
-              file=sys.stderr)
+        for row in new_rows:
+            rows.append(row)
+            completed += 1
+            if writer:
+                with _csv_write_lock:
+                    fcntl.flock(csv_file, fcntl.LOCK_EX)
+                    try:
+                        writer.writerow(row)
+                        csv_file.flush()
+                    finally:
+                        fcntl.flock(csv_file, fcntl.LOCK_UN)
+            my_grid = f"{row['my_x']}x{row['my_y']}" if row.get("my_x") else "?"
+            wisq_grid = f"{row['wisq_x']}x{row['wisq_y']}" if row.get("wisq_x") else "?"
+            print(f"[{completed}] {row['circuit']} "
+                  f"{row.get('safe_passage_strategy', '')}/{row.get('routing_strategy', '')} "
+                  f"my_grid={my_grid} wisq_grid={wisq_grid} "
+                  f"mine={row['my_routing_steps']} wisq={row['wisq_routing_steps']} "
+                  f"ratio={row['ratio_wisq_over_mine']} status={row['wisq_status']}",
+                  file=sys.stderr)
 
     if args.workers > 1:
         with ThreadPoolExecutor(max_workers=args.workers) as ex:
             futures = {ex.submit(_process, i, c): c for i, c in todo}
             for fut in as_completed(futures):
-                _write_row(fut.result())
+                _write_rows(fut.result())
     else:
         for i, c in todo:
-            print(f"\n──── {c} ({len(by_circuit[c])} combos) ────", file=sys.stderr)
-            _write_row(_process(i, c))
+            print(f"\n──── {c} ({len(pending[c])} combos) ────", file=sys.stderr)
+            _write_rows(_process(i, c))
 
     if csv_file:
         csv_file.close()
