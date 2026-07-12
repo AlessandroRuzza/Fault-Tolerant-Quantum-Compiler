@@ -129,3 +129,6 @@ qasms/synth*.qasm
 *.alg
 *.xdv
 paper/*.log
+
+
+config/random_cube_native.json
