@@ -13,9 +13,9 @@ Output layout (in --out-dir):
 
   <metric>/<metric>_vs_optimality_deg<N>.png   one subfolder per characteristic;
                                    inside, for each polynomial degree N in 1..5,
-                                   a trend curve PER configuration (with faint
-                                   per-circuit scatter behind it, one legend
-                                   entry per config).
+                                   a trend curve PER configuration plus the
+                                   per-circuit scatter (one colour per config,
+                                   legend = connectivity / routing).
   optimality_correlations_<config>.png   (root) for EACH configuration, a ranked
                                    bar chart of Spearman(optimality, characteristic).
   optimality_correlations_combined.png   (root) a single ranking pooling all
@@ -103,9 +103,60 @@ LABELS = {
     "max_estimated_path_length": "Max path length", "path_length_stddev": "Path length stddev",
 }
 
+# Short formula / definition of each characteristic (shown on the X axis of the
+# trend plots and next to each characteristic in the correlation rankings).
+# n = number of logical qubits; "gates" = total routable gates.
+FORMULAS = {
+    "total_routable_gates": "= #CNOT + #T/Tdg + #other",
+    "num_logical_qubits": "= n (logical qubits)",
+    "num_cnot": "= #CNOT gates",
+    "num_t_tdg": "= #T + #Tdg gates",
+    "num_other_gates": "= gates − #CNOT − #T/Tdg",
+    "t_count_ratio": "= #T/Tdg / gates",
+    "cnot_ratio": "= #CNOT / gates",
+    "other_gate_ratio": "= #other / gates",
+    "num_unique_cnot_pairs": "= #distinct CNOT qubit-pairs",
+    "max_cnot_pair_repetition": "= max #CNOT on one pair",
+    "avg_cnot_pair_repetition": "= #CNOT / #unique pairs",
+    "cnot_interaction_density": "= #pairs / (n(n−1)/2)",
+    "max_cnot_degree": "= max_q #CNOT partners",
+    "min_cnot_degree": "= min_q #CNOT partners",
+    "t_qubit_diversity": "= #qubits touched by a T/Tdg",
+    "avg_cnot_degree": "= 2·#pairs / n",
+    "cnot_degree_gini": "= Gini(degree distribution)",
+    "cnot_graph_modularity": "= Louvain modularity Q",
+    "cnot_pair_rep_gini": "= Gini(per-pair CNOT counts)",
+    "cnot_graph_diameter": "= longest shortest-path",
+    "cnot_graph_avg_shortest_path": "= mean shortest-path length",
+    "cnot_edge_weight_stddev": "= std(per-pair CNOT counts)",
+    "cnot_graph_clustering_coeff": "= mean local clustering coeff",
+    "num_unique_layers": "= #distinct layer structures",
+    "layer_reuse_ratio": "= (layers − unique) / layers",
+    "depth_width_ratio": "= total_layers / n",
+    "density": "= gates / (n × total_layers)",
+    "avg_layer_size": "= gates / total_layers",
+    "max_layer_size": "= max_layer #gates",
+    "avg_cnot_per_layer": "= #CNOT / total_layers",
+    "avg_t_per_layer": "= #T/Tdg / total_layers",
+    "max_t_in_layer": "= max_layer #T/Tdg",
+    "max_cnot_in_layer": "= max_layer #CNOT",
+    "t_depth": "= #layers with ≥1 T/Tdg",
+    "cnot_depth": "= #layers with ≥1 CNOT",
+    "t_layer_ratio": "= t_depth / total_layers",
+    "layer_congestion_score": "= std / mean of layer sizes",
+    "max_repeated_seq_len": "= longest repeated layer run",
+    "avg_estimated_path_length": "= mean grid Manhattan dist",
+    "max_estimated_path_length": "= max grid Manhattan dist",
+    "path_length_stddev": "= std(path lengths)",
+}
+
 
 def lab(k):
     return LABELS.get(k, k)
+
+
+def formula(k):
+    return FORMULAS.get(k, "")
 
 
 def config_label(cfg, cfg_cols):
@@ -120,6 +171,19 @@ def config_label(cfg, cfg_cols):
         else:
             parts.append(f"{SHORT.get(c, c)}={v}")
     return " / ".join(parts)
+
+
+def config_conn_route(cfg, cfg_cols, const_params):
+    """Legend label: only the connectivity (safe_passage) and routing strategy.
+
+    Values are taken from the varying columns if present, otherwise from the
+    constant-parameter values, so the label is correct even when one of the two
+    does not vary across the CSV.
+    """
+    d = dict(zip(cfg_cols, cfg))
+    conn = d.get("safe_passage_strategy", const_params.get("safe_passage_strategy", "?"))
+    route = d.get("routing_strategy", const_params.get("routing_strategy", "?"))
+    return f"{conn} / {route}"
 
 
 def config_slug(cfg, cfg_cols):
@@ -140,6 +204,8 @@ def load(runs_csv, metrics_csv, wisq_csv=None):
     # configuration = combination of the tuning-param columns that vary
     present = [c for c in PARAM_COLS if c in rows[0]]
     cfg_cols = [c for c in present if len({r[c] for r in rows}) > 1]
+    # constant params (present but not varying) — used to complete the conn/route label
+    const_params = {c: rows[0][c] for c in present if c not in cfg_cols}
 
     # best (min) routing_steps per (config, circuit); also harvest any row-level
     # circuit-structural columns (see ROW_METRIC_COLS) as we go, since the runs
@@ -228,8 +294,8 @@ def load(runs_csv, metrics_csv, wisq_csv=None):
         vals = [metvals[c][k] for c in metvals if metvals[c][k] is not None]
         if len(vals) >= 5 and len(set(vals)) > 1:
             usable.append(k)
-    return {"cfg_cols": cfg_cols, "configs": configs, "optimality": optimality,
-            "metvals": metvals, "metrics": usable}
+    return {"cfg_cols": cfg_cols, "const_params": const_params, "configs": configs,
+            "optimality": optimality, "metvals": metvals, "metrics": usable}
 
 
 def plot_trend(d, key, degree, out_path):
@@ -247,6 +313,7 @@ def plot_trend(d, key, degree, out_path):
 
     plotted = False
     for i, cfg in enumerate(configs):
+        color = cmap(i % 10)
         pts = [(d["metvals"][c][key], ov) for c, ov in d["optimality"][cfg].items()
                if d["metvals"].get(c, {}).get(key) is not None]
         xs = np.array([p[0] for p in pts], float)
@@ -259,6 +326,8 @@ def plot_trend(d, key, degree, out_path):
         # need strictly more points than the polynomial order and ≥2 distinct x
         if len(xs) <= degree or len(set(xs)) < 2:
             continue
+        # per-circuit scatter (one colour per configuration), no legend entry of its own
+        ax.scatter(xs, ys, s=22, color=color, alpha=0.5, edgecolors="none", zorder=2)
         with np.errstate(all="ignore"):
             coeffs = np.polyfit(xs, ys, degree)
         sp, _ = stats.spearmanr(xs, ys)
@@ -278,13 +347,13 @@ def plot_trend(d, key, degree, out_path):
         ax.set_ylim(max(0.0, min(ys_all) - 0.05), 1.05)
 
     deg_name = {1: "linear", 2: "quadratic", 3: "cubic", 4: "quartic", 5: "quintic"}.get(degree, f"degree {degree}")
-    ax.set_xlabel(lab(key), fontsize=11)
+    ax.set_xlabel(f"{lab(key)}\n{formula(key)}", fontsize=11)
     ax.set_ylabel("Routing optimality = total_layers / routing_steps", fontsize=11)
     ax.set_title(f"Gaussian routing optimality vs {lab(key)}\n"
                  f"{deg_name} trend (degree {degree}), one curve per configuration",
                  fontsize=12, fontweight="bold")
     ax.grid(alpha=0.25, zorder=0)
-    ax.legend(fontsize=8, loc="best", title="Configuration")
+    ax.legend(fontsize=8.5, loc="best", title="connectivity / routing")
     fig.tight_layout()
     fig.savefig(out_path, dpi=130, bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -305,18 +374,20 @@ def plot_correlation_ranking(d, pairs, subtitle, out_path):
         sp, _ = stats.spearmanr(xs, ys)
         if np.isnan(sp):
             continue
-        rows.append((lab(k), sp))
+        rows.append((k, sp))
     if not rows:
         return
     rows.sort(key=lambda r: abs(r[1]))
-    labels = [r[0] for r in rows]
+    keys = [r[0] for r in rows]
     vals = [r[1] for r in rows]
+    # each tick shows the characteristic name and, below it, its formula
+    labels = [f"{lab(k)}\n{formula(k)}" for k in keys]
     colors = ["#e15759" if v > 0 else "#4e79a7" for v in vals]
 
-    fig, ax = plt.subplots(figsize=(9, max(5.5, len(labels) * 0.32)), facecolor="white")
+    fig, ax = plt.subplots(figsize=(9.5, max(6.0, len(labels) * 0.5)), facecolor="white")
     ax.barh(range(len(labels)), vals, color=colors, edgecolor="white", zorder=2)
     ax.set_yticks(range(len(labels)))
-    ax.set_yticklabels(labels, fontsize=8.5)
+    ax.set_yticklabels(labels, fontsize=8)
     ax.axvline(0, color="#444", lw=1)
     for i, v in enumerate(vals):
         ax.text(v + (0.02 if v >= 0 else -0.02), i, f"{v:+.2f}",
@@ -362,7 +433,8 @@ def main():
     # correlation rankings stay in the root out-dir
     for cfg in d["configs"]:
         pairs = list(d["optimality"][cfg].items())
-        plot_correlation_ranking(d, pairs, f"config: {config_label(cfg, d['cfg_cols'])}",
+        plot_correlation_ranking(d, pairs,
+                                 f"config: {config_conn_route(cfg, d['cfg_cols'], d['const_params'])}",
                                  out_dir / f"optimality_correlations_{config_slug(cfg, d['cfg_cols'])}.png")
     # one combined ranking pooling all configurations
     combined = [(c, ov) for cfg in d["configs"] for c, ov in d["optimality"][cfg].items()]
