@@ -1,7 +1,7 @@
-# wisq3 — COMPLETO (winner post-hoc) ⚠ NON FAIR, NON same-grid
+# wisq3 — winner post-hoc ⚠ NON FAIR e NON same-grid
 
 
-ATTENZIONE doppia: (1) per ogni circuito e' tenuta solo la combo VINCENTE (scelta a posteriori); (2) NON e' same-grid: noi sulla nostra griglia minima, WISQ su una griglia cresciuta (area mediana 1.68x). Solo riferimento.
+NON RIPORTABILE: (1) tiene solo la combo VINCENTE per circuito (scelta a posteriori); (2) non e' same-grid. Per i risultati onesti usare i report B_*. 256 circuiti.
 
 
 Dati da: `all_circuits_8_variants_our_dimension_wisq3.csv` — **256 circuiti**.
