@@ -14,8 +14,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-CSV = ROOT / "data/results/single_config/wisqmin_connectivity_packing.csv"
+CSV = ROOT / "data/results/single_config/wisqmin_connectivity_naive_critical.csv"
 OUT = ROOT / "results/all_circuits_8/_fig_candidates"
+OUT_PAPER = ROOT / "paper_overleaf/figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 WIN = "#2E7D32"   # green
@@ -109,14 +110,16 @@ def fig_winrate_budget():
     ax.plot(x, vic_rate, "-o", color="#1565C0", linewidth=1.8, markersize=6)
     for xi, v in zip(x, vic_rate):
         ax.annotate(f"{v:.0f}%", (xi, v), textcoords="offset points",
-                    xytext=(0, 8), ha="center", fontsize=8)
+                    xytext=(0, 8), ha="center", fontsize=7)
     ax.set_xticks(x); ax.set_xticklabels(labels)
-    ax.set_xlabel("wall-clock budget per circuit (s)  → tighter")
-    ax.set_ylabel("our win-rate (% of 256)")
+    ax.set_xlabel("timeout per circuit (s)")
+    ax.set_ylabel(r"our win-rate (% of 256)")
     ax.set_ylim(min(vic_rate) - 8, 100)
-    ax.set_title("Win-rate vs WISQ as the time budget tightens", fontsize=10)
+    ax.set_title("Win-rate vs WISQ as the timeout tightens", fontsize=10)
     ax.grid(True, linestyle=":", alpha=0.35)
-    fig.tight_layout(); fig.savefig(OUT / "2_winrate_budget.png", dpi=170); plt.close(fig)
+    fig.tight_layout(); 
+    fig.savefig(OUT_PAPER / "winrate_budget.pdf")
+    fig.savefig(OUT / "2_winrate_budget.png", dpi=170); plt.close(fig)
 
 # ---------------------------------------------------------------- Fig 3: performance profile (ECDF of ratio)
 def fig_perf_profile():
