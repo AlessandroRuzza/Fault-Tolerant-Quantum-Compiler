@@ -421,6 +421,66 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_ours_generic(path: Path) -> dict[str, dict]:
+    """circuit -> {n_qubits, x, y, steps|None}. A row counts as a success when its
+    status is `success` and a routing-step value is present. Handles both schemas via
+    header names: the random file uses `status`, the single_config files use `my_status`."""
+    out: dict[str, dict] = {}
+    with path.open(newline="") as f:
+        for r in csv.DictReader(f):
+            st = (r.get("status") or r.get("my_status") or "").strip()
+            steps_raw = (r.get("my_routing_steps") or "").strip()
+            ok = st == "success" and steps_raw
+            out[r["circuit"]] = {
+                "n_qubits": _int(r.get("n_qubits")),
+                "x": _int(r.get("my_x")), "y": _int(r.get("my_y")),
+                "steps": _int(steps_raw) if ok else None,
+            }
+    return out
+
+
+def cmd_report_ab(args: argparse.Namespace) -> int:
+    """Generic A-vs-B report between two ours-only CSVs (same grid per circuit),
+    rendered with the same style as the random_vs_* reports. The A side is the subject
+    and the row universe (consistent with cmd_report, where the `ours` side drives the
+    circuit list): every circuit in A is listed, B is looked up and marked n/a where it
+    has no successful result. Verdict is from A's perspective (WIN = A fewer steps)."""
+    a = _load_ours_generic(Path(args.a_csv))
+    b = _load_ours_generic(Path(args.b_csv))
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    circuits = sorted(a, key=lambda c: (a[c]["n_qubits"] or 0, c))
+    rows, mismatched = [], []
+    for c in circuits:
+        ax, ay = a[c]["x"], a[c]["y"]
+        grid = f"{ax}x{ay}" if ax else "?"
+        br = b.get(c)
+        if br and br["x"] is not None and ax is not None and br["x"] != ax:
+            mismatched.append((c, br["x"], ax))
+        rows.append({"circuit": c, "n_qubits": a[c]["n_qubits"], "grid": grid,
+                     "a_steps": a[c]["steps"], "b_steps": br["steps"] if br else None})
+
+    built, counts = build_comparison(rows, args.a_label, args.b_label)
+    note = args.note or (
+        f"Both sides produced by OUR compiler on the **same grid per circuit** (verified "
+        f"identical). `{args.a_label}` and `{args.b_label}` differ only in the compared knob; "
+        f"lower routing_steps is better. All `{args.a_label}` circuits are listed (n/a where "
+        f"`{args.b_label}` has no successful mapping).")
+    md = render_md(f"{args.a_label} vs {args.b_label}", args.a_label, args.b_label,
+                   built, counts, note)
+    stem = f"{args.a_label}_vs_{args.b_label}"
+    (out_dir / f"{stem}_results.md").write_text(md)
+    write_csv(out_dir / f"{stem}.csv", built)
+    if mismatched:
+        print(f"WARNING: {len(mismatched)} circuits have grid(a)!=grid(b): "
+              f"{mismatched[:5]}", file=sys.stderr)
+    print("Wrote:")
+    print(f"  {out_dir / (stem + '_results.md')}")
+    print(f"  {out_dir / (stem + '.csv')}")
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -445,6 +505,16 @@ def main() -> int:
                     help=f"WISQ-native baseline CSV (default: {DEFAULT_BASELINE.name})")
     pp.add_argument("--out-dir", default="results")
     pp.set_defaults(func=cmd_report)
+
+    pab = sub.add_parser("report-ab",
+                         help="Generic A-vs-B report between two ours-only CSVs (same style).")
+    pab.add_argument("--a-csv", required=True, help="Ours CSV for side A (subject + row universe).")
+    pab.add_argument("--b-csv", required=True, help="Ours CSV for side B (comparison target, looked up).")
+    pab.add_argument("--a-label", required=True, help="Short label for A, e.g. random.")
+    pab.add_argument("--b-label", required=True, help="Short label for B, e.g. gauss.")
+    pab.add_argument("--out-dir", default="results")
+    pab.add_argument("--note", default="", help="Override the descriptive note under the title.")
+    pab.set_defaults(func=cmd_report_ab)
 
     args = p.parse_args()
     return args.func(args)

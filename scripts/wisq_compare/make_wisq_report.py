@@ -618,10 +618,17 @@ def main() -> int:
                    help="mr_timeout used for the asymmetric baseline row (s).")
     p.add_argument("--budgets", type=float, nargs="*",
                    default=[3600, 1800, 900, 600, 300, 60])
+    p.add_argument("--them-label", default="WISQ",
+                   help="Name of the opponent side (the wisq_* columns) in the prose. "
+                        "Default 'WISQ'; e.g. 'random' when both sides are ours and the "
+                        "wisq_* columns hold a random-placement baseline. Applied as a "
+                        "whole-word rename on the final Markdown, so the rest is unchanged.")
     args = p.parse_args()
 
     md = build_report(args.csv, args.title, args.intro, set(args.exclude),
                       args.shrink_baseline, args.wisq_timeout, sorted(args.budgets, reverse=True))
+    if args.them_label != "WISQ":
+        md = re.sub(r"\bWISQ\b", args.them_label, md)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(md)
     print(f"Wrote {args.out}  ({len(md.splitlines())} lines)")
