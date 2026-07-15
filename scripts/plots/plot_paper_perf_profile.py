@@ -34,7 +34,6 @@ INPUT_CSV = (
     / "wisqmin_connectivity_naive_critical.csv"
 )
 OUTPUT_PDF = REPO_ROOT / "paper_overleaf" / "figures" / "gaussian_perf_profile.pdf"
-PREVIEW_PNG = REPO_ROOT / "results" / "all_circuits_8" / "_fig_candidates" / "paper_fig4_perf_profile.png"
 
 TIE = "#9E9E9E"
 INK = "#263238"
@@ -88,11 +87,8 @@ def main() -> int:
     fig.tight_layout()
     OUTPUT_PDF.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(OUTPUT_PDF)
-    PREVIEW_PNG.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PREVIEW_PNG, dpi=170)
     plt.close(fig)
     print(f"saved: {OUTPUT_PDF}")
-    print(f"preview: {PREVIEW_PNG}")
     print(f"n={n} match_or_beat={frac_ge*100:.1f}% ties={tie_share:.1f}% "
           f"tie_time_win={tie_time_pct:.1f}%")
     return 0
