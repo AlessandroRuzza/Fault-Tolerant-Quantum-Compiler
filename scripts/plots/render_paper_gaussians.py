@@ -190,12 +190,14 @@ def render_fields(args):
 
     # fine evaluation mesh
     n = args.mesh
-    xs = np.linspace(0, maxX, n)
-    ys = np.linspace(0, maxY, n)
+    xs = np.linspace(-0.5, maxX+0.5, n+1)
+    ys = np.linspace(-0.5, maxY+0.5, n+1)
     XX, YY = np.meshgrid(xs, ys)
+    # imshow extent must match the mesh domain, else markers misalign / clip
+    extent = [xs[0], xs[-1], ys[0], ys[-1]]
 
-    def stack(centres, weight, inverse):
-        F = np.zeros_like(XX)
+    def stack(centres, weight, inverse, XX=XX, YY=YY):
+        F = np.zeros_like(XX, dtype=float)
         for (mx, my) in centres:
             F += gaussian_field(XX, YY, mx, my, sigma, weight, inverse)
         return F
@@ -205,6 +207,20 @@ def render_fields(args):
     f_mapped = stack(placed, args.mapped_weight, inverse=True)      # spread out
     f_base = gaussian_field(XX, YY, maxX // 2, maxY // 2, sigma, args.base_weight, False)
     S = f_magic + f_cnot + f_mapped + f_base
+
+    # final mapping spot: the current qubit lands on the *lattice cell* with the
+    # highest total score. Evaluate S on integer coords (not the fine display
+    # mesh) and mask out occupied cells -- magic tiles and already-placed qubits.
+    GX, GY = np.meshgrid(np.arange(w), np.arange(h))
+    Sg = (stack(magic, args.magic_high, inverse=False, XX=GX, YY=GY)
+          + stack(partners, args.cnot_high, inverse=False, XX=GX, YY=GY)
+          + stack(placed, args.mapped_weight, inverse=True, XX=GX, YY=GY)
+          + gaussian_field(GX, GY, maxX // 2, maxY // 2, sigma, args.base_weight, False))
+    occupied = set(magic) | set(placed)
+    for (ox, oy) in occupied:
+        Sg[oy, ox] = -np.inf
+    peak_yy, peak_xx = np.unravel_index(int(np.argmax(Sg)), Sg.shape)
+    map_x, map_y = int(GX[peak_yy, peak_xx]), int(GY[peak_yy, peak_xx])
 
     from matplotlib.lines import Line2D
 
@@ -219,21 +235,22 @@ def render_fields(args):
     # shared scale would crush the lower-magnitude magic/CNOT/baseline panels.
     panels = [
         (f_magic, "magic-state", gs[0, 0]),
-        (f_cnot, "CNOT-partner", gs[0, 1]),
+        (f_cnot, "partner", gs[0, 1]),
         (f_mapped, "repulsion", gs[1, 0]),
-        (f_base, "baseline", gs[1, 1]),
+        (f_base, "centering", gs[1, 1]),
     ]
     for F, title, cell in panels:
         ax = fig.add_subplot(cell)
-        im = ax.imshow(F, origin="lower", extent=[0, maxX, 0, maxY],
+        im = ax.imshow(F, origin="lower", extent=extent,
                        cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
         ax.set_title(title, pad=2, fontsize=11)
-        ax.set_xticks([])
-        ax.set_yticks([])
+        ax.set_xticks(range(0, maxX + 1, 2))
+        ax.set_yticks(range(0, maxY + 1, 2))
+        ax.tick_params(labelsize=5, length=2)
         if title == "magic-state":
             for (mx, my) in magic:
                 ax.plot(mx, my, marker="*", color="white", ms=8, mew=0.7, mec="black")
-        if title == "CNOT-partner":
+        if title == "partner":
             for (mx, my) in partners:
                 ax.plot(mx, my, marker="o", color="white", ms=5, mew=0.6, mec="black")
         if title == "repulsion":
@@ -247,7 +264,7 @@ def render_fields(args):
 
     # Superposition S as a top-down heatmap, matching the four family panels.
     axS = fig.add_subplot(gs[0:2, 2])
-    imS = axS.imshow(S, origin="lower", extent=[0, maxX, 0, maxY],
+    imS = axS.imshow(S, origin="lower", extent=extent,
                      cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
     axS.set_title(r"superposition $S$", pad=2, fontsize=11)
     axS.set_xlabel("x", labelpad=1, fontsize=10)
@@ -261,6 +278,7 @@ def render_fields(args):
         axS.plot(mx, my, marker="o", color="white", ms=5, mew=0.7, mec="black")
     for (mx, my) in placed:
         axS.plot(mx, my, marker="s", color="white", ms=5, mew=0.7, mec="black")
+    axS.plot(map_x, map_y, marker="X", color="red", ms=9, mew=0.8, mec="black")
     cbS = fig.colorbar(imS, ax=axS, location="right", shrink=0.9, aspect=22, pad=0.02)
     cbS.set_label(r"score $S$", fontsize=10)
     cbS.ax.tick_params(labelsize=7)
@@ -274,9 +292,11 @@ def render_fields(args):
         Line2D([0], [0], linestyle="none", marker="o", markerfacecolor="white",
                markeredgecolor="black", markersize=9, label="partner"),
         Line2D([0], [0], linestyle="none", marker="s", markerfacecolor="white",
-               markeredgecolor="black", markersize=9, label="placed patch"),
+               markeredgecolor="black", markersize=9, label="placed qubit"),
+        Line2D([0], [0], linestyle="none", marker="X", markerfacecolor="red",
+               markeredgecolor="black", markersize=10, label="final mapping"),
     ]
-    axL.legend(handles=legend_handles, loc="center", ncol=3, fontsize=10,
+    axL.legend(handles=legend_handles, loc="center", ncol=4, fontsize=10,
                handletextpad=0.4, columnspacing=1.4, framealpha=0.9,
                facecolor="0.85", edgecolor="0.6")
 
@@ -335,7 +355,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--frames-dir", default=os.path.join(here, "visualization", "gaussian_frames"))
-    ap.add_argument("--out-dir", default=os.path.join(here, "paper", "figures"))
+    ap.add_argument("--out-dir", default=os.path.join(here, "paper_overleaf", "figures"))
     ap.add_argument("--confidence", type=float, default=0.99999)
 
     # decomposition
