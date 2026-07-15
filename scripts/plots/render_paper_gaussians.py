@@ -302,7 +302,6 @@ def render_fields(args):
 
     out = os.path.join(args.out_dir, "gaussian_fields.pdf")
     fig.savefig(out)
-    fig.savefig(out[:-4] + ".png", dpi=200)
     plt.close(fig)
     print(f"[fields] frame={frame} magic={len(magic)} placed={len(placed)} "
           f"partners={len(partners)} -> {out}")
@@ -320,8 +319,18 @@ def render_frames(args):
 
     set_style()
     fig = plt.figure(figsize=(args.strip_w, args.strip_h))
-    gs = fig.add_gridspec(1, len(frames), wspace=0.02)
+    # Interleave a thin column between each pair of plots; the shared colourbar
+    # lives in the first such gap, i.e. between the two score surfaces.
+    n = len(frames)
+    width_ratios = []
+    for i in range(n):
+        width_ratios.append(1.0)
+        if i < n - 1:
+            width_ratios.append(0.20)
+    gs = fig.add_gridspec(1, 2 * n - 1, width_ratios=width_ratios, wspace=0.02)
+    plot_cols = [2 * i for i in range(n)]
 
+    axes, ranges = [], []
     for i, f in enumerate(frames):
         Z, w, h = load_grid(os.path.join(frames_dir, f"total_{f}.dat"))
         Zu, XI, YI = bilinear_upsample(Z, args.upsample)
@@ -329,7 +338,7 @@ def render_frames(args):
         # absolute plateau height grows with the placed count; normalising each
         # frame exposes the relief (wells where qubits commit, magic features).
         zlo, zhi = float(Zu.min()), float(Zu.max())
-        ax = fig.add_subplot(gs[0, i], projection="3d")
+        ax = fig.add_subplot(gs[0, plot_cols[i]], projection="3d")
         ax.plot_surface(XI, YI, Zu, cmap=SURF_CMAP, linewidth=0,
                         antialiased=True, vmin=zlo, vmax=zhi, rcount=80, ccount=80)
         placed = [component_center(p) for p in component_paths(frames_dir, "mapped", f)]
@@ -338,13 +347,38 @@ def render_frames(args):
         _style_3d(ax)
         ax.set_xticks(range(0, w, 2))
         ax.set_yticks(range(0, h, 2))
-        ax.set_xlabel("x", labelpad=-3)
-        ax.set_ylabel("y", labelpad=-3)
-        ax.set_zlabel(r"score $S$", labelpad=-3, rotation=90)
+        ax.set_xlabel("x", labelpad=-7)
+        ax.set_ylabel("y", labelpad=-7)
+        # ax.set_zlabel(r"score $S$", labelpad=-3, rotation=90)
+        axes.append(ax)
+        ranges.append((zlo, zhi))
+
+    # Single shared colour scale. Every surface uses the same viridis ramp, but
+    # each is normalised to its own [zlo, zhi], so one bar serves both: its two
+    # ends are "lowest" / "highest" and each SIDE reads out in a frame's units --
+    # left labels = first (leftmost) frame, right labels = last (rightmost).
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import Normalize
+    sm = ScalarMappable(norm=Normalize(0.0, 1.0), cmap=SURF_CMAP)
+    # Dedicated axis in the gap column: a thin bar, vertically centred
+    # (~half height) with empty side columns leaving room for the tick labels.
+    gap = gs[0, 1].subgridspec(3, 3, height_ratios=[1.0, 3.5, 1.0],
+                               width_ratios=[1.0, 0.5, 1.0])
+    cax = fig.add_subplot(gap[1, 1])
+    cb = fig.colorbar(sm, cax=cax)
+    cax.set_title(r"score $S$", fontsize=8, pad=9)
+    r_lo, r_hi = ranges[-1]                       # right side = rightmost frame
+    cb.set_ticks([0.0, 1.0])
+    cb.ax.set_yticklabels([f"{r_lo:.1f}", f"{r_hi:.1f}"])
+    cb.ax.tick_params(labelsize=6, length=1.5)
+    l_lo, l_hi = ranges[0]                         # left side = leftmost frame
+    lax = cb.ax.secondary_yaxis("left")
+    lax.set_yticks([0.0, 1.0])
+    lax.set_yticklabels([f"{l_lo:.1f}", f"{l_hi:.1f}"])
+    lax.tick_params(labelsize=6, length=1.5)
 
     out = os.path.join(args.out_dir, "gaussian_frames.pdf")
     fig.savefig(out)
-    fig.savefig(out[:-4] + ".png", dpi=200)
     plt.close(fig)
     print(f"[frames] frames={frames} magic={len(magic)} -> {out}")
 
