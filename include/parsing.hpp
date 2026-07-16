@@ -4,6 +4,9 @@
 #include <string>
 
 void print_usage(const char* executable);
+// Anchors a routed-circuit output path under PROJECT_ROOT/out (absolute paths
+// pass through). Call once on the final value, whatever layer it came from.
+std::string resolve_output_path(const std::string& output_arg);
 void apply_config_overrides(
     int argc,
     char **argv,
@@ -22,6 +25,7 @@ void apply_config_overrides(
     double& bfs_density_threshold,
     double& gaussian_sigma,
     std::string& config_path,
+    std::string& output_path,
     int& x,
     int& y,
     int& dimension_offset,
@@ -58,6 +62,7 @@ void argument_parsing(
     double& external_weight,
     double& bfs_density_threshold,
     double& gaussian_sigma,
+    std::string& output_path,
     int& x,
     int& y,
     std::string& graph_path,

@@ -103,10 +103,12 @@ def run_compiler_at(circuit: str, base_config: dict, binary: Path,
     return True, {
         "routing_steps": int(steps_m.group(1)),
         "num_qubits": int(qubits_m.group(1)) if qubits_m else None,
-        # For explicit positive x/y the compiler uses them verbatim, so the
-        # resolved dims equal the requested grid; fall back to x/y just in case.
-        "width": int(dims_m.group(1)) if dims_m else x,
-        "height": int(dims_m.group(2)) if dims_m else y,
+        # The compiler TRANSPOSES explicit x/y: requesting x=8,y=9 resolves to 9x8. So the
+        # resolved dims are the transpose of the requested grid, NOT the grid verbatim —
+        # hence the (y, x) fallback. Feeding a recorded width/height back in as x/y builds
+        # the MIRRORED grid, which on a rectangular grid can fail to map (see bwt_n37).
+        "width": int(dims_m.group(1)) if dims_m else y,
+        "height": int(dims_m.group(2)) if dims_m else x,
         "duration_seconds": float(exec_m.group(1)) if exec_m else duration,
     }
 

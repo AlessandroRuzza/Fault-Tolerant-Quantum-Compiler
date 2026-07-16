@@ -150,6 +150,9 @@ public:
     virtual ~IQubitRouter() = default;
     virtual void route_circuit() = 0;
     virtual int  get_routing_length() const = 0;
+    // The routed circuit itself: step i is the gate->path map routed in parallel
+    // on that step. Serialized by write_routing_json.
+    virtual const std::vector<Routing>& get_routing() const = 0;
     virtual void print_routing_steps() const = 0;
     virtual void print_non_routed_histogram() const = 0;
     virtual void reset() = 0;
@@ -233,7 +236,7 @@ public:
         first_exposure_routed = 0;
     }
 
-    inline const std::vector<Routing>& get_routing() const { return routing_steps; }
+    inline const std::vector<Routing>& get_routing() const override { return routing_steps; }
     inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
     void print_routing(int i) const;
     void print_non_routed_histogram() const;
@@ -325,7 +328,7 @@ public:
         first_exposure_routed = 0;
     }
 
-    inline const std::vector<Routing>& get_routing() const { return routing_steps; }
+    inline const std::vector<Routing>& get_routing() const override { return routing_steps; }
     inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
     void print_routing(int i) const;
     void print_non_routed_histogram() const;
@@ -448,7 +451,7 @@ public:
         first_exposure_routed = 0;
     }
 
-    inline const std::vector<Routing>& get_routing() const { return routing_steps; }
+    inline const std::vector<Routing>& get_routing() const override { return routing_steps; }
     inline const Routing& get_route_step(int i) const { return routing_steps[i]; }
     void print_routing(int i) const;
     void print_non_routed_histogram() const;

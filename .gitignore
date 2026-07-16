@@ -64,6 +64,8 @@ venv/
 visualization/
 universal_set_qasms
 qasm_graphs
+# Routed circuits (--output-path); tens of MB each on big circuits
+out/
 qasms/vqe_n24.qasm
 .codex
 

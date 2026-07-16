@@ -99,7 +99,7 @@ public:
     void print_routing_steps()        const override;
     inline void reset()                     override { circuit.reset(); routing_steps.clear(); }
 
-    inline const std::vector<Routing>& get_routing()    const { return routing_steps; }
+    inline const std::vector<Routing>& get_routing()    const override { return routing_steps; }
     inline const Routing& get_route_step(int i)         const { return routing_steps[i]; }
     void print_routing(int i)  const;
     void print_non_routed_histogram() const;

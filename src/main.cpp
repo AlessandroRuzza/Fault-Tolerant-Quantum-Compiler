@@ -448,26 +448,35 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         }
     }
 
+    // Defaults are the tuned optima of the `connectivity` column of
+    // results/pesi_finali.md, so an argument-less run already compiles with the
+    // best-known configuration. Only --circuit (and optionally --x/--y) should
+    // need overriding. The `cube` column differs on safe_passage_strategy,
+    // border_distance_percentage (5), mapped (15), cnot_high (6), magic_high (0.7).
     std::string path = (std::filesystem::path(PROJECT_ROOT) / "qasms" / "example.qasm").string();
     std::string magic_aware_strategy = "distance";
-    std::string type = "magic_aware";
+    std::string type = "gaussian";
     std::string gaussian_strategy = "fine";
-    std::string safe_passage_strategy = "passage";
-    double magic_high = 1.5;
-    double magic_low = 0.5;
-    double cnot_high = 1.5;
-    double cnot_low = 0.5;
-    double mapped_gaussian_weight = 0.8;
+    std::string safe_passage_strategy = "connectivity";
+    // magic_high/magic_low/cnot_low are inert for non_routed: the sweeps closed
+    // them at 0 everywhere in the connectivity regime.
+    double magic_high = 0.0;
+    double magic_low = 0.0;
+    // cnot_high rides the ridge cnot ≈ mapped / 2.5 — retune the pair, never one alone.
+    double cnot_high = 8.0;
+    double cnot_low = 0.0;
+    double mapped_gaussian_weight = 20.0;
     double base_gaussian_weight = 1.0;
-    double external_weight = 0.0;
+    // external_weight saturates: any negative value is near-optimal, 0 costs ~1.5pp.
+    double external_weight = -15.0;
     // CNOT-graph density below which CNOT-BFS mapping order is used (>= falls
     // back to the priority heap). Tuned to 0.70 post-fix (BFS beats heap almost
     // everywhere); configurable via JSON/CLI, env FTQC_BFS_DENSITY_THRESHOLD wins.
     double bfs_density_threshold = 0.70;
     // Direct, absolute gaussian sigma (stddev, same on both axes, graph-independent),
     // used verbatim by every gaussian. Replaced gaussian_confidence. Must be > 0;
-    // sweep optimum ~0.4 in the coarse/connectivity regime.
-    double gaussian_sigma = 0.4;
+    // the fine/connectivity optimum is a weak plateau around 0.7.
+    double gaussian_sigma = 0.7;
     // Anchored to PROJECT_ROOT, not the CWD: the old CWD-relative default
     // loaded the config from build/ but silently fell back to hardcoded
     // defaults when launched from anywhere else — a reproducibility trap.
@@ -477,15 +486,24 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::string magic_state_placement_strategy = "center_circle";
     int number_of_magic_states = -1;  // -1 = proportional to circuit (max_t_in_layer)
     double number_of_magic_states_multiplier = 0.0;
-    double border_distance_percentage = 10.0;
-    int x = 10;
-    int y = 11;
+    double border_distance_percentage = 15.0;
+    // -1 = auto-size from qubit count and interaction degree. Heuristic, not a
+    // guarantee: it usually lands on a workable lattice, but grid size is the
+    // dominant lever on non_routed, so pass --x/--y (or dimension_offset) when
+    // the auto grid leaves layers unrouted.
+    int x = -1;
+    int y = -1;
     int dimension_offset = 0;  // signed delta on auto-computed grid (x<0 mode)
     std::string routing_strategy = "naive_critical";
-    std::string t_routing_mode = "normal_t_routing";
+    std::string t_routing_mode = "smart_t_routing";
     int patience_threshold = 3;
     bool use_layer_cache = true;
     bool metrics_only = false;
+    // Routed-circuit dump. Relative to PROJECT_ROOT/out (see
+    // resolve_output_path), so an argument-less run lands in out/route.json
+    // rather than wherever the binary was launched from. Set it to "" to turn
+    // the dump off.
+    std::string output_path = "route.json";
     int repetition_count = 1;
     bool use_layer_cache_explicit = false;
     double cnot_formula_scale = 1.0;
@@ -511,6 +529,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         bfs_density_threshold,
         gaussian_sigma,
         config_path,
+        output_path,
         x,
         y,
         dimension_offset,
@@ -548,6 +567,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         external_weight,
         bfs_density_threshold,
         gaussian_sigma,
+        output_path,
         x,
         y,
         graph_path,
@@ -565,6 +585,12 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         packing_commute,
         layering_commute
     );
+
+    // Resolved once, after every layer (default / config / CLI) has had its say,
+    // so all three anchor identically and the value printed is the real one.
+    if (!output_path.empty()) {
+        output_path = resolve_output_path(output_path);
+    }
 
     std::cout << "circuit path: " << path << std::endl;
     std::cout << "magic aware strategy: " << magic_aware_strategy << std::endl;
@@ -595,6 +621,7 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
     std::cout << "layering_commute: " << (layering_commute ? "true" : "false") << std::endl;
     std::cout << "use_layer_cache: " << (use_layer_cache ? "true" : "false") << std::endl;
     std::cout << "metrics_only: " << (metrics_only ? "true" : "false") << std::endl;
+    std::cout << "output_path: " << (output_path.empty() ? "(none)" : output_path) << std::endl;
     if (!graph_path.empty()) {
         std::cout << "graph path: " << graph_path << std::endl;
     } else {
@@ -638,7 +665,8 @@ benchmarkResult run_one_execution_from_args(int argc, char **argv) {
         cnot_formula_scale,
         mapped_formula_scale,
         packing_commute,
-        layering_commute
+        layering_commute,
+        output_path
     );
     write_benchmark_result_file_if_requested(result);
 

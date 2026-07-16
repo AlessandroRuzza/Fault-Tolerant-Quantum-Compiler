@@ -16,6 +16,7 @@ Main directories you will use most often:
 - `qasms/`: input OpenQASM circuits.
 - `config/`: single-run config files and benchmark JSONs.
 - `graphs/`: graph descriptions in JSON.
+- `out/`: routed circuits written by each run (gitignored).
 - `universal_set_qasms/`: generated translated QASM output.
 - `benchmarks/results/`: benchmark CSV outputs.
 - `benchmarks/logs/`: per-run benchmark logs.
@@ -83,8 +84,13 @@ The executable supports:
 Configuration precedence in single execution mode:
 
 1. CLI flags
-2. Config file (`--config`)
-3. Hardcoded defaults
+2. Config file (`--config`, defaulting to `config/0_compiler_config.json`)
+3. Hardcoded defaults (`src/main.cpp`)
+
+Both layers 2 and 3 already hold the tuned optimal parameters, so passing nothing
+is a valid, well-tuned run — see
+[The default config file](#the-default-config-file) and
+[Every configurable parameter](#every-configurable-parameter).
 
 ## Run a single QASM file
 
@@ -134,15 +140,159 @@ You can still override config values from CLI:
 	--routing-strategy naive
 ```
 
+### The default config file
+
+`config/0_compiler_config.json` **is the default config**: it is loaded
+automatically when you don't pass `--config`, and it is resolved from the
+repository root (`PROJECT_ROOT`), not from the current directory — so it applies
+no matter where you launch the binary from.
+
+Its values are the **tuned optima** from
+[`results/pesi_finali.md`](results/pesi_finali.md) (the `connectivity` column),
+mirrored by the hardcoded defaults in `src/main.cpp`. **Running with no options
+at all already compiles with the best-known configuration**, so in practice you
+only need to specify the *circuit* and, optionally, the *grid dimension*:
+
+```bash
+./FaultTolerantQuantumCompiler --circuit qft_n100 --x 30 --y 30
+```
+
+The grid is in fact optional too. With the default `x = y = -1` the lattice is
+**auto-sized** from the qubit count and the circuit's interaction degree. That
+heuristic has a good chance of landing on a workable grid, but it is **not a
+guarantee** — grid size is the single dominant lever on `non_routed` (see
+[Tuned Gaussian mapping parameters](#tuned-gaussian-mapping-parameters)), so if
+a run leaves layers unrouted, pin `--x`/`--y` explicitly or pad the auto grid
+with `dimension_offset`.
+
+### Routed-circuit output
+
+Every single run writes the routed circuit — the compiler's actual product, as
+opposed to the step counts and metrics it *reports* — as JSON:
+
+```bash
+./FaultTolerantQuantumCompiler --circuit adder_n4          # -> out/route.json
+./FaultTolerantQuantumCompiler --circuit adder_n4 --output-path adder/run1
+                                                            # -> out/adder/run1.json
+```
+
+Relative paths resolve under `<project_root>/out/`, **not** the working
+directory: runs are normally launched from `build/`, and anchoring to the CWD
+would bury the output there. Absolute paths are used verbatim, a missing `.json`
+extension is appended, intermediate directories are created, and `out/` is
+gitignored. Set `output_path` to `""` in a config to turn the dump off.
+
+Benchmark workers never write it, the same way they skip the universal-QASM and
+`.graph` artifacts: they run dozens-way parallel onto one shared path, so they
+would clobber each other's dump. Benchmark outputs stay the logs and CSV — see
+[Benchmark run](#3-benchmark-run).
+
+The schema encodes positions as flat row-major indices and carries no edge list,
+which matches the only topology the compiler accepts — see
+[Supported graphs](#supported-graphs).
+
+The file uses the same schema as WISQ's `--mode scmr` output, so the tools that
+already read a WISQ result read ours unchanged — for example
+`python scripts/plots/visualize_wisq_steps.py -i out/route.json -o frames/`,
+which renders each step and checks the paths are node-disjoint:
+
+| Field | Meaning |
+|---|---|
+| `map` | `[[logical_qubit, node], ...]` — where the mapper placed each qubit |
+| `arch` | `{"width", "height", "alg_qubits", "magic_states"}` |
+| `steps` | one entry per routing step; each is a list of `{"id", "op", "qubits", "path"}` routed in parallel on that step |
+| `gates` | the routed gate list (post T-decomposition, as in `universal_set_qasms/`) |
+
+Nodes are flat row-major grid indices (`node = y * width + x`). `arch.alg_qubits`
+lists the nodes *holding* a logical qubit: WISQ picks its data qubits from a
+fixed even/even sublattice, our mapper chooses them, so the field means
+"occupied slots" rather than "available slots". With `repetition > 1` the dump is
+the best repetition — the one the reported metrics describe. Gates are sorted by
+`id`, so the same configuration always produces a byte-identical file.
+
+Size scales with the step count (one path per gate per step), so it grows fast:
+`bwt_n21` routes in 116400 steps and dumps 55 MB. Point `--output-path` somewhere
+roomy — or disable it — before looping over large circuits by hand.
+
+### Supported graphs
+
+The target architecture is always a **generated rectangular grid**, sized from
+`x`/`y` (or `dimension_offset`). External graphs cannot be passed: both `--graph`
+and the `graph` config key are refused.
+
+```
+Error: --graph is not supported: the target architecture is always a generated
+rectangular grid. Size it with --x/--y (or dimension_offset).
+```
+
+### Every configurable parameter
+
+Each parameter can be set **either** as a key in the config JSON **or** as a CLI
+flag — they are interchangeable, and CLI wins over the file (see
+[precedence](#basic-usage)). Config keys are accepted in both `UPPER_CASE` and
+`lower_case` spelling for the weights, and CLI flags accept `-` or `_` as
+separator.
+
+| Config key | CLI flag (aliases) | Values | Default |
+|---|---|---|---|
+| `circuit` | `--circuit` | name, `name.qasm`, or absolute path; bare names resolve under `qasms/` | `ising_n420` ‡ |
+| `type` | `--type` | `magic_aware` \| `gaussian` \| `random` | `gaussian` |
+| `gaussian_strategy` | `--gaussian-strategy` | `coarse` \| `fine` | `fine` |
+| `magic_aware_strategy` | `--magic-aware-strategy` | `distance` \| `center` \| `random` (only for `type=magic_aware`) | `distance` |
+| `safe_passage_strategy` | `--safe-passage` | `passage` \| `passage_no_subgraphs` \| `cube` \| `connectivity` | `connectivity` |
+| `MagicStatePlacementStrategy` | `--magic-state-placement-strategy` (`--MagicStatePlacementStrategy`) | `right_row` \| `center_circle` | `center_circle` |
+| `number_of_magic_states` | `--number-of-magic-states` (`--NumberOfMagicStates`) | `-1` = proportional to circuit \| integer = exact count \| `0<f<1` = multiplier | `-1` |
+| `border_distance_percentage` | `--border-distance-percentage` (`--BorderDistancePercentage`) | float in `[0,100]` | `15` |
+| `x` | `--x` | `>0` exact \| `0` heuristic upper bound \| `-1` auto-size (`< -1` rejected) | `-1` |
+| `y` | `--y` | same sentinels as `x` | `-1` |
+| `dimension_offset` | — (config only) | signed delta on the auto-sized grid (`<0` tighter, `>0` padded); applies only when `x`/`y` are `-1` | `0` |
+| `MAGIC_HIGH` | `--magic-high` | float `>= 0`; must be `>= MAGIC_LOW` | `0` |
+| `MAGIC_LOW` | `--magic-low` | float `>= 0` | `0` |
+| `CNOT_HIGH` | `--cnot-high` | float `>= 0`, or `-1` = auto formula (per circuit family × grid size); must be `>= CNOT_LOW` | `8` |
+| `CNOT_LOW` | `--cnot-low` | float `>= 0`, or `-1` = auto | `0` |
+| `MAPPED_GAUSSIAN_WEIGHT` | `--mapped-gaussian-weight` | float `>= 0`, or `-1` = auto formula | `20` |
+| `BASE_GAUSSIAN_WEIGHT` | `--base-gaussian-weight` | float `>= 0` | `1` |
+| `EXTERNAL_WEIGHT` | `--external-weight` | any finite float (negative is the useful range) | `-15` |
+| `GAUSSIAN_SIGMA` | `--gaussian-sigma` | float `> 0`; absolute stddev, same on both axes | `0.7` |
+| `CNOT_FORMULA_SCALE` | — (config only) | float; scales the `CNOT_HIGH: -1` auto formula | `1.0` |
+| `MAPPED_FORMULA_SCALE` | — (config only) | float; scales the `MAPPED_GAUSSIAN_WEIGHT: -1` auto formula | `1.0` |
+| `bfs_density_threshold` | `--bfs-density-threshold` | float; CNOT-graph density below which CNOT-BFS mapping order is used, `<0` = always heap. Env `FTQC_BFS_DENSITY_THRESHOLD` overrides everything | `0.70` |
+| `routing_strategy` | `--routing-strategy` (`--routing`, `--routing-method`) | `congestion` \| `naive` \| `naive_critical` \| `packing` \| `critical_packing` \| `greedy_lookahead` \| `dascot_sa` \| `boost` † | `naive_critical` |
+| `t-routing-mode` | `--t-routing-mode` | `normal_t_routing` \| `smart_t_routing` | `smart_t_routing` |
+| `patience_threshold` | `--patience-threshold` | integer `>= 0`; T-gate deferrals allowed under `smart_t_routing` | `3` |
+| `packing_commute` | `--packing-commute` | `true` \| `false`; commutation-aware frontier, read only by `packing` / `critical_packing` | `false` |
+| `layering_commute` | `--layering-commute` | `true` \| `false`; commutation-aware layering, affects every router | `false` |
+| `use_layer_cache` | `--use-layer-cache` | `true` \| `false` | `true` |
+| `repetition` | `--repetition` (`--repeat`, `--rep`) | integer `> 0`; repeats the run (useful for `random`) | `1` |
+| — | `--metrics-only` | flag (CLI only); suppresses artifact generation, prints metrics only | off |
+| `output_path` | `--output-path` (`--output_path`) | where to write the routed circuit as JSON (see [Routed-circuit output](#routed-circuit-output)); relative paths resolve under `out/`, `.json` is appended if missing, `""` disables the dump | `route.json` → `out/route.json` |
+| `graph` | `--graph` | **not supported** — the grid is always generated, see [Supported graphs](#supported-graphs); passing either is an error | — |
+| — | `--config` | path to a single-run config JSON | `config/0_compiler_config.json` |
+
+† `boost` only exists when the binary is built with Boost support. See
+[Routing strategies](#routing-strategies) for what each router does, and
+[Packing tunables](#packing-tunables) for the two `packing` env vars
+(`FTQC_PACKING_CANDIDATES`, `FTQC_PACKING_LOOKAHEAD`).
+
+‡ The "Default" column is what you get from an argument-less run, i.e. the config
+file's value. For `circuit` that is `ising_n420` (the config sets it); the
+hardcoded fallback in `src/main.cpp`, used only if the config file is missing or
+omits the key, is `qasms/example.qasm`. Every other default is identical in both
+layers.
+
 ## Tuned Gaussian mapping parameters
 
 Recommended Gaussian-mapping parameters, by *safe-passage regime*: `cube` yields
 shorter routes but needs a larger lattice, `connectivity` packs onto smaller
 lattices. These are the consolidated optima from the weight sweeps; the full
 per-parameter reasoning, metric trade-offs, and correlation analysis live in
-[`metric_analysis_outcomes/pesi_tunati.md`](metric_analysis_outcomes/pesi_tunati.md)
-(final summary in
-[`pesi_finali.md`](metric_analysis_outcomes/pesi_finali.md)).
+[`results/pesi_tunati.md`](results/pesi_tunati.md) (final summary in
+[`results/pesi_finali.md`](results/pesi_finali.md)).
+
+The **`connectivity` column is what the binary ships as its default** — both the
+hardcoded defaults in `src/main.cpp` and `config/0_compiler_config.json` — so you
+only need this table when switching to `cube` or re-tuning. See
+[The default config file](#the-default-config-file).
 
 | Parameter | `connectivity` | `cube` |
 |---|---|---|
@@ -185,8 +335,10 @@ Key points from the sweeps:
 † `routing_strategy`: the table lists `packing`, which minimises **routing steps**
 on large circuits. For **non_routed** (the primary metric) and compile time,
 `naive` / `naive_critical` is the more robust choice — it ties or beats packing on
-non_routed and runs 12–18× faster with no timeouts. See
-[Routing strategies](#routing-strategies) for the trade-off.
+non_routed and runs 12–18× faster with no timeouts. **`naive_critical` is
+therefore the shipped default**, the one point where the defaults deviate from
+this table; pass `--routing-strategy packing` when routing steps are what you
+care about. See [Routing strategies](#routing-strategies) for the trade-off.
 
 > `GAUSSIAN_CONFIDENCE` (a confidence value from which sigma was derived) was
 > removed; the mapping now takes the absolute `GAUSSIAN_SIGMA` directly.
@@ -368,6 +520,8 @@ make run-bench BENCH_PATH=all_circuits RERUN_TIMEOUTS=1 BENCH_JOBS=8
 ### 1) Single QASM run
 
 - Console output: printed to terminal (routing steps, average parallelism, selected options).
+- Routed circuit (see [Routed-circuit output](#routed-circuit-output)):
+	- `out/route.json`, or wherever `--output-path` points
 - Generated universal-set circuit:
 	- `universal_set_qasms/<circuit_name>_universal.qasm`
 - Visualization artifacts (if produced by the selected flow):
@@ -380,6 +534,7 @@ Note: each single execution starts by cleaning previous generated files in `visu
 Same output locations as single QASM run:
 
 - Terminal summary.
+- `out/route.json` (or the config's `output_path`).
 - `universal_set_qasms/<circuit_name>_universal.qasm`
 - `visualization/` generated artifacts.
 

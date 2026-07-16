@@ -313,6 +313,25 @@ std::filesystem::path extract_config_path(int argc, char **argv, std::string& co
 
 } // namespace
 
+// Where the routed circuit gets written. Relative paths are anchored to
+// PROJECT_ROOT/out, never to the CWD: runs are launched from build/, so a
+// CWD-relative path would bury the output there — the same reproducibility trap
+// the config path used to have. Absolute paths are honoured as-is. Unlike the
+// resolvers above this one is called from main.cpp, hence the external linkage.
+std::string resolve_output_path(const std::string& output_arg) {
+    std::filesystem::path candidate(output_arg);
+
+    if (!candidate.has_extension()) {
+        candidate += ".json";
+    }
+
+    if (!candidate.is_absolute()) {
+        candidate = std::filesystem::path(PROJECT_ROOT) / "out" / candidate;
+    }
+
+    return candidate.lexically_normal().string();
+}
+
 void print_usage(const char* executable) {
     std::cout << "Usage: " << executable << "\n"
               << "[--circuit [circuit_name|circuit_name.qasm|full_path_to_qasm]]\n"
@@ -332,7 +351,7 @@ void print_usage(const char* executable) {
               << "[--base-gaussian-weight <float>=0]\n"
               << "[--external-weight <float>]\n"
               << "[--bfs-density-threshold <float>, default=0.70 | CNOT-graph density below which CNOT-BFS order is used; <0 always heap; env FTQC_BFS_DENSITY_THRESHOLD overrides]\n"
-              << "[--gaussian-sigma <float> > 0, default=0.4 | absolute gaussian stddev, same on both axes, graph-independent]\n"
+              << "[--gaussian-sigma <float> > 0, default=0.7 | absolute gaussian stddev, same on both axes, graph-independent]\n"
 #if FTOQC_HAS_BOOST_ROUTER
               << "[--routing-strategy [congestion|naive|naive_critical|packing|critical_packing|greedy_lookahead|dascot_sa|boost]]\n"
 #else
@@ -344,13 +363,18 @@ void print_usage(const char* executable) {
               << "[--x <int>: >0 explicit | 0 heuristic upper bound | <0 auto-size]\n"
               << "[--y <int>: same sentinels as --x]\n"
               << "[--use-layer-cache <true|false>]\n"
+              << "[--output-path <json_file_path> | --output_path, default=route.json | routed circuit as JSON (WISQ scmr schema: map/arch/steps/gates); relative to <project_root>/out, \"\" disables]\n"
               << "[--metrics-only]\n"
-              << "[--graph <graph_path>]\n"
               << "[--config <json_file_path>]\n"
               << "Configuration precedence:\n"
               << "  1) CLI options\n"
-              << "  2) config file \n"
+              << "  2) config file (--config; defaults to config/0_compiler_config.json)\n"
               << "  3) hardcoded defaults\n"
+              << "Defaults are the tuned `connectivity` optima (results/pesi_finali.md):\n"
+              << "  gaussian/fine mapping, connectivity safe passage, border 15%,\n"
+              << "  external -15, sigma 0.7, mapped 20, cnot_high 8, magic 0,\n"
+              << "  naive_critical + smart_t_routing, auto-sized grid.\n"
+              << "So a run usually needs only --circuit (and --x/--y to pin the grid).\n"
               << "   or: " << executable << " --help\n";
 }
 
@@ -372,6 +396,7 @@ void apply_config_overrides(
     double& bfs_density_threshold,
     double& gaussian_sigma,
     std::string& config_path,
+    std::string& output_path,
     int& x,
     int& y,
     int& dimension_offset,
@@ -663,10 +688,20 @@ void apply_config_overrides(
     }
 
     if (config_json.contains("graph")) {
-        if (!config_json["graph"].is_string()) {
-            throw std::runtime_error("Config key 'graph' must be a string");
+        throw std::runtime_error(
+            "Config key 'graph' is not supported: the target architecture is always "
+            "a generated rectangular grid. Size it with 'x'/'y' (or 'dimension_offset')."
+        );
+    }
+
+    // Where to dump the routed circuit (WISQ scmr schema). Anchored under
+    // PROJECT_ROOT/out by resolve_output_path, not relative to the config's dir.
+    if (config_json.contains("output_path") || config_json.contains("output-path")) {
+        const char* key = config_json.contains("output_path") ? "output_path" : "output-path";
+        if (!config_json[key].is_string()) {
+            throw std::runtime_error(std::string("Config key '") + key + "' must be a string");
         }
-        graph_path = resolve_config_graph_path(config_json["graph"].get<std::string>(), resolved_config_path);
+        output_path = config_json[key].get<std::string>();
     }
 
     if (config_json.contains("routing_strategy") || config_json.contains("routing-strategy")) {
@@ -771,6 +806,7 @@ void argument_parsing(
     double& external_weight,
     double& bfs_density_threshold,
     double& gaussian_sigma,
+    std::string& output_path,
     int& x,
     int& y,
     std::string& graph_path,
@@ -817,6 +853,18 @@ void argument_parsing(
                 throw std::runtime_error("Missing value for --circuit");
             }
             path = resolve_cli_circuit_path(argv[++i]);
+            continue;
+        }
+
+        // WISQ spells this --output_path; accept both so the two compilers can
+        // be driven by the same command line.
+        if (arg == "--output-path" || arg == "--output_path") {
+            if (i + 1 >= argc) {
+                std::cerr << "Missing value for --output-path\n";
+                print_usage(argv[0]);
+                throw std::runtime_error("Missing value for --output-path");
+            }
+            output_path = argv[++i];
             continue;
         }
 
@@ -1027,13 +1075,11 @@ void argument_parsing(
         }
 
         if (arg == "--graph") {
-            if (i + 1 >= argc) {
-                std::cerr << "Missing value for --graph\n";
-                print_usage(argv[0]);
-                throw std::runtime_error("Missing value for --graph");
-            }
-            graph_path = resolve_cli_graph_path(argv[++i]);
-            continue;
+            std::cerr << "Error: --graph is not supported.\n";
+            throw std::runtime_error(
+                "Error: --graph is not supported: the target architecture is always "
+                "a generated rectangular grid. Size it with --x/--y (or dimension_offset)."
+            );
         }
 
         if (arg == "--routing-strategy" || arg == "--routing_strategy" || arg == "--routing-method" || arg == "--routing_method" || arg == "--routing" ) {

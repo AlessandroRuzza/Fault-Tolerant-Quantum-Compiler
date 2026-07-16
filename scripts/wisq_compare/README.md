@@ -61,6 +61,7 @@ ogni file in "quale domanda risponde".
 | `gridrun_minimum_wisq_dimension.py` | griglia minima **di WISQ**, noi ci adattiamo | WISQ | **ricerca** (scan `s` in su fino a successo WISQ) | `gridrun_minimum_wisq_dimension.pbs` | `_wisqmin.csv` |
 | `compare_wisq_conn.py` | vinciamo su una griglia **più stretta** di WISQ? | `WISQ_native − SHRINK` | **ricerca** (footprint; colonne `dim_diff_side`, `grow_steps`) | `compare_wisq_conn.pbs` | `_wisqconn.csv` |
 | `compare_random.py` | baseline **random/cube** vs WISQ (sub-comandi `run`/`report`) | WISQ native | — (legge la griglia dal baseline WISQ) | `compare_random.pbs` | `_ours.csv` |
+| `gridrun_dimension_sweep.py` | come rispondono i **nostri** step al crescere della griglia (**niente WISQ**) | config (`x`,`y` per circuito) | — (legge la griglia dalla config, poi `+1` per lato × `--dimensions`) | `gridrun_dimension_sweep.pbs` | `_dims.csv` |
 
 Gli script `gridrun_*`, `conn`, `random` **riusano** `compare_wisq_parity.py` come
 libreria (`import compare_wisq_parity as cw2`: runner WISQ, builder d'arch, lettore .graph,
@@ -76,6 +77,30 @@ Entrambi i compiler sono forzati su `side = wisq_native_side(n) + offset` (parit
 compare_wisq_parity.py --offsets 0,2,4,6,8 --bench config/<sweep>.json -o <out>_runs.csv --workers 28
 # report: aggrega per offset (WIN/LOSS/TIE, geomean/median)
 compare_wisq_parity.py --offset-report <out>_runs.csv --out-dir results/
+```
+
+### Sweep di dimensione dalla griglia minima (`gridrun_dimension_sweep.py`)
+L'unico script qui che **non** chiama WISQ: misura solo come cambiano i nostri
+`routing_steps` al variare del lato. È anche l'unico che prende la griglia **verbatim dalla
+config** (`x`,`y` per circuito): il motore offset di `compare_wisq_parity.py` NON può farlo
+— `_offset_base_dims` ricava la base a runtime (nostra auto / native WISQ) e ignora `x`,`y`,
+e rifiuta gli offset negativi, quindi non sa partire *sotto* la nostra auto.
+Metti in config la **minima** presa da un CSV che l'ha registrata (es.
+`benchmarks/results/our_mingrid_from_wisq3.csv`, minime di connectivity) — **non ricalcolarla**
+da un conteggio di qubit. Ogni passo cresce di `+1` per lato, quindi l'aspect ratio di partenza
+è preservato (`12x13 → 13x14 → …`).
+
+> **⚠ Il compilatore TRASPONE gli assi**: `x=8,y=9` in config → `resolved graph dimensions: 9x8`.
+> Tutti i CSV registrano `my_x`/`my_y` parsati da `resolved …`, cioè le **risolte**: ridarle
+> come `x`,`y` esegue la griglia **specchiata**. Su griglia quadrata è innocuo, su rettangolare
+> no — `bwt_n37` mappa a `9x8` richiesto e va in `SafePassageException` a `8x9`, e gli step
+> cambiano (33686 vs 33852). **Per riprodurre una griglia letta da un CSV: `x=my_y, y=my_x`.**
+> Il CSV di questo script registra entrambe: `req_x`/`req_y` (richiesta, chiave di resume) e
+> `my_x`/`my_y` (risolta, confrontabile con gli altri CSV). Un fallimento non ferma lo sweep: la riga è registrata con
+`status=failed` e si prosegue (in fondo al range i fallimenti sono attesi).
+```sh
+qsub -v BENCH_PATH=dim_sweep_family_median_min,BENCH_JOBS=28 pbs/gridrun_dimension_sweep.pbs
+# DIMENSIONS=30 di default; il resume è per (circuito, config, griglia) — my_x/my_y sono nel CSV
 ```
 
 ### Rinominati / fusi (per non ricascarci)

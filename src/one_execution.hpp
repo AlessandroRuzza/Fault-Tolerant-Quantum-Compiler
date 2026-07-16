@@ -17,6 +17,7 @@
 #include "compute_dimensions.hpp"
 #include "helpers.hpp"
 #include "circuit_metrics.hpp"
+#include "write_routing_json.hpp"
 
 #include <memory>
 #include <chrono>
@@ -134,7 +135,9 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     double cnot_formula_scale = 1.0,
     double mapped_formula_scale = 1.0,
     bool packing_commute = false,
-    bool layering_commute = false) {
+    bool layering_commute = false,
+    // Empty = don't dump the routed circuit (see write_routing_json).
+    std::string routing_output_path = "") {
 
     // Clear any stale partial state (a worker process runs exactly one
     // one_execution, but resetting keeps the timeout handler honest).
@@ -711,6 +714,17 @@ benchmarkResult one_execution(std::string path, std::string magic_aware_strategy
     std::cout << "\n------- ROUTING ---------" << std::endl;
 
     if (PRINT_ROUTING) best_router->print_routing_steps();
+
+    // The routed circuit is the compiler's actual product: without this it only
+    // ever left the process as a step count on stdout/CSV. Written from the best
+    // repetition, so the JSON is the route the reported metrics describe.
+    // Gated like the universal-QASM and .graph artifacts above: benchmark
+    // workers run dozens-way parallel on one shared path, so they would clobber
+    // each other's dump (and each one is tens of MB).
+    if (!routing_output_path.empty() && benchmark_artifacts_enabled()) {
+        write_routing_json(routing_output_path, circuit, *best_graph, *best_mapping, *best_router);
+        std::cout << "Routed circuit written to " << routing_output_path << "\n";
+    }
 
     std::cout << "\nTotal routing steps (" << routing_strategy << "): " << best_routing_steps << "\n";
     std::cout << "Minimum routing steps (layering depth): " << min_routing_steps << "\n";
