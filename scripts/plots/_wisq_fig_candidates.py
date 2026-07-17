@@ -15,6 +15,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CSV = ROOT / "data/results/single_config/wisqmin_connectivity_naive_critical.csv"
+# CSV = ROOT / "data/results/single_config/wisqmin_connectivity_dascot_sa.csv"
 OUT = ROOT / "results/all_circuits_8/_fig_candidates"
 OUT_PAPER = ROOT / "paper_overleaf/figures"
 OUT.mkdir(parents=True, exist_ok=True)
