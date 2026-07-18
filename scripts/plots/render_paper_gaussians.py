@@ -19,9 +19,25 @@ describes (T-heavy qubit -> magic attractive).  Because real benchmarks rarely
 exercise the magic *and* CNOT-partner families in the same frame, rendering the
 decomposition from the formula is what keeps all four panels populated.
 
-Usage (defaults match a factor247_n15 fine/connectivity run already on disk):
+Usage:
 
-    .env/bin/python scripts/plots/render_paper_gaussians.py
+    env/bin/python3 scripts/plots/render_paper_gaussians.py
+
+The gaussian_frames dump the paper figure is rendered from was produced by the
+JUNE binary (commit 19bf732, e.g. `git worktree add tmp/oldbin 19bf732`) --
+today's `fine` strategy amplifies the magic weight per qubit, which buries the
+repulsion wells under giant magic peaks:
+
+    FTQC_SAVE_FRAMES=1 build/FaultTolerantQuantumCompiler \
+        --circuit factor247_n15 --type gaussian --safe-passage connectivity \
+        --magic-high 1.5 --mapped-gaussian-weight 3.5 --cnot-high 1.5 \
+        --gaussian-sigma 0.85 --repetition 1
+
+Illustrative weights, not the tuned ones, chosen so wells and magic bumps read
+at a comparable scale.  Magic-tile positions come from magic_tiles.dat when
+present (dumped from the graph by gaussian_images.hpp even at magic weight 0);
+for older dumps like this one they are recovered from the magic_component
+layers.
 """
 
 import argparse
@@ -103,6 +119,22 @@ def component_center(path):
     return int(xx), int(yy)
 
 
+def load_magic_tiles(frames_dir):
+    """Real magic-tile coordinates.
+
+    Prefers the ``magic_tiles.dat`` dump (written from the graph, so present
+    even when the magic weights are 0); falls back to locating the per-tile
+    magic gaussian components of runs where the magic weight was > 0."""
+    p = os.path.join(frames_dir, "magic_tiles.dat")
+    if os.path.exists(p):
+        a = np.loadtxt(p, ndmin=2)
+        return [(int(x), int(y)) for x, y in a]
+    mf = first_frame_with(frames_dir, "magic")
+    if mf is None:
+        return []
+    return [component_center(q) for q in component_paths(frames_dir, "magic", mf)]
+
+
 def first_frame_with(frames_dir, prefix):
     pat = re.compile(rf"{re.escape(prefix)}_component_(\d+)_\d+\.dat$")
     frames = sorted(
@@ -180,8 +212,7 @@ def render_fields(args):
     sigma = compute_sigma(radius, args.confidence)
 
     # real magic-tile positions (constant across frames)
-    mf = first_frame_with(frames_dir, "magic")
-    magic = [component_center(p) for p in component_paths(frames_dir, "magic", mf)] if mf is not None else []
+    magic = load_magic_tiles(frames_dir)
 
     # real placed positions at this frame; pick a compact illustrative subset
     placed_all = [component_center(p) for p in component_paths(frames_dir, "mapped", frame)]
@@ -310,72 +341,113 @@ def render_fields(args):
 # ---------------------------------------------------------------------------
 # fig:frames  -- formation strip (real total surfaces + overlays)
 # ---------------------------------------------------------------------------
+MAGIC_COLOR = "#FFE0E0"   # red!12: the magic-tile fill of fig:overview (fig_conflict)
+MAGIC_EDGE = "#8C0000"    # red!55!black
+MAPPED_COLOR = "#C7D3DE"  # ftblue!25: the data-tile azure of fig:overview
+MAPPED_EDGE = "#1F4E79"   # ftblue
+
+
 def render_frames(args):
     frames_dir = args.frames_dir
     frames = args.strip_frames
 
-    mf = first_frame_with(frames_dir, "magic")
-    magic = [component_center(p) for p in component_paths(frames_dir, "magic", mf)] if mf is not None else []
+    magic = load_magic_tiles(frames_dir)
+
+    from matplotlib.patches import Patch
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection
 
     set_style()
     fig = plt.figure(figsize=(args.strip_w, args.strip_h))
     # Interleave a thin column between each pair of plots; the shared colourbar
-    # lives in the first such gap, i.e. between the two score surfaces.
+    # lives in a dedicated column at the right end of the strip.
     n = len(frames)
     width_ratios = []
     for i in range(n):
         width_ratios.append(1.0)
         if i < n - 1:
-            width_ratios.append(0.20)
-    gs = fig.add_gridspec(1, 2 * n - 1, width_ratios=width_ratios, wspace=0.02)
+            width_ratios.append(0.05)
+    width_ratios.append(0.20)
+    gs = fig.add_gridspec(1, len(width_ratios), width_ratios=width_ratios,
+                          wspace=0.02)
     plot_cols = [2 * i for i in range(n)]
+    cbar_col = len(width_ratios) - 1
 
     axes, ranges = [], []
     for i, f in enumerate(frames):
         Z, w, h = load_grid(os.path.join(frames_dir, f"total_{f}.dat"))
         Zu, XI, YI = bilinear_upsample(Z, args.upsample)
+        placed = [component_center(p) for p in component_paths(frames_dir, "mapped", f)]
         # per-frame normalisation: the score is repulsion-dominated, so the
         # absolute plateau height grows with the placed count; normalising each
         # frame exposes the relief (wells where qubits commit, magic features).
         zlo, zhi = float(Zu.min()), float(Zu.max())
         ax = fig.add_subplot(gs[0, plot_cols[i]], projection="3d")
-        ax.plot_surface(XI, YI, Zu, cmap=SURF_CMAP, linewidth=0,
+
+        # Lattice grid drawn on the floor of the same axes, slightly below the
+        # surface: plain tile grid with the magic tiles and committed patches
+        # over-painted (named by the colour legend at the bottom).
+        floor_z = zlo - 0.08 * (zhi - zlo)
+        segs = [[(gx, -0.5, floor_z), (gx, h - 0.5, floor_z)]
+                for gx in np.arange(-0.5, w, 1.0)]
+        segs += [[(-0.5, gy, floor_z), (w - 0.5, gy, floor_z)]
+                 for gy in np.arange(-0.5, h, 1.0)]
+        ax.add_collection3d(Line3DCollection(segs, colors="0.75", linewidths=0.35))
+
+        def tile(cx, cy):
+            return [(cx - 0.5, cy - 0.5, floor_z), (cx + 0.5, cy - 0.5, floor_z),
+                    (cx + 0.5, cy + 0.5, floor_z), (cx - 0.5, cy + 0.5, floor_z)]
+
+        if magic:
+            ax.add_collection3d(Poly3DCollection(
+                [tile(mx, my) for mx, my in magic],
+                facecolors=MAGIC_COLOR, edgecolors=MAGIC_EDGE, linewidths=0.4))
+        if placed:
+            ax.add_collection3d(Poly3DCollection(
+                [tile(px, py) for px, py in placed],
+                facecolors=MAPPED_COLOR, edgecolors=MAPPED_EDGE, linewidths=0.4))
+
+        # Slightly translucent surface: the mapped-qubit tiles sit in the grid
+        # interior, right under the wells, and an opaque sheet would hide them.
+        ax.plot_surface(XI, YI, Zu, cmap=SURF_CMAP, linewidth=0, alpha=0.82,
                         antialiased=True, vmin=zlo, vmax=zhi, rcount=80, ccount=80)
-        placed = [component_center(p) for p in component_paths(frames_dir, "mapped", f)]
-        ax.set_zlim(zlo, zhi)
+        ax.set_xlim(-0.5, w - 0.5)
+        ax.set_ylim(-0.5, h - 0.5)
+        ax.set_zlim(floor_z, zhi)
         ax.set_title(f"{len(placed)} qubits placed", pad=-2)
         _style_3d(ax)
         ax.set_xticks(range(0, w, 2))
         ax.set_yticks(range(0, h, 2))
         ax.set_xlabel("x", labelpad=-7)
         ax.set_ylabel("y", labelpad=-7)
-        # ax.set_zlabel(r"score $S$", labelpad=-3, rotation=90)
         axes.append(ax)
         ranges.append((zlo, zhi))
 
+    # Colour legend for the floor-grid overlays.
+    legend_handles = [
+        Patch(facecolor=MAGIC_COLOR, edgecolor=MAGIC_EDGE, linewidth=0.6,
+              label="magic tile"),
+        Patch(facecolor=MAPPED_COLOR, edgecolor=MAPPED_EDGE, linewidth=0.6,
+              label="mapped qubit"),
+    ]
+    fig.legend(handles=legend_handles, loc="lower center", ncol=2, fontsize=7,
+               handlelength=1.2, handleheight=1.1, handletextpad=0.6,
+               columnspacing=1.4, framealpha=0.9, facecolor="0.9",
+               edgecolor="0.6", bbox_to_anchor=(0.5, 0.04))
+
     # Single shared colour scale. Every surface uses the same viridis ramp, but
-    # each is normalised to its own [zlo, zhi], so one bar serves both: its two
-    # ends are "lowest" / "highest" and each SIDE reads out in a frame's units --
-    # left labels = first (leftmost) frame, right labels = last (rightmost).
+    # each is normalised to its own [zlo, zhi], so the bar is qualitative:
+    # unlabelled, its ends just read "lowest" / "highest" within each frame.
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import Normalize
     sm = ScalarMappable(norm=Normalize(0.0, 1.0), cmap=SURF_CMAP)
-    # Dedicated axis in the gap column: a thin bar, vertically centred
-    # (~half height) with empty side columns leaving room for the tick labels.
-    gap = gs[0, 1].subgridspec(3, 3, height_ratios=[1.0, 3.5, 1.0],
-                               width_ratios=[1.0, 0.5, 1.0])
+    # Dedicated axis in the right-hand column: a thin bar, vertically centred
+    # (~half height) with empty side columns keeping it clear of the surfaces.
+    gap = gs[0, cbar_col].subgridspec(3, 3, height_ratios=[1.0, 3.5, 1.0],
+                                      width_ratios=[1.0, 0.5, 1.0])
     cax = fig.add_subplot(gap[1, 1])
     cb = fig.colorbar(sm, cax=cax)
-    cax.set_title(r"score $S$", fontsize=8, pad=9)
-    r_lo, r_hi = ranges[-1]                       # right side = rightmost frame
-    cb.set_ticks([0.0, 1.0])
-    cb.ax.set_yticklabels([f"{r_lo:.1f}", f"{r_hi:.1f}"])
-    cb.ax.tick_params(labelsize=6, length=1.5)
-    l_lo, l_hi = ranges[0]                         # left side = leftmost frame
-    lax = cb.ax.secondary_yaxis("left")
-    lax.set_yticks([0.0, 1.0])
-    lax.set_yticklabels([f"{l_lo:.1f}", f"{l_hi:.1f}"])
-    lax.tick_params(labelsize=6, length=1.5)
+    cax.set_title("score", fontsize=8, pad=9)
+    cb.set_ticks([])
 
     out = os.path.join(args.out_dir, "gaussian_frames.pdf")
     fig.savefig(out)
@@ -410,7 +482,7 @@ def main():
                     default=[2, 10])
     ap.add_argument("--upsample", type=int, default=10)
     ap.add_argument("--strip-w", type=float, default=6.5)
-    ap.add_argument("--strip-h", type=float, default=3.3)
+    ap.add_argument("--strip-h", type=float, default=3.6)
 
     ap.add_argument("--only", choices=["fields", "frames"], default=None)
     args = ap.parse_args()
