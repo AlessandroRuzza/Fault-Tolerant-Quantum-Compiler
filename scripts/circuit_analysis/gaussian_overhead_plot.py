@@ -11,24 +11,44 @@ combination of the tuning-parameter columns that vary across the CSV.
 
 Output layout (in --out-dir):
 
-  <metric>/<metric>_vs_optimality_deg<N>.png   one subfolder per characteristic;
+  <metric>/<metric>_vs_optimality_deg<N>.<fmt>  one subfolder per characteristic;
                                    inside, for each polynomial degree N in 1..5,
                                    a trend curve PER configuration plus the
                                    per-circuit scatter (one colour per config,
                                    legend = connectivity / routing).
-  optimality_correlations_<config>.png   (root) for EACH configuration, a ranked
+  optimality_correlations_<config>.<fmt>  (root) for EACH configuration, a ranked
                                    bar chart of Spearman(optimality, characteristic).
-  optimality_correlations_combined.png   (root) a single ranking pooling all
+  optimality_correlations_combined.<fmt>  (root) a single ranking pooling all
                                    configurations together.
+
+--format sets <fmt>: pdf (default, vector -- use this for figures that go into
+the paper) or png (raster, handier when eyeballing the whole output tree).
 
 A WISQ baseline curve (dashed black) is added to every trend plot by joining
 data/best_wisq_per_circuit.csv (circuit, wisq_routing_steps) against the same
 total_layers metric; pass --wisq-csv to point elsewhere or a nonexistent path
 to omit it.
 
+--routing <strategy> keeps a single router: the router then disappears from the
+legend (it is named once in the title) and the WISQ baseline is switched off, so
+each plot shows exactly the remaining configurations.
+--no-rankings skips the optimality_correlations_*.png ranking charts and emits
+only the per-characteristic trend plots.
+--no-legend drops the legend from the trend plots only (ranking charts keep it).
+--simple_text uses minimal text on the trend plots: y='Routing optimality',
+x=the characteristic name only, title='Routing optimality vs <name> (<fit> fit)'.
+--no_title generates the trend plots with no title at all.
+--paper_dim sizes the trend plots to Figure 6 of the paper (0.8*column, IEEEtran)
+with paper-scale fonts, saved at the exact size; include at width=0.8\linewidth.
+--fit chooses the trend fit: poly (degrees 1..5, may wiggle), monotone (isotonic +
+PCHIP, guaranteed monotone), decay (saturating exponential), log (a + b·ln x),
+binned (PCHIP through equal-count bin medians), power (log-log power law), wls
+(density-weighted log), or all. binned/power/wls track the sparse tail better.
+
 Usage:
   python3 scripts/circuit_analysis/gaussian_overhead_plot.py <runs_csv> \
-      [--metrics <csv>] [--wisq-csv <csv>] [--out-dir <dir>]
+      [--schema runs|wisq] [--routing <strategy>] [--metrics <csv>] \
+      [--wisq-csv <csv>] [--out-dir <dir>] [--format pdf|png]
 """
 
 import argparse
@@ -42,6 +62,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
+from scipy.interpolate import PchipInterpolator
+from scipy.optimize import curve_fit
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_METRICS = PROJECT_ROOT / "benchmarks" / "results" / "cache_metrics" / "all_circuits_cache_metrics.csv"
@@ -60,6 +82,20 @@ PARAM_COLS = [
     "border_distance_percentage", "number_of_magic_states", "routing_strategy",
     "t_routing_mode", "use_layer_cache",
 ]
+
+# Column schemas of the runs CSV, selected with --schema. The two CSV families
+# name the same quantities differently:
+#   runs : benchmark CSVs (data/results/*_runs.csv)           -> routing_steps / status
+#   wisq : WISQ-comparison CSVs (data/results/single_config/) -> my_routing_steps / my_status
+# "steps" is the routing-steps column, "status" the success flag (ignored when the
+# column is absent), "extra_params" the tuning-parameter columns specific to that
+# family (added on top of PARAM_COLS).
+SCHEMAS = {
+    "runs": {"steps": "routing_steps", "status": "status", "extra_params": []},
+    "wisq": {"steps": "my_routing_steps", "status": "my_status",
+             "extra_params": ["type", "MagicStatePlacementStrategy"]},
+}
+
 # Circuit-structural columns that a runs CSV may already carry per-row (written
 # by the benchmark itself). These are preferred over the external metrics CSV,
 # which is a lazily-populated cache and can be missing many circuits (notably
@@ -76,6 +112,7 @@ SHORT = {
     "magic_high": "mH", "magic_low": "mL", "cnot_high": "cH", "cnot_low": "cL",
     "mapped_gaussian_weight": "map", "base_gaussian_weight": "base", "external_weight": "ext",
     "gaussian_confidence": "conf", "magic_state_placement_strategy": "place",
+    "MagicStatePlacementStrategy": "place",
     "border_distance_percentage": "bd", "number_of_magic_states": "nmagic",
     "t_routing_mode": "trout", "use_layer_cache": "cache",
 }
@@ -159,6 +196,13 @@ def formula(k):
     return FORMULAS.get(k, "")
 
 
+def metric_dirname(k):
+    """Folder name for a characteristic: the exact label shown in the ranking
+    charts (lab), with '/' — the only path-illegal character in those labels —
+    replaced by '-' (e.g. 'Avg CNOT / layer' -> 'Avg CNOT - layer')."""
+    return lab(k).replace("/", "-").strip()
+
+
 def config_label(cfg, cfg_cols):
     """Readable legend label: bare value for strategy columns, short=value for the rest."""
     if cfg == WISQ_CFG:
@@ -166,43 +210,78 @@ def config_label(cfg, cfg_cols):
     parts = []
     for c, v in zip(cfg_cols, cfg):
         if c in ("safe_passage_strategy", "routing_strategy", "gaussian_strategy",
-                 "magic_aware_strategy", "mapping_type"):
+                 "magic_aware_strategy", "mapping_type", "type"):
             parts.append(str(v))
         else:
             parts.append(f"{SHORT.get(c, c)}={v}")
     return " / ".join(parts)
 
 
-def config_conn_route(cfg, cfg_cols, const_params):
+def config_conn_route(cfg, cfg_cols, const_params, hide_routing=False):
     """Legend label: only the connectivity (safe_passage) and routing strategy.
 
     Values are taken from the varying columns if present, otherwise from the
     constant-parameter values, so the label is correct even when one of the two
-    does not vary across the CSV.
+    does not vary across the CSV (e.g. single-configuration CSVs).
+
+    hide_routing drops the router from the label: with --routing every curve
+    shares the same one, so it is stated once in the title instead.
     """
-    d = dict(zip(cfg_cols, cfg))
-    conn = d.get("safe_passage_strategy", const_params.get("safe_passage_strategy", "?"))
-    route = d.get("routing_strategy", const_params.get("routing_strategy", "?"))
-    return f"{conn} / {route}"
+    if cfg == WISQ_CFG:
+        return "WISQ"
+    d = dict(const_params or {})
+    d.update(dict(zip(cfg_cols, cfg)))
+    conn = d.get("safe_passage_strategy", "?")
+    if hide_routing:
+        return conn
+    return f"{conn} / {d.get('routing_strategy', '?')}"
 
 
-def config_slug(cfg, cfg_cols):
+def config_slug(cfg, cfg_cols, const_params=None):
     if cfg == WISQ_CFG:
         return WISQ_CFG
-    d = dict(zip(cfg_cols, cfg))
-    base = "_".join(str(d.get(c, "")) for c in ("safe_passage_strategy", "routing_strategy") if c in d)
+    # constant params complete the slug for single-configuration CSVs, where
+    # nothing varies and cfg_cols is empty (slug would otherwise be blank).
+    d = dict(const_params or {})
+    d.update(dict(zip(cfg_cols, cfg)))
+    base = "_".join(str(d[c]) for c in ("safe_passage_strategy", "routing_strategy") if c in d)
     if not base:
         base = "_".join(str(x) for x in cfg)
-    return re.sub(r"[^0-9A-Za-z._-]+", "_", base).strip("_")
+    return re.sub(r"[^0-9A-Za-z._-]+", "_", base).strip("_") or "config"
 
 
-def load(runs_csv, metrics_csv, wisq_csv=None):
+def load(runs_csv, metrics_csv, wisq_csv=None, schema="runs", routing=None):
     rows = list(csv.DictReader(open(runs_csv)))
     if not rows:
         return None
 
+    sch = SCHEMAS[schema]
+    steps_col, status_col = sch["steps"], sch["status"]
+    if steps_col not in rows[0]:
+        print(f"ERROR: column '{steps_col}' (schema '{schema}') not found in {runs_csv}.\n"
+              f"       Available columns: {', '.join(rows[0].keys())}\n"
+              f"       Try a different --schema (choices: {', '.join(SCHEMAS)}).")
+        return None
+    has_status = status_col in rows[0]
+
+    # --routing: keep a single router. It then no longer varies, so it drops out
+    # of cfg_cols into const_params and is hidden from the legend (hide_routing);
+    # the WISQ baseline is dropped too, leaving exactly the kept configurations.
+    if routing is not None:
+        if "routing_strategy" not in rows[0]:
+            print(f"ERROR: --routing given but column 'routing_strategy' is not in {runs_csv}.")
+            return None
+        available = sorted({r["routing_strategy"] for r in rows})
+        rows = [r for r in rows if r["routing_strategy"] == routing]
+        if not rows:
+            print(f"ERROR: no rows with routing_strategy='{routing}'.\n"
+                  f"       Available routers: {', '.join(available)}")
+            return None
+        wisq_csv = None
+
     # configuration = combination of the tuning-param columns that vary
-    present = [c for c in PARAM_COLS if c in rows[0]]
+    param_cols = PARAM_COLS + [c for c in sch["extra_params"] if c not in PARAM_COLS]
+    present = [c for c in param_cols if c in rows[0]]
     cfg_cols = [c for c in present if len({r[c] for r in rows}) > 1]
     # constant params (present but not varying) — used to complete the conn/route label
     const_params = {c: rows[0][c] for c in present if c not in cfg_cols}
@@ -214,11 +293,13 @@ def load(runs_csv, metrics_csv, wisq_csv=None):
     row_metvals = {}
     row_min_routing_steps = {}
     for r in rows:
-        if r.get("status") != "success" or not r.get("routing_steps", "").strip():
+        if has_status and r.get(status_col) != "success":
+            continue
+        if not (r.get(steps_col) or "").strip():
             continue
         circuit = r["circuit"]
         cfg = tuple(r[c] for c in cfg_cols)
-        steps[cfg][circuit] = min(steps[cfg][circuit], int(float(r["routing_steps"])))
+        steps[cfg][circuit] = min(steps[cfg][circuit], int(float(r[steps_col])))
 
         vals = row_metvals.setdefault(circuit, {})
         for k in ROW_METRIC_COLS:
@@ -295,10 +376,184 @@ def load(runs_csv, metrics_csv, wisq_csv=None):
         if len(vals) >= 5 and len(set(vals)) > 1:
             usable.append(k)
     return {"cfg_cols": cfg_cols, "const_params": const_params, "configs": configs,
-            "optimality": optimality, "metvals": metvals, "metrics": usable}
+            "optimality": optimality, "metvals": metvals, "metrics": usable,
+            "routing_filter": routing, "hide_routing": routing is not None}
 
 
-def plot_trend(d, key, degree, out_path):
+def _pava(y):
+    """Pool-adjacent-violators: least-squares non-decreasing isotonic fit of y."""
+    y = np.asarray(y, float)
+    vals, cnts = [], []
+    for v in y:
+        c = 1
+        while vals and vals[-1] > v:                 # violation -> merge blocks
+            pv, pc = vals.pop(), cnts.pop()
+            v = (v * c + pv * pc) / (c + pc)
+            c += pc
+        vals.append(v)
+        cnts.append(c)
+    out = np.empty(len(y))
+    idx = 0
+    for v, c in zip(vals, cnts):
+        out[idx:idx + c] = v
+        idx += c
+    return out
+
+
+def fit_curve(xs, ys, method, degree, grid, bins=10):
+    """Return (gx, gy) for the requested trend fit, or None if it can't be fit.
+
+    poly     : ordinary least-squares polynomial of the given degree (may wiggle).
+    monotone : isotonic regression (direction from Spearman sign) smoothed with a
+               shape-preserving PCHIP spline -> guaranteed monotone, smooth.
+    decay    : saturating exponential y = c + a*exp(-b*x') fit (x' = x rescaled to
+               [0,1]); monotone by construction, works for rising or falling data.
+    log      : logarithmic fit y = a + b*ln(x - xmin + 1) (the shift keeps the
+               argument >= 1, so zero/negative x are fine); monotone in x.
+
+    The next three tackle the "dense low-x cluster dominates, sparse tail ignored"
+    problem, so the curve tracks the whole x-range rather than the crowded side:
+    binned   : split x into `bins` equal-count groups, take the per-group MEDIAN of
+               x and y, and PCHIP through those points -> every x-region weighs the
+               same and the median ignores the vertical scatter (robust central
+               trend).
+    power    : power law y = a*x'^b (x' = x - xmin + 1), fit as a line in log-log
+               space, so it minimises relative error and follows the tail better.
+    wls      : the `log` fit but weighted least squares with weights ~ 1/local
+               x-density, so a lone tail point counts as much as the dense cluster.
+    """
+    xs = np.asarray(xs, float)
+    ys = np.asarray(ys, float)
+    if len(set(xs)) < 2:
+        return None
+
+    if method == "poly":
+        if len(xs) <= degree:
+            return None
+        with np.errstate(all="ignore"):
+            coeffs = np.polyfit(xs, ys, degree)
+        return grid, np.polyval(coeffs, grid)
+
+    if method == "monotone":
+        if len(xs) < 3:
+            return None
+        sp, _ = stats.spearmanr(xs, ys)
+        if np.isnan(sp):
+            return None
+        increasing = sp >= 0
+        order = np.argsort(xs)
+        sx, sy = xs[order], ys[order]
+        z = _pava(sy if increasing else -sy)
+        if not increasing:
+            z = -z
+        ux, inv = np.unique(sx, return_inverse=True)
+        uy = np.array([z[inv == j].mean() for j in range(len(ux))])
+        if len(ux) < 2:
+            return None
+        f = PchipInterpolator(ux, uy, extrapolate=False)   # shape-preserving
+        g = grid[(grid >= ux[0]) & (grid <= ux[-1])]
+        return g, f(g)
+
+    if method == "decay":
+        if len(xs) < 4:
+            return None
+        xmin, xmax = xs.min(), xs.max()
+        xn = (xs - xmin) / (xmax - xmin)
+        c0 = ys[np.argmax(xs)]
+        a0 = ys[np.argmin(xs)] - c0
+        model = lambda t, a, b, c: c + a * np.exp(-b * t)
+        try:
+            popt, _ = curve_fit(model, xn, ys, p0=[a0, 2.0, c0],
+                                bounds=([-np.inf, 1e-3, -np.inf], [np.inf, 50.0, np.inf]),
+                                maxfev=10000)
+        except (RuntimeError, ValueError):
+            return None
+        g = grid[(grid >= xmin) & (grid <= xmax)]
+        return g, model((g - xmin) / (xmax - xmin), *popt)
+
+    if method == "log":
+        if len(xs) < 3:
+            return None
+        xmin, xmax = xs.min(), xs.max()
+        lx = np.log(xs - xmin + 1.0)              # shift so argument >= 1
+        if len(set(lx)) < 2:
+            return None
+        coeffs = np.polyfit(lx, ys, 1)            # y = b*ln(x-xmin+1) + a, monotone
+        g = grid[(grid >= xmin) & (grid <= xmax)]
+        return g, np.polyval(coeffs, np.log(g - xmin + 1.0))
+
+    if method == "binned":
+        if len(xs) < 6:
+            return None
+        k = max(2, min(bins, len(xs) // 3))       # >= 3 points per bin
+        order = np.argsort(xs)
+        sx, sy = xs[order], ys[order]
+        groups = np.array_split(np.arange(len(sx)), k)
+        bx = np.array([np.median(sx[gi]) for gi in groups])
+        by = np.array([np.median(sy[gi]) for gi in groups])
+        ux, idx = np.unique(bx, return_index=True)   # PCHIP needs strictly increasing x
+        uy = by[idx]
+        if len(ux) < 2:
+            return None
+        f = PchipInterpolator(ux, uy, extrapolate=False)
+        g = grid[(grid >= ux[0]) & (grid <= ux[-1])]
+        return g, f(g)
+
+    if method == "power":
+        if len(xs) < 3:
+            return None
+        xmin, xmax = xs.min(), xs.max()
+        xp = xs - xmin + 1.0                       # shift so x' >= 1 (handles x <= 0)
+        pos = ys > 0                               # log-log needs positive y
+        if pos.sum() < 3 or len(set(xp[pos])) < 2:
+            return None
+        b, la = np.polyfit(np.log(xp[pos]), np.log(ys[pos]), 1)   # ln y = b ln x' + ln a
+        g = grid[(grid >= xmin) & (grid <= xmax)]
+        return g, np.exp(la) * (g - xmin + 1.0) ** b
+
+    if method == "wls":
+        if len(xs) < 3:
+            return None
+        xmin, xmax = xs.min(), xs.max()
+        lx = np.log(xs - xmin + 1.0)
+        if len(set(lx)) < 2:
+            return None
+        h = (xmax - xmin) / 20.0 or 1.0
+        dens = np.array([np.count_nonzero(np.abs(xs - xi) <= h) for xi in xs], float)
+        w = 1.0 / np.sqrt(dens)                    # down-weight crowded x-regions
+        coeffs = np.polyfit(lx, ys, 1, w=w)
+        g = grid[(grid >= xmin) & (grid <= xmax)]
+        return g, np.polyval(coeffs, np.log(g - xmin + 1.0))
+
+    return None
+
+
+# Human-readable description of each fit method, used in plot titles.
+FIT_DESC = {
+    "monotone": "monotone fit (isotonic + PCHIP)",
+    "decay": "saturating-exponential fit",
+    "log": "logarithmic fit (a + b·ln x)",
+    "binned": "binned-median fit (equal-count bins)",
+    "power": "power-law fit (y = a·xᵇ)",
+    "wls": "density-weighted logarithmic fit",
+}
+# Short version of the same, used in the --simple_text single-line title.
+FIT_SHORT = {
+    "monotone": "monotone fit", "decay": "exponential fit", "log": "logarithmic fit",
+    "binned": "binned-median fit", "power": "power-law fit", "wls": "weighted-log fit",
+}
+
+# --paper_dim target: the exact footprint of Figure 6 (fig:winrate-budget) in the
+# paper. Width = 0.8 * columnwidth (IEEEtran 10pt conference => columnwidth =
+# 252.0 TeX pt = 3.487 in); aspect = 244.8/288 from the winrate_budget.pdf box.
+# Include the produced PDF at width=0.8\linewidth (or its natural size) so LaTeX
+# does NOT rescale it and the text keeps the point sizes set here.
+PAPER_COL_IN = 252.0 / 72.27          # IEEEtran column width in inches
+PAPER_FIG_W = 0.8 * PAPER_COL_IN      # 2.790 in
+PAPER_FIG_H = PAPER_FIG_W * (244.8 / 288.0)   # 2.372 in
+
+
+def plot_trend(d, key, method, out_path, degree=None):
     configs, cfg_cols = d["configs"], d["cfg_cols"]
     cmap = plt.get_cmap("tab10")
 
@@ -308,33 +563,40 @@ def plot_trend(d, key, degree, out_path):
         return
     xr = np.linspace(min(all_x), max(all_x), 200)
 
-    fig, ax = plt.subplots(figsize=(10, 6.5), facecolor="white")
-    ax.axhline(1.0, color="#888", ls="--", lw=1.2, zorder=1, label="optimality = 1 (ideal)")
+    # --paper_dim: Figure-6 physical size and paper-scale fonts/line widths, so the
+    # PDF drops into the paper at 1:1 with correctly sized text.
+    paper = d.get("paper_dim")
+    if paper:
+        figsize = (PAPER_FIG_W, PAPER_FIG_H)
+        fs_label, fs_title, fs_tick, fs_leg = 8, 8, 7, 6.5
+        lw, lw_wisq, msize, ah_lw, dpi = 1.2, 1.5, 8, 0.8, 300
+    else:
+        figsize = (10, 6.5)
+        fs_label, fs_title, fs_tick, fs_leg = 11, 12, None, 8.5
+        lw, lw_wisq, msize, ah_lw, dpi = 2.4, 2.8, 22, 1.2, 130
+
+    fig, ax = plt.subplots(figsize=figsize, facecolor="white")
+    ax.axhline(1.0, color="#888", ls="--", lw=ah_lw, zorder=1, label="optimality = 1 (ideal)")
 
     plotted = False
     for i, cfg in enumerate(configs):
-        color = cmap(i % 10)
         pts = [(d["metvals"][c][key], ov) for c, ov in d["optimality"][cfg].items()
                if d["metvals"].get(c, {}).get(key) is not None]
         xs = np.array([p[0] for p in pts], float)
         ys = np.array([p[1] for p in pts], float)
         is_wisq = cfg == WISQ_CFG
         color = "black" if is_wisq else cmap(i % 10)
-        if len(xs):
-            ax.scatter(xs, ys, s=22, alpha=0.35, color=color, zorder=2,
-                       marker="^" if is_wisq else "o", linewidths=0)
-        # need strictly more points than the polynomial order and ≥2 distinct x
-        if len(xs) <= degree or len(set(xs)) < 2:
-            continue
         # per-circuit scatter (one colour per configuration), no legend entry of its own
-        ax.scatter(xs, ys, s=22, color=color, alpha=0.5, edgecolors="none", zorder=2)
-        with np.errstate(all="ignore"):
-            coeffs = np.polyfit(xs, ys, degree)
-        sp, _ = stats.spearmanr(xs, ys)
-        ls = "--" if is_wisq else "-"
-        ax.plot(xr, np.polyval(coeffs, xr), color=color, lw=2.8 if is_wisq else 2.4,
-                ls=ls, zorder=4 if is_wisq else 3,
-                label=f"{config_label(cfg, cfg_cols)}   (ρ={sp:+.2f})")
+        if len(xs):
+            ax.scatter(xs, ys, s=msize, color=color, alpha=0.35, zorder=2,
+                       marker="^" if is_wisq else "o", linewidths=0)
+        fit = fit_curve(xs, ys, method, degree, xr, bins=d.get("bins", 10))
+        if fit is None:
+            continue
+        gx, gy = fit
+        ax.plot(gx, gy, color=color, lw=lw_wisq if is_wisq else lw,
+                ls="--" if is_wisq else "-", zorder=4 if is_wisq else 3,
+                label=config_conn_route(cfg, cfg_cols, d["const_params"], d["hide_routing"]))
         plotted = True
 
     if not plotted:
@@ -346,16 +608,42 @@ def plot_trend(d, key, degree, out_path):
     if ys_all:
         ax.set_ylim(max(0.0, min(ys_all) - 0.05), 1.05)
 
-    deg_name = {1: "linear", 2: "quadratic", 3: "cubic", 4: "quartic", 5: "quintic"}.get(degree, f"degree {degree}")
-    ax.set_xlabel(f"{lab(key)}\n{formula(key)}", fontsize=11)
-    ax.set_ylabel("Routing optimality = total_layers / routing_steps", fontsize=11)
-    ax.set_title(f"Gaussian routing optimality vs {lab(key)}\n"
-                 f"{deg_name} trend (degree {degree}), one curve per configuration",
-                 fontsize=12, fontweight="bold")
+    if method == "poly":
+        deg_name = {1: "linear", 2: "quadratic", 3: "cubic", 4: "quartic",
+                    5: "quintic"}.get(degree, f"degree {degree}")
+        trend_desc = f"{deg_name} trend (degree {degree})"
+        fit_short = f"{deg_name} fit"
+    else:
+        trend_desc = FIT_DESC.get(method, method)
+        fit_short = FIT_SHORT.get(method, f"{method} fit")
+
+    if d.get("simple_text"):
+        # minimal labels/title: axis names only (no formula), single-line title
+        ax.set_xlabel(lab(key), fontsize=fs_label)
+        ax.set_ylabel("Routing optimality", fontsize=fs_label)
+        title = f"Routing optimality vs {lab(key)} ({fit_short})"
+    else:
+        ax.set_xlabel(f"{lab(key)}\n{formula(key)}", fontsize=fs_label)
+        ax.set_ylabel("Routing optimality = total_layers / routing_steps", fontsize=fs_label)
+        # with --routing every curve shares the router, so name it once here
+        router_note = f"\nrouter: {d['routing_filter']}" if d["hide_routing"] else ""
+        title = (f"Gaussian routing optimality vs {lab(key)}\n"
+                 f"{trend_desc}, one curve per configuration{router_note}")
+    if not d.get("no_title"):
+        ax.set_title(title, fontsize=fs_title, fontweight="bold")
+    if fs_tick is not None:
+        ax.tick_params(labelsize=fs_tick)
     ax.grid(alpha=0.25, zorder=0)
-    ax.legend(fontsize=8.5, loc="best", title="connectivity / routing")
+    if not d.get("no_legend"):
+        ax.legend(fontsize=fs_leg, loc="best",
+                  title="connectivity" if d["hide_routing"] else "connectivity / routing")
     fig.tight_layout()
-    fig.savefig(out_path, dpi=130, bbox_inches="tight", facecolor="white")
+    # paper mode: keep the exact figsize (no tight bbox, which would crop and change
+    # the physical dimensions); tight_layout fits the labels inside the fixed canvas.
+    if paper:
+        fig.savefig(out_path, dpi=dpi, facecolor="white")
+    else:
+        fig.savefig(out_path, dpi=dpi, bbox_inches="tight", facecolor="white")
     plt.close(fig)
 
 
@@ -415,41 +703,128 @@ def main():
                     help="Per-circuit WISQ routing_steps CSV (circuit, wisq_routing_steps) "
                          f"added as an extra baseline curve (default: {DEFAULT_WISQ_CSV}). "
                          "Pass a nonexistent path to omit it.")
+    p.add_argument("--schema", choices=sorted(SCHEMAS), default="runs",
+                   help="Column schema of the runs CSV: 'runs' = benchmark CSVs "
+                        "(routing_steps/status, default), 'wisq' = WISQ-comparison CSVs "
+                        "such as data/results/single_config/*.csv (my_routing_steps/my_status).")
+    p.add_argument("--routing", default=None, metavar="STRATEGY",
+                   help="Keep only rows with this routing_strategy (e.g. naive_critical). "
+                        "The router is then dropped from the legend (stated in the title "
+                        "instead) and the WISQ baseline is disabled, so the plots show "
+                        "exactly the remaining configurations.")
+    p.add_argument("--no-rankings", action="store_true",
+                   help="Skip the correlation-ranking charts (optimality_correlations_*.png, "
+                        "the per-characteristic Spearman 'table'); only the per-characteristic "
+                        "trend plots are produced.")
+    p.add_argument("--no-legend", action="store_true",
+                   help="Drop the legend from the trend plots only (the ranking charts keep "
+                        "their positive/negative colour legend).")
+    p.add_argument("--simple_text", action="store_true",
+                   help="Minimal text on the trend plots: y axis 'Routing optimality', "
+                        "x axis the characteristic name only (no formula), and a single-line "
+                        "title 'Routing optimality vs <characteristic> (<fit> fit)'.")
+    p.add_argument("--no_title", action="store_true",
+                   help="Generate the trend plots without any title (axes and legend kept).")
+    p.add_argument("--paper_dim", action="store_true",
+                   help="Size the trend plots to Figure 6 of the paper "
+                        f"({PAPER_FIG_W:.2f}x{PAPER_FIG_H:.2f} in = 0.8*column, IEEEtran) with "
+                        "paper-scale fonts, and save at the exact size (no tight-bbox crop) so "
+                        "LaTeX does not rescale. Include it at width=0.8\\linewidth. Pair with "
+                        "--simple_text / --no_title for a clean paper figure.")
+    p.add_argument("--fit",
+                   choices=["poly", "monotone", "decay", "log", "binned", "power", "wls", "all"],
+                   default="poly",
+                   help="Trend fit for the per-characteristic plots: 'poly' (default) = "
+                        "polynomials of degree 1..5 (can wiggle); 'monotone' = isotonic + "
+                        "PCHIP (guaranteed monotone); 'decay' = saturating exponential; "
+                        "'log' = logarithmic y=a+b*ln(x); 'binned' = PCHIP through equal-count "
+                        "bin medians (robust, tracks the whole range); 'power' = power law "
+                        "y=a*x^b (log-log fit); 'wls' = density-weighted log fit; "
+                        "'all' = produce every fit for comparison.")
+    p.add_argument("--bins", type=int, default=10,
+                   help="Number of equal-count bins for the 'binned' fit (default 10).")
     p.add_argument("--out-dir", type=Path, default=None)
+    p.add_argument("--format", choices=["pdf", "png"], default="pdf",
+                   help="Output image format: 'pdf' (default) is vector and keeps text "
+                        "and curves sharp at any zoom, as required for paper figures; "
+                        "'png' is raster and easier to skim in bulk.")
     args = p.parse_args()
 
     out_dir = args.out_dir or (Path(args.runs_csv).resolve().parent / "gaussian_overhead_plots")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    d = load(args.runs_csv, args.metrics, args.wisq_csv)
+    d = load(args.runs_csv, args.metrics, args.wisq_csv, args.schema, args.routing)
     if not d or not d["configs"]:
         print("ERROR: no data (check runs CSV and metrics).")
         return
+    d["no_legend"] = args.no_legend      # affects the trend plots only
+    d["simple_text"] = args.simple_text  # minimal axis/title text on the trend plots
+    d["no_title"] = args.no_title        # drop the title on the trend plots
+    d["paper_dim"] = args.paper_dim      # Figure-6 size + paper-scale fonts
+    d["bins"] = args.bins                # number of bins for the 'binned' fit
 
     print(f"Configurations: {len(d['configs'])} | characteristics: {len(d['metrics'])}")
+    if d["routing_filter"]:
+        print(f"Router filter: {d['routing_filter']} (WISQ baseline disabled)")
     for cfg in d["configs"]:
-        print(f"  - {config_label(cfg, d['cfg_cols'])}  ({len(d['optimality'][cfg])} circuits)")
+        line = config_conn_route(cfg, d["cfg_cols"], d["const_params"], d["hide_routing"])
+        detail = config_label(cfg, d["cfg_cols"])   # varying params, empty if none vary
+        if detail and detail != line:
+            line += f"   [{detail}]"
+        print(f"  - {line}  ({len(d['optimality'][cfg])} circuits)")
 
-    # correlation rankings stay in the root out-dir
-    for cfg in d["configs"]:
-        pairs = list(d["optimality"][cfg].items())
-        plot_correlation_ranking(d, pairs,
-                                 f"config: {config_conn_route(cfg, d['cfg_cols'], d['const_params'])}",
-                                 out_dir / f"optimality_correlations_{config_slug(cfg, d['cfg_cols'])}.png")
-    # one combined ranking pooling all configurations
-    combined = [(c, ov) for cfg in d["configs"] for c, ov in d["optimality"][cfg].items()]
-    plot_correlation_ranking(d, combined, "combined (all configurations pooled)",
-                             out_dir / "optimality_correlations_combined.png")
+    # correlation rankings stay in the root out-dir (skipped with --no-rankings)
+    if not args.no_rankings:
+        for cfg in d["configs"]:
+            pairs = list(d["optimality"][cfg].items())
+            subtitle = f"config: {config_conn_route(cfg, d['cfg_cols'], d['const_params'], d['hide_routing'])}"
+            if d["routing_filter"]:
+                subtitle += f"   |   router: {d['routing_filter']}"
+            plot_correlation_ranking(d, pairs, subtitle,
+                                     out_dir / f"optimality_correlations_"
+                                               f"{config_slug(cfg, d['cfg_cols'], d['const_params'])}"
+                                               f".{args.format}")
+        # one combined ranking pooling all configurations
+        combined = [(c, ov) for cfg in d["configs"] for c, ov in d["optimality"][cfg].items()]
+        plot_correlation_ranking(d, combined, "combined (all configurations pooled)",
+                                 out_dir / f"optimality_correlations_combined.{args.format}")
 
-    # trend curves: one subfolder per characteristic, the 5 degrees inside
+    # trend curves: one subfolder per characteristic. Which curves go inside
+    # depends on --fit (poly -> 5 degree files, monotone/decay -> 1 file each,
+    # all -> every one, so the fits can be compared side by side).
+    do_poly = args.fit in ("poly", "all")
+    do_monotone = args.fit in ("monotone", "all")
+    do_decay = args.fit in ("decay", "all")
+    do_log = args.fit in ("log", "all")
+    do_binned = args.fit in ("binned", "all")
+    do_power = args.fit in ("power", "all")
+    do_wls = args.fit in ("wls", "all")
     degrees = [1, 2, 3, 4, 5]
     for k in d["metrics"]:
-        sub = out_dir / k
+        sub = out_dir / metric_dirname(k)   # folder named like the ranking-chart label
         sub.mkdir(parents=True, exist_ok=True)
-        for deg in degrees:
-            plot_trend(d, k, deg, sub / f"{k}_vs_optimality_deg{deg}.png")
-    print(f"Wrote {len(d['configs'])} per-config + 1 combined ranking (root), "
-          f"and {len(d['metrics'])} characteristic folders x {len(degrees)} degrees to {out_dir}/")
+        if do_poly:
+            for deg in degrees:
+                plot_trend(d, k, "poly", sub / f"{k}_vs_optimality_deg{deg}.{args.format}", degree=deg)
+        if do_monotone:
+            plot_trend(d, k, "monotone", sub / f"{k}_vs_optimality_monotone.{args.format}")
+        if do_decay:
+            plot_trend(d, k, "decay", sub / f"{k}_vs_optimality_decay.{args.format}")
+        if do_log:
+            plot_trend(d, k, "log", sub / f"{k}_vs_optimality_log.{args.format}")
+        if do_binned:
+            plot_trend(d, k, "binned", sub / f"{k}_vs_optimality_binned.{args.format}")
+        if do_power:
+            plot_trend(d, k, "power", sub / f"{k}_vs_optimality_power.{args.format}")
+        if do_wls:
+            plot_trend(d, k, "wls", sub / f"{k}_vs_optimality_wls.{args.format}")
+    per_char = (5 * do_poly + do_monotone + do_decay + do_log
+                + do_binned + do_power + do_wls)
+    ranking_note = ("no rankings (--no-rankings), " if args.no_rankings
+                    else f"{len(d['configs'])} per-config + 1 combined ranking (root), ")
+    print(f"Wrote {ranking_note}"
+          f"{len(d['metrics'])} characteristic folders x {per_char} trend plots "
+          f"(--fit {args.fit}) to {out_dir}/")
 
 
 if __name__ == "__main__":
