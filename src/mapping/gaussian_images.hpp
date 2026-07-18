@@ -189,6 +189,17 @@ void save_gaussian_frame(
     const std::filesystem::path out_dir = std::filesystem::path(PROJECT_ROOT) / "visualization" / "gaussian_frames";
     std::filesystem::create_directories(out_dir);
 
+    // Magic-tile coordinates come from the graph, not the gaussian layers, so
+    // they are available even when the magic weights are 0 (tuned default).
+    static bool magic_tiles_written = false;
+    if (!magic_tiles_written) {
+        std::ofstream tiles(out_dir / "magic_tiles.dat");
+        for (const int node_id : graph.get_magic_state_ids()) {
+            tiles << graph.get_coordX(node_id) << " " << graph.get_coordY(node_id) << "\n";
+        }
+        magic_tiles_written = true;
+    }
+
     const std::string idx = std::to_string(frame_id++);
     const std::filesystem::path mapped_dat = out_dir / ("mapped_" + idx + ".dat");
     const std::filesystem::path magic_dat = out_dir / ("magic_" + idx + ".dat");
