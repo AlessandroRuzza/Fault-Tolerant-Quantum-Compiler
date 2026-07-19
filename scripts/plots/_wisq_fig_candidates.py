@@ -74,7 +74,7 @@ def fig_ratio_bars():
     ax.set_xlim(-1, len(data))
     ax.set_xlabel("circuits (sorted by ratio)")
     ax.set_ylabel("WISQ steps / our steps")
-    ax.set_title("Per-circuit routing-step ratio vs WISQ", fontsize=10)
+    # ax.set_title("Per-circuit routing-step ratio vs WISQ", fontsize=10)
     from matplotlib.patches import Patch
     ax.legend(handles=[Patch(color=WIN, label=f"we win  ({win})"),
                        Patch(color=TIE, label=f"tie  ({tie})"),
@@ -116,7 +116,7 @@ def fig_winrate_budget():
     ax.set_xlabel("timeout per circuit (s)")
     ax.set_ylabel(r"our win-rate (% of 256)")
     ax.set_ylim(min(vic_rate) - 8, 100)
-    ax.set_title("Win-rate vs WISQ as the timeout tightens", fontsize=10)
+    # ax.set_title("Win-rate vs WISQ as the timeout tightens", fontsize=10)
     ax.grid(True, linestyle=":", alpha=0.35)
     fig.tight_layout(); 
     fig.savefig(OUT_PAPER / "winrate_budget.pdf")

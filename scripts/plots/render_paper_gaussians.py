@@ -258,38 +258,48 @@ def render_fields(args):
     set_style()
     fig = plt.figure(figsize=(args.fields_w, args.fields_h), constrained_layout=True)
     # extra short bottom row holds the shared marker legend
-    gs = fig.add_gridspec(3, 3, width_ratios=[1, 1, 1.45],
+    big_w = 1.45  # score-S column width relative to a mini column
+    gs = fig.add_gridspec(3, 3, width_ratios=[1, 1, big_w],
                           height_ratios=[1, 1, 0.30])
 
     # Each family is shown on its own colour scale (with its own colourbar): the
     # repulsion field sums many inverse Gaussians into a tall plateau, so a single
     # shared scale would crush the lower-magnitude magic/CNOT/baseline panels.
     panels = [
-        (f_magic, "magic-state", gs[0, 0]),
-        (f_cnot, "partner", gs[0, 1]),
-        (f_mapped, "repulsion", gs[1, 0]),
-        (f_base, "centering", gs[1, 1]),
+        (f_magic, "T-sites", gs[0, 0]),
+        (f_cnot, "CNOTs", gs[0, 1]),
+        (f_mapped, "Mapped", gs[1, 0]),
+        (f_base, "Center", gs[1, 1]),
     ]
+    # Colourbars are drawn on inset axes pinned to their panel: constrained_layout
+    # never moves or resizes insets, so gap (--cbar-gap) and thickness
+    # (--cbar-width) come out identical on every panel by construction. If the
+    # bar axes sat in layout-managed cells instead, the engine would squeeze each
+    # one differently to fit its tick labels ("12.0" is wider than "0.0") -> the
+    # uneven bar widths this replaces. The spacer sub-column only *reserves* room
+    # for bar + labels, which the engine cannot see on an inset.
+    spacer = args.cbar_gap + args.cbar_width + 0.15  # 0.15 = tick-label room
     for F, title, cell in panels:
-        ax = fig.add_subplot(cell)
+        sub = cell.subgridspec(1, 2, width_ratios=[1, spacer], wspace=0)
+        ax = fig.add_subplot(sub[0, 0])
         im = ax.imshow(F, origin="lower", extent=extent,
                        cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
-        ax.set_title(title, pad=2, fontsize=11)
+        ax.set_title(title, pad=2, fontsize=12)
         ax.set_xticks(range(0, maxX + 1, 2))
         ax.set_yticks(range(0, maxY + 1, 2))
-        ax.tick_params(labelsize=5, length=2)
-        if title == "magic-state":
+        ax.tick_params(labelsize=8, length=2)
+        if title == "T-sites":
             for (mx, my) in magic:
                 ax.plot(mx, my, marker="*", color="white", ms=8, mew=0.7, mec="black")
-        if title == "partner":
+        if title == "CNOTs":
             for (mx, my) in partners:
                 ax.plot(mx, my, marker="o", color="white", ms=5, mew=0.6, mec="black")
-        if title == "repulsion":
+        if title == "Mapped":
             for (mx, my) in placed:
                 ax.plot(mx, my, marker="s", color="white", ms=5, mew=0.6, mec="black")
-        cbf = fig.colorbar(im, ax=ax, location="right", shrink=0.9,
-                           aspect=12, pad=0.03)
-        cbf.ax.tick_params(labelsize=6.5, length=1.5)
+        caxf = ax.inset_axes([1.0 + args.cbar_gap, 0.0, args.cbar_width, 1.0])
+        cbf = fig.colorbar(im, cax=caxf)
+        cbf.ax.tick_params(labelsize=8, length=1.5)
         cbf.set_ticks([float(F.min()), float(F.max())])
         cbf.ax.set_yticklabels([f"{F.min():.1f}", f"{F.max():.1f}"])
 
@@ -297,12 +307,12 @@ def render_fields(args):
     axS = fig.add_subplot(gs[0:2, 2])
     imS = axS.imshow(S, origin="lower", extent=extent,
                      cmap=HEAT_CMAP, aspect="auto", interpolation="bilinear")
-    axS.set_title(r"superposition $S$", pad=2, fontsize=11)
-    axS.set_xlabel("x", labelpad=1, fontsize=10)
-    axS.set_ylabel("y", labelpad=1, fontsize=10)
+    axS.set_title(r"score $S$", pad=2, fontsize=12)
+    # axS.set_xlabel("x", labelpad=1, fontsize=10)
+    # axS.set_ylabel("y", labelpad=1, fontsize=10)
     axS.set_xticks(range(0, maxX + 1, 2))
     axS.set_yticks(range(0, maxY + 1, 2))
-    axS.tick_params(labelsize=5, length=2)
+    axS.tick_params(labelsize=8, length=2)
     for (mx, my) in magic:
         axS.plot(mx, my, marker="*", color="white", ms=9, mew=0.8, mec="black")
     for (mx, my) in partners:
@@ -310,24 +320,32 @@ def render_fields(args):
     for (mx, my) in placed:
         axS.plot(mx, my, marker="s", color="white", ms=5, mew=0.7, mec="black")
     axS.plot(map_x, map_y, marker="X", color="red", ms=9, mew=0.8, mec="black")
-    cbS = fig.colorbar(imS, ax=axS, location="right", shrink=0.9, aspect=22, pad=0.02)
-    cbS.set_label(r"score $S$", fontsize=10)
-    cbS.ax.tick_params(labelsize=7)
+    # Same pinned-inset technique as the mini panels, so the gap matches them.
+    # Inset coords are fractions of the *host* panel width; the score panel is
+    # big_w*(1+spacer) times wider than a mini panel (big_w columns, no spacer
+    # eating into it), so rescale to keep gap and thickness equal in absolute
+    # size. The bar hangs into the right figure margin; savefig's tight bbox
+    # picks it and its labels up.
+    big_scale = big_w * (1.0 + spacer)
+    caxS = axS.inset_axes([1.0 + args.cbar_gap / big_scale, 0.0,
+                           args.cbar_width / big_scale, 1.0])
+    cbS = fig.colorbar(imS, cax=caxS)
+    cbS.ax.tick_params(labelsize=8)
 
     # Shared marker legend in the dedicated bottom row.
     axL = fig.add_subplot(gs[2, :])
     axL.axis("off")
     legend_handles = [
         Line2D([0], [0], linestyle="none", marker="*", markerfacecolor="white",
-               markeredgecolor="black", markersize=11, label="magic tile"),
+               markeredgecolor="black", markersize=11, label="magic-state tile"),
         Line2D([0], [0], linestyle="none", marker="o", markerfacecolor="white",
-               markeredgecolor="black", markersize=9, label="partner"),
+               markeredgecolor="black", markersize=9, label="CNOTs"),
         Line2D([0], [0], linestyle="none", marker="s", markerfacecolor="white",
-               markeredgecolor="black", markersize=9, label="placed qubit"),
+               markeredgecolor="black", markersize=9, label="mapped qubit"),
         Line2D([0], [0], linestyle="none", marker="X", markerfacecolor="red",
                markeredgecolor="black", markersize=10, label="final mapping"),
     ]
-    axL.legend(handles=legend_handles, loc="center", ncol=4, fontsize=10,
+    axL.legend(handles=legend_handles, loc="center", ncol=4, fontsize=12,
                handletextpad=0.4, columnspacing=1.4, framealpha=0.9,
                facecolor="0.85", edgecolor="0.6")
 
@@ -446,8 +464,16 @@ def render_frames(args):
                                       width_ratios=[1.0, 0.5, 1.0])
     cax = fig.add_subplot(gap[1, 1])
     cb = fig.colorbar(sm, cax=cax)
-    cax.set_title("score", fontsize=8, pad=9)
-    cb.set_ticks([])
+    cax.set_title(r"score", fontsize=11, pad=9)
+    r_lo, r_hi = ranges[-1]                       # right side = rightmost frame
+    cb.set_ticks([0.0, 1.0])
+    cb.ax.set_yticklabels([f"{r_lo:.1f}", f"{r_hi:.1f}"])
+    cb.ax.tick_params(labelsize=6, length=1.5)
+    l_lo, l_hi = ranges[0]                         # left side = leftmost frame
+    lax = cb.ax.secondary_yaxis("left")
+    lax.set_yticks([0.0, 1.0])
+    lax.set_yticklabels([f"{l_lo:.1f}", f"{l_hi:.1f}"])
+    lax.tick_params(labelsize=6, length=1.5)
 
     out = os.path.join(args.out_dir, "gaussian_frames.pdf")
     fig.savefig(out)
@@ -474,6 +500,11 @@ def main():
     ap.add_argument("--mapped-weight", type=float, default=2.0)
     ap.add_argument("--base-weight", type=float, default=1.0)
     ap.add_argument("--mesh", type=int, default=160)
+    ap.add_argument("--cbar-gap", type=float, default=0.03,
+                    help="mini-panel to colourbar spacing, as a fraction of the "
+                         "panel width (larger = further apart)")
+    ap.add_argument("--cbar-width", type=float, default=0.05,
+                    help="mini-panel colourbar thickness, relative to the panel width")
     ap.add_argument("--fields-w", type=float, default=7.0)
     ap.add_argument("--fields-h", type=float, default=3.5)
 
