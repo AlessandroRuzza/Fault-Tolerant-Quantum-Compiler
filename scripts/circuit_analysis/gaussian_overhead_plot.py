@@ -38,8 +38,6 @@ only the per-characteristic trend plots.
 --simple_text uses minimal text on the trend plots: y='Routing optimality',
 x=the characteristic name only, title='Routing optimality vs <name> (<fit> fit)'.
 --no_title generates the trend plots with no title at all.
---paper_dim sizes the trend plots to Figure 6 of the paper (0.8*column, IEEEtran)
-with paper-scale fonts, saved at the exact size; include at width=0.8\linewidth.
 --fit chooses the trend fit: poly (degrees 1..5, may wiggle), monotone (isotonic +
 PCHIP, guaranteed monotone), decay (saturating exponential), log (a + b·ln x),
 binned (PCHIP through equal-count bin medians), power (log-log power law), wls
@@ -568,7 +566,7 @@ def plot_trend(d, key, method, out_path, degree=None):
     paper = d.get("paper_dim")
     if paper:
         figsize = (PAPER_FIG_W, PAPER_FIG_H)
-        fs_label, fs_title, fs_tick, fs_leg = 8, 8, 7, 6.5
+        fs_label, fs_title, fs_tick, fs_leg = 7, 8, 7, 6.5
         lw, lw_wisq, msize, ah_lw, dpi = 1.2, 1.5, 8, 0.8, 300
     else:
         figsize = (10, 6.5)
