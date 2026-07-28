@@ -81,6 +81,27 @@ Open <http://localhost:8000>. `GET /api/health` reports the same thing over HTTP
 > 2026-07-17). An older one runs fine but writes no routed circuit, and the
 > server says so rather than failing silently.
 
+## Sharing a local run
+
+[`tunnel.sh`](tunnel.sh) puts the local server behind a Cloudflare quick
+tunnel — a random `https://<something>.trycloudflare.com` hostname that lasts as
+long as the script runs. No Cloudflare account, no DNS, nothing to deploy, which
+makes it the fast way to show someone a compilation.
+
+```sh
+./webserver/tunnel.sh --serve        # start the server and tunnel it
+./webserver/tunnel.sh                # tunnel to a server already running
+./webserver/tunnel.sh --install      # fetch cloudflared into webserver/.bin
+```
+
+It reuses a server already listening on the port, or starts one with `--serve`
+and stops it again on exit. Ctrl-C closes both.
+
+Be aware of what the tunnel is: while it runs, anyone holding the URL can reach
+the compiler and spend your CPU on circuits of their choosing, with no
+authentication in front of it. Keep it short-lived and use the Render
+deployment for anything long-running.
+
 ## Docker
 
 Build from the **repository root** — the image compiles the C++ sources, which
@@ -94,6 +115,20 @@ docker run --rm -p 8000:8000 ftqc-web
 `PROJECT_ROOT` is baked into the binary at compile time as the CMake source
 directory, which is `/app` in the image; `FTQC_ROOT` points the server at the
 same `/app`, so a bare circuit name resolves identically on both sides.
+
+The image keeps only circuits at or below `MAX_CIRCUIT_MB` (default 12) — 221
+of 231 files. The ten it drops are ~350 MB of the ~440 MB library and are
+exactly the ones a modest instance cannot compile inside the request timeout,
+so shipping them buys nothing. That, plus avoiding a recursive `chown`, takes
+the image from 1.46 GB to **355 MB**. Keep more circuits with:
+
+```sh
+docker build -f webserver/Dockerfile --build-arg MAX_CIRCUIT_MB=64 -t ftqc-web .
+```
+
+The cut is applied inside this Dockerfile rather than in `.dockerignore`
+because the benchmark image at the repository root copies the same directory
+and does need the big circuits.
 
 ## Deploying to Render
 
