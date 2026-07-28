@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fault-Tolerant Quantum Compiler</title>
+  <meta name="description" content="Compile a QASM circuit onto a surface-code lattice and watch the lattice-surgery routes it schedules.">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚛️</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Fault-Tolerant Quantum Compiler</h1>
+        <p>Map a circuit onto a surface-code lattice, then watch every lattice-surgery route in each routing step.</p>
+      </div>
+    </div>
+    <button type="button" id="theme-toggle" class="ghost-button" aria-label="Switch colour theme">
+      <span class="theme-icon" aria-hidden="true"></span>
+    </button>
+  </header>
+
+  <main class="layout">
+    <!-- ─── configuration ─────────────────────────────────────────────── -->
+    <aside class="panel config" aria-label="Compiler configuration">
+      <form id="config-form" autocomplete="off">
+        <section class="field-group open" data-group="circuit">
+          <h2>Circuit</h2>
+          <div class="group-body">
+            <div class="field">
+              <label for="circuit-source">Source</label>
+              <select id="circuit-source">
+                <option value="library">Bundled circuit</option>
+                <option value="paste">Paste QASM</option>
+              </select>
+            </div>
+            <div class="field" id="circuit-picker">
+              <label for="circuit-select">Circuit</label>
+              <input type="search" id="circuit-filter" placeholder="Filter by name…" aria-label="Filter circuits">
+              <select id="circuit-select" size="8"></select>
+              <p class="help" id="circuit-count"></p>
+            </div>
+            <div class="field hidden" id="qasm-paste">
+              <label for="qasm-text">OpenQASM 2.0 source</label>
+              <textarea id="qasm-text" rows="10" spellcheck="false"
+                placeholder="OPENQASM 2.0;&#10;include &quot;qelib1.inc&quot;;&#10;qreg q[4];&#10;cx q[0],q[1];&#10;t q[2];"></textarea>
+              <p class="help">Staged in a scratch directory for this run only.</p>
+            </div>
+          </div>
+        </section>
+        <!-- Remaining groups are generated from /api/spec. -->
+        <div id="generated-groups"></div>
+
+        <div class="form-actions">
+          <button type="submit" id="compile-button" class="primary-button">
+            <span class="label">Compile</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+          <button type="button" id="reset-button" class="ghost-button">Reset defaults</button>
+        </div>
+        <p class="status" id="form-status" role="status"></p>
+      </form>
+    </aside>
+
+    <!-- ─── results ───────────────────────────────────────────────────── -->
+    <section class="results" aria-label="Compilation result">
+      <div id="empty-state" class="empty-state">
+        <div class="empty-art" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <h2>Nothing compiled yet</h2>
+        <p>Pick a circuit on the left and hit <strong>Compile</strong>. Each routing step is drawn as its own lattice; every path in a step animates together, because that is exactly what the hardware does — in parallel, within one step.</p>
+      </div>
+
+      <div id="result-view" class="hidden">
+        <div id="warnings" class="warnings"></div>
+
+        <div class="metrics" id="metrics"></div>
+
+        <div class="viz-toolbar panel">
+          <div class="control">
+            <button type="button" id="play-toggle" class="primary-button compact" aria-pressed="true">Pause</button>
+          </div>
+          <div class="control">
+            <label for="speed">Speed <output id="speed-out">1.0×</output></label>
+            <input type="range" id="speed" min="0.15" max="3" step="0.05" value="1">
+          </div>
+          <div class="control">
+            <label for="columns">Columns <output id="columns-out">auto</output></label>
+            <input type="range" id="columns" min="0" max="8" step="1" value="0">
+          </div>
+          <div class="control">
+            <label for="scrub">Progress <output id="scrub-out">0%</output></label>
+            <input type="range" id="scrub" min="0" max="1000" step="1" value="0">
+          </div>
+          <div class="control checkbox">
+            <label><input type="checkbox" id="show-labels" checked> Qubit labels</label>
+            <label><input type="checkbox" id="show-idle" checked> Idle nodes</label>
+          </div>
+          <div class="control grow">
+            <label for="highlight">Follow qubit</label>
+            <select id="highlight"><option value="">— none —</option></select>
+          </div>
+          <div class="control">
+            <button type="button" id="download-route" class="ghost-button">Download route.json</button>
+          </div>
+        </div>
+
+        <div class="legend panel" id="legend">
+          <span class="legend-item"><i class="swatch node-alg"></i>Logical qubit</span>
+          <span class="legend-item"><i class="swatch node-magic"></i>Magic state</span>
+          <span class="legend-item"><i class="swatch node-idle"></i>Free node</span>
+          <span class="legend-item"><i class="swatch path-cx"></i>Two-qubit route</span>
+          <span class="legend-item"><i class="swatch path-t"></i>T route (to a magic state)</span>
+          <span class="legend-item"><i class="swatch path-other"></i>Other operation</span>
+        </div>
+
+        <div id="steps" class="steps" role="list"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ─── step detail ─────────────────────────────────────────────────── -->
+  <dialog id="detail" class="detail">
+    <header>
+      <div>
+        <h2 id="detail-title">Step</h2>
+        <p id="detail-subtitle"></p>
+      </div>
+      <div class="detail-nav">
+        <button type="button" id="detail-prev" class="ghost-button" aria-label="Previous step">←</button>
+        <button type="button" id="detail-next" class="ghost-button" aria-label="Next step">→</button>
+        <button type="button" id="detail-close" class="ghost-button" aria-label="Close">✕</button>
+      </div>
+    </header>
+    <div class="detail-body">
+      <div class="detail-canvas"><canvas id="detail-canvas"></canvas></div>
+      <ol id="detail-gates" class="gate-list"></ol>
+    </div>
+  </dialog>
+
+  <script src="/static/js/viz.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
