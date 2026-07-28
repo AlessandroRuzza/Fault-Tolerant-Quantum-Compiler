@@ -185,6 +185,45 @@ cat <<EOF
 
 EOF
 
+# Reachability self-check.
+#
+# A tunnel can be perfectly healthy and still look broken, because the hostname
+# has to resolve on whatever machine opens the link. Plenty of corporate and
+# campus resolvers blackhole *.trycloudflare.com by pattern — quick tunnels are
+# a well-known exfiltration route — while still resolving the apex domain, so
+# the failure looks like a dead tunnel rather than a DNS policy. Distinguish
+# the two by asking a public resolver over HTTPS and retrying against the
+# address it hands back.
+HOSTNAME_ONLY="${PUBLIC_URL#https://}"
+
+if curl -sf -m 15 "$PUBLIC_URL/api/health" >/dev/null 2>&1; then
+    echo "  reachability: OK (resolved and served locally)"
+else
+    DOH_IP="$(curl -s -m 10 -H 'accept: application/dns-json' \
+        "https://1.1.1.1/dns-query?name=${HOSTNAME_ONLY}&type=A" 2>/dev/null \
+        | grep -oE '"data":"[0-9.]+"' | head -1 | cut -d'"' -f4 || true)"
+
+    if [ -n "$DOH_IP" ] && curl -sf -m 15 --resolve "${HOSTNAME_ONLY}:443:${DOH_IP}" \
+            "$PUBLIC_URL/api/health" >/dev/null 2>&1; then
+        cat <<EOF
+  reachability: the tunnel is UP, but this machine's DNS will not resolve it.
+
+    public DNS resolves ${HOSTNAME_ONLY} to ${DOH_IP}
+    your resolver ($(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null || echo unknown)) does not
+
+  The link works for anyone whose DNS is not filtering it. To open it here,
+  enable DNS-over-HTTPS in your browser or use a resolver such as 1.1.1.1.
+  If the filtering is deliberate on your network, prefer the Render
+  deployment over working around it.
+
+EOF
+    else
+        echo "  reachability: could not reach the tunnel yet — it may still be"
+        echo "                propagating. Retry the URL in a few seconds."
+        echo
+    fi
+fi
+
 # cloudflared keeps running until interrupted; the EXIT trap tears down both it
 # and the server we may have started.
 wait "$CF_PID"
