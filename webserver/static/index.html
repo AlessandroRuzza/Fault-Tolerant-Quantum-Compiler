@@ -25,7 +25,12 @@
   <main class="layout">
     <!-- ─── configuration ─────────────────────────────────────────────── -->
     <aside class="panel config" aria-label="Compiler configuration">
-      <form id="config-form" autocomplete="off">
+      <!-- novalidate on purpose: the fields are generated, they live in groups
+           that are collapsed by default, and a browser cannot focus an invalid
+           control it cannot show. Native validation therefore fails by making
+           Compile do nothing at all. The form validates itself instead and
+           reports through the same failure surface as a compile error. -->
+      <form id="config-form" autocomplete="off" novalidate>
         <section class="field-group open" data-group="circuit">
           <h2>Circuit</h2>
           <div class="group-body">
@@ -66,6 +71,23 @@
 
     <!-- ─── results ───────────────────────────────────────────────────── -->
     <section class="results" aria-label="Compilation result">
+      <!-- Survives until the next Compile press, so a failure cannot scroll
+           away or be missed by someone who dismissed the dialog. -->
+      <div id="error-state" class="error-state hidden" role="alert">
+        <div class="error-head">
+          <span class="error-mark" aria-hidden="true">!</span>
+          <div>
+            <h2 id="error-title">Compilation failed</h2>
+            <p id="error-message"></p>
+          </div>
+        </div>
+        <details id="error-details" class="hidden">
+          <summary>Compiler output</summary>
+          <pre id="error-detail-text"></pre>
+        </details>
+        <p class="error-foot" id="error-foot">This stays until the next Compile.</p>
+      </div>
+
       <div id="empty-state" class="empty-state">
         <div class="empty-art" aria-hidden="true">
           <span></span><span></span><span></span><span></span>
@@ -119,6 +141,18 @@
 
         <div id="steps" class="steps" role="list"></div>
       </div>
+
+      <!-- Covers whatever is underneath rather than replacing it: a failed run
+           then leaves the previous result exactly as it was. -->
+      <div id="busy-overlay" class="busy-overlay hidden" role="status" aria-live="polite">
+        <div class="busy-card">
+          <span class="spinner large" aria-hidden="true"></span>
+          <h2>Compiling…</h2>
+          <p id="busy-circuit"></p>
+          <p class="busy-elapsed"><span id="busy-elapsed">0.0</span>s elapsed</p>
+          <p class="help" id="busy-hint">Routing runs on the server and pins a core for the whole run; large circuits take longer.</p>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -138,6 +172,26 @@
     <div class="detail-body">
       <div class="detail-canvas"><canvas id="detail-canvas"></canvas></div>
       <ol id="detail-gates" class="gate-list"></ol>
+    </div>
+  </dialog>
+
+  <!-- ─── failure popup ───────────────────────────────────────────────── -->
+  <dialog id="error-dialog" class="detail error-dialog">
+    <header>
+      <div>
+        <h2 id="error-dialog-title">Compilation failed</h2>
+        <p id="error-dialog-message"></p>
+      </div>
+      <div class="detail-nav">
+        <button type="button" id="error-dialog-close" class="ghost-button" aria-label="Close">✕</button>
+      </div>
+    </header>
+    <div class="error-dialog-body">
+      <details id="error-dialog-details" class="hidden">
+        <summary>Compiler output</summary>
+        <pre id="error-dialog-detail-text"></pre>
+      </details>
+      <button type="button" id="error-dialog-dismiss" class="primary-button compact">Dismiss</button>
     </div>
   </dialog>
 

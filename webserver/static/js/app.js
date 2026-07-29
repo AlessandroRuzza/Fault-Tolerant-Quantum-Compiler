@@ -24,6 +24,8 @@
     detailStep: 0,
     observer: null,
     unsubscribe: null,
+    busyTimer: null,
+    runTimeoutSeconds: null,
     options: { showLabels: true, showIdle: true, highlightQubit: null },
   };
 
@@ -167,6 +169,41 @@
       else settings[key] = Number(input.value);
     }
     return settings;
+  }
+
+  function fieldLabel(input) {
+    const wrapper = input.closest('.field');
+    const label = wrapper && wrapper.querySelector('label');
+    return label ? label.textContent : input.dataset.key;
+  }
+
+  /* Replaces native validation, which cannot be used here: an offending field
+   * is usually inside a collapsed group, so the browser silently refuses to
+   * submit rather than pointing at anything. Step is deliberately not checked —
+   * it is the slider's granularity, not a constraint on the value. */
+  function validateForm() {
+    const problems = [];
+    for (const input of document.querySelectorAll('#generated-groups [data-key]')) {
+      const { kind } = input.dataset;
+      if (kind !== 'int' && kind !== 'float') continue;
+      const raw = input.value.trim();
+      const value = Number(raw);
+      if (raw === '' || !Number.isFinite(value)) {
+        problems.push({ input, message: `${fieldLabel(input)} needs a number.` });
+      } else if (input.min !== '' && value < Number(input.min)) {
+        problems.push({ input, message: `${fieldLabel(input)} must be at least ${input.min}.` });
+      } else if (input.max !== '' && value > Number(input.max)) {
+        problems.push({ input, message: `${fieldLabel(input)} must be at most ${input.max}.` });
+      }
+    }
+    return problems;
+  }
+
+  function revealField(input) {
+    const group = input.closest('.field-group');
+    if (group) group.classList.add('open');
+    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    input.focus({ preventScroll: true });
   }
 
   function writeForm(settings) {
@@ -523,6 +560,15 @@
       URL.revokeObjectURL(url);
     });
 
+    // Dismissing the popup deliberately leaves the panel behind — the failure
+    // is still on screen where the result would have been.
+    const errorDialog = $('#error-dialog');
+    $('#error-dialog-close').addEventListener('click', () => errorDialog.close());
+    $('#error-dialog-dismiss').addEventListener('click', () => errorDialog.close());
+    errorDialog.addEventListener('click', (event) => {
+      if (event.target === errorDialog) errorDialog.close();
+    });
+
     $('#detail-close').addEventListener('click', () => $('#detail').close());
     $('#detail-prev').addEventListener('click', () => stepDetail(-1));
     $('#detail-next').addEventListener('click', () => stepDetail(1));
@@ -568,10 +614,130 @@
 
   // ── run ───────────────────────────────────────────────────────────────
 
-  function setStatus(message, isError) {
+  function setStatus(message, kind) {
     const status = $('#form-status');
     status.textContent = message || '';
-    status.classList.toggle('error', Boolean(isError));
+    status.classList.toggle('error', kind === 'error');
+    status.classList.toggle('busy', kind === 'busy');
+  }
+
+  // ── busy indication ───────────────────────────────────────────────────
+
+  /* A run is synchronous on the server and can take a minute, so the wait needs
+   * to look like work rather than like a dead page: the button spins, the
+   * result column is covered by a spinner card, and a counter ticks up so it is
+   * visibly still going. */
+  function startBusy(label) {
+    const button = $('#compile-button');
+    button.disabled = true;
+    button.classList.add('busy');
+    $('#busy-circuit').textContent = label;
+    $('#busy-elapsed').textContent = '0.0';
+    $('#busy-hint').textContent =
+      'Routing runs on the server and pins a core for the whole run; large circuits take longer.';
+    $('#busy-overlay').classList.remove('hidden');
+    setStatus(`Compiling ${label}…`, 'busy');
+
+    const started = performance.now();
+    state.busyTimer = window.setInterval(() => {
+      const seconds = (performance.now() - started) / 1000;
+      $('#busy-elapsed').textContent = seconds.toFixed(1);
+      if (seconds > 15 && state.runTimeoutSeconds) {
+        $('#busy-hint').textContent =
+          `Still routing. The server stops a run that passes ${Math.round(state.runTimeoutSeconds)}s.`;
+      }
+    }, 100);
+  }
+
+  function stopBusy() {
+    if (state.busyTimer !== null) {
+      window.clearInterval(state.busyTimer);
+      state.busyTimer = null;
+    }
+    $('#busy-overlay').classList.add('hidden');
+    const button = $('#compile-button');
+    button.disabled = false;
+    button.classList.remove('busy');
+  }
+
+  // ── failure reporting ─────────────────────────────────────────────────
+
+  /* Carries the compiler's own output alongside the headline so both the popup
+   * and the panel can offer it without re-deriving anything. */
+  class CompileFailure extends Error {
+    constructor(message, details) {
+      super(message);
+      this.name = 'CompileFailure';
+      this.details = details || '';
+    }
+  }
+
+  // FastAPI answers a request that fails validation with a list of objects
+  // rather than a string, so `detail` cannot be trusted to be text.
+  function detailToText(detail) {
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => {
+          if (item && typeof item === 'object' && item.msg) {
+            const where = Array.isArray(item.loc) ? item.loc.filter((p) => p !== 'body').join('.') : '';
+            return where ? `${where}: ${item.msg}` : String(item.msg);
+          }
+          return typeof item === 'string' ? item : JSON.stringify(item);
+        })
+        .join('\n');
+    }
+    if (detail && typeof detail === 'object') return JSON.stringify(detail);
+    return '';
+  }
+
+  function clearFailure() {
+    $('#error-state').classList.add('hidden');
+    for (const [message, wrapper, target] of [
+      ['#error-message', '#error-details', '#error-detail-text'],
+      ['#error-dialog-message', '#error-dialog-details', '#error-dialog-detail-text'],
+    ]) {
+      $(message).textContent = '';
+      $(target).textContent = '';
+      $(wrapper).classList.add('hidden');
+    }
+    const dialog = $('#error-dialog');
+    if (dialog.open) dialog.close();
+  }
+
+  /* Two surfaces on purpose. The popup is impossible to miss but is dismissed
+   * in a keystroke; the panel sits where the result would have been and stays
+   * there until the next Compile, so the reason is still on screen once the
+   * popup is gone. */
+  function showFailure(message, options = {}) {
+    const { details = '', title = 'Compilation failed', detailsLabel = 'Compiler output' } = options;
+    const text = message || 'The compilation failed.';
+
+    $('#error-title').textContent = title;
+    $('#error-dialog-title').textContent = title;
+    $('#error-message').textContent = text;
+    $('#error-dialog-message').textContent = text;
+
+    for (const [wrapper, target] of [
+      ['#error-details', '#error-detail-text'],
+      ['#error-dialog-details', '#error-dialog-detail-text'],
+    ]) {
+      $(wrapper).classList.toggle('hidden', !details);
+      $(wrapper).querySelector('summary').textContent = detailsLabel;
+      $(target).textContent = details || '';
+    }
+
+    // The previous run is left on screen underneath, which is only helpful if
+    // it is labelled as previous — the metrics below are not this failure's.
+    $('#error-foot').textContent = $('#result-view').classList.contains('hidden')
+      ? 'This stays until the next Compile.'
+      : 'The result below is from the last successful run. This stays until the next Compile.';
+
+    $('#error-state').classList.remove('hidden');
+    const dialog = $('#error-dialog');
+    if (!dialog.open) dialog.showModal();
+    $('#error-state').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setStatus(text, 'error');
   }
 
   function renderWarnings(warnings) {
@@ -601,32 +767,103 @@
     state.options.highlightQubit = null;
   }
 
+  /* Every failure mode reaches the caller as a CompileFailure with a sentence a
+   * user can act on: a refused connection, an HTML error page from a proxy, a
+   * truncated body and the compiler's own 422 all look alike from here
+   * otherwise, and `response.json()` on a non-JSON body throws a parser message
+   * that says nothing about what went wrong. */
+  async function postCompile(body) {
+    let response;
+    try {
+      response = await fetch('/api/compile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      throw new CompileFailure(
+        'Could not reach the compiler service. It may have stopped, or the connection dropped.',
+        String((error && error.message) || error)
+      );
+    }
+
+    // A tunnel or proxy dropping mid-response fails here, not at the fetch.
+    let raw;
+    try {
+      raw = await response.text();
+    } catch (error) {
+      throw new CompileFailure(
+        'The reply from the compiler service was cut short.',
+        String((error && error.message) || error)
+      );
+    }
+
+    let payload = null;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const detail = payload ? detailToText(payload.detail) : '';
+      throw new CompileFailure(
+        detail || `The server answered ${response.status} ${response.statusText || 'with an error'}.`,
+        (payload && payload.stderr) || (payload ? '' : raw.slice(0, 4000))
+      );
+    }
+    if (!payload) {
+      throw new CompileFailure(
+        'The server replied with something that was not a compilation result.',
+        raw.slice(0, 4000)
+      );
+    }
+    return payload;
+  }
+
   async function compile(event) {
     event.preventDefault();
-    const button = $('#compile-button');
-    button.disabled = true;
-    button.classList.add('busy');
-    setStatus('Compiling…');
+    if ($('#compile-button').disabled) return;
+
+    // The previous failure clears here and nowhere else: that is what makes the
+    // panel last exactly until the next press of Compile.
+    clearFailure();
+
+    const problems = validateForm();
+    if (problems.length) {
+      revealField(problems[0].input);
+      showFailure(
+        problems.length === 1
+          ? problems[0].message
+          : `${problems[0].message} (${problems.length - 1} more field${problems.length === 2 ? '' : 's'} to fix.)`,
+        {
+          title: 'Nothing to compile yet',
+          details: problems.length > 1 ? problems.map((problem) => problem.message).join('\n') : '',
+          detailsLabel: 'Every field to fix',
+        }
+      );
+      return;
+    }
 
     const settings = readForm();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 
     const body = { settings };
+    let label;
     if ($('#circuit-source').value === 'paste') {
       body.qasm_text = $('#qasm-text').value;
       body.qasm_name = 'pasted';
+      label = 'pasted QASM';
     } else {
       body.circuit = $('#circuit-select').value;
+      const option = $('#circuit-select').selectedOptions[0];
+      label = option ? option.textContent : 'the selected circuit';
     }
 
+    startBusy(label);
+
     try {
-      const response = await fetch('/api/compile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.detail || 'The compilation failed.');
+      const payload = await postCompile(body);
 
       state.result = payload;
       state.model = FTQCViz.buildModel(payload.route);
@@ -650,10 +887,17 @@
         `${payload.truncated ? ` (showing ${shown})` : ''} · ${payload.elapsed_seconds.toFixed(2)}s`
       );
     } catch (error) {
-      setStatus(error.message, true);
+      // Anything thrown while rendering the result is a failed compilation from
+      // the user's side of the screen too, so it is reported the same way.
+      showFailure(
+        error instanceof CompileFailure ? error.message : `The result could not be displayed: ${error.message}`,
+        {
+          details: error instanceof CompileFailure ? error.details : (error && error.stack) || '',
+          detailsLabel: error instanceof CompileFailure ? 'Compiler output' : 'Where it failed',
+        }
+      );
     } finally {
-      button.disabled = false;
-      button.classList.remove('busy');
+      stopBusy();
     }
   }
 
@@ -682,10 +926,24 @@
       renderCircuitOptions('');
 
       if (!state.circuits.length) {
-        setStatus('No bundled circuits found — paste QASM instead.', true);
+        setStatus('No bundled circuits found — paste QASM instead.', 'error');
       }
     } catch (error) {
-      setStatus(`Could not reach the compiler service: ${error.message}`, true);
+      setStatus(`Could not reach the compiler service: ${error.message}`, 'error');
+    }
+
+    // Best-effort: tells the busy card when to warn about the server's timeout,
+    // and catches a missing binary before anyone waits on a run that cannot work.
+    try {
+      const health = await fetch('/api/health').then((r) => r.json());
+      if (typeof health.run_timeout_seconds === 'number') {
+        state.runTimeoutSeconds = health.run_timeout_seconds;
+      }
+      if (health.ok === false) {
+        setStatus('The compiler binary was not found on the server — compiling will fail.', 'error');
+      }
+    } catch {
+      /* The form still works; the timeout hint is simply omitted. */
     }
   }
 

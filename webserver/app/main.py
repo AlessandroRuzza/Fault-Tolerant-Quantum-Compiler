@@ -46,7 +46,14 @@ class CompileRequest(BaseModel):
 
 @app.exception_handler(compiler.CompileError)
 async def _compile_error_handler(_request, exc: compiler.CompileError):
-    return JSONResponse(status_code=422, content={"detail": str(exc)})
+    # `stderr` rides along so the UI can offer the compiler's own words behind a
+    # disclosure; the headline alone is often too short to debug a bad circuit.
+    payload: dict[str, Any] = {"detail": str(exc)}
+    if exc.stderr:
+        payload["stderr"] = exc.stderr[-4000:]
+    if exc.exit_code is not None:
+        payload["exit_code"] = exc.exit_code
+    return JSONResponse(status_code=422, content=payload)
 
 
 @app.get("/api/spec")
@@ -67,6 +74,7 @@ async def health() -> dict:
         "binary": str(compiler.BINARY),
         "circuits": len(compiler.available_circuits()),
         "free_slots": _run_slots._value,  # noqa: SLF001 — diagnostics only
+        "run_timeout_seconds": compiler.RUN_TIMEOUT_SECONDS,
     }
 
 

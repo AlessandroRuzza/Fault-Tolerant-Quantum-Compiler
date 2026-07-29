@@ -213,6 +213,18 @@ def run_compile(
             )
 
         if not route_path.is_file():
+            # Two very different causes land here and the message has to tell
+            # them apart. A circuit the parser could make nothing of routes zero
+            # gates and exits 0, printing "no routable gates" — blaming a stale
+            # binary for that sends the reader off debugging the wrong thing.
+            if "no routable gates" in completed.stdout:
+                raise CompileError(
+                    "The circuit produced no routable gates. Check that the "
+                    "source is valid OpenQASM 2.0 and contains gates the "
+                    "compiler routes.",
+                    stderr=completed.stderr,
+                    exit_code=completed.returncode,
+                )
             raise CompileError(
                 "The run finished but wrote no routed circuit. The binary may "
                 "predate write_routing_json — rebuild it.",

@@ -174,8 +174,11 @@ _FIELDS: list[dict[str, Any]] = [
         "kind": "float",
         "default": 0.7,
         "min": 0.01,
+        # Must divide `default - min`, or the browser rejects the untouched form
+        # and the Compile button does nothing. 0.05 did not (0.66 and 0.71 were
+        # the nearest valid values to the 0.7 default).
         "max": 20.0,
-        "step": 0.05,
+        "step": 0.01,
         "help": "Absolute standard deviation, identical on both axes and "
         "independent of the grid. Must be positive.",
     },
