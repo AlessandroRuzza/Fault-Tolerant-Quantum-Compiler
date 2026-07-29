@@ -2,8 +2,11 @@
 # Docker build context has to be the root because the image compiles the C++
 # sources that live above webserver/.
 #
-# The repository uses a git submodule for nlohmann_json — enable "Include
-# submodules" on the service, or the build fails at the CMake configure step.
+# No submodule configuration is needed. Two of this repository's three
+# submodules are private, so a hosted builder's recursive init aborts on them
+# and leaves the public nlohmann_json empty as collateral; the Dockerfile
+# fetches that one itself, pinned to the same revision, when it finds it
+# missing.
 services:
   - type: web
     name: ftqc-web

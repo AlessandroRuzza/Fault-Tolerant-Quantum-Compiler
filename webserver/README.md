@@ -134,9 +134,21 @@ and does need the big circuits.
 
 [`render.yaml`](render.yaml) is a ready blueprint. Point Render at the
 repository root, keep the Docker context at `.` and the Dockerfile at
-`./webserver/Dockerfile`, and **enable submodules** on the service — the build
-needs `external/nlohmann_json`. The health check path is `/api/health`, and the
+`./webserver/Dockerfile`. The health check path is `/api/health`, and the
 container binds whatever `$PORT` Render injects.
+
+Setting it up by hand instead of from the blueprint: leave **Root Directory
+empty** — it sets the Docker build context, and the image compiles `src/`,
+`include/` and `external/`, which all live above `webserver/`. Set the
+**Dockerfile Path** to `./webserver/Dockerfile` under Advanced, and add the
+environment variables below yourself, since the manual form does not read
+`render.yaml`.
+
+Submodules need no special handling. Two of the three are private, so a hosted
+builder's recursive init aborts on them and leaves the public
+`external/nlohmann_json` empty — which surfaces much later as a CMake error
+about a missing `CMakeLists.txt`. The Dockerfile detects that and fetches the
+pinned revision itself.
 
 A compilation is CPU-bound and single-threaded for its whole duration, so size
 `FTQC_MAX_CONCURRENT_RUNS` to the instance rather than leaving runs to fight

@@ -25,14 +25,37 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         cmake \
         ninja-build \
         libeigen3-dev \
-        libboost-dev
+        libboost-dev \
+        curl \
+        ca-certificates
 
 WORKDIR /app
 
-# external/ holds the nlohmann_json submodule. Run
-# `git submodule update --init --recursive` before building, or the CMake
-# configure step will fail on the missing headers.
 COPY external/        ./external/
+
+# CMakeLists.txt does add_subdirectory(external/nlohmann_json), so that
+# submodule has to be a real source tree by the time cmake runs. A plain
+# `git clone` leaves it as an empty directory, and the failure is a confusing
+# "does not contain a CMakeLists.txt file" several steps later.
+#
+# Hosted builders make this worse than a missing --recursive flag. This
+# repository has three submodules and two of them are private; a recursive init
+# aborts on the first one it cannot read, leaving the public nlohmann_json
+# uninitialised as collateral. Nothing the build can configure fixes that.
+#
+# So fetch it here when it is missing, pinned to the same revision the
+# submodule points at, and leave a populated checkout alone. The image then
+# builds from a bare clone with no submodule support at all.
+ARG NLOHMANN_JSON_SHA=3ed64e502a6371311af3c2f309e6525b2f5f6f18
+RUN if [ -f external/nlohmann_json/CMakeLists.txt ]; then \
+        echo "nlohmann_json: using the checked-out submodule"; \
+    else \
+        echo "nlohmann_json: submodule is empty, fetching ${NLOHMANN_JSON_SHA}"; \
+        mkdir -p external/nlohmann_json; \
+        curl -fsSL "https://github.com/nlohmann/json/archive/${NLOHMANN_JSON_SHA}.tar.gz" \
+            | tar -xz -C external/nlohmann_json --strip-components=1; \
+        test -f external/nlohmann_json/CMakeLists.txt; \
+    fi
 COPY CMakeLists.txt   ./
 COPY include/         ./include/
 COPY src/             ./src/
