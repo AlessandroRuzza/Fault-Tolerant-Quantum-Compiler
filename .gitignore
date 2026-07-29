@@ -51,7 +51,7 @@ benchmarks/**/*_plots_*/
 # debug information files
 *.dwo
 
-
+*.pyc
 build/
 build-*/
 build_*/
