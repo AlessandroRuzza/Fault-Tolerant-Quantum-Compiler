@@ -1,0 +1,98 @@
+#!/bin/bash
+#PBS -q cpu
+#PBS -l walltime=24:00:00
+#PBS -N buildts
+#PBS -j oe
+#
+# Runs scripts/build_test_set.py: converts a QASM suite to the universal gate set
+# with WISQ's own converter, into test_set/.
+#
+#   qsub -v SOURCE=MQTBench,WORKERS=28,MAX_ROTATIONS=500,MAX_INPUT_MB=2 pbs/build_test_set.pbs
+#
+# PREFIX marks a suite whose stems clash with another's. FTCircuitBench keeps
+# different circuits under the same name in qasm/hamiltonians/ and
+# qasm/hamiltonians_5trotter/ (ising_1d_9q and friends), and output names are
+# stems, so one would overwrite the other:
+#
+#   qsub -v SOURCE=FTCircuitBench/qasm/hamiltonians,PREFIX=full_,WORKERS=28 pbs/build_test_set.pbs
+#
+# One job at a time: they all write test_set/_build_log.csv, and two at once
+# would clobber each other's rows.
+#
+# ── How this one differs from every other pbs here ──────────────────────────
+# The others run their python INSIDE ftqc.sif. This one does not: build_test_set.py
+# is a driver that launches one `apptainer exec` per circuit, so running it inside
+# the image would mean nesting containers. It runs on the host and needs
+# scripts/build_test_set.py and scripts/wisq_zero_rz_shim.py present in
+# $PBS_O_WORKDIR — the host checkout, not the image. Editing them here takes effect
+# immediately; there is no image to rebuild for this job.
+#
+# The host needs nothing but python3 (standard library). qiskit is imported only to
+# count rotations, and only for circuits missing from test_set/_rotations.csv — that
+# cache is committed already filled in, so no counting happens and qiskit is never
+# imported. If you point SOURCE at a suite that is NOT in the cache, either run
+# `--estimate` somewhere with qiskit first and copy the cache over, or drop
+# MAX_ROTATIONS (which is what needs the counts).
+
+cd "$PBS_O_WORKDIR"
+
+SOURCE="${SOURCE:-qasms}"
+WORKERS="${WORKERS:-28}"
+EPSILON="${EPSILON:-1e-8}"
+TIMEOUT="${TIMEOUT:-14400}"
+MAX_ROTATIONS="${MAX_ROTATIONS:-500}"
+MAX_INPUT_MB="${MAX_INPUT_MB:-2}"
+PREFIX="${PREFIX:-}"
+SIF="${SIF:-ftqc.sif}"
+
+mkdir -p test_set logs
+LOG_FILE="logs/buildts_${PBS_JOBID}.log"
+echo "Log file: $PBS_O_WORKDIR/$LOG_FILE"
+
+{
+echo "JOBID=$PBS_JOBID"
+echo "HOSTNAME=$(hostname)"
+echo "WORKDIR=$(pwd)"
+echo "SOURCE=$SOURCE"
+echo "WORKERS=$WORKERS  EPSILON=$EPSILON  TIMEOUT=$TIMEOUT"
+echo "MAX_ROTATIONS=$MAX_ROTATIONS  MAX_INPUT_MB=$MAX_INPUT_MB  SIF=$SIF"
+echo "PREFIX=${PREFIX:-<none>}"
+date
+} >> "$LOG_FILE" 2>&1
+
+if [ ! -f "$SIF" ]; then
+    echo "image not found: $SIF" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Seed qasms/ from the image, like the other jobs do. This is not cosmetic here:
+# .gitignore excludes qasms/synth*.qasm (37 circuits) and three randomcircuit
+# files, so a host checkout is missing them, while .dockerignore does not — the
+# image carries all 267. cp -an never overwrites, so a fuller host copy wins.
+if [ "$SOURCE" = "qasms" ]; then
+    mkdir -p qasms
+    apptainer exec --bind "$PWD/qasms:/host_qasms" "$SIF" \
+        bash -lc 'cp -an /app/qasms/. /host_qasms/' >> "$LOG_FILE" 2>&1
+    echo "qasms/ after seeding: $(find qasms -name '*.qasm' | wc -l)" >> "$LOG_FILE" 2>&1
+fi
+
+# --epsilon must match what test_set/ already holds, or every output made at the
+# other value is deleted and reconverted. 1e-8 is what is in there.
+python3 scripts/build_test_set.py \
+    --source "$SOURCE" \
+    --out test_set \
+    --backend apptainer --sif "$SIF" \
+    --epsilon "$EPSILON" \
+    --workers "$WORKERS" \
+    --timeout "$TIMEOUT" \
+    --max-rotations "$MAX_ROTATIONS" \
+    --max-input-mb "$MAX_INPUT_MB" \
+    ${PREFIX:+--prefix "$PREFIX"} >> "$LOG_FILE" 2>&1
+STATUS=$?
+
+{
+echo "circuits now: $(find test_set -name '*.qasm' | wc -l)"
+echo "EXIT=$STATUS"
+echo "END_JOB=$PBS_JOBID"
+date
+} >> "$LOG_FILE" 2>&1

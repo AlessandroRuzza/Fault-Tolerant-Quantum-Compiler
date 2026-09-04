@@ -134,3 +134,10 @@ paper/*.log
 
 
 config/random_cube_native.json
+
+# test_set/: the converted circuits are regenerable (scripts/build_test_set.py);
+# keep the log and the rotation cache, which are what the build reads back.
+test_set/*.qasm
+Feynman-benchmarks/
+FTCircuitBench/
+MQTBench/
